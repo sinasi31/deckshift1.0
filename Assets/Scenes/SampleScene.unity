@@ -998,7 +998,7 @@ Camera:
   far clip plane: 1000
   field of view: 34
   orthographic: 1
-  orthographic size: 5
+  orthographic size: 10
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -1023,7 +1023,7 @@ Transform:
   m_GameObject: {fileID: 519420028}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.74, y: 0, z: -10}
+  m_LocalPosition: {x: 0, y: 0, z: -10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2300,10 +2300,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerTransform: {fileID: 1988395663}
   roomPrefabs:
-  - {fileID: 8332266042270835778, guid: 8ba39287049d0fe47a6d225a640046a9, type: 3}
-  - {fileID: 1422451216666308920, guid: f64e142ab5aef1940932666856db1a02, type: 3}
-  - {fileID: 5692090829004841499, guid: f7d3208092b58e249b317f383da22e82, type: 3}
-  - {fileID: 5989603842656422047, guid: 7be3ecc39fcf3a4489ad1c44fa676a0c, type: 3}
+  - {fileID: 8994572794713311534, guid: 50db830b311bb164986cebcf5f5cc126, type: 3}
 --- !u!4 &1361928416
 Transform:
   m_ObjectHideFlags: 0
@@ -2903,8 +2900,8 @@ Transform:
   m_GameObject: {fileID: 1601525404}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.73, y: -0.05, z: 0}
-  m_LocalScale: {x: 0.6564975, y: 0.51198035, z: 0.1681189}
+  m_LocalPosition: {x: -0.05, y: -0.05, z: 0}
+  m_LocalScale: {x: 0.92786515, y: 0.93137133, z: 0.23235649}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -2957,10 +2954,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_UiScaleMode: 0
+  m_UiScaleMode: 1
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
-  m_ReferenceResolution: {x: 800, y: 600}
+  m_ReferenceResolution: {x: 1920, y: 1080}
   m_ScreenMatchMode: 0
   m_MatchWidthOrHeight: 0
   m_PhysicalUnit: 3
@@ -3823,7 +3820,7 @@ MonoBehaviour:
   moveSpeed: 5
   maxHealth: 100
   isInvincible: 0
-  defaultJumpForce: 7
+  defaultJumpForce: 8
   maxShift: 20
   currentState: 0
   fireballPrefab: {fileID: 6847861146471343392, guid: c410de68076b28846bb5e156129b8267, type: 3}
