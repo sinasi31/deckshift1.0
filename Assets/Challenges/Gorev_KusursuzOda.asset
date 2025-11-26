@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46bf215f25e340446bf808b5a9dd0f3e, type: 3}
+  m_Name: Gorev_KusursuzOda
+  m_EditorClassIdentifier: 
+  challengeID: KusursuzOda_1
+  aciklama: "Bir oday\u0131 hi\xE7 hasar almadan tamamla"
+  unlockableCard: {fileID: 11400000, guid: 26ab3f4e031f6eb4198d3c3e6942ff07, type: 2}
+  isCompleted: 1
