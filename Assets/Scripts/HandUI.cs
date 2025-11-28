@@ -41,7 +41,10 @@ public class HandUI : MonoBehaviour
             CardUI cardUI = cardUIObject.GetComponent<CardUI>();
             if (cardUI != null)
             {
-                cardUI.Setup(card, i + 2);
+                // DEÐÝÞÝKLÝK BURADA:
+                // Eskiden: cardUI.Setup(card, i + 2);
+                // Þimdi: i + 1 yapýyoruz ki [1]'den baþlasýn.
+                cardUI.Setup(card, i + 1);
             }
         }
     }

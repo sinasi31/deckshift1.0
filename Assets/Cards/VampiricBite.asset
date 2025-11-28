@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardName: Vampiric Bite
   description: Deal damage in close range and heal yourself for 10 HP.
-  cardArt: {fileID: 0}
+  cardArt: {fileID: -6795663199175653850, guid: 52bc7bce66b7c0e4db0b8ef8c72579e7, type: 3}
   actionType: 9
   actionValue: 20
   singleUse: 0

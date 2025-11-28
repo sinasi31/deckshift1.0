@@ -46,10 +46,14 @@ public class DeckManager : MonoBehaviour
     void Update()
     {
         if (GameManager.instance.currentState != GameState.Playing) return;
-        if (Input.GetKeyDown(KeyCode.Alpha2)) PlayCard(0);
-        if (Input.GetKeyDown(KeyCode.Alpha3)) PlayCard(1);
-        if (Input.GetKeyDown(KeyCode.Alpha4)) PlayCard(2);
-        if (Input.GetKeyDown(KeyCode.Alpha5)) PlayCard(3);
+
+        // ESKÝSÝ: Alpha2, Alpha3, Alpha4, Alpha5
+        // YENÝSÝ: Alpha1, Alpha2, Alpha3, Alpha4
+
+        if (Input.GetKeyDown(KeyCode.Alpha1)) PlayCard(0); // 1. Kart
+        if (Input.GetKeyDown(KeyCode.Alpha2)) PlayCard(1); // 2. Kart
+        if (Input.GetKeyDown(KeyCode.Alpha3)) PlayCard(2); // 3. Kart
+        if (Input.GetKeyDown(KeyCode.Alpha4)) PlayCard(3); // 4. Kart
     }
 
     public void DrawCard()
