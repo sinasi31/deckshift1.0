@@ -6,21 +6,31 @@ public class ExitDoor : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
+        // Sadece bir kere çalýþsýn ve sadece oyuncu tetiklesin
+        if (hasBeenTriggered || !other.CompareTag("Player")) return;
+
         PlayerController player = other.GetComponent<PlayerController>();
-        if (!hasBeenTriggered && player != null)
+        if (player != null)
         {
             hasBeenTriggered = true;
+            Debug.Log("Çýkýþ kapýsýna ulaþýldý! Ödül ekraný açýlýyor...");
 
-            // --- YENÝ KONTROL ---
-            // Oyuncu bu odayý hasar almadan mý geçti?
+            // Hasarsýzlýk kontrolü
             if (!player.TookDamageThisRoom)
             {
-                // Eðer hasar almadýysa, AchievementManager'a haber ver.
                 AchievementManager.instance.OnRoomClearedFlawlessly();
             }
 
-            // Ödül ekranýný göster (bu kod ayný kalýyor).
-            RewardManager.instance.ShowRewardScreen();
+            // Ödül ekranýný çaðýr
+            // Eðer RewardManager yoksa veya hata verirse oyun burada takýlýr.
+            if (RewardManager.instance != null)
+            {
+                RewardManager.instance.ShowRewardScreen();
+            }
+            else
+            {
+                Debug.LogError("ExitDoor Hatasý: RewardManager bulunamadý!");
+            }
         }
     }
 }

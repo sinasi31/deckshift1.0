@@ -25,4 +25,5 @@ public enum CardActionType
     Fireball,
     Portal,
     VampiricBite,
+    GlassWail,
 }

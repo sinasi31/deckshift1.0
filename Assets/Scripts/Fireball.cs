@@ -27,26 +27,23 @@ public class Fireball : MonoBehaviour
     {
         if (hasHit) return;
 
-        // --- YENİ EKLENEN KONTROL ---
-        // Eğer çarptığım şey bir "Portal" ise, hiçbir şey yapma (patlama).
-        // Bırak Portal script'i beni ışınlasın.
-        if (other.GetComponent<Portal>() != null)
-        {
-            return; // Fonksiyondan çık, yok olma.
-        }
-        // --- BİTİŞ ---
+        // Portal kontrolü
+        if (other.GetComponent<Portal>() != null) return;
 
-        // 1. Bir Düşmana Çarptık mı?
-        PatrolEnemy enemy = other.GetComponent<PatrolEnemy>();
-        if (enemy != null)
+        // --- YENİ VE TEK KONTROL ---
+        // Çarptığım şeyin Canı (EnemyHealth) var mı?
+        EnemyHealth targetHealth = other.GetComponent<EnemyHealth>();
+
+        if (targetHealth != null)
         {
             hasHit = true;
-            enemy.TakeDamage(damage);
+            targetHealth.TakeDamage(damage); // Ortak hasar fonksiyonunu çağır
             Destroy(gameObject);
             return;
         }
+        // --- BİTİŞ ---
 
-        // 2. Duvara/Zemine çarptık mı?
+        // Duvar kontrolü
         if (other.gameObject.GetComponent<PlayerController>() == null)
         {
             hasHit = true;

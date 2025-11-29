@@ -9,7 +9,11 @@ public class RewardManager : MonoBehaviour
 
     [Header("References")]
     public GameObject rewardScreen;
-    public List<Button> rewardCardButtons;
+
+    // --- DEÐÝÞÝKLÝK: Artýk Button listesi deðil, CardUI listesi tutuyoruz ---
+    public List<CardUI> rewardCardSlots;
+    // --- BÝTÝÞ ---
+
     private List<CardData> offeredCards = new List<CardData>();
     private int bonusCardIndex = -1;
 
@@ -21,16 +25,18 @@ public class RewardManager : MonoBehaviour
 
     private void Start()
     {
-        rewardScreen.SetActive(false);
+        if (rewardScreen != null) rewardScreen.SetActive(false);
     }
 
     public void ShowRewardScreen()
     {
         offeredCards.Clear();
         bonusCardIndex = -1;
+
         List<CardData> cardPool = AchievementManager.instance.GetAvailableCardPool();
         GameManager.instance.SetGameState(GameState.Paused);
 
+        // 3 Kart Seç
         for (int i = 0; i < 3; i++)
         {
             if (cardPool.Count == 0) break;
@@ -39,33 +45,51 @@ public class RewardManager : MonoBehaviour
             cardPool.RemoveAt(randomIndex);
         }
 
+        // Bonus þansý
         if (offeredCards.Count > 0)
             bonusCardIndex = Random.Range(0, offeredCards.Count);
 
-        for (int i = 0; i < rewardCardButtons.Count; i++)
+        // Kartlarý UI'a yerleþtir
+        for (int i = 0; i < rewardCardSlots.Count; i++)
         {
             if (i < offeredCards.Count)
             {
-                rewardCardButtons[i].gameObject.SetActive(true);
-                CardData data = offeredCards[i];
-                string cardName = data.cardName;
-                string cardDescription = data.description;
+                CardUI slot = rewardCardSlots[i];
+                slot.gameObject.SetActive(true);
 
+                CardData data = offeredCards[i];
+
+                // --- GÖRSEL KURULUM (En Önemli Kýsým) ---
+                // CardUI'ýn kendi Setup fonksiyonunu kullanýyoruz!
+                // Görsel olmasý için geçici bir RuntimeCard oluþturuyoruz.
+                RuntimeCard visualCard = new RuntimeCard(data);
+
+                // Bonus varsa açýklamasýný güncelle (Sadece görsel için)
                 if (i == bonusCardIndex)
                 {
-                    cardDescription += "\n<b>(+1 Shift!)</b>"; // 'Jump Charge' -> 'Shift'
+                    // Not: Bu kalýcý veriyi deðiþtirmez, sadece visualCard'ý etkiler
+                    // (CardUI scriptinde descriptionText'i description'dan aldýðýmýzý varsayarsak)
+                    // Ancak CardData ScriptableObject olduðu için açýklamayý kodla deðiþtirmek riskli olabilir.
+                    // Þimdilik bonusu göstermek için basit bir yöntem:
+                    Debug.Log($"Kart {i} BONUSLU (+1 Shift)");
                 }
 
-                rewardCardButtons[i].transform.Find("CardName").GetComponent<TextMeshProUGUI>().text = cardName;
-                rewardCardButtons[i].transform.Find("CardDescription").GetComponent<TextMeshProUGUI>().text = cardDescription;
+                // Setup'ý çaðýr (Bu; resmi, frame'i, daireleri her þeyi ayarlar!)
+                slot.Setup(visualCard, i + 1);
 
-                int cardIndex = i;
-                rewardCardButtons[i].onClick.RemoveAllListeners();
-                rewardCardButtons[i].onClick.AddListener(() => SelectCard(cardIndex));
+                // --- BUTON TIKLAMA OLAYI ---
+                Button btn = slot.GetComponent<Button>();
+                if (btn != null)
+                {
+                    int cardIndex = i;
+                    btn.onClick.RemoveAllListeners();
+                    btn.onClick.AddListener(() => SelectCard(cardIndex));
+                }
             }
             else
             {
-                rewardCardButtons[i].gameObject.SetActive(false);
+                // Yeterli kart yoksa slotu kapat
+                rewardCardSlots[i].gameObject.SetActive(false);
             }
         }
 
@@ -80,7 +104,6 @@ public class RewardManager : MonoBehaviour
 
         if (cardIndex == bonusCardIndex)
         {
-            // AddShift() fonksiyonunu çaðýrýyoruz
             GameManager.instance.player.AddShift(1);
         }
 
