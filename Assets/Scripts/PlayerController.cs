@@ -440,29 +440,25 @@ public class PlayerController : MonoBehaviour
     // --- YENÝ: ISIRMA FONKSÝYONU ---
     private void PerformVampiricBite(float damageAmount)
     {
-        // FirePoint merkezli bir daire çizip içinde düþman var mý diye bakýyoruz
         Collider2D hitEnemy = Physics2D.OverlapCircle(firePoint.position, biteRange, enemyLayer);
 
         if (hitEnemy != null)
         {
-            // Çarptýðýmýz þeyin üzerinde 'PatrolEnemy' scripti var mý?
-            // (Ýlerde tüm düþmanlar için ortak bir 'EnemyHealth' scripti yapabiliriz)
-            PatrolEnemy enemy = hitEnemy.GetComponent<PatrolEnemy>();
+            // --- YENÝ VE TEK KONTROL ---
+            // Isýrdýðým þeyin Caný (EnemyHealth) var mý?
+            EnemyHealth targetHealth = hitEnemy.GetComponent<EnemyHealth>();
 
-            if (enemy != null)
+            if (targetHealth != null)
             {
-                // 1. Düþmana Hasar Ver
-                enemy.TakeDamage(damageAmount);
-                Debug.Log("Düþman ýsýrýldý!");
-
-                // 2. Kendini Ýyileþtir
-                Heal(biteHealAmount);
+                targetHealth.TakeDamage(damageAmount); // Hasar ver
+                Heal(biteHealAmount); // Can çal
+                Debug.Log("Bir þey ýsýrýldý!");
             }
+            // --- BÝTÝÞ ---
         }
         else
         {
-            Debug.Log("Isýracak kimse yok! (Havayý ýsýrdýn)");
-            // Ýstersen burada "boþa gitti" sesi çalabilirsin
+            Debug.Log("Isýracak kimse yok!");
         }
     }
 
