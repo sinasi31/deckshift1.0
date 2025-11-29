@@ -152,7 +152,6 @@ MonoBehaviour:
   projectilePrefab: {fileID: 4286991970044149987, guid: 6b73fab4fba96814294a378972349c17, type: 3}
   firePoint: {fileID: 624914422611531266}
   fireRate: 2
-  maxHealth: 20
 --- !u!114 &4083053409723435075
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -166,6 +165,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealth: 15
+  scriptsToDisable:
+  - {fileID: 4470832548366921458}
 --- !u!1 &5450092081969174536
 GameObject:
   m_ObjectHideFlags: 0

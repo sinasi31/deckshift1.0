@@ -184,7 +184,6 @@ MonoBehaviour:
   groundLayer:
     serializedVersion: 2
     m_Bits: 8
-  maxHealth: 30
 --- !u!114 &3726729032928614124
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -198,6 +197,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealth: 30
+  scriptsToDisable:
+  - {fileID: 3339397666568596744}
 --- !u!1 &8083074988721256616
 GameObject:
   m_ObjectHideFlags: 0

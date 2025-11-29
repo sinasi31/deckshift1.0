@@ -62,4 +62,17 @@ public class PatrolEnemy : MonoBehaviour
             Gizmos.DrawWireSphere(groundCheckPoint.position, groundCheckRadius);
         }
     }
+    private void OnDisable()
+    {
+        if (rb != null)
+        {
+            // Sadece yatay hızı (Yürüme) sıfırla. 
+            // Dikey hız (rb.linearVelocity.y) kalsın ki havadaysa yere düşebilsin.
+            rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
+            
+            // Eğer havada asılı kalsın (tamamen donsun) istersen:
+            rb.linearVelocity = Vector2.zero; 
+            // rb.gravityScale = 0; // (Ama bunu OnEnable'da geri açman gerekir)
+        }
+    }
 }

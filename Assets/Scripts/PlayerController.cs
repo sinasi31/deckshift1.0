@@ -60,6 +60,7 @@ public class PlayerController : MonoBehaviour
     [Header("Combat Settings")]
     public GameObject fireballPrefab;
     public Transform firePoint;
+    public float wailRange = 10f; // Çýðlýk menzili
     // VAMPIRIC BITE 
     public float biteRange = 1.5f; // Isýrma menzili (kýsa olmalý)
     public float biteHealAmount = 10f; // Isýrýnca kaç can geleceði
@@ -211,6 +212,10 @@ public class PlayerController : MonoBehaviour
             case CardActionType.Portal:
                 // Portal fonksiyonuna 'keepCardInHand' deðiþkenini gönderiyoruz
                 return TryPlacePortal(out keepCardInHand);
+
+            case CardActionType.GlassWail:
+                PerformGlassWail(value); // 'value' süresi olacak (kaç saniye donacaklarý)
+                return true;
         }
         return false;
     }
@@ -470,5 +475,18 @@ public class PlayerController : MonoBehaviour
         Debug.Log($"Ýyileþildi! Güncel Can: {currentHealth}");
 
         // UI otomatik olarak Update() içinde güncellendiði için baþka bir þey yapmana gerek yok.
+    }
+    private void PerformGlassWail(float stunDuration)
+    {
+        EnemyHealth[] allEnemies = FindObjectsByType<EnemyHealth>(FindObjectsSortMode.None);
+
+        Debug.Log($"GLOBAL Glass Wail kullanýldý! {allEnemies.Length} düþman dondu.");
+
+        foreach (EnemyHealth enemy in allEnemies)
+        {
+            enemy.Stun(stunDuration);
+        }
+
+        // TODO: Buraya tüm ekraný kaplayan bir beyaz flaþ efekti eklersen çok havalý olur.
     }
 }

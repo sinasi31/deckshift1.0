@@ -48,4 +48,14 @@ public class Turret : MonoBehaviour
             projectile.Launch(fireDirection);
         }
     }
+    // Turret.cs içine ekle:
+    private void OnDisable()
+    {
+        StopAllCoroutines();
+    }
+
+    private void OnEnable()
+    {
+        StartCoroutine(FireRoutine());
+    }
 }
