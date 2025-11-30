@@ -26,4 +26,6 @@ public enum CardActionType
     Portal,
     VampiricBite,
     GlassWail,
+    Phase,
+
 }
