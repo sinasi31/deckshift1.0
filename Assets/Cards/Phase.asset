@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 27701a6f0f52d86438cb67605f92527c, type: 3}
-  m_Name: PlaformCreate
+  m_Name: Phase
   m_EditorClassIdentifier: 
-  cardName: Create Platform
-  description: Spawns a temporary platform at your cursor's location.
-  cardArt: {fileID: 7809697326786025474, guid: fd5ebe8a2051b074ab5a4b0e022ebf7d, type: 3}
-  actionType: 6
-  actionValue: 0
+  cardName: 
+  description: Become a ghost for 3 seconds. Fly through walls and enemies.
+  cardArt: {fileID: 0}
+  actionType: 11
+  actionValue: 3
   singleUse: 0
-  shiftCost: 0
-  maxUses: 3
+  shiftCost: 2
+  maxUses: 2

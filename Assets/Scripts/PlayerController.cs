@@ -9,6 +9,9 @@ public class PlayerController : MonoBehaviour
     public float groundCheckRadius = 0.2f;
     public LayerMask groundLayer;
     public GameObject platformPrefab;
+    private SpriteRenderer spriteRenderer; // Görünmezlik efekti için
+    private bool isPhasing = false;        // Þu an hayalet miyiz?
+    private float verticalInput;
 
     [Header("Fall Settings")]
     public float fallDamage = 20f;
@@ -70,6 +73,7 @@ public class PlayerController : MonoBehaviour
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
+        spriteRenderer = GetComponent<SpriteRenderer>();
     }
 
     void Start()
@@ -84,22 +88,42 @@ public class PlayerController : MonoBehaviour
         if (GameManager.instance != null && GameManager.instance.currentState == GameState.Paused)
         {
             moveInput = 0;
+            verticalInput = 0;
             return;
         }
 
-        if (Input.GetButtonDown("Jump"))
+        // --- HAYALET MODUNDAYSAK ---
+        if (isPhasing)
         {
-            HandleJumpInput();
-        }
-
-        if (currentState == PlayerState.Idle || currentState == PlayerState.Running || currentState == PlayerState.Jumping)
+            // Hem Yatay (A/D) hem Dikey (W/S) girdiyi al
             moveInput = Input.GetAxisRaw("Horizontal");
+            verticalInput = Input.GetAxisRaw("Vertical");
+        }
+        // --- NORMAL MODDAYSAK ---
         else
-            moveInput = 0;
+        {
+            if (Input.GetButtonDown("Jump"))
+            {
+                HandleJumpInput();
+            }
+
+            // Sadece yatay girdi al, dikey sýfýr
+            if (currentState == PlayerState.Idle || currentState == PlayerState.Running || currentState == PlayerState.Jumping)
+                moveInput = Input.GetAxisRaw("Horizontal");
+            else
+                moveInput = 0;
+
+            verticalInput = 0;
+        }
 
         isGrounded = IsGroundedCheck();
         isWallDetected = WallCheck();
-        HandleStateTransitions();
+
+        // Hayaletken animasyon/durum deðiþimlerini engelle ki takýlmasýn
+        if (!isPhasing)
+        {
+            HandleStateTransitions();
+        }
     }
 
     private void HandleJumpInput()
@@ -116,10 +140,20 @@ public class PlayerController : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (currentState == PlayerState.WallSliding)
+        if (isPhasing)
+        {
+            // --- UÇUÞ HAREKETÝ ---
+            // Hem X hem Y ekseninde hareket et
+            rb.linearVelocity = new Vector2(moveInput * moveSpeed, verticalInput * moveSpeed);
+        }
+        else if (currentState == PlayerState.WallSliding)
+        {
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, Mathf.Clamp(rb.linearVelocity.y, -wallSlideSpeed, float.MaxValue));
+        }
         else if (currentState != PlayerState.Dashing && currentState != PlayerState.KnockedBack)
+        {
             rb.linearVelocity = new Vector2(moveInput * moveSpeed, rb.linearVelocity.y);
+        }
     }
 
     private void HandleStateTransitions()
@@ -170,6 +204,10 @@ public class PlayerController : MonoBehaviour
             case CardActionType.VampiricBite:
                 // 'value' karttan gelen hasar miktarý olacak
                 PerformVampiricBite(value);
+                return true;
+
+            case CardActionType.Phase:
+                PerformPhase(value); // value = kaç saniye süreceði
                 return true;
 
             case CardActionType.DashForward:
@@ -388,13 +426,12 @@ public class PlayerController : MonoBehaviour
     // --- ÝMZA DEÐÝÞTÝ: 'out bool keepCard' eklendi ---
     private bool TryPlacePortal(out bool keepCard)
     {
-        keepCard = false; // Varsayýlan deðer
-
+        keepCard = false;
         if (portalPrefab == null) return false;
 
         Vector2 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
 
-        // --- DURUM 1: ÝLK PORTAL (BEDAVA & KART ELDE KALIR) ---
+        // --- DURUM 1: ÝLK PORTAL (Ayný kalýyor) ---
         if (firstPortalInstance == null)
         {
             GameObject p1 = Instantiate(portalPrefab, mousePos, Quaternion.identity);
@@ -402,12 +439,10 @@ public class PlayerController : MonoBehaviour
             firstPortalInstance.spriteRenderer.color = Color.gray;
 
             Debug.Log("Ýlk Portal yerleþtirildi. Kart elde tutuluyor.");
-
-            // --- KRÝTÝK NOKTA ---
-            keepCard = true; // Kartý elden atma!
-            return true; // Ýþlem baþarýlý
+            keepCard = true;
+            return true;
         }
-        // --- DURUM 2: ÝKÝNCÝ PORTAL (ÜCRETLÝ & KART HARCANIR) ---
+        // --- DURUM 2: ÝKÝNCÝ PORTAL (BURAYI GÜNCELLÝYORUZ) ---
         else
         {
             // Mesafe kontrolü
@@ -415,30 +450,41 @@ public class PlayerController : MonoBehaviour
             if (distance > portalMaxRange)
             {
                 Debug.LogWarning("Mesafe çok uzak!");
-                keepCard = true; // Hata olsa bile ilk portalý kaybetmemek için kartý tut
-                return false; // Ýþlem baþarýsýz (Shift gitmesin diye false dönüyoruz)
-            }
-
-            // Shift kontrolü (Manuel)
-            if (currentShift < portalCost)
-            {
-                Debug.LogWarning($"Yeterli Shift yok! {portalCost} gerekiyor.");
-                keepCard = true; // Paran yetmedi, kartý tut ki sonra atabilesin
+                keepCard = true;
                 return false;
             }
 
-            // Baþarýlý! Shift harca, portalý koy.
-            SpendShift(portalCost);
+            // --- YENÝ: ÝNDÝRÝM HESAPLAMA ---
+            int finalCost = portalCost; // Varsayýlan maliyet (2)
 
+            // Eðer "Discount" skilli varsa maliyeti 1 düþür
+            if (SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.KineticDiscount))
+            {
+                finalCost = Mathf.Max(0, finalCost - 1);
+                Debug.Log($"Portal maliyetine indirim uygulandý! Yeni maliyet: {finalCost}");
+            }
+            // -------------------------------
+
+            // Shift kontrolü (finalCost üzerinden)
+            if (currentShift < finalCost)
+            {
+                Debug.LogWarning($"Yeterli Shift yok! {finalCost} gerekiyor.");
+                keepCard = true;
+                return false;
+            }
+
+            // Shift harca (finalCost kadar)
+            SpendShift(finalCost);
+
+            // Portalý koy
             GameObject p2 = Instantiate(portalPrefab, mousePos, Quaternion.identity);
             Portal secondPortal = p2.GetComponent<Portal>();
 
             firstPortalInstance.Link(secondPortal);
             firstPortalInstance = null;
 
-            Debug.Log("Portal baðlantýsý kuruldu! Kart harcanýyor.");
-
-            keepCard = false; // Artýk kartýn iþi bitti, kullaným hakkýndan düþebilirsin.
+            Debug.Log("Portal baðlantýsý kuruldu!");
+            keepCard = false;
             return true;
         }
     }
@@ -488,5 +534,67 @@ public class PlayerController : MonoBehaviour
         }
 
         // TODO: Buraya tüm ekraný kaplayan bir beyaz flaþ efekti eklersen çok havalý olur.
+    }
+    private void PerformPhase(float duration)
+    {
+        StartCoroutine(PhaseRoutine(duration));
+    }
+
+    private IEnumerator PhaseRoutine(float duration)
+    {
+        isPhasing = true; // Kontrolleri uçuþ moduna al
+
+        // 1. Yerçekimini KAPAT (Havada asýlý kalsýn)
+        float originalGravity = rb.gravityScale;
+        rb.gravityScale = 0f;
+        rb.linearVelocity = Vector2.zero; // Düþmeyi durdur
+
+        // 2. Katmanlarý Belirle (Unity'deki isimlerin AYNI olmasý lazým)
+        int playerLayer = LayerMask.NameToLayer("Player");
+        int groundLayer = LayerMask.NameToLayer("Ground");
+        int enemyLayer = LayerMask.NameToLayer("Enemy");
+
+        // 3. Çarpýþmalarý KAPAT (Duvar ve Düþman içinden geç)
+        Physics2D.IgnoreLayerCollision(playerLayer, groundLayer, true);
+        Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, true);
+
+        // 4. Görseli Þeffaf Yap
+        if (spriteRenderer != null)
+        {
+            Color color = spriteRenderer.color;
+            color.a = 0.4f; // %40 Görünürlük
+            spriteRenderer.color = color;
+        }
+
+        Debug.Log("HAYALET MODU AÇIK: Uçabilir ve içinden geçebilirsin.");
+
+        // --- SÜRE BOYUNCA BEKLE ---
+        yield return new WaitForSeconds(duration);
+
+        // --- BÝTÝÞ ---
+
+        // 5. Çarpýþmalarý GERÝ AÇ
+        Physics2D.IgnoreLayerCollision(playerLayer, groundLayer, false);
+        Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, false);
+
+        // 6. Yerçekimini GERÝ AÇ
+        rb.gravityScale = originalGravity;
+
+        // 7. Görseli Düzelt
+        if (spriteRenderer != null)
+        {
+            Color color = spriteRenderer.color;
+            color.a = 1f; // Tam Görünürlük
+            spriteRenderer.color = color;
+        }
+
+        isPhasing = false; // Normal kontrollere dön
+        Debug.Log("HAYALET MODU KAPANDI.");
+    }
+    public void IncreaseMaxShift(int amount)
+    {
+        maxShift += amount;
+        currentShift += amount;
+        // UI otomatik güncellenecek
     }
 }

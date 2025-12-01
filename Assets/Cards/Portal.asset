@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardName: Portal
   description: Place two linked portals within range. Objects pass through
-  cardArt: {fileID: 0}
+  cardArt: {fileID: 1208040086343421634, guid: 11e22d0c88d04264cb44299e795dd15f, type: 3}
   actionType: 8
   actionValue: 0
   singleUse: 0

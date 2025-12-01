@@ -39,6 +39,27 @@ public class EnemyHealth : MonoBehaviour
     private void Die()
     {
         Debug.Log($"{gameObject.name} öldü!");
+
+        // --- SKILL KONTROLLERÝ ---
+        if (SkillManager.instance != null)
+        {
+            // 1. RECYCLE: +1 Shift
+            if (SkillManager.instance.HasSkill(SkillType.Recycle))
+            {
+                // PlayerController'a ulaþmak için GameManager'ý kullanabiliriz
+                if (GameManager.instance != null && GameManager.instance.player != null)
+                    GameManager.instance.player.AddShift(1);
+            }
+
+            // 2. VAMPIRE: Can Yenileme
+            if (SkillManager.instance.HasSkill(SkillType.VampiricAura))
+            {
+                if (GameManager.instance != null && GameManager.instance.player != null)
+                    GameManager.instance.player.Heal(5); // 5 Can ver
+            }
+        }
+        // --- BÝTÝÞ ---
+
         Destroy(gameObject);
     }
 
