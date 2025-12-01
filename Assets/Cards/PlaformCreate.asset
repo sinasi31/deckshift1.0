@@ -14,7 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardName: Create Platform
   description: Spawns a temporary platform at your cursor's location.
-  cardArt: {fileID: 0}
+  cardArt: {fileID: 7809697326786025474, guid: fd5ebe8a2051b074ab5a4b0e022ebf7d, type: 3}
   actionType: 6
   actionValue: 0
   singleUse: 0
+  shiftCost: 0
+  maxUses: 3

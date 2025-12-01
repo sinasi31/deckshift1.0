@@ -46,14 +46,10 @@ public class DeckManager : MonoBehaviour
     void Update()
     {
         if (GameManager.instance.currentState != GameState.Playing) return;
-
-        // ESKÝSÝ: Alpha2, Alpha3, Alpha4, Alpha5
-        // YENÝSÝ: Alpha1, Alpha2, Alpha3, Alpha4
-
-        if (Input.GetKeyDown(KeyCode.Alpha1)) PlayCard(0); // 1. Kart
-        if (Input.GetKeyDown(KeyCode.Alpha2)) PlayCard(1); // 2. Kart
-        if (Input.GetKeyDown(KeyCode.Alpha3)) PlayCard(2); // 3. Kart
-        if (Input.GetKeyDown(KeyCode.Alpha4)) PlayCard(3); // 4. Kart
+        if (Input.GetKeyDown(KeyCode.Alpha1)) PlayCard(0);
+        if (Input.GetKeyDown(KeyCode.Alpha2)) PlayCard(1);
+        if (Input.GetKeyDown(KeyCode.Alpha3)) PlayCard(2);
+        if (Input.GetKeyDown(KeyCode.Alpha4)) PlayCard(3);
     }
 
     public void DrawCard()
@@ -72,89 +68,97 @@ public class DeckManager : MonoBehaviour
         hand.Add(drawnCard);
     }
 
+    // --- DÜZELTÝLMÝÞ VE SKILL ENTEGRELÝ PLAYCARD FONKSÝYONU ---
     private void PlayCard(int handIndex)
     {
         if (handIndex >= hand.Count) return;
 
+        // Deðiþkenleri SADECE BURADA tanýmlýyoruz
         RuntimeCard playedCard = hand[handIndex];
         CardData cardTemplate = playedCard.cardData;
 
+        // --- SKILL KONTROLÜ: Kinetic Discount ---
+        int finalCost = cardTemplate.shiftCost;
+        if (SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.KineticDiscount))
+        {
+            finalCost = Mathf.Max(0, finalCost - 1);
+        }
+        // ----------------------------------------
+
         // 1. Shift Maliyet Kontrolü
-        if (player.GetCurrentShift() < cardTemplate.shiftCost)
+        if (player.GetCurrentShift() < finalCost)
         {
-            Debug.LogWarning($"Yeterli SHIFT yok!");
-            return;
-        }
-        // 2. Kullaným Hakký Kontrolü
-        if (playedCard.currentUses <= 0)
-        {
-            Debug.LogWarning($"Kullaným hakký bitmiþ.");
+            Debug.LogWarning($"Yeterli SHIFT yok! Gerekli: {finalCost}");
             return;
         }
 
-        // Shift'i burada harcamýyoruz, PlayerController içinde manuel harcananlar olabilir (Portal gibi)
-        // Ama standart kartlar için otomatik harcama:
-        if (cardTemplate.actionType != CardActionType.Portal) // Portal hariç
+        // 2. Kullaným Hakký Kontrolü (Sonsuz deðilse)
+        if (!playedCard.isInfinite && playedCard.currentUses <= 0)
         {
-            player.SpendShift(cardTemplate.shiftCost);
+            Debug.LogWarning($"Kartýn kullaným hakký bitmiþ: {cardTemplate.cardName}");
+            return;
         }
 
-        // --- DEÐÝÞÝKLÝK BURADA ---
-        bool keepInHand; // PlayerController'dan gelecek cevap için deðiþken
-        bool success = player.ExecuteAction(cardTemplate.actionType, cardTemplate.actionValue, out keepInHand);
+        // --- Kartý Oyna ---
+        // Portal gibi özel kartlar shift'i kendi içinde harcayabilir, 
+        // standart kartlar için burada harcýyoruz.
+        if (cardTemplate.actionType != CardActionType.Portal)
+        {
+            player.SpendShift(finalCost);
+        }
+
+        bool success = player.ExecuteAction(cardTemplate.actionType, cardTemplate.actionValue, out bool keepInHand);
 
         if (success)
         {
-            // Eðer kartýn elde kalmasý gerekiyorsa (Ýlk portalý koyduysak)
-            if (keepInHand)
+            // Eðer kart (Portal'ýn ilk aþamasý gibi) elde kalmalýysa çýk.
+            if (keepInHand) return;
+
+            // --- KULLANIM HAKKI DÜÞME ---
+            if (!playedCard.isInfinite)
             {
-                Debug.Log("Kart baþarýyla kullanýldý ama elde tutuluyor (Çok aþamalý kart).");
-                // Kartý silmiyoruz, kullaným hakkýný düþürmüyoruz.
-                // Sadece belki bir ses veya görsel efekt olabilir.
-                return;
+                playedCard.currentUses--;
+                Debug.Log($"{cardTemplate.cardName} oynandý. Kalan: {playedCard.currentUses}");
             }
-
-            // --- Buradan aþaðýsý, kartýn iþlemi tamamen bittiðinde çalýþýr ---
-
-            // Kullaným hakkýný düþür
-            playedCard.currentUses--;
-            Debug.Log($"{cardTemplate.cardName} oynandý. Kalan kullaným: {playedCard.currentUses}");
+            else
+            {
+                Debug.Log($"{cardTemplate.cardName} (SONSUZ) oynandý.");
+            }
+            // ----------------------------
 
             hand.RemoveAt(handIndex);
 
-            if (playedCard.currentUses > 0)
+            // Kartý Mezarlýða Gönder (Sonsuzsa veya hakký varsa)
+            if (playedCard.isInfinite || playedCard.currentUses > 0)
             {
-                if (!cardTemplate.singleUse)
+                if (!cardTemplate.singleUse || playedCard.isInfinite)
                     discardPile.Add(playedCard);
             }
             else
             {
-                Debug.Log($"{cardTemplate.cardName} kullaným hakký bitti, desteden silindi.");
+                Debug.Log($"{cardTemplate.cardName} bitti, silindi.");
             }
 
             DrawCard();
             OnHandChanged?.Invoke();
         }
     }
+    // -----------------------------------------------------------
 
-    // --- DEÐÝÞEN FONKSÝYON: ShuffleDeck() ---
     private void ShuffleDeck()
     {
         for (int i = 0; i < drawPile.Count; i++)
         {
-            RuntimeCard temp = drawPile[i]; // 'RuntimeCard' olmalý
+            RuntimeCard temp = drawPile[i];
             int randomIndex = UnityEngine.Random.Range(i, drawPile.Count);
             drawPile[i] = drawPile[randomIndex];
             drawPile[randomIndex] = temp;
         }
     }
-    // --- BÝTÝÞ ---
 
-    // --- DEÐÝÞEN FONKSÝYON: AddCardToDeck() ---
     public void AddCardToDeck(CardData newCardData)
     {
         RuntimeCard newCardInstance = new RuntimeCard(newCardData);
-        discardPile.Add(newCardInstance); // 'discardPile' List<RuntimeCard> olmalý
+        discardPile.Add(newCardInstance);
     }
-    // --- BÝTÝÞ ---
 }

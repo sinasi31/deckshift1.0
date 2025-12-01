@@ -426,13 +426,12 @@ public class PlayerController : MonoBehaviour
     // --- ÝMZA DEÐÝÞTÝ: 'out bool keepCard' eklendi ---
     private bool TryPlacePortal(out bool keepCard)
     {
-        keepCard = false; // Varsayýlan deðer
-
+        keepCard = false;
         if (portalPrefab == null) return false;
 
         Vector2 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
 
-        // --- DURUM 1: ÝLK PORTAL (BEDAVA & KART ELDE KALIR) ---
+        // --- DURUM 1: ÝLK PORTAL (Ayný kalýyor) ---
         if (firstPortalInstance == null)
         {
             GameObject p1 = Instantiate(portalPrefab, mousePos, Quaternion.identity);
@@ -440,12 +439,10 @@ public class PlayerController : MonoBehaviour
             firstPortalInstance.spriteRenderer.color = Color.gray;
 
             Debug.Log("Ýlk Portal yerleþtirildi. Kart elde tutuluyor.");
-
-            // --- KRÝTÝK NOKTA ---
-            keepCard = true; // Kartý elden atma!
-            return true; // Ýþlem baþarýlý
+            keepCard = true;
+            return true;
         }
-        // --- DURUM 2: ÝKÝNCÝ PORTAL (ÜCRETLÝ & KART HARCANIR) ---
+        // --- DURUM 2: ÝKÝNCÝ PORTAL (BURAYI GÜNCELLÝYORUZ) ---
         else
         {
             // Mesafe kontrolü
@@ -453,30 +450,41 @@ public class PlayerController : MonoBehaviour
             if (distance > portalMaxRange)
             {
                 Debug.LogWarning("Mesafe çok uzak!");
-                keepCard = true; // Hata olsa bile ilk portalý kaybetmemek için kartý tut
-                return false; // Ýþlem baþarýsýz (Shift gitmesin diye false dönüyoruz)
-            }
-
-            // Shift kontrolü (Manuel)
-            if (currentShift < portalCost)
-            {
-                Debug.LogWarning($"Yeterli Shift yok! {portalCost} gerekiyor.");
-                keepCard = true; // Paran yetmedi, kartý tut ki sonra atabilesin
+                keepCard = true;
                 return false;
             }
 
-            // Baþarýlý! Shift harca, portalý koy.
-            SpendShift(portalCost);
+            // --- YENÝ: ÝNDÝRÝM HESAPLAMA ---
+            int finalCost = portalCost; // Varsayýlan maliyet (2)
 
+            // Eðer "Discount" skilli varsa maliyeti 1 düþür
+            if (SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.KineticDiscount))
+            {
+                finalCost = Mathf.Max(0, finalCost - 1);
+                Debug.Log($"Portal maliyetine indirim uygulandý! Yeni maliyet: {finalCost}");
+            }
+            // -------------------------------
+
+            // Shift kontrolü (finalCost üzerinden)
+            if (currentShift < finalCost)
+            {
+                Debug.LogWarning($"Yeterli Shift yok! {finalCost} gerekiyor.");
+                keepCard = true;
+                return false;
+            }
+
+            // Shift harca (finalCost kadar)
+            SpendShift(finalCost);
+
+            // Portalý koy
             GameObject p2 = Instantiate(portalPrefab, mousePos, Quaternion.identity);
             Portal secondPortal = p2.GetComponent<Portal>();
 
             firstPortalInstance.Link(secondPortal);
             firstPortalInstance = null;
 
-            Debug.Log("Portal baðlantýsý kuruldu! Kart harcanýyor.");
-
-            keepCard = false; // Artýk kartýn iþi bitti, kullaným hakkýndan düþebilirsin.
+            Debug.Log("Portal baðlantýsý kuruldu!");
+            keepCard = false;
             return true;
         }
     }
@@ -582,5 +590,11 @@ public class PlayerController : MonoBehaviour
 
         isPhasing = false; // Normal kontrollere dön
         Debug.Log("HAYALET MODU KAPANDI.");
+    }
+    public void IncreaseMaxShift(int amount)
+    {
+        maxShift += amount;
+        currentShift += amount;
+        // UI otomatik güncellenecek
     }
 }

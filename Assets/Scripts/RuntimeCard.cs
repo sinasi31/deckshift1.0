@@ -1,16 +1,20 @@
 /*
-Bu script'i Unity'de hiçbir objeye eklemeyeceksin.
-Bu, 'DeckManager'ýn kullanacaðý basit bir veri taþýyýcý sýnýftýr.
+Bu script'i Unity'de hiçbir objeye ekleme.
+Sadece veri taþýyýcýdýr.
 */
 public class RuntimeCard
 {
-    public CardData cardData; // Þablon (Adý, hasarý, maliyeti, maks. kullanýmý)
-    public int currentUses;   // O anki kullaným hakký (5, 4, 3...)
+    public CardData cardData; // Þablon
+    public int currentUses;   // Kalan kullaným hakký
 
-    // Yeni bir RuntimeCard oluþtururken bu 'constructor'ý kullanacaðýz
+    // --- EKSÝK OLAN KISIM BURASIYDI ---
+    public bool isInfinite = false; // Kart sonsuz mu?
+    // ----------------------------------
+
     public RuntimeCard(CardData data)
     {
         cardData = data;
-        currentUses = data.maxUses; // O anki kullaným hakkýný, þablondaki maks. hakka eþitle
+        currentUses = data.maxUses;
+        isInfinite = false; // Baþlangýçta sonsuz deðil
     }
 }
