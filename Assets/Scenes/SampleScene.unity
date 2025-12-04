@@ -1083,9 +1083,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: '    BLOMPO BLESSES YOU
-
-    ''''BLOMPA'''' SAID THE RULER'
+  m_text: "BLOMPO OFFERS YOU HIS \nBLESSINGS"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -1119,7 +1117,7 @@ MonoBehaviour:
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 0
-  m_HorizontalAlignment: 1
+  m_HorizontalAlignment: 2
   m_VerticalAlignment: 256
   m_textAlignment: 65535
   m_characterSpacing: 0
@@ -1875,6 +1873,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 4ed05ca2f31dc07448877e4390a4ee60, type: 2}
   - {fileID: 11400000, guid: 5a5a5f031de93eb47aa35dc69d7c61e0, type: 2}
   - {fileID: 11400000, guid: 5aa353438259d5a45b5b0cd62b5b78bf, type: 2}
+  - {fileID: 11400000, guid: 2b6b5dacabc9303428fb6c97dad09625, type: 2}
+  - {fileID: 11400000, guid: 788a6406bf04dcb498f55317f601f2b7, type: 2}
   handCapacity: 4
 --- !u!4 &1329495661
 Transform:
@@ -1999,7 +1999,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerTransform: {fileID: 1988395663}
   roomPrefabs:
-  - {fileID: 3407626564415475163, guid: 44865511e58827f4fb02b140639b3c72, type: 3}
+  - {fileID: 9171175336316986854, guid: 46f113991b78b214a82458a6ff4c5685, type: 3}
 --- !u!4 &1361928416
 Transform:
   m_ObjectHideFlags: 0
@@ -3464,7 +3464,7 @@ MonoBehaviour:
   moveSpeed: 5
   maxHealth: 100
   isInvincible: 0
-  defaultJumpForce: 5.8
+  defaultJumpForce: 7
   maxShift: 20
   currentState: 0
   fireballPrefab: {fileID: 6847861146471343392, guid: c410de68076b28846bb5e156129b8267, type: 3}

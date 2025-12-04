@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 9688a56189d5d144fb283f8bb682ee76
+guid: baf6627b7e31d204f9358303e3b97f13
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 1302723820812287101
-    second: Untitled_Artwork_0
+      213: -2506806188812462326
+    second: Goblin_Ranged_concept_art_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Untitled_Artwork_0
+      name: Goblin_Ranged_concept_art_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 2388
-        height: 1668
+        x: 4
+        y: 99
+        width: 341
+        height: 431
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: d7cb4f3b964341210800000000000000
-      internalID: 1302723820812287101
+      spriteID: a07151b8d09063dd0800000000000000
+      internalID: -2506806188812462326
       vertices: []
       indices: 
       edges: []
@@ -134,8 +134,7 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable:
-      Untitled_Artwork_0: 1302723820812287101
+    nameFileIdTable: {}
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
