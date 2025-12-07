@@ -38,6 +38,7 @@ Transform:
   - {fileID: 1675823696742324080}
   - {fileID: 4644197857625177974}
   - {fileID: 817739782259018561}
+  - {fileID: 6750993329842904426}
   - {fileID: 1145715628451485745}
   - {fileID: 927930133984354924}
   - {fileID: 5091087405449613043}
@@ -86,7 +87,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5567609310244014044, guid: af2f3ac442651394fa0501eb360877a7, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -1.7102004
+      value: -1.55
       objectReference: {fileID: 0}
     - target: {fileID: 5567609310244014044, guid: af2f3ac442651394fa0501eb360877a7, type: 3}
       propertyPath: m_LocalPosition.z
@@ -731,6 +732,76 @@ PrefabInstance:
 Transform:
   m_CorrespondingSourceObject: {fileID: 3372735793331765573, guid: 9abac2d98a8752e479445d1bb24a92a5, type: 3}
   m_PrefabInstance: {fileID: 3831111814229886946}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1001 &4241632641181497519
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 437298180120193138}
+    m_Modifications:
+    - target: {fileID: 3921724147241360320, guid: cc53616ec5971284992f00b89cd1f82d, type: 3}
+      propertyPath: m_Name
+      value: SlotMachine (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 7452637988212860357, guid: cc53616ec5971284992f00b89cd1f82d, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.2585618
+      objectReference: {fileID: 0}
+    - target: {fileID: 7452637988212860357, guid: cc53616ec5971284992f00b89cd1f82d, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.2571647
+      objectReference: {fileID: 0}
+    - target: {fileID: 7452637988212860357, guid: cc53616ec5971284992f00b89cd1f82d, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0.96
+      objectReference: {fileID: 0}
+    - target: {fileID: 7452637988212860357, guid: cc53616ec5971284992f00b89cd1f82d, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 4.46
+      objectReference: {fileID: 0}
+    - target: {fileID: 7452637988212860357, guid: cc53616ec5971284992f00b89cd1f82d, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -0.024903772
+      objectReference: {fileID: 0}
+    - target: {fileID: 7452637988212860357, guid: cc53616ec5971284992f00b89cd1f82d, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7452637988212860357, guid: cc53616ec5971284992f00b89cd1f82d, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7452637988212860357, guid: cc53616ec5971284992f00b89cd1f82d, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7452637988212860357, guid: cc53616ec5971284992f00b89cd1f82d, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7452637988212860357, guid: cc53616ec5971284992f00b89cd1f82d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7452637988212860357, guid: cc53616ec5971284992f00b89cd1f82d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7452637988212860357, guid: cc53616ec5971284992f00b89cd1f82d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: cc53616ec5971284992f00b89cd1f82d, type: 3}
+--- !u!4 &6750993329842904426 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 7452637988212860357, guid: cc53616ec5971284992f00b89cd1f82d, type: 3}
+  m_PrefabInstance: {fileID: 4241632641181497519}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &4252181354838124829
 PrefabInstance:
