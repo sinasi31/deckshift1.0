@@ -12,7 +12,7 @@ public class PlayerController : MonoBehaviour
     private SpriteRenderer spriteRenderer; // Görünmezlik efekti için
     private bool isPhasing = false;        // Þu an hayalet miyiz?
     private float verticalInput;
-
+    private Vector3 originalScale;
     [Header("Fall Settings")]
     public float fallDamage = 20f;
     private Vector3 currentRoomEntryPoint;
@@ -78,6 +78,7 @@ public class PlayerController : MonoBehaviour
 
     void Start()
     {
+        originalScale = transform.localScale;
         currentHealth = maxHealth;
         currentShift = maxShift; // Güncellendi
         ChangeState(PlayerState.Idle);
@@ -91,6 +92,7 @@ public class PlayerController : MonoBehaviour
             verticalInput = 0;
             return;
         }
+        if (currentState == PlayerState.InCannon) return;
 
         // --- HAYALET MODUNDAYSAK ---
         if (isPhasing)
@@ -607,5 +609,36 @@ public class PlayerController : MonoBehaviour
         maxShift += amount;
         currentShift += amount;
         // UI otomatik güncellenecek
+    }
+    public void EnterCannon(Transform cannonTransform)
+    {
+        ChangeState(PlayerState.InCannon);
+
+        rb.linearVelocity = Vector2.zero; 
+        rb.bodyType = RigidbodyType2D.Kinematic; 
+
+        
+        if (GetComponent<SpriteRenderer>() != null)
+            GetComponent<SpriteRenderer>().enabled = false;
+
+        transform.position = cannonTransform.position;
+        
+        transform.SetParent(cannonTransform);
+    }
+
+
+    public void LaunchFromCannon(Vector2 forceVector)
+    {
+        transform.SetParent(null);
+        transform.localScale = originalScale;
+        transform.rotation = Quaternion.identity;
+        transform.position = new Vector3(transform.position.x, transform.position.y, 0f);
+
+        if (GetComponent<SpriteRenderer>() != null)
+            GetComponent<SpriteRenderer>().enabled = true;
+
+        rb.bodyType = RigidbodyType2D.Dynamic;
+        rb.AddForce(forceVector, ForceMode2D.Impulse);
+        ChangeState(PlayerState.Jumping);
     }
 }

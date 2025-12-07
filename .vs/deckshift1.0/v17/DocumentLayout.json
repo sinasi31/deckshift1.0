@@ -3,12 +3,8 @@
   "WorkspaceRootPath": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|c:\\users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\assets\\scripts\\enemyhealth.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\enemyhealth.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|c:\\users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\assets\\scripts\\damagepopup.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\damagepopup.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|c:\\users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\assets\\scripts\\camerashake.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\camerashake.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -23,27 +19,14 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "EnemyHealth.cs",
-              "DocumentMoniker": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\EnemyHealth.cs",
-              "RelativeDocumentMoniker": "Assets\\Scripts\\EnemyHealth.cs",
-              "ToolTip": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\EnemyHealth.cs",
-              "RelativeToolTip": "Assets\\Scripts\\EnemyHealth.cs",
-              "ViewState": "AgIAABEAAAAAAAAAAAAgwDEAAAAFAAAAAAAAAA==",
+              "Title": "CameraShake.cs",
+              "DocumentMoniker": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\CameraShake.cs",
+              "RelativeDocumentMoniker": "Assets\\Scripts\\CameraShake.cs",
+              "ToolTip": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\CameraShake.cs",
+              "RelativeToolTip": "Assets\\Scripts\\CameraShake.cs",
+              "ViewState": "AgIAAAMAAAAAAAAAAAAAACoAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-07T03:13:10.594Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "DamagePopup.cs",
-              "DocumentMoniker": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\DamagePopup.cs",
-              "RelativeDocumentMoniker": "Assets\\Scripts\\DamagePopup.cs",
-              "ToolTip": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\DamagePopup.cs",
-              "RelativeToolTip": "Assets\\Scripts\\DamagePopup.cs",
-              "ViewState": "AgIAAA4AAAAAAAAAAAAQwDgAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-07T03:10:00.133Z",
+              "WhenOpened": "2025-12-07T08:16:42.144Z",
               "EditorCaption": ""
             }
           ]

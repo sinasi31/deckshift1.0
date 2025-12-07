@@ -1,7 +1,3 @@
-/* Bu script'i Unity'de herhangi bir objeye eklemene GEREK YOK.
-Sadece "Scripts" klasöründe durmasý, diðer tüm script'lerin 
-bu tanýmlarý görmesini saðlayacaktýr.
-*/
 
 public enum PlayerState
 {
@@ -10,7 +6,8 @@ public enum PlayerState
     Jumping,
     Dashing,
     KnockedBack,
-    WallSliding
+    WallSliding,
+    InCannon
 }
 
 public enum CardActionType

@@ -38,8 +38,6 @@ public class CameraShake : MonoBehaviour
 
             yield return null; // Bir sonraki kareyi bekle
         }
-
-        // Sarsýntý bitince kamerayý tam eski yerine koy (Çok önemli!)
         transform.position = originalPos;
     }
 }
