@@ -6,8 +6,10 @@ public class Fireball : MonoBehaviour
     [Header("Settings")]
     public float speed = 15f;
     public float lifeTime = 3f;
+    [Header("Efektler")]
+    public GameObject explosionEffect;
 
-    public float damage = 10f; // Bu, PlayerController taraf�ndan ayarlanacak
+    public float damage = 10f;
 
     private Rigidbody2D rb;
     private bool hasHit = false;
@@ -27,27 +29,47 @@ public class Fireball : MonoBehaviour
     {
         if (hasHit) return;
 
-        // Portal kontrolü
         if (other.GetComponent<Portal>() != null) return;
 
-        // --- YENİ VE TEK KONTROL ---
-        // Çarptığım şeyin Canı (EnemyHealth) var mı?
         EnemyHealth targetHealth = other.GetComponent<EnemyHealth>();
 
         if (targetHealth != null)
         {
             hasHit = true;
-            targetHealth.TakeDamage(damage); // Ortak hasar fonksiyonunu çağır
+            targetHealth.TakeDamage(damage);
+            CreateExplosionEffect();
             Destroy(gameObject);
             return;
         }
-        // --- BİTİŞ ---
+        if (other.isTrigger)
+        {
+            return; 
+        }
 
         // Duvar kontrolü
         if (other.gameObject.GetComponent<PlayerController>() == null)
         {
             hasHit = true;
+            CreateExplosionEffect();
             Destroy(gameObject);
+        }
+        if (targetHealth != null)
+        {
+            hasHit = true;
+            targetHealth.TakeDamage(damage);
+            if (CameraShake.instance != null)
+                CameraShake.instance.Shake(0.15f, 0.5f);
+            Destroy(gameObject);
+            return;
+        }
+
+    }
+    void CreateExplosionEffect()
+    {
+        if (explosionEffect != null)
+        {
+            // Efekti merminin olduğu yerde yarat
+            Instantiate(explosionEffect, transform.position, Quaternion.identity);
         }
     }
 }

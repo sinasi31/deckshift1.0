@@ -81,12 +81,12 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: -2506806188812462326, guid: baf6627b7e31d204f9358303e3b97f13, type: 3}
+  m_Sprite: {fileID: -2506806188812462326, guid: 6cad9c2ba5189794b8d3d2406e1cf888, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 1, y: 1}
+  m_Size: {x: 3.41, y: 4.31}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
@@ -158,7 +158,7 @@ BoxCollider2D:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
     oldSize: {x: 3.41, y: 4.31}
-    newSize: {x: 1, y: 1}
+    newSize: {x: 3.41, y: 4.31}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
@@ -199,6 +199,7 @@ MonoBehaviour:
   maxHealth: 30
   scriptsToDisable:
   - {fileID: 3339397666568596744}
+  damagePopupPrefab: {fileID: 2036397937272019125, guid: c4cd6b8e18cb9d141b1b0f9fa894bc1f, type: 3}
 --- !u!1 &8083074988721256616
 GameObject:
   m_ObjectHideFlags: 0

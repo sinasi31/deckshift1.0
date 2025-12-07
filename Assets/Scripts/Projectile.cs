@@ -26,18 +26,32 @@ public class Projectile : MonoBehaviour
     }
 
     // Bir þeye çarptýðýnda...
-    private void OnTriggerEnter2D(Collider2D other)
+    void OnTriggerEnter2D(Collider2D other)
     {
-        // Çarptýðý þey oyuncu mu?
+        // --- YENÝ EKLENEN KISIM ---
+        // Eðer çarptýðým þey bir Trigger (Pervane, Portal, Iþýk vb.) ise
+        // beni yok etme, içinden geçmeme izin ver.
+        if (other.isTrigger)
+        {
+            return;
+        }
+        // -------------------------
+
+        // 1. Oyuncuya Çarptý mý?
         PlayerController player = other.GetComponent<PlayerController>();
         if (player != null)
         {
-            // Oyuncuya hasar ver
-            player.TakeDamage(damage);
+            player.TakeDamage(damage); // Hasar ver
+            Destroy(gameObject); // Mermiyi yok et
+            return;
         }
 
-        // Mermi, oyuncuya veya baþka bir þeye (duvar gibi) çarptýðýnda kendini yok et.
-        // Not: 'Ground' katmanýna sahip duvarlar gibi þeylerin de bir Collider'ý olmalý.
-        Destroy(gameObject);
+        // 2. Duvara Çarptý mý?
+        // (Düþmanlara çarparsa yok olmasýn, içinden geçsin diye EnemyHealth kontrolü yapabiliriz
+        //  veya düþmanlar birbirini vurmasýn istiyorsan buraya EnemyHealth kontrolü de ekleyebilirsin)
+        if (other.GetComponent<EnemyHealth>() == null)
+        {
+            Destroy(gameObject); // Duvara çarptý, yok et
+        }
     }
 }

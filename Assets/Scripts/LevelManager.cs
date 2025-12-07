@@ -34,6 +34,13 @@ public class LevelManager : MonoBehaviour
             Destroy(currentRoom);
         }
 
+        TemporaryObject[] junk = FindObjectsByType<TemporaryObject>(FindObjectsSortMode.None);
+
+        foreach (TemporaryObject obj in junk)
+        {
+            Destroy(obj.gameObject);
+        }
+
         // Listeden rastgele bir oda prefab'ý seç
         int randomIndex = Random.Range(0, roomPrefabs.Count);
         GameObject selectedRoomPrefab = roomPrefabs[randomIndex];

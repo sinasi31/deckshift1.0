@@ -11,6 +11,8 @@ public class EnemyHealth : MonoBehaviour
     [Header("Stun (Sersemletme) Ayarlarý")]
     [Tooltip("Stun yediðinde devre dýþý býrakýlacak scriptleri buraya sürükle (Örn: PatrolEnemy, Turret).")]
     public List<MonoBehaviour> scriptsToDisable; // Durdurulacak scriptler listesi
+    [Header("Efektler")]
+    public GameObject damagePopupPrefab; // Buraya prefabý sürükleyeceðiz
 
     private SpriteRenderer enemySprite;
     private Color originalColor;
@@ -30,12 +32,22 @@ public class EnemyHealth : MonoBehaviour
         currentHealth -= damage;
         Debug.Log($"{gameObject.name} hasar aldý! Kalan Can: {currentHealth}");
 
+        // --- YENÝ: HASAR YAZISI ÇIKART ---
+        if (damagePopupPrefab != null)
+        {
+            // Yazýyý düþmanýn tepesinde yarat
+            GameObject popup = Instantiate(damagePopupPrefab, transform.position + Vector3.up * 0.5f, Quaternion.identity);
+
+            // Setup fonksiyonunu çaðýrýp hasarý yazdýr
+            popup.GetComponent<DamagePopup>().Setup(Mathf.RoundToInt(damage));
+        }
+        // ---------------------------------
+
         if (currentHealth <= 0)
         {
             Die();
         }
     }
-
     private void Die()
     {
         Debug.Log($"{gameObject.name} öldü!");

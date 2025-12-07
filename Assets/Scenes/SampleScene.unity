@@ -901,6 +901,7 @@ GameObject:
   - component: {fileID: 519420031}
   - component: {fileID: 519420029}
   - component: {fileID: 519420030}
+  - component: {fileID: 519420033}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -970,7 +971,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
-  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
+  m_BackGroundColor: {r: 0, g: 0, b: 0, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -1026,6 +1027,18 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &519420033
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 519420028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a0f97dcb5bc46345b70f8c7f5b95a4d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &567272145
 GameObject:
   m_ObjectHideFlags: 0
@@ -1754,10 +1767,12 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 0c38fe9c93f68d14c92b94d00d6db756, type: 2}
   defaultUnlockedCards:
   - {fileID: 11400000, guid: 523cee4ce9c65d749ba3e978c44ae531, type: 2}
-  - {fileID: 11400000, guid: 0b2353722c884374792f15a335d6d750, type: 2}
   - {fileID: 11400000, guid: 2b6b5dacabc9303428fb6c97dad09625, type: 2}
   - {fileID: 11400000, guid: b3132bd486128a34183f125375419fd5, type: 2}
   - {fileID: 11400000, guid: 788a6406bf04dcb498f55317f601f2b7, type: 2}
+  - {fileID: 11400000, guid: 5a5a5f031de93eb47aa35dc69d7c61e0, type: 2}
+  - {fileID: 11400000, guid: 4ed05ca2f31dc07448877e4390a4ee60, type: 2}
+  - {fileID: 11400000, guid: 5aa353438259d5a45b5b0cd62b5b78bf, type: 2}
 --- !u!4 &1165239179
 Transform:
   m_ObjectHideFlags: 0
@@ -1999,6 +2014,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerTransform: {fileID: 1988395663}
   roomPrefabs:
+  - {fileID: 8994572794713311534, guid: 50db830b311bb164986cebcf5f5cc126, type: 3}
   - {fileID: 9171175336316986854, guid: 46f113991b78b214a82458a6ff4c5685, type: 3}
 --- !u!4 &1361928416
 Transform:
@@ -2731,7 +2747,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -0.05, y: -0.05, z: 0}
-  m_LocalScale: {x: 0.92786515, y: 0.93137133, z: 0.23235649}
+  m_LocalScale: {x: 0.99346524, y: 0.9972193, z: 0.24878411}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}

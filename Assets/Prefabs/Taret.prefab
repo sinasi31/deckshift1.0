@@ -167,6 +167,7 @@ MonoBehaviour:
   maxHealth: 15
   scriptsToDisable:
   - {fileID: 4470832548366921458}
+  damagePopupPrefab: {fileID: 2036397937272019125, guid: c4cd6b8e18cb9d141b1b0f9fa894bc1f, type: 3}
 --- !u!1 &5450092081969174536
 GameObject:
   m_ObjectHideFlags: 0

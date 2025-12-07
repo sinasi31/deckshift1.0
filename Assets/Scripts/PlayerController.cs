@@ -312,6 +312,10 @@ public class PlayerController : MonoBehaviour
     public void TakeDamage(float damage)
     {
         if (isInvincible) { return; }
+        if (CameraShake.instance != null)
+            CameraShake.instance.Shake(0.2f, 0.3f);
+        // ------------------------
+
         tookDamageThisRoom = true;
         currentHealth = Mathf.Max(currentHealth - damage, 0f);
         if (currentHealth <= 0) { Die(); }
@@ -438,7 +442,12 @@ public class PlayerController : MonoBehaviour
             firstPortalInstance = p1.GetComponent<Portal>();
             firstPortalInstance.spriteRenderer.color = Color.gray;
 
-            Debug.Log("Ýlk Portal yerleþtirildi. Kart elde tutuluyor.");
+            // --- YENÝ EKLENEN SATIR ---
+            // Ýlk portalý koyduðumuz an menzil halkasýný göster!
+            firstPortalInstance.ShowRangeCircle(portalMaxRange);
+            // --------------------------
+
+            Debug.Log("Ýlk Portal yerleþtirildi...");
             keepCard = true;
             return true;
         }
@@ -527,6 +536,8 @@ public class PlayerController : MonoBehaviour
         EnemyHealth[] allEnemies = FindObjectsByType<EnemyHealth>(FindObjectsSortMode.None);
 
         Debug.Log($"GLOBAL Glass Wail kullanýldý! {allEnemies.Length} düþman dondu.");
+        if (CameraShake.instance != null)
+            CameraShake.instance.Shake(0.5f, 0.5f);
 
         foreach (EnemyHealth enemy in allEnemies)
         {
