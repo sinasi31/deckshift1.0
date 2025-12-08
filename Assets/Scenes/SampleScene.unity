@@ -3127,6 +3127,10 @@ MonoBehaviour:
   playerTransform: {fileID: 1988395663}
   roomPrefabs:
   - {fileID: 9171175336316986854, guid: 46f113991b78b214a82458a6ff4c5685, type: 3}
+  - {fileID: 6751315299090171207, guid: f2889a95a83c6e140b8842016911629c, type: 3}
+  - {fileID: 4645761292745309642, guid: 226903306034d834b8555818dda2558f, type: 3}
+  - {fileID: 3407626564415475163, guid: 44865511e58827f4fb02b140639b3c72, type: 3}
+  - {fileID: 8994572794713311534, guid: 50db830b311bb164986cebcf5f5cc126, type: 3}
 --- !u!4 &1361928416
 Transform:
   m_ObjectHideFlags: 0
