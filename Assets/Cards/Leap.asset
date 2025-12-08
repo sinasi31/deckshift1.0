@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Leap
   m_EditorClassIdentifier: 
   cardName: Leap
-  description: Perform a high jump. Does not consume a Jump Charge.
+  description: Perform a high jump. Does not consume a shift.
   cardArt: {fileID: 0}
   actionType: 0
   actionValue: 15
