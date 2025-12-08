@@ -1,5 +1,5 @@
 using UnityEngine;
-using TMPro; // TextMeshPro kullanacaðýz
+using TMPro;
 
 public class DamagePopup : MonoBehaviour
 {
@@ -9,7 +9,11 @@ public class DamagePopup : MonoBehaviour
 
     // Hareket Ayarlarý
     private Vector3 moveVector;
-    private float moveSpeed = 2f;
+
+    // --- DÜZELTME 1: Bu deðiþkeni kullanacaðýz, deðerini 10 (eski hýz) yapalým ---
+    private float moveSpeed = 10f;
+    // ---------------------------------------------------------------------------
+
     private float disappearSpeed = 3f;
 
     private void Awake()
@@ -20,21 +24,17 @@ public class DamagePopup : MonoBehaviour
     public void Setup(int damageAmount)
     {
         textMesh.text = damageAmount.ToString();
-
-        // Yazý rengini al (Baþlangýçta tam görünür)
         textColor = textMesh.color;
-        disappearTimer = 0.5f; // Yarým saniye bekle sonra silinmeye baþla
+        disappearTimer = 0.5f;
 
-        // Hafifçe yukarý ve saða/sola rastgele fýrlasýn (Daha dinamik durur)
-        moveVector = new Vector3(Random.Range(-0.5f, 0.5f), 1f) * 10f; // Ýlk fýrlama hýzý
+        // --- DÜZELTME 2: Elle '10f' yazmak yerine 'moveSpeed' deðiþkenini kullandýk ---
+        moveVector = new Vector3(Random.Range(-0.5f, 0.5f), 1f) * moveSpeed;
+        // -----------------------------------------------------------------------------
     }
 
     private void Update()
     {
-        // 1. Hareket (Yukarý Süzülme)
         transform.position += moveVector * Time.deltaTime;
-
-        // Hýzý zamanla yavaþlat (Fiziksel sürtünme gibi)
         moveVector -= moveVector * 8f * Time.deltaTime;
 
         if (disappearTimer > 0)
@@ -43,11 +43,9 @@ public class DamagePopup : MonoBehaviour
         }
         else
         {
-            // 2. Renk Solmasý (Fade Out)
             textColor.a -= disappearSpeed * Time.deltaTime;
             textMesh.color = textColor;
 
-            // Görünmez olunca yok et
             if (textColor.a < 0)
             {
                 Destroy(gameObject);

@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: Phase
   m_EditorClassIdentifier: 
   cardName: Phase
-  description: Become a ghost for 3 seconds. Fly through walls and enemies.
+  description: Become a ghost for 2 seconds. Fly through walls and enemies.
   cardArt: {fileID: 0}
   actionType: 11
-  actionValue: 3
+  actionValue: 2
   singleUse: 0
   shiftCost: 2
   maxUses: 2

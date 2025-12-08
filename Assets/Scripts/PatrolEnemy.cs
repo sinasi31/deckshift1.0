@@ -21,7 +21,6 @@ public class PatrolEnemy : MonoBehaviour
 
     private void Start()
     {
-        // BURADA ESKİDEN CAN KODLARI VARDI, ARTIK YOK.
         rb.linearVelocity = new Vector2(moveSpeed, 0);
     }
 
@@ -66,13 +65,16 @@ public class PatrolEnemy : MonoBehaviour
     {
         if (rb != null)
         {
-            // Sadece yatay hızı (Yürüme) sıfırla. 
-            // Dikey hız (rb.linearVelocity.y) kalsın ki havadaysa yere düşebilsin.
-            rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
             
-            // Eğer havada asılı kalsın (tamamen donsun) istersen:
+            rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
             rb.linearVelocity = Vector2.zero; 
-            // rb.gravityScale = 0; // (Ama bunu OnEnable'da geri açman gerekir)
+        }
+    }
+    private void OnEnable()
+    {
+        if (rb != null)
+        {
+            rb.linearVelocity = new Vector2(moveSpeed * (isFacingRight ? 1 : -1), 0);
         }
     }
 }
