@@ -6,6 +6,7 @@ public class WorldSlotMachine : MonoBehaviour
 {
     [Header("Ödül Havuzlarý")]
     public List<RelicData> commonRewards;
+    public List<RelicData> rareRewards;
     public List<RelicData> epicRewards;
     public List<RelicData> legendaryRewards;
 
@@ -47,14 +48,10 @@ public class WorldSlotMachine : MonoBehaviour
     {
         if (playerInRange && Input.GetKeyDown(interactKey))
         {
-            // UI Manager'ý çaðýr ve havuzlarý gönder
             if (SlotMachineUI.instance != null)
             {
-                // Yazýyý gizle
                 if (promptText_UI != null) promptText_UI.gameObject.SetActive(false);
-
-                // Ekraný aç
-                SlotMachineUI.instance.OpenSlotMachine(commonRewards, epicRewards, legendaryRewards, this.gameObject);
+                SlotMachineUI.instance.OpenSlotMachine(commonRewards, rareRewards, epicRewards, legendaryRewards, this.gameObject);
             }
             else
             {

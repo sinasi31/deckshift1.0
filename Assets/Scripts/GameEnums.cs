@@ -36,3 +36,10 @@ public enum SkillType
     MaxShiftBonus,  // Max Shift +1 (YENÝ)
     InfinitySeal    // Bir karta sonsuz kullaným (YENÝ)
 }
+public enum Rarity
+{
+    Common,
+    Rare,
+    Epic,
+    Legendary
+}

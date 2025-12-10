@@ -16,7 +16,7 @@ MonoBehaviour:
   description: Perform a high jump. Does not consume a shift.
   cardArt: {fileID: 0}
   actionType: 0
-  actionValue: 15
+  actionValue: 10
   singleUse: 0
   shiftCost: 0
   maxUses: 3
