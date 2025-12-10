@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: cc818309cd8b3784da3a51e8b3d9902d
+guid: 5377253bc351970429ad8887ac0fc179
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 5958457827856790607
-    second: Wizard_Character_0
+      213: -1602876987008863875
+    second: 518-5186782_hd-skull-transparent-png-image-download-scary-skeleton-removebg-preview_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,23 +100,23 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Wizard_Character_0
+      name: 518-5186782_hd-skull-transparent-png-image-download-scary-skeleton-removebg-preview_0
       rect:
         serializedVersion: 2
-        x: 100
-        y: 218
-        width: 221
-        height: 168
+        x: 103
+        y: 23
+        width: 306
+        height: 439
       alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+      pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: f44bc8e33d1b0b250800000000000000
-      internalID: 5958457827856790607
+      spriteID: d7130ba6fdf61c9e0800000000000000
+      internalID: -1602876987008863875
       vertices: []
       indices: 
       edges: []
@@ -125,7 +125,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 7289d60b05581f24cbbac41886ef29e4
+    spriteID: 
     internalID: 0
     vertices: []
     indices: 
@@ -134,8 +134,7 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable:
-      Wizard_Character_0: 5958457827856790607
+    nameFileIdTable: {}
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
