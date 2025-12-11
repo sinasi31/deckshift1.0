@@ -85,6 +85,10 @@ public class LevelManager : MonoBehaviour
                 playerController.SetCurrentEntryPoint(entryPoint.position);
             }
         }
+        if (DeckManager.instance != null)
+        {
+            DeckManager.instance.RefillHand();
+        }
 
         // Kamera sýnýrlarýný ayarla (CameraFollow iptal edildiði için bu kýsým opsiyonel veya sabit kamera için gereksiz olabilir)
         // Ama eðer ileride tekrar eklersen kod burada durabilir.

@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: Dash
   m_EditorClassIdentifier: 
   cardName: Dash
-  description: Launch forward. Does not consume a Jump Charge.
-  cardArt: {fileID: -4438197675066153964, guid: 8b67f5d7a9e1f63438ea7781a87802d1, type: 3}
+  description: Launch forward.
+  cardArt: {fileID: -5771381502418914927, guid: fa4fd7bb605a1634ea48a6f9eb9eda13, type: 3}
   actionType: 1
   actionValue: 10
   singleUse: 0
