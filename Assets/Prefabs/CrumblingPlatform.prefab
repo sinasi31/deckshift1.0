@@ -147,5 +147,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 55db2d1c0bdb2c6488398f8cc8b5528b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  timeToFall: 0.5
+  timeToFall: 2
   respawnTime: 2
