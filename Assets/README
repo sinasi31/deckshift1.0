@@ -1,0 +1,10 @@
+## Core Systems Overview
+
+### Player Controller
+Handles movement, jumping, and Shift consumption.
+
+### Card System
+Manages card usage, costs, charges, and effects.
+
+### LevelManager
+Controls level completion, Shift carry-over, and reward selection.
