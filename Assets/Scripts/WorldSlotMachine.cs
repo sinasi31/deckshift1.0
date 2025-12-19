@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
-using TMPro;
+// TMPro using'ini silebilirsin eðer kodla metin deðiþtirmeyeceksen.
 
 public class WorldSlotMachine : MonoBehaviour
 {
@@ -11,27 +11,25 @@ public class WorldSlotMachine : MonoBehaviour
     public List<RelicData> legendaryRewards;
 
     [Header("Etkileþim")]
-    private TextMeshProUGUI promptText_UI;
     public KeyCode interactKey = KeyCode.E;
     private bool playerInRange = false;
+
+    [Header("Görsel Referans")]
+    // Unity'de makinenin üzerine koyacaðýmýz yazý objesini buraya sürükle
+    public GameObject interactionPopup;
+
+    private void Start()
+    {
+        // Oyun baþladýðýnda yazýnýn kapalý olduðundan emin olalým
+        if (interactionPopup != null) interactionPopup.SetActive(false);
+    }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (other.CompareTag("Player"))
         {
             playerInRange = true;
-            // Tembel Yükleme ile metni bul
-            if (promptText_UI == null)
-            {
-                GameObject obj = GameObject.Find("InteractPrompt_Text");
-                if (obj != null) promptText_UI = obj.GetComponent<TextMeshProUGUI>();
-            }
-
-            if (promptText_UI != null)
-            {
-                promptText_UI.gameObject.SetActive(true);
-                promptText_UI.text = $"Press [{interactKey}] to Spin";
-            }
+            if (interactionPopup != null) interactionPopup.SetActive(true);
         }
     }
 
@@ -40,7 +38,7 @@ public class WorldSlotMachine : MonoBehaviour
         if (other.CompareTag("Player"))
         {
             playerInRange = false;
-            if (promptText_UI != null) promptText_UI.gameObject.SetActive(false);
+            if (interactionPopup != null) interactionPopup.SetActive(false);
         }
     }
 
@@ -50,12 +48,10 @@ public class WorldSlotMachine : MonoBehaviour
         {
             if (SlotMachineUI.instance != null)
             {
-                if (promptText_UI != null) promptText_UI.gameObject.SetActive(false);
+                // Etkileþime girince yazýyý kapat (görüntü kirliliði olmasýn)
+                if (interactionPopup != null) interactionPopup.SetActive(false);
+
                 SlotMachineUI.instance.OpenSlotMachine(commonRewards, rareRewards, epicRewards, legendaryRewards, this.gameObject);
-            }
-            else
-            {
-                Debug.LogError("SlotMachineUI sahneden bulunamadý!");
             }
         }
     }

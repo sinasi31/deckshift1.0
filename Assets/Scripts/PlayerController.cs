@@ -17,6 +17,32 @@ public class PlayerController : MonoBehaviour
     public float fallDamage = 20f;
     private Vector3 currentRoomEntryPoint;
 
+    [Header("Economy")]
+    public int currentGold = 0; // Mevcut altýn
+    public void AddGold(int amount)
+    {
+        currentGold += amount;
+        Debug.Log($"Altýn kazanýldý: {amount}. Toplam: {currentGold}");
+        // TODO: UI güncellemesi (GoldUI) buraya eklenebilir.
+    }
+
+    // Altýn harcama fonksiyonu (Eðer para yetiyorsa true döner)
+    public bool TrySpendGold(int amount)
+    {
+        if (currentGold >= amount)
+        {
+            currentGold -= amount;
+            Debug.Log($"Altýn harcandý: {amount}. Kalan: {currentGold}");
+            // TODO: UI güncellemesi
+            return true;
+        }
+        else
+        {
+            Debug.Log("Yetersiz Bakiye!");
+            return false;
+        }
+    }
+
     [Header("Portal Settings")]
     public GameObject portalPrefab; // Portal prefabýný buraya sürükleyeceðiz
     public float portalMaxRange = 10f; // Ýki portal arasý maksimum mesafe
