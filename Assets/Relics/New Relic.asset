@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 71417128076b2fb429c3677f2e47bf2d, type: 3}
   m_Name: New Relic
   m_EditorClassIdentifier: 
-  relicID: thorns
-  relicName: 
+  relicID: Thorns
+  relicName: Spiked Carapace
   description: 
   relicArt: {fileID: 0}
   rarity: 1

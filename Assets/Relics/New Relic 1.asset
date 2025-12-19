@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 71417128076b2fb429c3677f2e47bf2d, type: 3}
   m_Name: New Relic 1
   m_EditorClassIdentifier: 
-  relicID: Oops All 6's
-  relicName: 
+  relicID: Oops
+  relicName: Oops! All 7's
   description: 
   relicArt: {fileID: 0}
-  rarity: 0
+  rarity: 2

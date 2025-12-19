@@ -161,4 +161,17 @@ public class DeckManager : MonoBehaviour
         RuntimeCard newCardInstance = new RuntimeCard(newCardData);
         discardPile.Add(newCardInstance);
     }
+    public void RefillHand()
+    {
+        while (hand.Count < handCapacity)
+        {
+            if (drawPile.Count == 0 && discardPile.Count == 0)
+            {
+                break;
+            }
+
+            DrawCard();
+        }
+        OnHandChanged?.Invoke();
+    }
 }

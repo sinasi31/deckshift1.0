@@ -1,36 +1,71 @@
 using UnityEngine;
+// TMPro kütüphanesine gerek kalmadý çünkü sadece objeyi aç/kapat yapacaðýz
+// Ama eðer metni kodla deðiþtirmek istersen (örn: tuþ deðiþirse) tutabilirsin.
 
 public class ExitDoor : MonoBehaviour
 {
     private bool hasBeenTriggered = false;
+    private bool isPlayerInRange = false;
+    private PlayerController currentPlayer;
+
+    [Header("Etkileþim Ayarlarý")]
+    public KeyCode interactKey = KeyCode.E;
+
+    [Header("Görsel Referans")]
+    // Unity'de kapýnýn üzerine koyacaðýmýz yazý objesini buraya sürükleyeceðiz
+    public GameObject interactionPopup;
+
+    private void Update()
+    {
+        if (isPlayerInRange && !hasBeenTriggered && Input.GetKeyDown(interactKey))
+        {
+            PerformExit();
+        }
+    }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        // Sadece bir kere çalýþsýn ve sadece oyuncu tetiklesin
-        if (hasBeenTriggered || !other.CompareTag("Player")) return;
+        if (hasBeenTriggered) return;
 
-        PlayerController player = other.GetComponent<PlayerController>();
-        if (player != null)
+        if (other.CompareTag("Player"))
         {
-            hasBeenTriggered = true;
-            Debug.Log("Çýkýþ kapýsýna ulaþýldý! Ödül ekraný açýlýyor...");
+            isPlayerInRange = true;
+            currentPlayer = other.GetComponent<PlayerController>();
 
-            // Hasarsýzlýk kontrolü
-            if (!player.TookDamageThisRoom)
-            {
-                AchievementManager.instance.OnRoomClearedFlawlessly();
-            }
+            // Yazýyý Aç
+            if (interactionPopup != null)
+                interactionPopup.SetActive(true);
+        }
+    }
 
-            // Ödül ekranýný çaðýr
-            // Eðer RewardManager yoksa veya hata verirse oyun burada takýlýr.
-            if (RewardManager.instance != null)
-            {
-                RewardManager.instance.ShowRewardScreen();
-            }
-            else
-            {
-                Debug.LogError("ExitDoor Hatasý: RewardManager bulunamadý!");
-            }
+    private void OnTriggerExit2D(Collider2D other)
+    {
+        if (other.CompareTag("Player"))
+        {
+            isPlayerInRange = false;
+            currentPlayer = null;
+
+            // Yazýyý Kapat
+            if (interactionPopup != null)
+                interactionPopup.SetActive(false);
+        }
+    }
+
+    private void PerformExit()
+    {
+        hasBeenTriggered = true;
+
+        // Çýkýþ yapýldýðý an yazýyý gizle
+        if (interactionPopup != null) interactionPopup.SetActive(false);
+
+        if (currentPlayer != null && !currentPlayer.TookDamageThisRoom)
+        {
+            AchievementManager.instance.OnRoomClearedFlawlessly();
+        }
+
+        if (RewardManager.instance != null)
+        {
+            RewardManager.instance.ShowRewardScreen();
         }
     }
 }
