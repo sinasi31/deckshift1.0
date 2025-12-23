@@ -113,7 +113,15 @@ public class DeckManager : MonoBehaviour
         {
             // Eðer kart (Portal'ýn ilk aþamasý gibi) elde kalmalýysa çýk.
             if (keepInHand) return;
+            // --- BURAYI YAPIÞTIR (DÜZELTÝLMÝÞ HALÝ) ---
 
+            // Sahnede HandUI scriptini bul ve çalýþtýr
+            HandUI ui = FindFirstObjectByType<HandUI>();
+            if (ui != null)
+            {
+                ui.AnimateCardFromHand(handIndex);
+            }
+            // ------------------------------------------
             // --- KULLANIM HAKKI DÜÞME ---
             if (!playedCard.isInfinite)
             {

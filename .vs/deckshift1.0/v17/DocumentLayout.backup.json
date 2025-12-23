@@ -1,10 +1,18 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\",
+  "WorkspaceRootPath": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|c:\\users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\assets\\scripts\\shopkeeper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\shopkeeper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|c:\\users\\efe\\documents\\github\\deckshift1.0\\assets\\scripts\\deckmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\deckmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|c:\\users\\efe\\documents\\github\\deckshift1.0\\assets\\scripts\\handui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\handui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\assets\\scripts\\cardui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\cardui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -19,15 +27,44 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "Shopkeeper.cs",
-              "DocumentMoniker": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\Shopkeeper.cs",
-              "RelativeDocumentMoniker": "Assets\\Scripts\\Shopkeeper.cs",
-              "ToolTip": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\Shopkeeper.cs",
-              "RelativeToolTip": "Assets\\Scripts\\Shopkeeper.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAC8AAAABAAAAAAAAAA==",
+              "Title": "DeckManager.cs",
+              "DocumentMoniker": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Assets\\Scripts\\DeckManager.cs",
+              "RelativeDocumentMoniker": "Assets\\Scripts\\DeckManager.cs",
+              "ToolTip": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Assets\\Scripts\\DeckManager.cs",
+              "RelativeToolTip": "Assets\\Scripts\\DeckManager.cs",
+              "ViewState": "AgIAAFsAAAAAAAAAAAAAAHsAAAA5AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-13T15:27:14.674Z",
+              "WhenOpened": "2025-12-23T14:49:15.062Z",
               "EditorCaption": ""
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{cce594b6-0c39-4442-ba28-10c64ac7e89f}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "HandUI.cs",
+              "DocumentMoniker": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Assets\\Scripts\\HandUI.cs",
+              "RelativeDocumentMoniker": "Assets\\Scripts\\HandUI.cs",
+              "ToolTip": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Assets\\Scripts\\HandUI.cs",
+              "RelativeToolTip": "Assets\\Scripts\\HandUI.cs",
+              "ViewState": "AgIAABwAAAAAAAAAAAAYwE4AAAAeAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-23T14:44:59.892Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "CardUI.cs",
+              "DocumentMoniker": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Assets\\Scripts\\CardUI.cs",
+              "RelativeDocumentMoniker": "Assets\\Scripts\\CardUI.cs",
+              "ToolTip": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Assets\\Scripts\\CardUI.cs",
+              "RelativeToolTip": "Assets\\Scripts\\CardUI.cs",
+              "ViewState": "AgIAAE8AAAAAAAAAAIBJwIQAAAAbAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-23T14:37:59.454Z"
             }
           ]
         }
