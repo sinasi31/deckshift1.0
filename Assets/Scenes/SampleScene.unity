@@ -1467,6 +1467,7 @@ GameObject:
   - component: {fileID: 448187557}
   - component: {fileID: 448187558}
   - component: {fileID: 448187559}
+  - component: {fileID: 448187560}
   m_Layer: 5
   m_Name: HandController
   m_TagString: Untagged
@@ -1533,6 +1534,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_HorizontalFit: 2
   m_VerticalFit: 0
+--- !u!114 &448187560
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 448187556}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e29b436fbc062a246825a87811ca6ed3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cardUIPrefab: {fileID: 1348322462062635029, guid: fe02ae68f50b6ec4fb5e2778d2693f30, type: 3}
+  handContainer: {fileID: 448187557}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,3 +1,4 @@
+using System.Collections; // <-- Bunu en tepeye ekle
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -78,4 +79,56 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
             descriptionPanel.SetActive(false);
         }
     }
+    // --- BURADAN BAÞLA ---
+
+    // Kart oynandýðýnda çaðrýlacak ana fonksiyon
+    public void PlayUseAnimation()
+    {
+        // Kartýn týklanabilirliðini kapat (tekrar basýlmasýn)
+        CanvasGroup group = GetComponent<CanvasGroup>();
+
+        // Eðer kartta CanvasGroup yoksa kodla biz ekleyelim
+        if (group == null) group = gameObject.AddComponent<CanvasGroup>();
+
+        group.interactable = false;
+        group.blocksRaycasts = false;
+
+        StartCoroutine(AnimateRoutine(group));
+    }
+
+    // Animasyonun saniye saniye iþlediði yer
+    private IEnumerator AnimateRoutine(CanvasGroup group)
+    {
+        float timer = 0f;
+        float duration = 0.4f; // Animasyon süresi
+
+        Vector3 startPos = transform.position;
+        Vector3 targetPos = startPos + new Vector3(0, 300f, 0); // 300 birim yukarý
+
+        Vector3 startScale = transform.localScale;
+        Vector3 targetScale = startScale * 1.5f; // 1.5 kat büyü
+
+        while (timer < duration)
+        {
+            timer += Time.unscaledDeltaTime;
+            float t = timer / duration;
+
+            // Hareketi yumuþatmak için SmoothStep formülü
+            t = t * t * (3f - 2f * t);
+
+            // 1. Yukarý Taþý
+            transform.position = Vector3.Lerp(startPos, targetPos, t);
+
+            // 2. Büyüt
+            transform.localScale = Vector3.Lerp(startScale, targetScale, t);
+
+            // 3. Þeffaflaþtýr
+            if (group != null) group.alpha = Mathf.Lerp(1f, 0f, t);
+
+            yield return null;
+        }
+
+        Destroy(gameObject); // Animasyon bitince kartý tamamen sil
+    }
+    // --- BURADA BÝTÝR ---
 }
