@@ -6069,6 +6069,8 @@ MonoBehaviour:
   maxHealth: 100
   isInvincible: 0
   defaultJumpForce: 7
+  fallMultiplier: 2.5
+  lowJumpMultiplier: 2
   maxShift: 20
   currentState: 0
   fireballPrefab: {fileID: 6847861146471343392, guid: c410de68076b28846bb5e156129b8267, type: 3}
