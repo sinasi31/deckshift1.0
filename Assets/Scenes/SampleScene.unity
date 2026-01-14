@@ -3895,7 +3895,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerTransform: {fileID: 1988395663}
   roomPrefabs:
-  - {fileID: 3407626564415475163, guid: 44865511e58827f4fb02b140639b3c72, type: 3}
+  - {fileID: 8994572794713311534, guid: 50db830b311bb164986cebcf5f5cc126, type: 3}
 --- !u!4 &1361928416
 Transform:
   m_ObjectHideFlags: 0
@@ -4833,7 +4833,7 @@ SpriteRenderer:
   m_SortingLayerID: 534107945
   m_SortingLayer: -1
   m_SortingOrder: 0
-  m_Sprite: {fileID: -3911092412272352980, guid: 826d868fbf683ae44b6d894e1ddf969a, type: 3}
+  m_Sprite: {fileID: 556542940148546371, guid: 7eb4cba9c37c14b4c80d9517fc96ec52, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -4853,8 +4853,8 @@ Transform:
   m_GameObject: {fileID: 1601525404}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.0301, y: 0.00079999, z: 0}
-  m_LocalScale: {x: 2.0304117, y: 1.9282981, z: 1.190495}
+  m_LocalPosition: {x: 0.0484, y: -0.0034, z: 0}
+  m_LocalScale: {x: 5.262685, y: 3.7316713, z: 1.190495}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
