@@ -1771,7 +1771,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "BLOMPO OFFERS YOU HIS \nBLESSINGS"
+  m_text: "BLOMPO OFFERS YOU IT'S \nBLESSINGS"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -3895,7 +3895,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerTransform: {fileID: 1988395663}
   roomPrefabs:
-  - {fileID: 9171175336316986854, guid: 46f113991b78b214a82458a6ff4c5685, type: 3}
+  - {fileID: 2492960062517277786, guid: 0e325e0cd9ee0a7468d9cc67cbc5804d, type: 3}
 --- !u!4 &1361928416
 Transform:
   m_ObjectHideFlags: 0
@@ -4833,7 +4833,7 @@ SpriteRenderer:
   m_SortingLayerID: 534107945
   m_SortingLayer: -1
   m_SortingOrder: 0
-  m_Sprite: {fileID: -1768854372134492381, guid: 2f956a5cf308f5b42ae58a5c47480ddb, type: 3}
+  m_Sprite: {fileID: -1955448553306655712, guid: 0ab97dcae3e143d49958563ed0b3ba26, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -4853,8 +4853,8 @@ Transform:
   m_GameObject: {fileID: 1601525404}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.05, y: -0.05, z: 0}
-  m_LocalScale: {x: 0.99346524, y: 0.9972193, z: 0.24878411}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1.8938315, y: 1.900988, z: 0.47425434}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -6029,7 +6029,7 @@ Transform:
   m_GameObject: {fileID: 1988395659}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.285, y: -1.7557, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 0.6740601, y: 0.94363236, z: 0.9969745}
   m_ConstrainProportionsScale: 0
   m_Children:
