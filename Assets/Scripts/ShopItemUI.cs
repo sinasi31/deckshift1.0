@@ -1,68 +1,84 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.EventSystems; // Fare hareketlerini algılamak için gerekli
 
 public enum ShopItemType { Card, Relic, Service }
 
-public class ShopItemUI : MonoBehaviour
+public class ShopItemUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
     [Header("UI References")]
     public Image itemIcon;
     public TextMeshProUGUI nameText;
     public TextMeshProUGUI priceText;
-    public TextMeshProUGUI descriptionText; // Hover yapılınca görünecek (opsiyonel)
-    public GameObject soldOutImage; // Satılınca üzerine gelecek "SOLD" görseli
+    public GameObject soldOutImage; // "SOLD" görseli buraya gelecek
     public Button buyButton;
+
+    [Header("Hover / Tooltip Settings")]
+    public GameObject descriptionPanel; // Yeni: Açıklama kutusunun kendisi
+    public TextMeshProUGUI descriptionText; // Yeni: Açıklamanın yazıldığı text
 
     private int price;
     private ShopItemType type;
-
-    // Satılan şeyin verisi
     private CardData cardData;
     private RelicData relicData;
-    private System.Action serviceAction; // Servis (Heal, Remove Card vb.) için fonksiyon
+    private System.Action serviceAction;
 
-    // --- KART İÇİN KURULUM ---
+    private void Start()
+    {
+        // Oyun başında açıklama paneli kapalı olsun
+        if (descriptionPanel != null) descriptionPanel.SetActive(false);
+    }
+
+    // Fare üzerine gelince paneli aç
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        if (descriptionPanel != null && buyButton.interactable)
+        {
+            descriptionPanel.SetActive(true);
+        }
+    }
+
+    // Fare üzerinden gidince paneli kapat
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        if (descriptionPanel != null)
+        {
+            descriptionPanel.SetActive(false);
+        }
+    }
+
     public void SetupCard(CardData card, int cost)
     {
         type = ShopItemType.Card;
         cardData = card;
         price = cost;
-
         itemIcon.sprite = card.cardArt;
         if (nameText) nameText.text = card.cardName;
-        UpdatePriceUI();
-
-        // Tooltip/Açıklama ayarı (CardUI'daki gibi hover sistemi de kurabilirsin)
         if (descriptionText) descriptionText.text = card.description;
+        UpdatePriceUI();
     }
 
-    // --- RELIC İÇİN KURULUM ---
     public void SetupRelic(RelicData relic, int cost)
     {
         type = ShopItemType.Relic;
         relicData = relic;
         price = cost;
-
         itemIcon.sprite = relic.relicArt;
         if (nameText) nameText.text = relic.relicName;
-        UpdatePriceUI();
-
         if (descriptionText) descriptionText.text = relic.description;
+        UpdatePriceUI();
     }
 
-    // --- SERVİS (CAN DOLDURMA VB.) İÇİN KURULUM ---
     public void SetupService(string name, Sprite icon, int cost, string desc, System.Action onBuy)
     {
         type = ShopItemType.Service;
         serviceAction = onBuy;
         price = cost;
-
         itemIcon.sprite = icon;
         if (nameText) nameText.text = name;
-        UpdatePriceUI();
-
         if (descriptionText) descriptionText.text = desc;
+        UpdatePriceUI();
     }
 
     private void UpdatePriceUI()
@@ -72,46 +88,31 @@ public class ShopItemUI : MonoBehaviour
         buyButton.interactable = true;
     }
 
-    // Butona bağlanacak fonksiyon
     public void OnClickBuy()
     {
         PlayerController player = GameManager.instance.player;
-
-        // 1. Para Kontrolü
         if (player.TrySpendGold(price))
         {
-            // 2. Ürünü Ver
             switch (type)
             {
                 case ShopItemType.Card:
                     DeckManager.instance.AddCardToDeck(cardData);
-                    Debug.Log("Kart Satın Alındı: " + cardData.cardName);
                     break;
                 case ShopItemType.Relic:
                     RelicManager.instance.AddRelic(relicData);
-                    Debug.Log("Relic Satın Alındı: " + relicData.relicName);
                     break;
                 case ShopItemType.Service:
-                    serviceAction?.Invoke(); // Servis fonksiyonunu çalıştır
-                    Debug.Log("Servis Satın Alındı.");
+                    serviceAction?.Invoke();
                     break;
             }
-
-            // 3. Görseli "Satıldı" yap
             BuySuccessful();
-        }
-        else
-        {
-            // Para yetmedi efekti (Kızarabilir veya ses çıkabilir)
-            Debug.Log("Para Yetmiyor!");
-            // Örn: priceText.color = Color.red; (Sonra geri düzeltmek gerekir)
         }
     }
 
     private void BuySuccessful()
     {
         if (soldOutImage) soldOutImage.SetActive(true);
-        buyButton.interactable = false; // Tekrar alınamasın
-        // İstersen burada itemIcon.color = Color.gray; yapabilirsin.
+        buyButton.interactable = false;
+        if (descriptionPanel != null) descriptionPanel.SetActive(false);
     }
 }

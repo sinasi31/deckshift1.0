@@ -1,17 +1,29 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\",
+  "WorkspaceRootPath": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|c:\\users\\efe\\documents\\github\\deckshift1.0\\assets\\scripts\\deckmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|c:\\users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\assets\\scripts\\shopitemui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\shopitemui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|c:\\users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\assets\\scripts\\deckmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\deckmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\assets\\scripts\\cardui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|c:\\users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\assets\\scripts\\playercontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\playercontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|c:\\users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\assets\\scripts\\shopmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\shopmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\assets\\scripts\\cardui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\cardui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\assets\\scripts\\handui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\assets\\scripts\\handui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\handui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
@@ -22,19 +34,54 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 1,
+          "SelectedChildIndex": 2,
           "Children": [
             {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{cce594b6-0c39-4442-ba28-10c64ac7e89f}"
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "PlayerController.cs",
+              "DocumentMoniker": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\PlayerController.cs",
+              "RelativeDocumentMoniker": "Assets\\Scripts\\PlayerController.cs",
+              "ToolTip": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\PlayerController.cs",
+              "RelativeToolTip": "Assets\\Scripts\\PlayerController.cs",
+              "ViewState": "AgIAAHwCAAAAAAAAAAAcwJ0CAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-14T21:41:00.491Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "ShopManager.cs",
+              "DocumentMoniker": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\ShopManager.cs",
+              "RelativeDocumentMoniker": "Assets\\Scripts\\ShopManager.cs",
+              "ToolTip": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\ShopManager.cs",
+              "RelativeToolTip": "Assets\\Scripts\\ShopManager.cs",
+              "ViewState": "AgIAACQAAAAAAAAAAAA5wDkAAAA9AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-14T21:11:04.252Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "ShopItemUI.cs",
+              "DocumentMoniker": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\ShopItemUI.cs",
+              "RelativeDocumentMoniker": "Assets\\Scripts\\ShopItemUI.cs",
+              "ToolTip": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\ShopItemUI.cs",
+              "RelativeToolTip": "Assets\\Scripts\\ShopItemUI.cs",
+              "ViewState": "AgIAAEgAAAAAAAAAAAAxwHUAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-14T21:04:59.486Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
               "Title": "DeckManager.cs",
-              "DocumentMoniker": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Assets\\Scripts\\DeckManager.cs",
+              "DocumentMoniker": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\DeckManager.cs",
               "RelativeDocumentMoniker": "Assets\\Scripts\\DeckManager.cs",
-              "ToolTip": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Assets\\Scripts\\DeckManager.cs",
+              "ToolTip": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\DeckManager.cs",
               "RelativeToolTip": "Assets\\Scripts\\DeckManager.cs",
               "ViewState": "AgIAAFsAAAAAAAAAAAAAAHsAAAA5AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
@@ -43,29 +90,27 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 5,
               "Title": "HandUI.cs",
-              "DocumentMoniker": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Assets\\Scripts\\HandUI.cs",
+              "DocumentMoniker": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\HandUI.cs",
               "RelativeDocumentMoniker": "Assets\\Scripts\\HandUI.cs",
-              "ToolTip": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Assets\\Scripts\\HandUI.cs",
+              "ToolTip": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\HandUI.cs",
               "RelativeToolTip": "Assets\\Scripts\\HandUI.cs",
               "ViewState": "AgIAABwAAAAAAAAAAAAYwE4AAAAeAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-23T14:44:59.892Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-12-23T14:44:59.892Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 4,
               "Title": "CardUI.cs",
-              "DocumentMoniker": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Assets\\Scripts\\CardUI.cs",
+              "DocumentMoniker": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\CardUI.cs",
               "RelativeDocumentMoniker": "Assets\\Scripts\\CardUI.cs",
-              "ToolTip": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Assets\\Scripts\\CardUI.cs",
+              "ToolTip": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\CardUI.cs",
               "RelativeToolTip": "Assets\\Scripts\\CardUI.cs",
               "ViewState": "AgIAAE8AAAAAAAAAAAAAAIQAAAAbAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-23T14:37:59.454Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-12-23T14:37:59.454Z"
             }
           ]
         }
