@@ -14,9 +14,11 @@ public class PlayerController : MonoBehaviour
     private float verticalInput;
     private Vector3 originalScale;
     private bool isSquashing = false; // Efekt þu an çalýþýyor mu kontrolü
+    public bool isInUpdraft = false; // Fanýn içindeyken bu true olacak
     [Header("Fall Settings")]
     public float fallDamage = 20f;
     private Vector3 currentRoomEntryPoint;
+
 
     [Header("Economy")]
     public int currentGold = 0; // Mevcut altýn
@@ -159,7 +161,8 @@ public class PlayerController : MonoBehaviour
         // --- BURAYA YAPIÞTIRIYORSUN ---
 
         // Sadece hayalet deðilsek ve duvarda kaymýyorsak bu fiziði uygula
-        if (!isPhasing && currentState != PlayerState.WallSliding)
+        // Sadece hayalet deðilsek, duvarda deðilsek VE FANDA DEÐÝLSEK (!isInUpdraft)
+        if (!isPhasing && currentState != PlayerState.WallSliding && !isInUpdraft)
         {
             // 1. Karakter aþaðý düþüyorsa (Hýzlý Düþüþ)
             if (rb.linearVelocity.y < 0)

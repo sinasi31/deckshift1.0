@@ -34,7 +34,25 @@ public class UpdraftFan : MonoBehaviour
             windParticles.transform.localPosition = fanCollider.offset;
         }
     }
+    // --- BURAYI EKLE ---
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        PlayerController player = other.GetComponent<PlayerController>();
+        if (player != null)
+        {
+            player.isInUpdraft = true; // Oyuncuya "Fandasýn, yerçekimini kapat" de
+        }
+    }
 
+    private void OnTriggerExit2D(Collider2D other)
+    {
+        PlayerController player = other.GetComponent<PlayerController>();
+        if (player != null)
+        {
+            player.isInUpdraft = false; // Oyuncuya "Çýktýn, yerçekimini aç" de
+        }
+    }
+    // -------------------
     private void OnTriggerStay2D(Collider2D other)
     {
         Rigidbody2D rb = other.attachedRigidbody;
