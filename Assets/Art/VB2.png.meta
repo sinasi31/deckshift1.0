@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 0649e7fc68f3054469b2c10318c83023
+guid: a54b7ee426604b2498b77a38862bb83b
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 7759890935455132937
-    second: ezgif-frame-032-removebg-preview_0
+      213: -6795663199175653850
+    second: commoncard_-_Copy_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,23 +100,23 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: ezgif-frame-032-removebg-preview_0
+      name: commoncard_-_Copy_0
       rect:
         serializedVersion: 2
-        x: 39
-        y: 26
-        width: 192
-        height: 157
+        x: 3
+        y: 21
+        width: 53
+        height: 49
       alignment: 0
-      pivot: {x: 0, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 90da39f21bba0bb60800000000000000
-      internalID: 7759890935455132937
+      spriteID: 626c0f74354f0b1a0800000000000000
+      internalID: -6795663199175653850
       vertices: []
       indices: 
       edges: []
@@ -125,7 +125,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 
+    spriteID: 597ba7f4c6e83db4a8dc3b76206507db
     internalID: 0
     vertices: []
     indices: 
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      ezgif-frame-032-removebg-preview_0: 7759890935455132937
+      commoncard_-_Copy_0: -6795663199175653850
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

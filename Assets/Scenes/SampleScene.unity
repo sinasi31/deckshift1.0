@@ -4458,7 +4458,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: b3132bd486128a34183f125375419fd5, type: 2}
   - {fileID: 11400000, guid: 788a6406bf04dcb498f55317f601f2b7, type: 2}
   - {fileID: 11400000, guid: 2b6b5dacabc9303428fb6c97dad09625, type: 2}
-  - {fileID: 11400000, guid: 523cee4ce9c65d749ba3e978c44ae531, type: 2}
+  - {fileID: 11400000, guid: 4ed05ca2f31dc07448877e4390a4ee60, type: 2}
   handCapacity: 4
 --- !u!4 &1329495661
 Transform:
@@ -4584,7 +4584,6 @@ MonoBehaviour:
   playerTransform: {fileID: 1988395663}
   roomPrefabs:
   - {fileID: 3407626564415475163, guid: 44865511e58827f4fb02b140639b3c72, type: 3}
-  - {fileID: 4645761292745309642, guid: 226903306034d834b8555818dda2558f, type: 3}
 --- !u!4 &1361928416
 Transform:
   m_ObjectHideFlags: 0
@@ -6837,8 +6836,11 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 8
   platformPrefab: {fileID: 2884497646027804218, guid: 0c30a27df86ca3d4485ef29c36533548, type: 3}
+  isInUpdraft: 0
   fallDamage: 20
   currentGold: 0
+  biteEffectPrefab: {fileID: 3283776623164260811, guid: 793631f470e29814da8521d7548720a4, type: 3}
+  leapEffectPrefab: {fileID: 4494037052561318430, guid: 1da5ff91634c74043845a8b98d0d41a1, type: 3}
   portalPrefab: {fileID: 908333651306973326, guid: 794d2df75acd43b45bb5028c806b3b7e, type: 3}
   portalMaxRange: 10
   portalCost: 2
@@ -6850,6 +6852,8 @@ MonoBehaviour:
   maxHealth: 100
   isInvincible: 0
   defaultJumpForce: 7
+  fallMultiplier: 2.5
+  lowJumpMultiplier: 2
   maxShift: 20
   currentState: 0
   fireballPrefab: {fileID: 6847861146471343392, guid: c410de68076b28846bb5e156129b8267, type: 3}
