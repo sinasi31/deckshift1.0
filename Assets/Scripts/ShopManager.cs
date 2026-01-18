@@ -42,8 +42,10 @@ public class ShopManager : MonoBehaviour
     public void OpenShop()
     {
         GameManager.instance.SetGameState(GameState.Paused);
-        Time.timeScale = 0f; // Oyunu durdur
+        Time.timeScale = 0f;
         shopPanel.SetActive(true);
+        Cursor.visible = true;
+        Cursor.lockState = CursorLockMode.None;
 
         UpdateGoldUI();
         PopulateShop();
@@ -52,8 +54,10 @@ public class ShopManager : MonoBehaviour
     public void CloseShop()
     {
         shopPanel.SetActive(false);
-        Time.timeScale = 1f; // Oyunu devam ettir
+        Time.timeScale = 1f;
         GameManager.instance.SetGameState(GameState.Playing);
+        Cursor.visible = true;
+        Cursor.lockState = CursorLockMode.Confined;
     }
 
     private void UpdateGoldUI()
@@ -67,7 +71,16 @@ public class ShopManager : MonoBehaviour
     // Satýn alým yaptýkça parayý güncellemek için Update'de veya event ile çaðýrabilirsin
     private void Update()
     {
-        if (shopPanel.activeSelf) UpdateGoldUI();
+        if (shopPanel.activeSelf)
+        {
+            UpdateGoldUI();
+
+            // Klavye ile kapatma desteði
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                CloseShop();
+            }
+        }
     }
 
     private void PopulateShop()

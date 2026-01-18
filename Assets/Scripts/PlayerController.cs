@@ -5,6 +5,7 @@ using UnityEngine.SceneManagement;
 public class PlayerController : MonoBehaviour
 {
     private Rigidbody2D rb;
+    private Animator animator;
     public Transform groundCheck;
     public float groundCheckRadius = 0.2f;
     public LayerMask groundLayer;
@@ -106,6 +107,7 @@ public class PlayerController : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
+        animator = GetComponent<Animator>();
     }
 
     void Start()
@@ -126,14 +128,11 @@ public class PlayerController : MonoBehaviour
         }
         if (currentState == PlayerState.InCannon) return;
 
-        // --- HAYALET MODUNDAYSAK ---
         if (isPhasing)
         {
-            // Hem Yatay (A/D) hem Dikey (W/S) girdiyi al
             moveInput = Input.GetAxisRaw("Horizontal");
             verticalInput = Input.GetAxisRaw("Vertical");
         }
-        // --- NORMAL MODDAYSAK ---
         else
         {
             if (Input.GetButtonDown("Jump"))
@@ -157,6 +156,7 @@ public class PlayerController : MonoBehaviour
         if (!isPhasing)
         {
             HandleStateTransitions();
+            UpdateAnimations();
         }
         // --- BURAYA YAPIÞTIRIYORSUN ---
 
@@ -176,6 +176,21 @@ public class PlayerController : MonoBehaviour
             }
         }
         // -----------------------------
+    }
+    private void UpdateAnimations()
+    {
+        if (animator == null) return;
+
+        // 1. Koþma Animasyonu (Speed parametresi)
+        // moveInput 0 ise duruyor, 1 veya -1 ise koþuyor demektir.
+        // Mathf.Abs ile hep pozitif yapýyoruz (0 ile 1 arasý)
+        animator.SetFloat("Speed", Mathf.Abs(moveInput));
+
+        // 2. Zýplama / Düþme Animasyonu
+        animator.SetBool("IsGrounded", isGrounded);
+
+        // Zýplýyor mu düþüyor mu? (Opsiyonel: Jump ve Fall ayrý animasyonlarsa)
+        animator.SetFloat("yVelocity", rb.linearVelocity.y);
     }
 
     private void HandleJumpInput()
