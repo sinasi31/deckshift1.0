@@ -10,19 +10,18 @@ public class SlotMachineUI : MonoBehaviour
 
     [Header("UI Referansları")]
     public GameObject slotPanel;
-    public TextMeshProUGUI reel1_Text;
-    public TextMeshProUGUI reel2_Text;
-    public TextMeshProUGUI reel3_Text;
     public TextMeshProUGUI resultText;
     public Button closeButton;
 
-    [Header("Görseller (İsteğe Bağlı)")]
-    public Sprite[] symbolSprites;
-    public Image reel1_Img, reel2_Img, reel3_Img;
+    [Header("Makaralar (Yeni Sistem)")]
+    // Buraya yukarıda yazdığımız SlotReel scriptlerini sürükle
+    public SlotReel reel1;
+    public SlotReel reel2;
+    public SlotReel reel3;
 
     // Havuzlar
     private List<RelicData> currentCommonPool;
-    private List<RelicData> currentRarePool; // <-- YENİ EKLENEN
+    private List<RelicData> currentRarePool;
     private List<RelicData> currentEpicPool;
     private List<RelicData> currentLegendaryPool;
 
@@ -34,12 +33,10 @@ public class SlotMachineUI : MonoBehaviour
         if (slotPanel != null) slotPanel.SetActive(false);
     }
 
-    // --- HATANIN ÇÖZÜLDÜĞÜ YER ---
-    // Parantez içine 'List<RelicData> rare' parametresini ekledik.
     public void OpenSlotMachine(List<RelicData> common, List<RelicData> rare, List<RelicData> epic, List<RelicData> legendary, GameObject machineObj)
     {
         currentCommonPool = common;
-        currentRarePool = rare; // Artık 'rare' tanınıyor
+        currentRarePool = rare;
         currentEpicPool = epic;
         currentLegendaryPool = legendary;
         currentMachineObject = machineObj;
@@ -51,34 +48,34 @@ public class SlotMachineUI : MonoBehaviour
         if (resultText != null) resultText.text = "SPINNING...";
 
         // 2. Dönme İşlemini Başlat
-        StartCoroutine(SpinRoutine());
+        StartCoroutine(SpinProcess());
     }
-    // -----------------------------
 
-    private IEnumerator SpinRoutine()
+    private IEnumerator SpinProcess()
     {
-        float duration = 2.5f;
-        float timer = 0f;
-
-        while (timer < duration)
-        {
-            UpdateVisualsRandomly(reel1_Text, reel1_Img);
-            UpdateVisualsRandomly(reel2_Text, reel2_Img);
-            UpdateVisualsRandomly(reel3_Text, reel3_Img);
-            timer += Time.unscaledDeltaTime;
-            yield return null;
-        }
-
-        // --- SONUÇ BELİRLEME (0-7 Arası) ---
         int r1 = Random.Range(0, 8);
         int r2 = Random.Range(0, 8);
         int r3 = Random.Range(0, 8);
+        reel1.Spin(r1, 1.5f);
+        yield return new WaitForSecondsRealtime(0.2f); 
 
-        SetReelFinal(reel1_Text, reel1_Img, r1);
-        SetReelFinal(reel2_Text, reel2_Img, r2);
-        SetReelFinal(reel3_Text, reel3_Img, r3);
+        reel2.Spin(r2, 2.0f);
+        yield return new WaitForSecondsRealtime(0.2f);
 
-        // --- KURUKAFA KONTROLÜ ---
+        reel3.Spin(r3, 2.5f);
+        yield return new WaitForSecondsRealtime(2.5f);
+        CheckRewards(r1, r2, r3);
+
+        if (closeButton != null)
+        {
+            closeButton.gameObject.SetActive(true);
+            closeButton.onClick.RemoveAllListeners();
+            closeButton.onClick.AddListener(ClosePanel);
+        }
+    }
+
+    private void CheckRewards(int r1, int r2, int r3)
+    {
         if (r1 == 0 || r2 == 0 || r3 == 0)
         {
             Debug.Log("KURUKAFA GELDİ! KAYBETTİN.");
@@ -86,14 +83,13 @@ public class SlotMachineUI : MonoBehaviour
         }
         else
         {
-            // --- ÖDÜL HESAPLA ---
             int total = r1 + r2 + r3;
             Debug.Log($"SLOT SONUÇ: {total}");
 
             RelicData reward = null;
             string rarityText = "";
 
-            if (total == 21)
+            if (total == 21) // 7-7-7
             {
                 reward = GetRandomReward(currentLegendaryPool);
                 rarityText = "<color=orange>JACKPOT! (LEGENDARY)</color>";
@@ -108,7 +104,7 @@ public class SlotMachineUI : MonoBehaviour
                 reward = GetRandomReward(currentRarePool);
                 rarityText = "<color=blue>RARE</color>";
             }
-            else // 3-10
+            else
             {
                 reward = GetRandomReward(currentCommonPool);
                 rarityText = "<color=grey>COMMON</color>";
@@ -122,13 +118,6 @@ public class SlotMachineUI : MonoBehaviour
                 RelicManager.instance.AddRelic(reward);
             }
         }
-
-        if (closeButton != null)
-        {
-            closeButton.gameObject.SetActive(true);
-            closeButton.onClick.RemoveAllListeners();
-            closeButton.onClick.AddListener(ClosePanel);
-        }
     }
 
     public void ClosePanel()
@@ -136,33 +125,6 @@ public class SlotMachineUI : MonoBehaviour
         slotPanel.SetActive(false);
         Time.timeScale = 1f;
         if (currentMachineObject != null) Destroy(currentMachineObject);
-    }
-
-    private void UpdateVisualsRandomly(TextMeshProUGUI txt, Image img)
-    {
-        int randomNum = Random.Range(0, 8);
-        if (img != null && symbolSprites != null && symbolSprites.Length > 0)
-        {
-            img.enabled = true;
-            if (txt) txt.enabled = false;
-            if (randomNum < symbolSprites.Length) img.sprite = symbolSprites[randomNum];
-        }
-        else if (txt != null)
-        {
-            txt.text = (randomNum == 0) ? "☠️" : randomNum.ToString();
-        }
-    }
-
-    private void SetReelFinal(TextMeshProUGUI txt, Image img, int val)
-    {
-        if (img != null && symbolSprites != null && symbolSprites.Length > 0)
-        {
-            if (val < symbolSprites.Length) img.sprite = symbolSprites[val];
-        }
-        else if (txt != null)
-        {
-            txt.text = (val == 0) ? "☠️" : val.ToString();
-        }
     }
 
     private RelicData GetRandomReward(List<RelicData> pool)
