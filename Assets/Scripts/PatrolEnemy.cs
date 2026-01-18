@@ -22,6 +22,10 @@ public class PatrolEnemy : MonoBehaviour
     private void Start()
     {
         rb.linearVelocity = new Vector2(moveSpeed, 0);
+        Vector3 fixScale = transform.localScale;
+        fixScale.x *= -1;
+        transform.localScale = fixScale;
+        // --- DÜZELTME BÝTÝÞÝ ---
     }
 
     private void Update()

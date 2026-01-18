@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 6505065351007540142}
   - component: {fileID: 3339397666568596744}
   - component: {fileID: 3726729032928614124}
+  - component: {fileID: 7043704574654365103}
   m_Layer: 11
   m_Name: PatrolEnemy
   m_TagString: Untagged
@@ -30,8 +31,8 @@ Transform:
   m_GameObject: {fileID: 3803665411137259555}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.3338, y: -2.8038, z: 0}
-  m_LocalScale: {x: 0.4333754, y: 0.4333754, z: 0.4333754}
+  m_LocalPosition: {x: 1.3311, y: -2.8051, z: 0}
+  m_LocalScale: {x: 0.5176669, y: 0.5176669, z: 0.5176669}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4771012582291030345}
@@ -153,7 +154,7 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0.3730272, y: 0.015868187}
+  m_Offset: {x: 0.39998507, y: -0.1368919}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
@@ -163,7 +164,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 2.7929256, y: 4.45936}
+  m_Size: {x: 2.4874058, y: 4.15384}
   m_EdgeRadius: 0
 --- !u!114 &3339397666568596744
 MonoBehaviour:
@@ -200,6 +201,28 @@ MonoBehaviour:
   scriptsToDisable:
   - {fileID: 3339397666568596744}
   damagePopupPrefab: {fileID: 2036397937272019125, guid: c4cd6b8e18cb9d141b1b0f9fa894bc1f, type: 3}
+--- !u!95 &7043704574654365103
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3803665411137259555}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: f7ee637c72a374744bcf877e4a1f44cd, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &8083074988721256616
 GameObject:
   m_ObjectHideFlags: 0
@@ -225,7 +248,7 @@ Transform:
   m_GameObject: {fileID: 8083074988721256616}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.15, y: -2.14, z: 0}
+  m_LocalPosition: {x: -0.82, y: -1.84, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
