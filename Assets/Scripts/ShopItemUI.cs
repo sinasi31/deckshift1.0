@@ -1,9 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using UnityEngine.EventSystems; // Fare hareketlerini algılamak için gerekli
-
-public enum ShopItemType { Card, Relic, Service }
+using UnityEngine.EventSystems;
 
 public class ShopItemUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
@@ -11,73 +9,83 @@ public class ShopItemUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
     public Image itemIcon;
     public TextMeshProUGUI nameText;
     public TextMeshProUGUI priceText;
-    public GameObject soldOutImage; // "SOLD" görseli buraya gelecek
+    public GameObject soldOutImage;
     public Button buyButton;
 
-    [Header("Hover / Tooltip Settings")]
-    public GameObject descriptionPanel; // Yeni: Açıklama kutusunun kendisi
-    public TextMeshProUGUI descriptionText; // Yeni: Açıklamanın yazıldığı text
+    [Header("Kart Bilgileri (Sadece Kartlar İçin)")]
+    public GameObject cardStatsPanel; // Shift ve Charge'ın olduğu kutu (Relicse kapatalım)
+    public TextMeshProUGUI shiftText;  // Shift bedelini yazan text
+    public TextMeshProUGUI chargeText; // Charge sayısını yazan text
 
-    private int price;
+    [Header("Hover / Tooltip")]
+    public GameObject descriptionPanel;
+    public TextMeshProUGUI descriptionText;
+
+    private ShopSlotData myData;
     private ShopItemType type;
-    private CardData cardData;
-    private RelicData relicData;
+    private int price;
     private System.Action serviceAction;
 
     private void Start()
     {
-        // Oyun başında açıklama paneli kapalı olsun
         if (descriptionPanel != null) descriptionPanel.SetActive(false);
     }
 
-    // Fare üzerine gelince paneli aç
     public void OnPointerEnter(PointerEventData eventData)
     {
         if (descriptionPanel != null && buyButton.interactable)
-        {
             descriptionPanel.SetActive(true);
-        }
     }
 
-    // Fare üzerinden gidince paneli kapat
     public void OnPointerExit(PointerEventData eventData)
     {
         if (descriptionPanel != null)
-        {
             descriptionPanel.SetActive(false);
+    }
+
+    // --- BURAYI GÜNCELLEDİK ---
+    public void SetupFromData(ShopSlotData data)
+    {
+        myData = data;
+        type = data.itemType;
+        price = data.price;
+
+        if (type == ShopItemType.Card)
+        {
+            itemIcon.sprite = data.cardReference.cardArt;
+            if (nameText) nameText.text = data.cardReference.cardName;
+            if (descriptionText) descriptionText.text = data.cardReference.description;
+
+            if (cardStatsPanel) cardStatsPanel.SetActive(true);
+            if (shiftText) shiftText.text = data.cardReference.shiftCost.ToString();
+            if(chargeText) chargeText.text = data.cardReference.maxUses.ToString();
         }
-    }
+        else if (type == ShopItemType.Relic)
+        {
+            itemIcon.sprite = data.relicReference.relicArt;
+            if (nameText) nameText.text = data.relicReference.relicName;
+            if (descriptionText) descriptionText.text = data.relicReference.description;
+            if (cardStatsPanel) cardStatsPanel.SetActive(false);
+        }
 
-    public void SetupCard(CardData card, int cost)
-    {
-        type = ShopItemType.Card;
-        cardData = card;
-        price = cost;
-        itemIcon.sprite = card.cardArt;
-        if (nameText) nameText.text = card.cardName;
-        if (descriptionText) descriptionText.text = card.description;
         UpdatePriceUI();
-    }
 
-    public void SetupRelic(RelicData relic, int cost)
-    {
-        type = ShopItemType.Relic;
-        relicData = relic;
-        price = cost;
-        itemIcon.sprite = relic.relicArt;
-        if (nameText) nameText.text = relic.relicName;
-        if (descriptionText) descriptionText.text = relic.description;
-        UpdatePriceUI();
+        if (myData.isSold) BuySuccessful();
     }
 
     public void SetupService(string name, Sprite icon, int cost, string desc, System.Action onBuy)
     {
+        myData = null;
         type = ShopItemType.Service;
         serviceAction = onBuy;
         price = cost;
+
         itemIcon.sprite = icon;
         if (nameText) nameText.text = name;
         if (descriptionText) descriptionText.text = desc;
+
+        if (cardStatsPanel) cardStatsPanel.SetActive(false);
+
         UpdatePriceUI();
     }
 
@@ -96,15 +104,17 @@ public class ShopItemUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
             switch (type)
             {
                 case ShopItemType.Card:
-                    DeckManager.instance.AddCardToDeck(cardData);
+                    if (myData != null) DeckManager.instance.AddCardToDeck(myData.cardReference);
                     break;
                 case ShopItemType.Relic:
-                    RelicManager.instance.AddRelic(relicData);
+                    if (myData != null) RelicManager.instance.AddRelic(myData.relicReference);
                     break;
                 case ShopItemType.Service:
                     serviceAction?.Invoke();
                     break;
             }
+
+            if (myData != null) myData.isSold = true;
             BuySuccessful();
         }
     }

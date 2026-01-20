@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 6682800146444715725}
   - component: {fileID: 4470832548366921458}
   - component: {fileID: 4083053409723435075}
-  m_Layer: 9
+  m_Layer: 11
   m_Name: Taret
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -177,7 +177,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 624914422611531266}
-  m_Layer: 9
+  m_Layer: 11
   m_Name: FirePoint
   m_TagString: Untagged
   m_Icon: {fileID: 0}

@@ -1,18 +1,19 @@
 using UnityEngine;
 using System.Collections;
-using System.Collections.Generic; // Listeler için gerekli
+using System.Collections.Generic;
 
 public class EnemyHealth : MonoBehaviour
 {
     [Header("Can Ayarlarý")]
     public float maxHealth = 30f;
     private float currentHealth;
+    private SpriteRenderer spriteRenderer;
 
     [Header("Stun (Sersemletme) Ayarlarý")]
     [Tooltip("Stun yediðinde devre dýþý býrakýlacak scriptleri buraya sürükle (Örn: PatrolEnemy, Turret).")]
-    public List<MonoBehaviour> scriptsToDisable; // Durdurulacak scriptler listesi
+    public List<MonoBehaviour> scriptsToDisable; 
     [Header("Efektler")]
-    public GameObject damagePopupPrefab; // Buraya prefabý sürükleyeceðiz
+    public GameObject damagePopupPrefab; 
 
     private SpriteRenderer enemySprite;
     private Color originalColor;
@@ -20,6 +21,7 @@ public class EnemyHealth : MonoBehaviour
 
     void Start()
     {
+        spriteRenderer = GetComponent<SpriteRenderer>();
         currentHealth = maxHealth;
 
         enemySprite = GetComponent<SpriteRenderer>();
@@ -30,15 +32,18 @@ public class EnemyHealth : MonoBehaviour
     public void TakeDamage(float damage)
     {
         currentHealth -= damage;
+        HitStop.instance.Stop(0.05f);
+        HitStop.instance.Stop(0.15f);
         Debug.Log($"{gameObject.name} hasar aldý! Kalan Can: {currentHealth}");
+        if (spriteRenderer != null)
+        {
+            StartCoroutine(FlashRoutine());
+        }
 
-        // --- YENÝ: HASAR YAZISI ÇIKART ---
         if (damagePopupPrefab != null)
         {
-            // Yazýyý düþmanýn tepesinde yarat
             GameObject popup = Instantiate(damagePopupPrefab, transform.position + Vector3.up * 0.5f, Quaternion.identity);
 
-            // Setup fonksiyonunu çaðýrýp hasarý yazdýr
             popup.GetComponent<DamagePopup>().Setup(Mathf.RoundToInt(damage));
         }
         // ---------------------------------
@@ -48,34 +53,38 @@ public class EnemyHealth : MonoBehaviour
             Die();
         }
     }
+    private System.Collections.IEnumerator FlashRoutine()
+    {
+        // Rengi Kýrmýzý (veya istediðin renk) yap
+        spriteRenderer.color = Color.red;
+
+        // Çok kýsa bekle (0.1 saniye)
+        yield return new WaitForSeconds(0.1f);
+
+        // Rengi normale (Beyaz) döndür
+        spriteRenderer.color = Color.white;
+    }
     private void Die()
     {
         Debug.Log($"{gameObject.name} öldü!");
 
-        // --- SKILL KONTROLLERÝ ---
         if (SkillManager.instance != null)
         {
             // 1. RECYCLE: +1 Shift
             if (SkillManager.instance.HasSkill(SkillType.Recycle))
             {
-                // PlayerController'a ulaþmak için GameManager'ý kullanabiliriz
                 if (GameManager.instance != null && GameManager.instance.player != null)
                     GameManager.instance.player.AddShift(1);
             }
 
-            // 2. VAMPIRE: Can Yenileme
             if (SkillManager.instance.HasSkill(SkillType.VampiricAura))
             {
                 if (GameManager.instance != null && GameManager.instance.player != null)
                     GameManager.instance.player.Heal(5); // 5 Can ver
             }
         }
-        // --- BÝTÝÞ ---
-
         Destroy(gameObject);
     }
-
-    // --- STUN BÖLÜMÜ ---
     public void Stun(float duration)
     {
         if (isStunned) return;
@@ -92,21 +101,15 @@ public class EnemyHealth : MonoBehaviour
         {
             if (script != null) script.enabled = false;
         }
-
-        // 2. Görsel Efekt (Mavi yap)
         if (enemySprite != null) enemySprite.color = Color.blue;
         Debug.Log($"{gameObject.name} DONDU!");
-
-        // 3. Bekle
         yield return new WaitForSeconds(duration);
 
-        // 4. Scriptleri AÇ
         foreach (var script in scriptsToDisable)
         {
             if (script != null) script.enabled = true;
         }
 
-        // 5. Rengi Düzelt
         if (enemySprite != null) enemySprite.color = originalColor;
         isStunned = false;
         Debug.Log($"{gameObject.name} ÇÖZÜLDÜ!");

@@ -8,26 +8,35 @@ public class ShopManager : MonoBehaviour
 
     [Header("UI Panel")]
     public GameObject shopPanel;
-    public TextMeshProUGUI playerGoldText; // "Gold: 150" yazýsý
+    public TextMeshProUGUI playerGoldText;
 
-    [Header("Satýlacak Ürün Havuzlarý")]
+    [Header("Genel Havuzlar")]
     public List<CardData> allCardsPool;
     public List<RelicData> allRelicsPool;
-    public Sprite healIcon; // Can doldurma ikonu
 
-    [Header("Dükkan Raflarý (UI Slotlarý)")]
-    // Unity Inspector'da bu listelere sahnede yarattýðýn ShopItemUI objelerini sürükle
+    [Header("Servis Ýkonlarý")]
+    public Sprite healIcon;
+    public Sprite shiftIcon; // <-- YENÝ: Shift ikonu için bunu sürükle
+
+    [Header("Dükkan Raflarý (UI Slotlar)")]
+    // Unity'de buraya 5 tane slot sürükle
     public List<ShopItemUI> cardSlots;
+    // Unity'de buraya 3 tane slot sürükle
     public List<ShopItemUI> relicSlots;
-    public ShopItemUI serviceSlot; // Genelde 1 tane heal/upgrade slotu olur
 
-    [Header("Fiyatlandýrma")]
-    public int cardPriceMin = 40;
-    public int cardPriceMax = 70;
-    public int relicPriceMin = 100;
-    public int relicPriceMax = 150;
+    // ARTIK 2 AYRI SLOTUMUZ VAR
+    public ShopItemUI healServiceSlot;
+    public ShopItemUI shiftServiceSlot; // <-- YENÝ: +3 Shift slotu
+
+    // ÞU AN AÇIK OLAN MARKET
+    private Shopkeeper currentShopkeeper;
+
+    [Header("Servis Fiyatlarý")]
     public int healCost = 50;
     public int healAmount = 30;
+
+    public int shiftCost = 75; // <-- YENÝ: Shift fiyatý
+    public int shiftAmount = 3; // <-- YENÝ: Kaç shift vereceði
 
     private void Awake()
     {
@@ -39,8 +48,9 @@ public class ShopManager : MonoBehaviour
         if (shopPanel != null) shopPanel.SetActive(false);
     }
 
-    public void OpenShop()
+    public void OpenShop(Shopkeeper shop)
     {
+        currentShopkeeper = shop;
         GameManager.instance.SetGameState(GameState.Paused);
         Time.timeScale = 0f;
         shopPanel.SetActive(true);
@@ -48,7 +58,7 @@ public class ShopManager : MonoBehaviour
         Cursor.lockState = CursorLockMode.None;
 
         UpdateGoldUI();
-        PopulateShop();
+        LoadShopContent();
     }
 
     public void CloseShop()
@@ -58,6 +68,7 @@ public class ShopManager : MonoBehaviour
         GameManager.instance.SetGameState(GameState.Playing);
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.Confined;
+        currentShopkeeper = null;
     }
 
     private void UpdateGoldUI()
@@ -68,70 +79,72 @@ public class ShopManager : MonoBehaviour
         }
     }
 
-    // Satýn alým yaptýkça parayý güncellemek için Update'de veya event ile çaðýrabilirsin
     private void Update()
     {
         if (shopPanel.activeSelf)
         {
             UpdateGoldUI();
-
-            // Klavye ile kapatma desteði
-            if (Input.GetKeyDown(KeyCode.Escape))
-            {
-                CloseShop();
-            }
+            if (Input.GetKeyDown(KeyCode.Escape)) CloseShop();
         }
     }
 
-    private void PopulateShop()
+    private void LoadShopContent()
     {
-        // 1. Kartlarý Doldur (Rastgele)
-        foreach (var slot in cardSlots)
-        {
-            if (allCardsPool.Count > 0)
-            {
-                CardData randomCard = allCardsPool[Random.Range(0, allCardsPool.Count)];
-                int price = Random.Range(cardPriceMin, cardPriceMax);
-                // Nadirliðe göre fiyat artýrabilirsin (Opsiyonel)
-                // if(randomCard.rarity == Rarity.Rare) price += 50;
+        // 1. Önce tüm slotlarý kapat (Temizlik)
+        foreach (var slot in cardSlots) slot.gameObject.SetActive(false);
+        foreach (var slot in relicSlots) slot.gameObject.SetActive(false);
+        if (healServiceSlot) healServiceSlot.gameObject.SetActive(false);
+        if (shiftServiceSlot) shiftServiceSlot.gameObject.SetActive(false);
 
-                slot.gameObject.SetActive(true);
-                slot.SetupCard(randomCard, price);
-            }
-            else
+        if (currentShopkeeper == null) return;
+
+        // 2. Shopkeeper'dan gelenleri diz
+        int cardIndex = 0;
+        int relicIndex = 0;
+
+        foreach (ShopSlotData data in currentShopkeeper.myInventory)
+        {
+            // Kartlarý Diz (Listenin boyutu kadar)
+            if (data.itemType == ShopItemType.Card && cardIndex < cardSlots.Count)
             {
-                slot.gameObject.SetActive(false);
+                ShopItemUI slot = cardSlots[cardIndex];
+                slot.gameObject.SetActive(true);
+                slot.SetupFromData(data);
+                cardIndex++;
+            }
+            // Relicleri Diz
+            else if (data.itemType == ShopItemType.Relic && relicIndex < relicSlots.Count)
+            {
+                ShopItemUI slot = relicSlots[relicIndex];
+                slot.gameObject.SetActive(true);
+                slot.SetupFromData(data);
+                relicIndex++;
             }
         }
-
-        // 2. Relicleri Doldur
-        foreach (var slot in relicSlots)
+        if (healServiceSlot != null)
         {
-            if (allRelicsPool.Count > 0)
-            {
-                RelicData randomRelic = allRelicsPool[Random.Range(0, allRelicsPool.Count)];
-                int price = Random.Range(relicPriceMin, relicPriceMax);
-
-                slot.gameObject.SetActive(true);
-                slot.SetupRelic(randomRelic, price);
-            }
-            else
-            {
-                slot.gameObject.SetActive(false);
-            }
-        }
-
-        // 3. Servis (Can Doldurma)
-        if (serviceSlot != null)
-        {
-            serviceSlot.SetupService(
-                "Repair Kit",
+            healServiceSlot.gameObject.SetActive(true);
+            healServiceSlot.SetupService(
+                "Medical Kit",
                 healIcon,
                 healCost,
-                $"Heal {healAmount} HP",
+                $"Restores <color=green>{healAmount} HP</color>.",
                 () => {
                     // Satýn alýnýnca çalýþacak kod:
                     GameManager.instance.player.Heal(healAmount);
+                }
+            );
+        }
+        if (shiftServiceSlot != null)
+        {
+            shiftServiceSlot.gameObject.SetActive(true);
+            shiftServiceSlot.SetupService(
+                "Shift Battery",
+                shiftIcon,
+                shiftCost,
+                $"Grants +{shiftAmount} Shift</color>.",
+                () => {
+                    GameManager.instance.player.AddShift(shiftAmount);
                 }
             );
         }

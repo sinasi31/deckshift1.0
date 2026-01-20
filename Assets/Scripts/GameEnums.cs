@@ -7,7 +7,8 @@ public enum PlayerState
     Dashing,
     KnockedBack,
     WallSliding,
-    InCannon
+    InCannon,
+    CometDiving,
 }
 
 public enum CardActionType
@@ -24,7 +25,8 @@ public enum CardActionType
     VampiricBite,
     GlassWail,
     Phase,
-
+    CometDive,
+    Adrenaline,
 }
 
 public enum SkillType

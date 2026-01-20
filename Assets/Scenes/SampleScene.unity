@@ -1488,11 +1488,14 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 5a5a5f031de93eb47aa35dc69d7c61e0, type: 2}
   - {fileID: 11400000, guid: 788a6406bf04dcb498f55317f601f2b7, type: 2}
   - {fileID: 11400000, guid: 26ab3f4e031f6eb4198d3c3e6942ff07, type: 2}
+  - {fileID: 11400000, guid: 37698d1e7ae28e54c902f9fd0a2475e6, type: 2}
+  - {fileID: 11400000, guid: 7714926994241fe46b0e14f010dcb23c, type: 2}
   allRelicsPool:
   - {fileID: 11400000, guid: e3ed7c54e5cf12e40ba922beb90f774d, type: 2}
   - {fileID: 11400000, guid: 725ba5b1c724cc549be3c29733632cb3, type: 2}
   - {fileID: 11400000, guid: 93fb4825864f14e49b326d09239f90b2, type: 2}
   healIcon: {fileID: -205270267638800340, guid: ba4ddf2b7efc51b4d8eb0fb5d81e0d71, type: 3}
+  shiftIcon: {fileID: 1429464083344649065, guid: e37bcb463881c9f428cfc77bed644af3, type: 3}
   cardSlots:
   - {fileID: 529317538}
   - {fileID: 211152070}
@@ -1503,13 +1506,12 @@ MonoBehaviour:
   - {fileID: 1817549223}
   - {fileID: 196730385}
   - {fileID: 1117918468}
-  serviceSlot: {fileID: 377589134}
-  cardPriceMin: 40
-  cardPriceMax: 70
-  relicPriceMin: 100
-  relicPriceMax: 150
+  healServiceSlot: {fileID: 377589134}
+  shiftServiceSlot: {fileID: 1206052637}
   healCost: 50
   healAmount: 30
+  shiftCost: 75
+  shiftAmount: 3
 --- !u!1001 &300847655
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3367,6 +3369,50 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 7695326855998578590, guid: b853c117ba40ec3459b51fc1a1daaad6, type: 3}
   m_PrefabInstance: {fileID: 709046821}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &729733869
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 729733870}
+  - component: {fileID: 729733871}
+  m_Layer: 0
+  m_Name: EffectManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &729733870
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 729733869}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -1002.5008, y: -1008.3779, z: 3.8538597}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1252172376}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &729733871
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 729733869}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5bc8fa9d8c1581040ad9c60fb252660e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &740180028
 GameObject:
   m_ObjectHideFlags: 0
@@ -5345,6 +5391,17 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: -324}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1206052637 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4566449952515792332, guid: b853c117ba40ec3459b51fc1a1daaad6, type: 3}
+  m_PrefabInstance: {fileID: 410010176}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a3a59c0993df644eb81e6dfb1cf1fb9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1252172375
 GameObject:
   m_ObjectHideFlags: 0
@@ -5385,6 +5442,7 @@ Transform:
   - {fileID: 1413185473}
   - {fileID: 994042989}
   - {fileID: 283644298}
+  - {fileID: 729733870}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1257228393
@@ -5424,7 +5482,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -24.362, y: 0}
+  m_AnchoredPosition: {x: -24.36206, y: 0}
   m_SizeDelta: {x: -920, y: -280}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1257228395
@@ -5788,10 +5846,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   player: {fileID: 1988395664}
   startingDeck:
-  - {fileID: 11400000, guid: b3132bd486128a34183f125375419fd5, type: 2}
   - {fileID: 11400000, guid: 788a6406bf04dcb498f55317f601f2b7, type: 2}
-  - {fileID: 11400000, guid: 2b6b5dacabc9303428fb6c97dad09625, type: 2}
-  - {fileID: 11400000, guid: 523cee4ce9c65d749ba3e978c44ae531, type: 2}
+  - {fileID: 11400000, guid: 7714926994241fe46b0e14f010dcb23c, type: 2}
+  - {fileID: 11400000, guid: 37698d1e7ae28e54c902f9fd0a2475e6, type: 2}
+  - {fileID: 11400000, guid: 7714926994241fe46b0e14f010dcb23c, type: 2}
   handCapacity: 4
 --- !u!4 &1329495661
 Transform:
@@ -9555,7 +9613,7 @@ MonoBehaviour:
   groundCheckRadius: 0.2
   groundLayer:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 2057
   platformPrefab: {fileID: 2884497646027804218, guid: 0c30a27df86ca3d4485ef29c36533548, type: 3}
   fallDamage: 20
   currentGold: 0
@@ -9571,6 +9629,14 @@ MonoBehaviour:
   isInvincible: 0
   defaultJumpForce: 7
   maxShift: 20
+  currentShift: 0
+  cometSpeed: 25
+  cometDamage: 40
+  cometRadius: 5
+  cometImpactEffect: {fileID: 0}
+  adrenalineDuration: 8
+  slowMotionFactor: 0.4
+  speedBoostMultiplier: 4
   currentState: 0
   fireballPrefab: {fileID: 6847861146471343392, guid: c410de68076b28846bb5e156129b8267, type: 3}
   firePoint: {fileID: 381632836}
