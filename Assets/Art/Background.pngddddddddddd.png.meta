@@ -1,14 +1,10 @@
 fileFormatVersion: 2
-<<<<<<< HEAD
-guid: 0ab97dcae3e143d49958563ed0b3ba26
-=======
-guid: a9d94f631ecbd3149a5d6f57c843247d
->>>>>>> EFES
+guid: 826d868fbf683ae44b6d894e1ddf969a
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -1955448553306655712
-    second: Background_0
+      213: -3911092412272352980
+    second: Background.pngddddddddddd_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -104,18 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Background_0
+      name: Background.pngddddddddddd_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-<<<<<<< HEAD
         width: 1920
         height: 1080
-=======
-        width: 7016
-        height: 4961
->>>>>>> EFES
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -124,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 024fa93b6e9dcd4e0800000000000000
-      internalID: -1955448553306655712
+      spriteID: c21e7c24c2209b9c0800000000000000
+      internalID: -3911092412272352980
       vertices: []
       indices: 
       edges: []
@@ -143,12 +134,8 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-<<<<<<< HEAD
-    nameFileIdTable: {}
-=======
     nameFileIdTable:
-      Background_0: -1955448553306655712
->>>>>>> EFES
+      Background.pngddddddddddd_0: -3911092412272352980
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
