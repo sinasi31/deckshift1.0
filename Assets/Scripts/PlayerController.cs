@@ -14,12 +14,9 @@ public class PlayerController : MonoBehaviour
     private bool isPhasing = false;        
     private float verticalInput;
     private Vector3 originalScale;
-    private bool isSquashing = false; // Efekt þu an çalýþýyor mu kontrolü
-    public bool isInUpdraft = false; // Fanýn içindeyken bu true olacak
     [Header("Fall Settings")]
     public float fallDamage = 20f;
     private Vector3 currentRoomEntryPoint;
-
 
     [Header("Economy")]
     public int currentGold = 0;
@@ -76,9 +73,6 @@ public class PlayerController : MonoBehaviour
 
     [Header("Jump Settings")]
     public float defaultJumpForce = 10f;
-    [Header("Better Jump Physics")]
-    public float fallMultiplier = 2.5f; // Düþerken 2.5 kat daha hýzlý düþsün (Tok his)
-    public float lowJumpMultiplier = 2f; // Tuþa az basarsan kýsa zýplasýn
 
     [Header("Shift Settings")]
     public int maxShift = 3;
@@ -159,24 +153,6 @@ public class PlayerController : MonoBehaviour
             HandleStateTransitions();
             UpdateAnimations();
         }
-        // --- BURAYA YAPIÞTIRIYORSUN ---
-
-        // Sadece hayalet deðilsek ve duvarda kaymýyorsak bu fiziði uygula
-        // Sadece hayalet deðilsek, duvarda deðilsek VE FANDA DEÐÝLSEK (!isInUpdraft)
-        if (!isPhasing && currentState != PlayerState.WallSliding && !isInUpdraft)
-        {
-            // 1. Karakter aþaðý düþüyorsa (Hýzlý Düþüþ)
-            if (rb.linearVelocity.y < 0)
-            {
-                rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (fallMultiplier - 1) * Time.deltaTime;
-            }
-            // 2. Karakter yukarý çýkýyor ama oyuncu elini tuþtan çektiyse (Kýsa Zýplama)
-            else if (rb.linearVelocity.y > 0 && !Input.GetButton("Jump"))
-            {
-                rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (lowJumpMultiplier - 1) * Time.deltaTime;
-            }
-        }
-        // -----------------------------
     }
     private void UpdateAnimations()
     {
@@ -330,12 +306,7 @@ public class PlayerController : MonoBehaviour
     {
         if (currentShift > 0)
         {
-<<<<<<< HEAD
             currentShift--;
-=======
-            StartCoroutine(ElasticEffect(0.6f, 1.4f, 0.1f)); // Ýncel ve uza
-            currentShift--; // 'currentShifts' DEÐÝL, 'currentShift'
->>>>>>> EFES
             Debug.Log($"Jumped! Shift remaining: {currentShift}");
 
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
@@ -452,17 +423,7 @@ public class PlayerController : MonoBehaviour
     {
         currentRoomEntryPoint = entryPoint;
     }
-    // --- BURAYA YAPIÞTIR ---
-    private void OnCollisionEnter2D(Collision2D collision)
-    {
-        // 1. Zemin kontrolü (Ayaklar yere deðdi mi?)
-        // 2. Hýz kontrolü (Hýzýmýz 5'ten büyük mü? Yani sert mi düþtük?)
-        // 3. Kilit kontrolü (Zaten efekt çalýþýyor mu?)
-        if (collision.contacts[0].normal.y > 0.5f && collision.relativeVelocity.magnitude > 5f && !isSquashing)
-        {
-            StartCoroutine(ElasticEffect(1.4f, 0.6f, 0.1f));
-        }
-    }
+
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (other.CompareTag("DeathZone"))
@@ -849,39 +810,5 @@ public class PlayerController : MonoBehaviour
         rb.bodyType = RigidbodyType2D.Dynamic;
         rb.AddForce(forceVector, ForceMode2D.Impulse);
         ChangeState(PlayerState.Jumping);
-    }
-    IEnumerator ElasticEffect(float x, float y, float seconds)
-    {
-        isSquashing = true; // KÝLÝTLE: Efekt baþladý, baþkasý araya giremez
-
-        float timer = 0;
-        float currentDirection = Mathf.Sign(transform.localScale.x);
-        Vector3 startScale = transform.localScale;
-
-        // Yönü koruyarak hedef boyutu hesapla
-        Vector3 targetScale = new Vector3(Mathf.Abs(originalScale.x) * x * currentDirection, originalScale.y * y, originalScale.z);
-
-        // 1. Hedef boyuta git
-        while (timer < seconds)
-        {
-            timer += Time.deltaTime;
-            transform.localScale = Vector3.Lerp(startScale, targetScale, timer / seconds);
-            yield return null;
-        }
-
-        // 2. Orijinal boyuta geri dön
-        timer = 0;
-        // Orijinal boyutu da yönü koruyarak ayarla
-        Vector3 finalScale = new Vector3(Mathf.Abs(originalScale.x) * currentDirection, originalScale.y, originalScale.z);
-
-        while (timer < seconds)
-        {
-            timer += Time.deltaTime;
-            transform.localScale = Vector3.Lerp(targetScale, finalScale, timer / seconds);
-            yield return null;
-        }
-
-        transform.localScale = finalScale; // Boyutu garanti düzelt
-        isSquashing = false; // KÝLÝDÝ AÇ: Artýk tekrar çalýþabilir
     }
 }
