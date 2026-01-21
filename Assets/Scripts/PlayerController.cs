@@ -40,6 +40,9 @@ public class PlayerController : MonoBehaviour
             return false;
         }
     }
+    [Header("VFX Settings")]
+    public GameObject biteEffectPrefab; // Hazýrladýðýmýz kýrmýzý kalýbý buraya koyacaðýz.
+    public GameObject leapEffectPrefab; // --- YENÝ EKLENEN: Leap efekti prefabý ---
 
     [Header("Portal Settings")]
     public GameObject portalPrefab; // Portal prefabýný buraya sürükleyeceðiz
@@ -231,6 +234,13 @@ public class PlayerController : MonoBehaviour
             case CardActionType.Jump:
                 rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
                 rb.AddForce(new Vector2(0f, value), ForceMode2D.Impulse);
+                // 2. YENÝ EKLEME: Sadece efekti oluþturuyoruz
+                if (leapEffectPrefab != null)
+                {
+                    // Ayaklarýn hizasý için Y ekseninde -0.8f aþaðý iniyoruz
+                    Vector3 spawnPos = transform.position + new Vector3(0f, -0.8f, 0f);
+                    Instantiate(leapEffectPrefab, spawnPos, Quaternion.identity);
+                }
                 ChangeState(PlayerState.Jumping);
                 return true;
             case CardActionType.VampiricBite:
@@ -556,6 +566,12 @@ public class PlayerController : MonoBehaviour
             {
                 targetHealth.TakeDamage(damageAmount); // Hasar ver
                 Heal(biteHealAmount); // Can çal
+                // --- BURAYA YAPIÞTIR ---
+                if (biteEffectPrefab != null)
+                {
+                    Instantiate(biteEffectPrefab, hitEnemy.transform.position, Quaternion.identity);
+                }
+                // -----------------------
                 Debug.Log("Bir þey ýsýrýldý!");
             }
             // --- BÝTÝÞ ---
