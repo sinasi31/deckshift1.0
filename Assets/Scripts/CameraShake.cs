@@ -1,43 +1,51 @@
 using UnityEngine;
-using System.Collections;
+using Unity.Cinemachine;
 
 public class CameraShake : MonoBehaviour
 {
     public static CameraShake instance;
 
+    private CinemachineCamera cinemachineCamera;
+    private CinemachineBasicMultiChannelPerlin perlinComponent;
+
+    private float shakeTimer;
+
+    // YENÝ: Bu çarpan sayesinde koddan gelen küçük sayýlarý (1, 2 gibi) devasa sarsýntýlara çevireceðiz.
+    [Header("Sarsýntý Ayarlarý")]
+    public float shakeMultiplier = 5f; // Bunu Inspector'dan arttýrabilirsin (örn: 10 yap)
+
     private void Awake()
     {
         if (instance == null) instance = this;
+
+        cinemachineCamera = GetComponent<CinemachineCamera>();
+        perlinComponent = GetComponent<CinemachineBasicMultiChannelPerlin>();
     }
 
-    /// <summary>
-    /// Ekraný sallar.
-    /// </summary>
-    /// <param name="duration">Ne kadar sürecek? (örn: 0.1s)</param>
-    /// <param name="magnitude">Ne kadar þiddetli olacak? (örn: 0.2)</param>
-    public void Shake(float duration, float magnitude)
+    public void Shake(float intensity, float time)
     {
-        StartCoroutine(ShakeRoutine(duration, magnitude));
-    }
-
-    private IEnumerator ShakeRoutine(float duration, float magnitude)
-    {
-        Vector3 originalPos = transform.position; // Kameranýn orijinal yerini kaydet
-        float elapsed = 0.0f;
-
-        while (elapsed < duration)
+        if (perlinComponent != null)
         {
-            // Rastgele bir x ve y ofseti belirle
-            float x = Random.Range(-1f, 1f) * magnitude;
-            float y = Random.Range(-1f, 1f) * magnitude;
+            // Gelen þiddeti çarpan ile büyüt
+            perlinComponent.AmplitudeGain = intensity * shakeMultiplier;
 
-            // Kamerayý titret
-            transform.position = new Vector3(originalPos.x + x, originalPos.y + y, originalPos.z);
-
-            elapsed += Time.deltaTime;
-
-            yield return null; // Bir sonraki kareyi bekle
+            shakeTimer = time;
         }
-        transform.position = originalPos;
+    }
+
+    private void Update()
+    {
+        if (shakeTimer > 0)
+        {
+            shakeTimer -= Time.deltaTime;
+
+            if (shakeTimer <= 0f)
+            {
+                if (perlinComponent != null)
+                {
+                    perlinComponent.AmplitudeGain = 0f;
+                }
+            }
+        }
     }
 }
