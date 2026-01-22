@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using System;
+using System.Collections;
 
 public class DeckManager : MonoBehaviour
 {
@@ -17,9 +18,17 @@ public class DeckManager : MonoBehaviour
     private List<RuntimeCard> discardPile = new List<RuntimeCard>();
     public int handCapacity = 4;
 
+    private int selectedIndex = -1;
+    private bool isReloading = false;
+
     public List<RuntimeCard> GetCurrentHand()
     {
         return hand;
+    }
+
+    public int GetSelectedIndex()
+    {
+        return selectedIndex;
     }
 
     private void Awake()
@@ -36,20 +45,42 @@ public class DeckManager : MonoBehaviour
             drawPile.Add(newCardInstance);
         }
         ShuffleDeck();
-        for (int i = 0; i < handCapacity; i++)
+        ReloadHand();
+    }
+
+    // Inputlarý PlayerController'a taþýdýðýmýz için Update temizlendi
+
+    public void SelectCard(int index)
+    {
+        if (isReloading) return;
+        if (index < 0 || index >= hand.Count) return;
+
+        if (selectedIndex != -1 && selectedIndex < hand.Count)
         {
-            DrawCard();
+            hand[selectedIndex].isSelected = false;
         }
+
+        selectedIndex = index;
+        hand[selectedIndex].isSelected = true;
+
+        // UI'ýn seçimi göstermesi için event tetikleyebiliriz
         OnHandChanged?.Invoke();
     }
 
-    void Update()
+    public void DeselectCard()
     {
-        if (GameManager.instance.currentState != GameState.Playing) return;
-        if (Input.GetKeyDown(KeyCode.Alpha1)) PlayCard(0);
-        if (Input.GetKeyDown(KeyCode.Alpha2)) PlayCard(1);
-        if (Input.GetKeyDown(KeyCode.Alpha3)) PlayCard(2);
-        if (Input.GetKeyDown(KeyCode.Alpha4)) PlayCard(3);
+        if (selectedIndex != -1 && selectedIndex < hand.Count)
+        {
+            hand[selectedIndex].isSelected = false;
+        }
+        selectedIndex = -1;
+        OnHandChanged?.Invoke();
+    }
+
+    public void TryCastSelectedCard()
+    {
+        if (isReloading || selectedIndex == -1) return;
+        PlayCard(selectedIndex);
     }
 
     public void DrawCard()
@@ -65,43 +96,67 @@ public class DeckManager : MonoBehaviour
 
         RuntimeCard drawnCard = drawPile[0];
         drawPile.RemoveAt(0);
+        drawnCard.isSelected = false;
+
         hand.Add(drawnCard);
     }
 
-    // --- DÜZELTÝLMÝÞ VE SKILL ENTEGRELÝ PLAYCARD FONKSÝYONU ---
+    public void ReloadHand()
+    {
+        if (isReloading) return;
+        StartCoroutine(ReloadRoutine());
+    }
+
+    private IEnumerator ReloadRoutine()
+    {
+        isReloading = true;
+        DeselectCard();
+
+        // Buraya "Shuffling..." sesi veya efekti eklenebilir
+        yield return new WaitForSeconds(0.5f);
+
+        // Mevcut eli ýskartaya at
+        if (hand.Count > 0)
+        {
+            discardPile.AddRange(hand);
+            hand.Clear();
+        }
+
+        // Yeni el çek
+        for (int i = 0; i < handCapacity; i++)
+        {
+            DrawCard();
+        }
+
+        OnHandChanged?.Invoke();
+        isReloading = false;
+    }
+
     private void PlayCard(int handIndex)
     {
         if (handIndex >= hand.Count) return;
 
-        // Deðiþkenleri SADECE BURADA tanýmlýyoruz
         RuntimeCard playedCard = hand[handIndex];
         CardData cardTemplate = playedCard.cardData;
 
-        // --- SKILL KONTROLÜ: Kinetic Discount ---
         int finalCost = cardTemplate.shiftCost;
         if (SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.KineticDiscount))
         {
             finalCost = Mathf.Max(0, finalCost - 1);
         }
-        // ----------------------------------------
 
-        // 1. Shift Maliyet Kontrolü
         if (player.GetCurrentShift() < finalCost)
         {
             Debug.LogWarning($"Yeterli SHIFT yok! Gerekli: {finalCost}");
             return;
         }
 
-        // 2. Kullaným Hakký Kontrolü (Sonsuz deðilse)
         if (!playedCard.isInfinite && playedCard.currentUses <= 0)
         {
             Debug.LogWarning($"Kartýn kullaným hakký bitmiþ: {cardTemplate.cardName}");
             return;
         }
 
-        // --- Kartý Oyna ---
-        // Portal gibi özel kartlar shift'i kendi içinde harcayabilir, 
-        // standart kartlar için burada harcýyoruz.
         if (cardTemplate.actionType != CardActionType.Portal)
         {
             player.SpendShift(finalCost);
@@ -111,47 +166,34 @@ public class DeckManager : MonoBehaviour
 
         if (success)
         {
-            // Eðer kart (Portal'ýn ilk aþamasý gibi) elde kalmalýysa çýk.
             if (keepInHand) return;
-            // --- BURAYI YAPIÞTIR (DÜZELTÝLMÝÞ HALÝ) ---
 
-            // Sahnede HandUI scriptini bul ve çalýþtýr
             HandUI ui = FindFirstObjectByType<HandUI>();
             if (ui != null)
             {
                 ui.AnimateCardFromHand(handIndex);
             }
-            // ------------------------------------------
-            // --- KULLANIM HAKKI DÜÞME ---
+
             if (!playedCard.isInfinite)
             {
                 playedCard.currentUses--;
-                Debug.Log($"{cardTemplate.cardName} oynandý. Kalan: {playedCard.currentUses}");
             }
-            else
-            {
-                Debug.Log($"{cardTemplate.cardName} (SONSUZ) oynandý.");
-            }
-            // ----------------------------
 
             hand.RemoveAt(handIndex);
 
-            // Kartý Mezarlýða Gönder (Sonsuzsa veya hakký varsa)
+            // Seçimi sýfýrla çünkü liste kaydý
+            selectedIndex = -1;
+
             if (playedCard.isInfinite || playedCard.currentUses > 0)
             {
                 if (!cardTemplate.singleUse || playedCard.isInfinite)
                     discardPile.Add(playedCard);
             }
-            else
-            {
-                Debug.Log($"{cardTemplate.cardName} bitti, silindi.");
-            }
 
-            DrawCard();
+            // DÝKKAT: DrawCard() ÇAÐIRMIYORUZ. Slot boþ kalmalý.
             OnHandChanged?.Invoke();
         }
     }
-    // -----------------------------------------------------------
 
     private void ShuffleDeck()
     {
@@ -168,18 +210,5 @@ public class DeckManager : MonoBehaviour
     {
         RuntimeCard newCardInstance = new RuntimeCard(newCardData);
         discardPile.Add(newCardInstance);
-    }
-    public void RefillHand()
-    {
-        while (hand.Count < handCapacity)
-        {
-            if (drawPile.Count == 0 && discardPile.Count == 0)
-            {
-                break;
-            }
-
-            DrawCard();
-        }
-        OnHandChanged?.Invoke();
     }
 }

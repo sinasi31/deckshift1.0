@@ -11,44 +11,26 @@ public class PlayerController : MonoBehaviour
     public LayerMask groundLayer;
     public GameObject platformPrefab;
     private SpriteRenderer spriteRenderer;
-    private bool isPhasing = false;        
+    private bool isPhasing = false;
     private float verticalInput;
     private Vector3 originalScale;
+    private Vector3 currentRoomEntryPoint;
+
     [Header("Fall Settings")]
     public float fallDamage = 20f;
-    private Vector3 currentRoomEntryPoint;
 
     [Header("Economy")]
     public int currentGold = 0;
-    public void AddGold(int amount)
-    {
-        currentGold += amount;
-        Debug.Log($"Altýn kazanýldý: {amount}. Toplam: {currentGold}");
-    }
-    public bool TrySpendGold(int amount)
-    {
-        if (currentGold >= amount)
-        {
-            currentGold -= amount;
-            Debug.Log($"Altýn harcandý: {amount}. Kalan: {currentGold}");
-            // TODO: UI güncellemesi
-            return true;
-        }
-        else
-        {
-            Debug.Log("Yetersiz Bakiye!");
-            return false;
-        }
-    }
+
     [Header("VFX Settings")]
-    public GameObject biteEffectPrefab; // Hazýrladýðýmýz kýrmýzý kalýbý buraya koyacaðýz.
-    public GameObject leapEffectPrefab; // --- YENÝ EKLENEN: Leap efekti prefabý ---
+    public GameObject biteEffectPrefab;
+    public GameObject leapEffectPrefab;
 
     [Header("Portal Settings")]
-    public GameObject portalPrefab; // Portal prefabýný buraya sürükleyeceðiz
-    public float portalMaxRange = 10f; // Ýki portal arasý maksimum mesafe
+    public GameObject portalPrefab;
+    public float portalMaxRange = 10f;
     public int portalCost = 2;
-    private Portal firstPortalInstance; // Sahnedeki ilk portalý aklýmýzda tutacaðýz
+    private Portal firstPortalInstance;
 
     [Header("Wall Settings")]
     public Transform wallCheck;
@@ -81,15 +63,17 @@ public class PlayerController : MonoBehaviour
     public int maxShift = 3;
     public int currentShift;
     public int GetCurrentShift() { return currentShift; }
+
     [Header("Comet Dive Settings")]
-    public float cometSpeed = 25f; 
-    public float cometDamage = 40f; 
-    public float cometRadius = 3f;  
+    public float cometSpeed = 25f;
+    public float cometDamage = 40f;
+    public float cometRadius = 3f;
     public GameObject cometImpactEffect;
+
     [Header("Adrenaline Card Settings")]
-    public float adrenalineDuration = 3f;  // Etki ne kadar sürsün?
-    public float slowMotionFactor = 0.4f; // Zaman ne kadar yavaþlasýn? (0.5 = yarým hýz)
-    public float speedBoostMultiplier = 1.5f; // Düþük canda ne kadar hýzlanalým?
+    public float adrenalineDuration = 3f;
+    public float slowMotionFactor = 0.4f;
+    public float speedBoostMultiplier = 1.5f;
 
     public PlayerState currentState;
     private bool isGrounded;
@@ -97,11 +81,10 @@ public class PlayerController : MonoBehaviour
     [Header("Combat Settings")]
     public GameObject fireballPrefab;
     public Transform firePoint;
-    public float wailRange = 10f; // Çýðlýk menzili
-    // VAMPIRIC BITE 
-    public float biteRange = 1.5f; // Isýrma menzili (kýsa olmalý)
-    public float biteHealAmount = 10f; // Isýrýnca kaç can geleceði
-    public LayerMask enemyLayer; // Düþmanlarý tanýmak için katman maskesi
+    public float wailRange = 10f;
+    public float biteRange = 1.5f;
+    public float biteHealAmount = 10f;
+    public LayerMask enemyLayer;
 
 
     void Awake()
@@ -115,7 +98,7 @@ public class PlayerController : MonoBehaviour
     {
         originalScale = transform.localScale;
         currentHealth = maxHealth;
-        currentShift = maxShift; // Güncellendi
+        currentShift = maxShift;
         ChangeState(PlayerState.Idle);
     }
 
@@ -127,6 +110,13 @@ public class PlayerController : MonoBehaviour
             verticalInput = 0;
             return;
         }
+        HandleCardInput();
+
+        if (Input.GetKeyDown(KeyCode.E))
+        {
+            CheckInteraction();
+        }
+
         if (currentState == PlayerState.InCannon) return;
 
         if (isPhasing)
@@ -157,6 +147,53 @@ public class PlayerController : MonoBehaviour
             UpdateAnimations();
         }
     }
+
+    private void HandleCardInput()
+    {
+        if (DeckManager.instance == null) return;
+
+        // Kart Seçimi (1-4)
+        if (Input.GetKeyDown(KeyCode.Alpha1)) DeckManager.instance.SelectCard(0);
+        if (Input.GetKeyDown(KeyCode.Alpha2)) DeckManager.instance.SelectCard(1);
+        if (Input.GetKeyDown(KeyCode.Alpha3)) DeckManager.instance.SelectCard(2);
+        if (Input.GetKeyDown(KeyCode.Alpha4)) DeckManager.instance.SelectCard(3);
+
+        // Kartý Ateþle (Sol Týk)
+        if (Input.GetMouseButtonDown(0))
+        {
+            DeckManager.instance.TryCastSelectedCard();
+        }
+
+        // Seçimi Ýptal Et (Sað Týk)
+        if (Input.GetMouseButtonDown(1))
+        {
+            DeckManager.instance.DeselectCard();
+        }
+
+        // Eli Yenile (R Tuþu) - Manual Recall
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            DeckManager.instance.ReloadHand();
+        }
+    }
+
+    // ... (Geri kalan tüm fonksiyonlar ayný kaldý) ...
+    // Sadece AddGold, TrySpendGold, Heal vs. gibi fonksiyonlar aynen duruyor.
+
+    public void AddGold(int amount)
+    {
+        currentGold += amount;
+    }
+    public bool TrySpendGold(int amount)
+    {
+        if (currentGold >= amount)
+        {
+            currentGold -= amount;
+            return true;
+        }
+        return false;
+    }
+
     private void UpdateAnimations()
     {
         if (animator == null) return;
@@ -227,17 +264,15 @@ public class PlayerController : MonoBehaviour
     }
     public bool ExecuteAction(CardActionType type, float value, out bool keepCardInHand)
     {
-        keepCardInHand = false; 
+        keepCardInHand = false;
 
         switch (type)
         {
             case CardActionType.Jump:
                 rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
                 rb.AddForce(new Vector2(0f, value), ForceMode2D.Impulse);
-                // 2. YENÝ EKLEME: Sadece efekti oluþturuyoruz
                 if (leapEffectPrefab != null)
                 {
-                    // Ayaklarýn hizasý için Y ekseninde -0.8f aþaðý iniyoruz
                     Vector3 spawnPos = transform.position + new Vector3(0f, -0.8f, 0f);
                     Instantiate(leapEffectPrefab, spawnPos, Quaternion.identity);
                 }
@@ -248,7 +283,7 @@ public class PlayerController : MonoBehaviour
                 return true;
 
             case CardActionType.Phase:
-                PerformPhase(value); // value = kaç saniye süreceði
+                PerformPhase(value);
                 return true;
 
             case CardActionType.DashForward:
@@ -302,11 +337,10 @@ public class PlayerController : MonoBehaviour
                 }
                 else
                 {
-                    Debug.Log("Sadece havadayken Comet Dive atabilirsin!");
-                    return false; // Kart harcanmaz
+                    return false;
                 }
 
-            case CardActionType.Adrenaline: // Ýsim deðiþti
+            case CardActionType.Adrenaline:
                 UseAdrenaline(value);
                 return true;
         }
@@ -317,15 +351,9 @@ public class PlayerController : MonoBehaviour
         if (currentShift > 0)
         {
             currentShift--;
-            Debug.Log($"Jumped! Shift remaining: {currentShift}");
-
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
             rb.AddForce(new Vector2(0f, jumpForce), ForceMode2D.Impulse);
             ChangeState(PlayerState.Jumping);
-        }
-        else
-        {
-            Debug.LogWarning("Tried to jump, but no Shift left!");
         }
     }
 
@@ -366,7 +394,6 @@ public class PlayerController : MonoBehaviour
         if (isInvincible) { return; }
         if (CameraShake.instance != null)
             CameraShake.instance.Shake(0.2f, 0.3f);
-        // ------------------------
 
         tookDamageThisRoom = true;
         currentHealth = Mathf.Max(currentHealth - damage, 0f);
@@ -380,7 +407,6 @@ public class PlayerController : MonoBehaviour
 
     private void Die()
     {
-        Debug.Log("Player Died!");
         SceneManager.LoadScene("GameOverScene");
     }
 
@@ -462,11 +488,9 @@ public class PlayerController : MonoBehaviour
             fireballScript.damage = damageFromCard;
     }
 
-    // --- "JUMP CHARGE" -> "SHIFT" OLARAK GÜNCELLENDÝ ---
     public void AddShift(int amount)
     {
         currentShift = Mathf.Min(currentShift + amount, maxShift);
-        Debug.Log($"Gained {amount} shift! Current: {currentShift}");
     }
 
     public void ResetShiftToMax()
@@ -474,14 +498,11 @@ public class PlayerController : MonoBehaviour
         currentShift = maxShift;
     }
 
-    // --- BU FONKSÝYON EKSÝKTÝ, EKLENDÝ ---
     public void SpendShift(int amount)
     {
         if (amount <= 0) return;
         currentShift = Mathf.Max(0, currentShift - amount);
-        Debug.Log($"Spent {amount} shift. Remaining: {currentShift}");
     }
-    // --- ÝMZA DEÐÝÞTÝ: 'out bool keepCard' eklendi ---
     private bool TryPlacePortal(out bool keepCard)
     {
         keepCard = false;
@@ -489,113 +510,79 @@ public class PlayerController : MonoBehaviour
 
         Vector2 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
 
-        // --- DURUM 1: ÝLK PORTAL (Ayný kalýyor) ---
         if (firstPortalInstance == null)
         {
             GameObject p1 = Instantiate(portalPrefab, mousePos, Quaternion.identity);
             firstPortalInstance = p1.GetComponent<Portal>();
             firstPortalInstance.spriteRenderer.color = Color.gray;
 
-            // --- YENÝ EKLENEN SATIR ---
-            // Ýlk portalý koyduðumuz an menzil halkasýný göster!
             firstPortalInstance.ShowRangeCircle(portalMaxRange);
-            // --------------------------
 
-            Debug.Log("Ýlk Portal yerleþtirildi...");
             keepCard = true;
             return true;
         }
-        // --- DURUM 2: ÝKÝNCÝ PORTAL (BURAYI GÜNCELLÝYORUZ) ---
         else
         {
-            // Mesafe kontrolü
             float distance = Vector2.Distance(firstPortalInstance.transform.position, mousePos);
             if (distance > portalMaxRange)
             {
-                Debug.LogWarning("Mesafe çok uzak!");
                 keepCard = true;
                 return false;
             }
 
-            // --- YENÝ: ÝNDÝRÝM HESAPLAMA ---
-            int finalCost = portalCost; // Varsayýlan maliyet (2)
+            int finalCost = portalCost;
 
-            // Eðer "Discount" skilli varsa maliyeti 1 düþür
             if (SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.KineticDiscount))
             {
                 finalCost = Mathf.Max(0, finalCost - 1);
-                Debug.Log($"Portal maliyetine indirim uygulandý! Yeni maliyet: {finalCost}");
             }
-            // -------------------------------
 
-            // Shift kontrolü (finalCost üzerinden)
             if (currentShift < finalCost)
             {
-                Debug.LogWarning($"Yeterli Shift yok! {finalCost} gerekiyor.");
                 keepCard = true;
                 return false;
             }
 
-            // Shift harca (finalCost kadar)
             SpendShift(finalCost);
 
-            // Portalý koy
             GameObject p2 = Instantiate(portalPrefab, mousePos, Quaternion.identity);
             Portal secondPortal = p2.GetComponent<Portal>();
 
             firstPortalInstance.Link(secondPortal);
             firstPortalInstance = null;
 
-            Debug.Log("Portal baðlantýsý kuruldu!");
             keepCard = false;
             return true;
         }
     }
-    // --- YENÝ: ISIRMA FONKSÝYONU ---
     private void PerformVampiricBite(float damageAmount)
     {
         Collider2D hitEnemy = Physics2D.OverlapCircle(firePoint.position, biteRange, enemyLayer);
 
         if (hitEnemy != null)
         {
-            // --- YENÝ VE TEK KONTROL ---
-            // Isýrdýðým þeyin Caný (EnemyHealth) var mý?
             EnemyHealth targetHealth = hitEnemy.GetComponent<EnemyHealth>();
 
             if (targetHealth != null)
             {
-                targetHealth.TakeDamage(damageAmount); // Hasar ver
-                Heal(biteHealAmount); // Can çal
-                // --- BURAYA YAPIÞTIR ---
+                targetHealth.TakeDamage(damageAmount);
+                Heal(biteHealAmount);
                 if (biteEffectPrefab != null)
                 {
                     Instantiate(biteEffectPrefab, hitEnemy.transform.position, Quaternion.identity);
                 }
-                // -----------------------
-                Debug.Log("Bir þey ýsýrýldý!");
             }
-            // --- BÝTÝÞ ---
-        }
-        else
-        {
-            Debug.Log("Isýracak kimse yok!");
         }
     }
 
-    // --- YENÝ: ÝYÝLEÞME FONKSÝYONU ---
     public void Heal(float amount)
     {
-        // Caný artýr ama Maksimum Caný geçmesin
         currentHealth = Mathf.Min(currentHealth + amount, maxHealth);
-        Debug.Log($"Ýyileþildi! Güncel Can: {currentHealth}");
-
-        // UI otomatik olarak Update() içinde güncellendiði için baþka bir þey yapmana gerek yok.
     }
     private void PerformGlassWail(float stunDuration)
     {
         EnemyHealth[] allEnemies = FindObjectsByType<EnemyHealth>(FindObjectsSortMode.None);
 
-        Debug.Log($"GLOBAL Glass Wail kullanýldý! {allEnemies.Length} düþman dondu.");
         if (CameraShake.instance != null)
             CameraShake.instance.Shake(0.5f, 0.5f);
 
@@ -603,8 +590,6 @@ public class PlayerController : MonoBehaviour
         {
             enemy.Stun(stunDuration);
         }
-
-        // TODO: Buraya tüm ekraný kaplayan bir beyaz flaþ efekti eklersen çok havalý olur.
     }
     private void PerformPhase(float duration)
     {
@@ -613,146 +598,98 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator PhaseRoutine(float duration)
     {
-        isPhasing = true; // Kontrolleri uçuþ moduna al
+        isPhasing = true;
 
-        // 1. Yerçekimini KAPAT (Havada asýlý kalsýn)
         float originalGravity = rb.gravityScale;
         rb.gravityScale = 0f;
-        rb.linearVelocity = Vector2.zero; // Düþmeyi durdur
+        rb.linearVelocity = Vector2.zero;
 
-        // 2. Katmanlarý Belirle (Unity'deki isimlerin AYNI olmasý lazým)
         int playerLayer = LayerMask.NameToLayer("Player");
         int groundLayer = LayerMask.NameToLayer("Ground");
         int enemyLayer = LayerMask.NameToLayer("Enemy");
 
-        // 3. Çarpýþmalarý KAPAT (Duvar ve Düþman içinden geç)
         Physics2D.IgnoreLayerCollision(playerLayer, groundLayer, true);
         Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, true);
 
-        // 4. Görseli Þeffaf Yap
         if (spriteRenderer != null)
         {
             Color color = spriteRenderer.color;
-            color.a = 0.4f; // %40 Görünürlük
+            color.a = 0.4f;
             spriteRenderer.color = color;
         }
 
-        Debug.Log("HAYALET MODU AÇIK: Uçabilir ve içinden geçebilirsin.");
-
-        // --- SÜRE BOYUNCA BEKLE ---
         yield return new WaitForSeconds(duration);
 
-        // --- BÝTÝÞ ---
-
-        // 5. Çarpýþmalarý GERÝ AÇ
         Physics2D.IgnoreLayerCollision(playerLayer, groundLayer, false);
         Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, false);
 
-        // 6. Yerçekimini GERÝ AÇ
         rb.gravityScale = originalGravity;
 
-        // 7. Görseli Düzelt
         if (spriteRenderer != null)
         {
             Color color = spriteRenderer.color;
-            color.a = 1f; // Tam Görünürlük
+            color.a = 1f;
             spriteRenderer.color = color;
         }
 
-        isPhasing = false; // Normal kontrollere dön
-        Debug.Log("HAYALET MODU KAPANDI.");
+        isPhasing = false;
     }
     public void IncreaseMaxShift(int amount)
     {
         maxShift += amount;
         currentShift += amount;
-        // UI otomatik güncellenecek
     }
     public void EnterCannon(Transform cannonTransform)
     {
         ChangeState(PlayerState.InCannon);
 
-        rb.linearVelocity = Vector2.zero; 
-        rb.bodyType = RigidbodyType2D.Kinematic; 
+        rb.linearVelocity = Vector2.zero;
+        rb.bodyType = RigidbodyType2D.Kinematic;
 
-        
+
         if (GetComponent<SpriteRenderer>() != null)
             GetComponent<SpriteRenderer>().enabled = false;
 
         transform.position = cannonTransform.position;
-        
+
         transform.SetParent(cannonTransform);
     }
     private void PerformCometDive()
     {
         ChangeState(PlayerState.CometDiving);
 
-        // Hareketi dondur ve hýzla aþaðý it
         rb.linearVelocity = new Vector2(0, -cometSpeed);
-
-        // Ýstersen havada kýsa bir an asýlý kalýp sonra düþebilir (daha havalý olur)
-        // Ama þimdilik direkt düþürüyoruz.
     }
 
-    // Yere çarpmayý algýlamak için OnCollisionEnter2D'yi güncelliyoruz
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        // Debug satýrýný açýk býrakalým ki neye çarptýðýný görelim
-        // Debug.Log($"Çarpýlan Obje: {collision.gameObject.name} - Layer: {LayerMask.LayerToName(collision.gameObject.layer)}");
-
-        // Eðer Comet Dive modundaysak
         if (currentState == PlayerState.CometDiving)
         {
-            // 1. Kontrol: Çarptýðýmýz þey ZEMÝN mi?
             bool isGround = (groundLayer.value & (1 << collision.gameObject.layer)) > 0;
-
-            // 2. Kontrol: Çarptýðýmýz þey DÜÞMAN mý? (Yeni ekledik)
             bool isEnemy = (enemyLayer.value & (1 << collision.gameObject.layer)) > 0;
 
-            // Eðer Zemin VEYA Düþman ise patlat!
             if (isGround || isEnemy)
             {
-                Debug.Log("Comet Dive: Hedefe (Yer/Düþman) çakýldýk! PATLIYOR!");
                 CometImpact();
             }
-            else
-            {
-                Debug.LogWarning($"Comet Dive ile bir þeye çarptýk ama Layer listemizde yok. Çarpýlan: {LayerMask.LayerToName(collision.gameObject.layer)}");
-            }
         }
-
-        // Buranýn altýna senin varsa eski hasar alma kodlarýn (TakeDamage) gelebilir.
     }
 
     private void CometImpact()
     {
-        // Çarpma anýnda durumu normale çevir
         ChangeState(PlayerState.Idle);
 
-        // 1. Alan Hasarý Kontrolü
-        // Gizmos'ta gördüðün sarý çemberin içinde "Enemy" layer'ý arýyoruz.
         Collider2D[] hitEnemies = Physics2D.OverlapCircleAll(transform.position, cometRadius, enemyLayer);
-
-        Debug.Log($"Comet Impact Alaný: {cometRadius} birim. Bulunan Obje Sayýsý: {hitEnemies.Length}");
 
         foreach (Collider2D enemy in hitEnemies)
         {
-            // Bulunan objenin adýný yazdýr
-            Debug.Log($"Vurulan Düþman: {enemy.name}");
-
             EnemyHealth eHealth = enemy.GetComponent<EnemyHealth>();
             if (eHealth != null)
             {
                 eHealth.TakeDamage(cometDamage);
-                Debug.Log($"{enemy.name} hasar aldý: {cometDamage}");
-            }
-            else
-            {
-                Debug.LogError($"HATA: {enemy.name} üzerinde 'EnemyHealth' scripti bulunamadý!");
             }
         }
 
-        // 2. Efekt ve Kamera
         if (CameraShake.instance != null) CameraShake.instance.Shake(0.3f, 0.5f);
         if (cometImpactEffect != null) Instantiate(cometImpactEffect, transform.position, Quaternion.identity);
     }
@@ -760,56 +697,38 @@ public class PlayerController : MonoBehaviour
     {
         float healthPercentage = currentHealth / maxHealth;
 
-        // Efekt (Varsa ekle)
         if (CameraShake.instance != null) CameraShake.instance.Shake(0.1f, 0.5f);
 
         if (healthPercentage > 0.5f)
         {
-            // --- DURUM A: YÜKSEK CAN (OVERDOSE / BULLET TIME) ---
-            // "Adrenalin duyularýný keskinleþtirir, zaman yavaþlar."
-            Debug.Log("Adrenaline: Bullet Time Modu!");
             StartCoroutine(AdrenalineSlowMoRoutine());
         }
         else
         {
-            // --- DURUM B: DÜÞÜK CAN (EMERGENCY STIM) ---
-            // "Kalbine iðne saplanmýþ gibi kendine getirir."
-            Debug.Log("Adrenaline: Acil Durum Ýyileþmesi!");
-
-            // 1. Ýyileþme (Kartýn 'value' deðeri kadar can ver)
             Heal(value);
-
-            // 2. Hýzlanma (Kaçmak için)
             StartCoroutine(AdrenalineSpeedBoostRoutine());
         }
     }
 
-    // Zamaný Yavaþlatma Coroutine'i
     private IEnumerator AdrenalineSlowMoRoutine()
     {
-        // Zamaný yavaþlat
         Time.timeScale = slowMotionFactor;
-        // Fizik hesaplamalarýný da yavaþlat ki karakterler titremesin
         Time.fixedDeltaTime = 0.02f * Time.timeScale;
 
-        // Gerçek dünyada 'duration' kadar bekle (Oyun zamaný yavaþladýðý için WaitForSecondsRealtime kullanýyoruz)
         yield return new WaitForSecondsRealtime(adrenalineDuration);
 
-        // Zamaný normale döndür
         Time.timeScale = 1f;
         Time.fixedDeltaTime = 0.02f;
-        Debug.Log("Adrenaline etkisi geçti.");
     }
 
-    // Hýzlandýrma Coroutine'i
     private IEnumerator AdrenalineSpeedBoostRoutine()
     {
         float originalSpeed = moveSpeed;
-        moveSpeed *= speedBoostMultiplier; // Hýzý artýr
+        moveSpeed *= speedBoostMultiplier;
 
         yield return new WaitForSeconds(adrenalineDuration);
 
-        moveSpeed = originalSpeed; // Hýzý normale döndür
+        moveSpeed = originalSpeed;
     }
 
 
@@ -826,5 +745,27 @@ public class PlayerController : MonoBehaviour
         rb.bodyType = RigidbodyType2D.Dynamic;
         rb.AddForce(forceVector, ForceMode2D.Impulse);
         ChangeState(PlayerState.Jumping);
+    }
+    [Header("Interaction Settings")]
+    public float interactionRange = 2f; // Ne kadar yakýndan etkileþime girsin?
+    public LayerMask interactableLayer; // Hangi objeler etkileþime açýk?
+
+    private void CheckInteraction()
+    {
+        // Oyuncunun etrafýndaki "Interactable" layer'ýndaki objeleri tara
+        Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, interactionRange, interactableLayer);
+
+        foreach (Collider2D hit in hits)
+        {
+            // Bulunan objede IInteractable özelliði var mý?
+            IInteractable interactable = hit.GetComponent<IInteractable>();
+
+            if (interactable != null)
+            {
+                // Varsa etkileþimi baþlat ve döngüden çýk (Ayný anda 2 þeye basmasýn)
+                interactable.Interact();
+                return;
+            }
+        }
     }
 }

@@ -1,7 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
-using TMPro;
 
 public class HandUI : MonoBehaviour
 {
@@ -19,17 +17,22 @@ public class HandUI : MonoBehaviour
         DeckManager.OnHandChanged -= UpdateHandDisplay;
     }
 
+    // Oyun baþlar baþlamaz eli çiz
     private void Start()
     {
-        UpdateHandDisplay();
+        // Biraz bekletelim ki DeckManager listeyi doldursun
+        Invoke("UpdateHandDisplay", 0.1f);
     }
 
     private void UpdateHandDisplay()
     {
+        // Önce temizle
         foreach (Transform child in handContainer)
         {
             Destroy(child.gameObject);
         }
+
+        if (DeckManager.instance == null) return;
 
         List<RuntimeCard> currentHand = DeckManager.instance.GetCurrentHand();
 
@@ -41,40 +44,31 @@ public class HandUI : MonoBehaviour
             CardUI cardUI = cardUIObject.GetComponent<CardUI>();
             if (cardUI != null)
             {
-                // DEÐÝÞÝKLÝK BURADA:
-                // Eskiden: cardUI.Setup(card, i + 2);
-                // Þimdi: i + 1 yapýyoruz ki [1]'den baþlasýn.
-                cardUI.Setup(card, i + 1);
+                // ÖNEMLÝ: Setup'a gerçek index'i (i) gönderiyoruz. 
+                // CardUI kendi içinde bunu (i+1) yapýp ekrana yazacak.
+                cardUI.Setup(card, i);
             }
         }
     }
-    // --- BURAYI YAPIÞTIR ---
 
-    // Bu fonksiyonu DeckManager çaðýracak
     public void AnimateCardFromHand(int index)
     {
-        // Eðer index hatalýysa veya kart yoksa iþlem yapma
         if (index < 0 || index >= handContainer.childCount) return;
 
-        // 1. Oynanan kartý bul
         Transform cardTransform = handContainer.GetChild(index);
 
-        // 2. KARTI KUTUDAN KOPAR (Çok Önemli!)
-        // Kartý HandContainer'ýn dýþýna (bir üst ebeveynine) taþýyoruz.
-        // Böylece diðer kartlar boþalan yeri hemen doldurabilir.
-        cardTransform.SetParent(handContainer.parent);
+        // Layout grubundan çýkar ki serbestçe uçabilsin
+        if (handContainer.parent != null)
+            cardTransform.SetParent(handContainer.parent);
+        else
+            cardTransform.SetParent(transform.root); // Garanti olsun
 
-        // 3. KARTI EN ÖNE AL
-        // Uçarken diðer panellerin arkasýnda kalmamasý için
         cardTransform.SetAsLastSibling();
 
-        // 4. ANÝMASYONU BAÞLAT
-        // Az önce CardUI'ya eklediðimiz o büyüyüp uçma kodunu çalýþtýr
         CardUI cardUI = cardTransform.GetComponent<CardUI>();
         if (cardUI != null)
         {
             cardUI.PlayUseAnimation();
         }
     }
-    // -----------------------
 }

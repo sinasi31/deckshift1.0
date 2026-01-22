@@ -1,52 +1,78 @@
-using System.Collections; // <-- Bunu en tepeye ekle
+ï»¿using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using UnityEngine.EventSystems; // Hover iþlemleri için bu kütüphane þart!
+using UnityEngine.EventSystems;
 
-// Artýk kartýmýz fare hareketlerini dinleyecek (IPointer...)
-public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
 {
-    [Header("Temel Görseller")]
-    public Image cardArtImage; // Kartýn resmi
-    public TextMeshProUGUI keyHintText; // [1], [2] yazýsý
+    [Header("Temel GÃ¶rseller")]
+    public Image cardArtImage;
+    public TextMeshProUGUI keyHintText;
 
-    [Header("Mekanik Görseller")]
-    public TextMeshProUGUI usesText; // Büyük Daire
-    public Transform shiftCostContainer; // Küçük Dairelerin Kutusu
-    public GameObject shiftPointPrefab;  // Küçük Daire Prefabý
+    [Header("SeÃ§im GÃ¶rselleri")]
+    public GameObject selectionFrame;
 
-    [Header("Hover (Açýklama) Ayarlarý")]
-    public GameObject descriptionPanel; // Fare üzerine gelince açýlacak kutu
-    public TextMeshProUGUI descriptionText; // O kutunun içindeki yazý
+    // Kart seÃ§ilince ne kadar yukarÄ± zÄ±plasÄ±n? (Ã–rn: 50 idealdir)
+    public float selectionLiftAmount = 50f;
 
-    // Setup sýrasýnda kartýn açýklamasýný panele yazacaðýz ama paneli gizli tutacaðýz
-    public void Setup(RuntimeCard card, int keyHintNumber)
+    [Header("Mekanik GÃ¶rseller")]
+    public TextMeshProUGUI usesText;
+    public Transform shiftCostContainer;
+    public GameObject shiftPointPrefab;
+
+    [Header("Hover (AÃ§Ä±klama) AyarlarÄ±")]
+    public GameObject descriptionPanel;
+    public TextMeshProUGUI descriptionText;
+
+    private RuntimeCard myCard;
+    private int myIndex;
+    private Vector3 originalScale;
+    private RectTransform rectTransform; // UI Pozisyonu iÃ§in gerekli
+    private bool isInitialized = false;
+
+    private void Awake()
     {
-        // 1. Resmi ve Ýpucunu ayarla (Ýsim artýk resimde olduðu için koda gerek yok)
-        cardArtImage.sprite = card.cardData.cardArt;
-        keyHintText.text = $"[{keyHintNumber}]";
+        rectTransform = GetComponent<RectTransform>();
+        originalScale = transform.localScale;
+        isInitialized = true;
+    }
 
-        // 2. Açýklama Metnini Hazýrla (Ama henüz gösterme)
+    public void Setup(RuntimeCard card, int index)
+    {
+        if (!isInitialized)
+        {
+            rectTransform = GetComponent<RectTransform>();
+            originalScale = transform.localScale;
+            isInitialized = true;
+        }
+
+        myCard = card;
+        myIndex = index;
+
+        cardArtImage.sprite = card.cardData.cardArt;
+        keyHintText.text = $"[{index + 1}]";
+
         if (descriptionPanel != null)
         {
-            descriptionPanel.SetActive(false); // Baþlangýçta gizle
+            descriptionPanel.SetActive(false);
             if (descriptionText != null)
             {
-                // Ýstersen kartýn ismini de açýklamaya ekleyebilirsin
                 descriptionText.text = $"<b>{card.cardData.cardName}</b>\n\n{card.cardData.description}";
             }
         }
 
-        // 3. Kullaným Hakký (Büyük Daire)
         if (usesText != null)
         {
-            usesText.text = card.currentUses.ToString();
-            if (card.currentUses == 1) usesText.color = Color.red;
-            else usesText.color = Color.white;
+            if (card.isInfinite)
+                usesText.text = "âˆž";
+            else
+            {
+                usesText.text = card.currentUses.ToString();
+                usesText.color = (card.currentUses == 1) ? Color.red : Color.white;
+            }
         }
 
-        // 4. Shift Maliyeti (Küçük Daireler)
         if (shiftCostContainer != null && shiftPointPrefab != null)
         {
             foreach (Transform child in shiftCostContainer) Destroy(child.gameObject);
@@ -55,39 +81,80 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
                 Instantiate(shiftPointPrefab, shiftCostContainer);
             }
         }
+
+        UpdateSelectionVisual();
     }
 
-    // --- HOVER (FARE ÜZERÝNE GELÝNCE) ---
+    private void Update()
+    {
+        if (myCard != null)
+        {
+            UpdateSelectionVisual();
+        }
+    }
+
+    private void UpdateSelectionVisual()
+    {
+        bool isSelected = myCard.isSelected;
+
+        if (selectionFrame != null)
+            selectionFrame.SetActive(isSelected);
+
+        // --- SCALE (BÃœYÃœME) AYARI ---
+        // SeÃ§iliyse %10 bÃ¼yÃ¼t, deÄŸilse orijinal boyutta kalsÄ±n (kÃ¼Ã§Ã¼ltmeyelim ki net dursun)
+        // EÄŸer seÃ§ili olmayanÄ± kÃ¼Ã§Ã¼ltmek istersen 0.85f yapabilirsin.
+        Vector3 targetScale = isSelected ? originalScale * 1.1f : originalScale * 0.9f;
+
+        // --- POZÄ°SYON (YUKARI KALDIRMA) AYARI ---
+        // SeÃ§iliyse Y ekseninde yukarÄ± kaldÄ±r, deÄŸilse 0'a (yerine) indir.
+        float targetY = isSelected ? selectionLiftAmount : 0f;
+
+        // Lerp ile yumuÅŸak geÃ§iÅŸler
+        float speed = Time.deltaTime * 15f; // Biraz hÄ±zlandÄ±rdÄ±m daha tepkisel olsun
+
+        // 1. BoyutlandÄ±r
+        transform.localScale = Vector3.Lerp(transform.localScale, targetScale, speed);
+
+        // 2. YukarÄ± TaÅŸÄ± (Sadece Y eksenini deÄŸiÅŸtiriyoruz, X Layout Group tarafÄ±ndan yÃ¶netiliyor)
+        if (rectTransform != null)
+        {
+            Vector2 currentPos = rectTransform.anchoredPosition;
+            Vector2 targetPos = new Vector2(currentPos.x, targetY);
+            rectTransform.anchoredPosition = Vector2.Lerp(currentPos, targetPos, speed);
+        }
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (eventData.button == PointerEventData.InputButton.Left)
+        {
+            if (DeckManager.instance != null)
+            {
+                DeckManager.instance.SelectCard(myIndex);
+            }
+        }
+    }
+
     public void OnPointerEnter(PointerEventData eventData)
     {
-        // Fare kartýn üzerine geldiðinde paneli aç
         if (descriptionPanel != null)
         {
             descriptionPanel.SetActive(true);
-
-            // Panelin her zaman en önde görünmesi için (diðer kartlarýn altýnda kalmasýn)
             descriptionPanel.transform.SetAsLastSibling();
         }
     }
 
-    // --- HOVER ÇIKIÞ (FARE GÝDÝNCE) ---
     public void OnPointerExit(PointerEventData eventData)
     {
-        // Fare karttan ayrýldýðýnda paneli kapat
         if (descriptionPanel != null)
         {
             descriptionPanel.SetActive(false);
         }
     }
-    // --- BURADAN BAÞLA ---
 
-    // Kart oynandýðýnda çaðrýlacak ana fonksiyon
     public void PlayUseAnimation()
     {
-        // Kartýn týklanabilirliðini kapat (tekrar basýlmasýn)
         CanvasGroup group = GetComponent<CanvasGroup>();
-
-        // Eðer kartta CanvasGroup yoksa kodla biz ekleyelim
         if (group == null) group = gameObject.AddComponent<CanvasGroup>();
 
         group.interactable = false;
@@ -96,39 +163,30 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
         StartCoroutine(AnimateRoutine(group));
     }
 
-    // Animasyonun saniye saniye iþlediði yer
     private IEnumerator AnimateRoutine(CanvasGroup group)
     {
         float timer = 0f;
-        float duration = 0.4f; // Animasyon süresi
+        float duration = 0.3f;
 
         Vector3 startPos = transform.position;
-        Vector3 targetPos = startPos + new Vector3(0, 300f, 0); // 300 birim yukarý
+        Vector3 targetPos = startPos + (Vector3.up * 200f);
 
         Vector3 startScale = transform.localScale;
-        Vector3 targetScale = startScale * 1.5f; // 1.5 kat büyü
+        Vector3 targetScale = originalScale * 1.3f;
 
         while (timer < duration)
         {
             timer += Time.unscaledDeltaTime;
             float t = timer / duration;
-
-            // Hareketi yumuþatmak için SmoothStep formülü
             t = t * t * (3f - 2f * t);
 
-            // 1. Yukarý Taþý
             transform.position = Vector3.Lerp(startPos, targetPos, t);
-
-            // 2. Büyüt
             transform.localScale = Vector3.Lerp(startScale, targetScale, t);
-
-            // 3. Þeffaflaþtýr
             if (group != null) group.alpha = Mathf.Lerp(1f, 0f, t);
 
             yield return null;
         }
 
-        Destroy(gameObject); // Animasyon bitince kartý tamamen sil
+        Destroy(gameObject);
     }
-    // --- BURADA BÝTÝR ---
 }

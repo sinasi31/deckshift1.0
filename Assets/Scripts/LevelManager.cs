@@ -87,7 +87,7 @@ public class LevelManager : MonoBehaviour
         }
         if (DeckManager.instance != null)
         {
-            DeckManager.instance.RefillHand();
+            DeckManager.instance.ReloadHand();
         }
 
         // Kamera sýnýrlarýný ayarla (CameraFollow iptal edildiði için bu kýsým opsiyonel veya sabit kamera için gereksiz olabilir)
