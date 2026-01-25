@@ -1,19 +1,19 @@
 using UnityEngine;
-// TMPro kütüphanesine gerek kalmadý çünkü sadece objeyi aç/kapat yapacaðýz
-// Ama eðer metni kodla deðiþtirmek istersen (örn: tuþ deðiþirse) tutabilirsin.
+using UnityEngine.SceneManagement; 
 
 public class ExitDoor : MonoBehaviour
 {
-    private bool hasBeenTriggered = false;
-    private bool isPlayerInRange = false;
-    private PlayerController currentPlayer;
+    [Header("Tür Ayarý (ÖNEMLÝ)")]
+    public bool isSceneLoader = false; 
+    public string sceneToLoad = "GameScene"; 
 
     [Header("Etkileþim Ayarlarý")]
     public KeyCode interactKey = KeyCode.E;
+    public GameObject interactionPopup; 
 
-    [Header("Görsel Referans")]
-    // Unity'de kapýnýn üzerine koyacaðýmýz yazý objesini buraya sürükleyeceðiz
-    public GameObject interactionPopup;
+    private bool hasBeenTriggered = false;
+    private bool isPlayerInRange = false;
+    private PlayerController currentPlayer;
 
     private void Update()
     {
@@ -31,10 +31,7 @@ public class ExitDoor : MonoBehaviour
         {
             isPlayerInRange = true;
             currentPlayer = other.GetComponent<PlayerController>();
-
-            // Yazýyý Aç
-            if (interactionPopup != null)
-                interactionPopup.SetActive(true);
+            if (interactionPopup != null) interactionPopup.SetActive(true);
         }
     }
 
@@ -44,28 +41,37 @@ public class ExitDoor : MonoBehaviour
         {
             isPlayerInRange = false;
             currentPlayer = null;
-
-            // Yazýyý Kapat
-            if (interactionPopup != null)
-                interactionPopup.SetActive(false);
+            if (interactionPopup != null) interactionPopup.SetActive(false);
         }
     }
 
     private void PerformExit()
     {
-        hasBeenTriggered = true;
-
-        // Çýkýþ yapýldýðý an yazýyý gizle
         if (interactionPopup != null) interactionPopup.SetActive(false);
 
-        if (currentPlayer != null && !currentPlayer.TookDamageThisRoom)
+        if (isSceneLoader)
         {
-            AchievementManager.instance.OnRoomClearedFlawlessly();
-        }
+            Debug.Log("Hub'dan çýkýlýyor, oyun baþlýyor...");
 
-        if (RewardManager.instance != null)
+            if (QuestSystem.instance != null) QuestSystem.instance.CloseBoard();
+
+            SceneManager.LoadScene(sceneToLoad);
+        }
+        else
         {
-            RewardManager.instance.ShowRewardScreen();
+            hasBeenTriggered = true; 
+
+            if (currentPlayer != null && !currentPlayer.TookDamageThisRoom)
+            {
+                AchievementManager.instance.OnRoomClearedFlawlessly();
+
+                if (QuestSystem.instance != null) QuestSystem.instance.ReportEvent(QuestType.NoDamageRoom, 1);
+            }
+
+            if (RewardManager.instance != null)
+            {
+                RewardManager.instance.ShowRewardScreen();
+            }
         }
     }
 }
