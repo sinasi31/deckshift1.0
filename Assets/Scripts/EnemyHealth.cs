@@ -66,6 +66,19 @@ public class EnemyHealth : MonoBehaviour
     }
     private void Die()
     {
+        if (QuestSystem.instance != null)
+        {
+            // 1. Normal Kill Görevleri için:
+            QuestSystem.instance.ReportEvent(QuestType.KillEnemy, 1);
+
+            // 2. Air Kill (Havada Öldürme) Kontrolü:
+            // Oyuncuyu bul ve havada mý diye bak
+            PlayerController player = FindFirstObjectByType<PlayerController>();
+            if (player != null && !player.IsGroundedCheck())
+            {
+                QuestSystem.instance.ReportEvent(QuestType.AirKill, 1);
+            }
+        }
         Debug.Log($"{gameObject.name} öldü!");
 
         if (SkillManager.instance != null)

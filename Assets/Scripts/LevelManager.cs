@@ -21,6 +21,11 @@ public class LevelManager : MonoBehaviour
     {
         if (instance == null) { instance = this; }
         else { Destroy(gameObject); }
+        if (playerTransform == null)
+        {
+            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+            if (playerObj != null) playerTransform = playerObj.transform;
+        }
     }
 
     private void Start()

@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 80de6c395540f2548b8364f3fbd5bfa5, type: 3}
   m_Name: New Quest 3
   m_EditorClassIdentifier: 
-  questName: Scrooge
-  description: 
-  type: 0
-  targetAmount: 0
-  rewardText: 
+  questName: Bounty Hunter
+  description: Kill 3 Enemies
+  type: 1
+  targetAmount: 3
+  rewardText: Gain Gold.

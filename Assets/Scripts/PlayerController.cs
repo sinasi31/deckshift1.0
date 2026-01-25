@@ -183,6 +183,10 @@ public class PlayerController : MonoBehaviour
     public void AddGold(int amount)
     {
         currentGold += amount;
+        if (QuestSystem.instance != null)
+        {
+            QuestSystem.instance.ReportEvent(QuestType.GoldAccumulate, amount);
+        }
     }
     public bool TrySpendGold(int amount)
     {
@@ -410,7 +414,7 @@ public class PlayerController : MonoBehaviour
         SceneManager.LoadScene("GameOverScene");
     }
 
-    private bool IsGroundedCheck()
+    public bool IsGroundedCheck()
     {
         return Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
     }
