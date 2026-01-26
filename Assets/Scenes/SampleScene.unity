@@ -1828,14 +1828,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2387a4a0cde1fd14a9fa400397b6f881, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  boardPanel: {fileID: 865424055}
-  questsContainer: {fileID: 1699918228}
-  questItemPrefab: {fileID: 7586346867272838562, guid: c343fdc98fefad14cb0318e3b46cdd8d, type: 3}
-  allPossibleQuests:
-  - {fileID: 11400000, guid: fca161a501413fb47aac0f14c559eaac, type: 2}
-  - {fileID: 11400000, guid: 8c5ea257c6704e34eb9ddb23d1c7c8de, type: 2}
-  - {fileID: 11400000, guid: dfacb3edaa7a8c840a4291df7b536229, type: 2}
-  - {fileID: 11400000, guid: 38d20fd3e1d18294f99a120f91690276, type: 2}
 --- !u!114 &368254229
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1848,8 +1840,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d8d4a0ae1cf34604d825350631df3167, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  activeQuests: []
-  maxActiveQuests: 3
 --- !u!4 &368254230
 Transform:
   m_ObjectHideFlags: 0
@@ -2122,7 +2112,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: 0, y: -8.300049}
+  m_AnchoredPosition: {x: 0, y: -8.30011}
   m_SizeDelta: {x: 0, y: 100}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!114 &448187558
@@ -6386,7 +6376,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerTransform: {fileID: 1988395663}
   roomPrefabs:
-  - {fileID: 1663763325813161598, guid: cdc1c637a20d4544fa651df1e97bd0ec, type: 3}
+  - {fileID: 7365539614123856241, guid: da1f0fa2b1d7b4d47ae3ccfd434a7561, type: 3}
 --- !u!4 &1361928416
 Transform:
   m_ObjectHideFlags: 0
