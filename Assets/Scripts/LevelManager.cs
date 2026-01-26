@@ -50,34 +50,42 @@ public class LevelManager : MonoBehaviour
 
     public void SpawnNextRoom()
     {
-        // 1. Temizlik (Eski objeleri sil)
         TemporaryObject[] junk = FindObjectsByType<TemporaryObject>(FindObjectsSortMode.None);
         foreach (TemporaryObject obj in junk) Destroy(obj.gameObject);
 
         if (currentRoom != null) Destroy(currentRoom);
 
-        // 2. Havuz Kontrolü
         if (availableRoomIndices.Count == 0)
         {
-            // Eðer tüm odalar bittiyse havuzu tekrar doldur
-            // (Ýstersen burada "Act 2'ye geç" mantýðý da kurabilirsin)
             RefillRoomPool();
         }
-
-        // 3. Rastgele Seçim (Torbadan Çek)
-        int randomIndexInPool = Random.Range(0, availableRoomIndices.Count); // Listeden rastgele bir sýra seç
-        int selectedRoomIndex = availableRoomIndices[randomIndexInPool]; // O sýradaki gerçek oda numarasýný al
-
-        // 4. Seçileni Torbadan At (Ýþaretle)
+        int randomIndexInPool = Random.Range(0, availableRoomIndices.Count); 
+        int selectedRoomIndex = availableRoomIndices[randomIndexInPool]; 
         availableRoomIndices.RemoveAt(randomIndexInPool);
 
         Debug.Log($"Seçilen Oda Indexi: {selectedRoomIndex}. Kalan Oda Sayýsý: {availableRoomIndices.Count}");
 
-        // 5. Odayý Yarat
         GameObject selectedRoomPrefab = roomPrefabs[selectedRoomIndex];
         currentRoom = Instantiate(selectedRoomPrefab, Vector3.zero, Quaternion.identity);
+        CameraController camScript = Camera.main.GetComponent<CameraController>();
 
-        // 6. Oyuncuyu Iþýnla
+        if (camScript != null)
+        {
+            camScript.target = playerTransform;
+            Transform boundsObj = currentRoom.transform.Find("CameraBounds");
+
+            if (boundsObj != null)
+            {
+                BoxCollider2D boundsCollider = boundsObj.GetComponent<BoxCollider2D>();
+                camScript.SetBounds(boundsCollider);
+            }
+            else
+            {
+                Debug.LogWarning("DÝKKAT: Bu oda prefabýnda 'CameraBounds' objesi yok! Kamera sýnýrsýz hareket edecek.");
+                camScript.SetBounds(null);
+            }
+        }
+
         Transform entryPoint = currentRoom.transform.Find("GirisNoktasi");
         if (entryPoint != null && playerTransform != null)
         {
@@ -94,8 +102,5 @@ public class LevelManager : MonoBehaviour
         {
             DeckManager.instance.ReloadHand();
         }
-
-        // Kamera sýnýrlarýný ayarla (CameraFollow iptal edildiði için bu kýsým opsiyonel veya sabit kamera için gereksiz olabilir)
-        // Ama eðer ileride tekrar eklersen kod burada durabilir.
     }
 }
