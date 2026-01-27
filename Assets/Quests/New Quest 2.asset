@@ -12,8 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 80de6c395540f2548b8364f3fbd5bfa5, type: 3}
   m_Name: New Quest 2
   m_EditorClassIdentifier: 
-  questName: 1
-  description: dsadasd
+  questName: Hit a Clip
+  description: Kill 3 enemies while airborne
   type: 2
-  targetAmount: 0
-  rewardText: sada
+  targetAmount: 3
+  rewardText: 'Reward: +10 Shifts'
+  rewardType: 1
+  rewardAmount: 10

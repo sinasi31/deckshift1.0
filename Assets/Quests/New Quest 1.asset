@@ -12,8 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 80de6c395540f2548b8364f3fbd5bfa5, type: 3}
   m_Name: New Quest 1
   m_EditorClassIdentifier: 
-  questName: Type
-  description: sadasd
+  questName: Invincible
+  description: Take 0 damage in a Level
   type: 3
-  targetAmount: 0
-  rewardText: das
+  targetAmount: 1
+  rewardText: 'Reward: 300 Gold'
+  rewardType: 0
+  rewardAmount: 300

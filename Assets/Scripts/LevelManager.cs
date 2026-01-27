@@ -1,6 +1,6 @@
+using Unity.Cinemachine;
 using System.Collections.Generic;
 using UnityEngine;
-
 public class LevelManager : MonoBehaviour
 {
     public static LevelManager instance;
@@ -67,22 +67,24 @@ public class LevelManager : MonoBehaviour
 
         GameObject selectedRoomPrefab = roomPrefabs[selectedRoomIndex];
         currentRoom = Instantiate(selectedRoomPrefab, Vector3.zero, Quaternion.identity);
-        CameraController camScript = Camera.main.GetComponent<CameraController>();
+        var vCam = FindFirstObjectByType<CinemachineCamera>();
 
-        if (camScript != null)
+        if (vCam != null)
         {
-            camScript.target = playerTransform;
-            Transform boundsObj = currentRoom.transform.Find("CameraBounds");
+            // 2. Confiner Bileþenini Bul
+            var confiner = vCam.GetComponent<CinemachineConfiner2D>();
 
-            if (boundsObj != null)
+            if (confiner != null)
             {
-                BoxCollider2D boundsCollider = boundsObj.GetComponent<BoxCollider2D>();
-                camScript.SetBounds(boundsCollider);
-            }
-            else
-            {
-                Debug.LogWarning("DÝKKAT: Bu oda prefabýnda 'CameraBounds' objesi yok! Kamera sýnýrsýz hareket edecek.");
-                camScript.SetBounds(null);
+                Transform boundsObj = currentRoom.transform.Find("CameraBounds");
+
+                if (boundsObj != null)
+                {
+                    Collider2D boundsCollider = boundsObj.GetComponent<Collider2D>();
+
+                    confiner.BoundingShape2D = boundsCollider;
+                    confiner.InvalidateBoundingShapeCache();
+                }
             }
         }
 

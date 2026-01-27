@@ -2535,6 +2535,9 @@ MonoBehaviour:
   target: {fileID: 1988395663}
   smoothSpeed: 0.125
   currentBounds: {fileID: 0}
+  cam: {fileID: 0}
+  camHalfHeight: 0
+  camHalfWidth: 0
 --- !u!224 &529317534 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 7695326855998578590, guid: b853c117ba40ec3459b51fc1a1daaad6, type: 3}
@@ -4401,6 +4404,7 @@ GameObject:
   - component: {fileID: 989554930}
   - component: {fileID: 989554934}
   - component: {fileID: 989554933}
+  - component: {fileID: 989554935}
   m_Layer: 0
   m_Name: CinemachineCamera
   m_TagString: Untagged
@@ -4515,6 +4519,26 @@ MonoBehaviour:
   AmplitudeGain: 0
   FrequencyGain: 15
   m_NoiseOffsets: {x: 0, y: 0, z: 0}
+--- !u!114 &989554935
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 989554929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f453f694addf4275988fac205bc91968, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  BoundingShape2D: {fileID: 0}
+  Damping: 0.5
+  SlowingDistance: 5
+  OversizeWindow:
+    Enabled: 0
+    MaxWindowSize: 0
+    Padding: 0
+  m_LegacyMaxWindowSize: -2
 --- !u!1 &994042988
 GameObject:
   m_ObjectHideFlags: 0
@@ -6367,10 +6391,6 @@ MonoBehaviour:
   playerTransform: {fileID: 1988395663}
   roomPrefabs:
   - {fileID: 1663763325813161598, guid: cdc1c637a20d4544fa651df1e97bd0ec, type: 3}
-  - {fileID: 3593429197512796908, guid: 82f796fbff06c1a429a90fe74d868e17, type: 3}
-  - {fileID: 6989258952826100690, guid: b393904b22617ce4390c1d96b634fd9b, type: 3}
-  - {fileID: 7365539614123856241, guid: da1f0fa2b1d7b4d47ae3ccfd434a7561, type: 3}
-  - {fileID: 9070547572088164800, guid: 079954258d2956648aaa52b90a7532bc, type: 3}
 --- !u!4 &1361928416
 Transform:
   m_ObjectHideFlags: 0
@@ -10242,6 +10262,10 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 5535401529240642686, guid: 340bbb3d789c2964d876f7f2e6408998, type: 3}
+      propertyPath: maxAirJumps
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5535401529240642686, guid: 340bbb3d789c2964d876f7f2e6408998, type: 3}
       propertyPath: biteEffectPrefab
       value: 
       objectReference: {fileID: 3283776623164260811, guid: 793631f470e29814da8521d7548720a4, type: 3}
@@ -10249,6 +10273,10 @@ PrefabInstance:
       propertyPath: leapEffectPrefab
       value: 
       objectReference: {fileID: 4494037052561318430, guid: 1da5ff91634c74043845a8b98d0d41a1, type: 3}
+    - target: {fileID: 5535401529240642686, guid: 340bbb3d789c2964d876f7f2e6408998, type: 3}
+      propertyPath: groundLayer.m_Bits
+      value: 2056
+      objectReference: {fileID: 0}
     - target: {fileID: 7930395910278553087, guid: 340bbb3d789c2964d876f7f2e6408998, type: 3}
       propertyPath: m_Name
       value: Player

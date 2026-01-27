@@ -10,9 +10,11 @@ public class QuestData : ScriptableObject
     [Header("Objectives")]
     public QuestType type;
     public int targetAmount;
+    [Header("Ödüller")]
+    public string rewardText; // Örn: "50 Gold" (Ekranda yazacak yazý)
+    public RewardType rewardType; // Örn: Gold
+    public int rewardAmount;
 
-    [Header("Rewards")]
-    public string rewardText;
 }
 
 public enum QuestType
@@ -23,3 +25,10 @@ public enum QuestType
     NoDamageRoom,
     UseCardCount
 }
+public enum RewardType
+{
+    Gold,
+    ShiftCharge,
+    Heal
+}
+

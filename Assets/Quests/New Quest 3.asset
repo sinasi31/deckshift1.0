@@ -16,4 +16,6 @@ MonoBehaviour:
   description: Kill 3 Enemies
   type: 1
   targetAmount: 3
-  rewardText: Gain Gold.
+  rewardText: 'Reward: 100 Gold'
+  rewardType: 0
+  rewardAmount: 100

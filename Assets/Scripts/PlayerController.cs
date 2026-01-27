@@ -1,14 +1,25 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using System.Collections.Generic; // Listeler için gerekirse
+using Unity.Cinemachine; // Eðer Cinemachine referansý gerekirse diye
 
 public class PlayerController : MonoBehaviour
 {
     private Rigidbody2D rb;
     private Animator animator;
+
+    [Header("Physics Checks")]
     public Transform groundCheck;
     public float groundCheckRadius = 0.2f;
     public LayerMask groundLayer;
+
+    // --- YENÝ EKLENEN: HAVA KONTROLLERÝ ---
+    [Header("Air Settings")]
+    public int maxAirJumps = 1; // Havada kaç kere zýplayabilir? (Double jump için 1 yap)
+    private int currentAirJumps = 0;
+    // --------------------------------------
+
     public GameObject platformPrefab;
     private SpriteRenderer spriteRenderer;
     private bool isPhasing = false;
@@ -76,7 +87,7 @@ public class PlayerController : MonoBehaviour
     public float speedBoostMultiplier = 1.5f;
 
     public PlayerState currentState;
-    private bool isGrounded;
+    private bool isGrounded; // Bu artýk Update'in en baþýnda hesaplanacak
 
     [Header("Combat Settings")]
     public GameObject fireballPrefab;
@@ -86,6 +97,9 @@ public class PlayerController : MonoBehaviour
     public float biteHealAmount = 10f;
     public LayerMask enemyLayer;
 
+    [Header("Interaction Settings")]
+    public float interactionRange = 2f;
+    public LayerMask interactableLayer;
 
     void Awake()
     {
@@ -104,12 +118,28 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+        // --- DÜZELTME: FÝZÝK KONTROLLERÝNÝ EN BAÞA ALDIK ---
+        // Böylece kart kullandýðýnda oyun senin yerde mi havada mý olduðunu önceden biliyor.
+        bool wasGrounded = isGrounded;
+        isGrounded = IsGroundedCheck();
+        isWallDetected = WallCheck();
+
+        // Yere yeni bastýysak hava zýplama hakkýný sýfýrla
+        if (isGrounded && !wasGrounded)
+        {
+            currentAirJumps = 0;
+            // Ýstersen buraya bir "Yere inme sesi" ekleyebilirsin
+        }
+        // ----------------------------------------------------
+
         if (GameManager.instance != null && GameManager.instance.currentState == GameState.Paused)
         {
             moveInput = 0;
             verticalInput = 0;
             return;
         }
+
+        // Kart inputlarý artýk isGrounded güncellendikten sonra çalýþýyor
         HandleCardInput();
 
         if (Input.GetKeyDown(KeyCode.E))
@@ -130,6 +160,7 @@ public class PlayerController : MonoBehaviour
             {
                 HandleJumpInput();
             }
+
             if (currentState == PlayerState.Idle || currentState == PlayerState.Running || currentState == PlayerState.Jumping)
                 moveInput = Input.GetAxisRaw("Horizontal");
             else
@@ -137,9 +168,6 @@ public class PlayerController : MonoBehaviour
 
             verticalInput = 0;
         }
-
-        isGrounded = IsGroundedCheck();
-        isWallDetected = WallCheck();
 
         if (!isPhasing)
         {
@@ -152,33 +180,26 @@ public class PlayerController : MonoBehaviour
     {
         if (DeckManager.instance == null) return;
 
-        // Kart Seçimi (1-4)
         if (Input.GetKeyDown(KeyCode.Alpha1)) DeckManager.instance.SelectCard(0);
         if (Input.GetKeyDown(KeyCode.Alpha2)) DeckManager.instance.SelectCard(1);
         if (Input.GetKeyDown(KeyCode.Alpha3)) DeckManager.instance.SelectCard(2);
         if (Input.GetKeyDown(KeyCode.Alpha4)) DeckManager.instance.SelectCard(3);
 
-        // Kartý Ateþle (Sol Týk)
         if (Input.GetMouseButtonDown(0))
         {
             DeckManager.instance.TryCastSelectedCard();
         }
 
-        // Seçimi Ýptal Et (Sað Týk)
         if (Input.GetMouseButtonDown(1))
         {
             DeckManager.instance.DeselectCard();
         }
 
-        // Eli Yenile (R Tuþu) - Manual Recall
         if (Input.GetKeyDown(KeyCode.R))
         {
             DeckManager.instance.ReloadHand();
         }
     }
-
-    // ... (Geri kalan tüm fonksiyonlar ayný kaldý) ...
-    // Sadece AddGold, TrySpendGold, Heal vs. gibi fonksiyonlar aynen duruyor.
 
     public void AddGold(int amount)
     {
@@ -206,6 +227,7 @@ public class PlayerController : MonoBehaviour
         animator.SetFloat("yVelocity", rb.linearVelocity.y);
     }
 
+    // --- DÜZELTME: ZIPLAMA MANTIÐI GÜNCELLENDÝ ---
     private void HandleJumpInput()
     {
         if (currentState == PlayerState.WallSliding)
@@ -214,9 +236,20 @@ public class PlayerController : MonoBehaviour
         }
         else if (isGrounded)
         {
+            // Yerdeysek normal zýpla
             PerformJump(defaultJumpForce);
         }
+        else
+        {
+            // Havadaysak ve hakkýmýz varsa zýpla (Sonsuz zýplama engellendi)
+            if (currentAirJumps < maxAirJumps && currentShift > 0)
+            {
+                currentAirJumps++;
+                PerformJump(defaultJumpForce);
+            }
+        }
     }
+    // ---------------------------------------------
 
     private void FixedUpdate()
     {
@@ -228,7 +261,7 @@ public class PlayerController : MonoBehaviour
         {
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, Mathf.Clamp(rb.linearVelocity.y, -wallSlideSpeed, float.MaxValue));
         }
-        else if (currentState != PlayerState.Dashing && currentState != PlayerState.KnockedBack)
+        else if (currentState != PlayerState.Dashing && currentState != PlayerState.KnockedBack && currentState != PlayerState.CometDiving)
         {
             rb.linearVelocity = new Vector2(moveInput * moveSpeed, rb.linearVelocity.y);
         }
@@ -266,6 +299,7 @@ public class PlayerController : MonoBehaviour
         newScale.x *= -1;
         transform.localScale = newScale;
     }
+
     public bool ExecuteAction(CardActionType type, float value, out bool keepCardInHand)
     {
         keepCardInHand = false;
@@ -273,6 +307,7 @@ public class PlayerController : MonoBehaviour
         switch (type)
         {
             case CardActionType.Jump:
+                // Kartla zýplama: Buna sýnýr koymuyoruz, kart harcandýðý için ödül bu.
                 rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
                 rb.AddForce(new Vector2(0f, value), ForceMode2D.Impulse);
                 if (leapEffectPrefab != null)
@@ -282,6 +317,7 @@ public class PlayerController : MonoBehaviour
                 }
                 ChangeState(PlayerState.Jumping);
                 return true;
+
             case CardActionType.VampiricBite:
                 PerformVampiricBite(value);
                 return true;
@@ -333,7 +369,10 @@ public class PlayerController : MonoBehaviour
             case CardActionType.GlassWail:
                 PerformGlassWail(value);
                 return true;
+
+            // --- DÜZELTÝLEN COMET DIVE ---
             case CardActionType.CometDive:
+                // isGrounded artýk Update'in baþýnda güncellendiði için burasý doðru çalýþacak
                 if (!isGrounded)
                 {
                     PerformCometDive();
@@ -341,8 +380,10 @@ public class PlayerController : MonoBehaviour
                 }
                 else
                 {
+                    Debug.Log("Comet Dive için havada olmalýsýn!"); // Hata ayýklama için
                     return false;
                 }
+            // -----------------------------
 
             case CardActionType.Adrenaline:
                 UseAdrenaline(value);
@@ -350,6 +391,7 @@ public class PlayerController : MonoBehaviour
         }
         return false;
     }
+
     private void PerformJump(float jumpForce)
     {
         if (currentShift > 0)
@@ -519,7 +561,6 @@ public class PlayerController : MonoBehaviour
             GameObject p1 = Instantiate(portalPrefab, mousePos, Quaternion.identity);
             firstPortalInstance = p1.GetComponent<Portal>();
             firstPortalInstance.spriteRenderer.color = Color.gray;
-
             firstPortalInstance.ShowRangeCircle(portalMaxRange);
 
             keepCard = true;
@@ -661,7 +702,6 @@ public class PlayerController : MonoBehaviour
     private void PerformCometDive()
     {
         ChangeState(PlayerState.CometDiving);
-
         rb.linearVelocity = new Vector2(0, -cometSpeed);
     }
 
@@ -735,7 +775,6 @@ public class PlayerController : MonoBehaviour
         moveSpeed = originalSpeed;
     }
 
-
     public void LaunchFromCannon(Vector2 forceVector)
     {
         transform.SetParent(null);
@@ -750,23 +789,17 @@ public class PlayerController : MonoBehaviour
         rb.AddForce(forceVector, ForceMode2D.Impulse);
         ChangeState(PlayerState.Jumping);
     }
-    [Header("Interaction Settings")]
-    public float interactionRange = 2f; // Ne kadar yakýndan etkileþime girsin?
-    public LayerMask interactableLayer; // Hangi objeler etkileþime açýk?
 
     private void CheckInteraction()
     {
-        // Oyuncunun etrafýndaki "Interactable" layer'ýndaki objeleri tara
         Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, interactionRange, interactableLayer);
 
         foreach (Collider2D hit in hits)
         {
-            // Bulunan objede IInteractable özelliði var mý?
             IInteractable interactable = hit.GetComponent<IInteractable>();
 
             if (interactable != null)
             {
-                // Varsa etkileþimi baþlat ve döngüden çýk (Ayný anda 2 þeye basmasýn)
                 interactable.Interact();
                 return;
             }

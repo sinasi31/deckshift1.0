@@ -114,6 +114,33 @@ public class QuestSystem : MonoBehaviour
         {
             quest.isCompleted = true;
             Debug.Log($"GÖREV TAMAMLANDI! Ödül: {quest.data.rewardText}");
+            GiveReward(quest.data);
         }
     }
+    private void GiveReward(QuestData data)
+    {
+        // Oyuncuyu bul (Sahne deðiþse bile bulur)
+        PlayerController player = FindFirstObjectByType<PlayerController>();
+
+        if (player != null)
+        {
+            switch (data.rewardType)
+            {
+                case RewardType.Gold:
+                    player.AddGold(data.rewardAmount);
+                    Debug.Log($"{data.rewardAmount} Altýn Eklendi!");
+                    break;
+
+                case RewardType.Heal:
+                    player.Heal(data.rewardAmount);
+                    break;
+
+                case RewardType.ShiftCharge:
+                    player.IncreaseMaxShift(data.rewardAmount); // PlayerController'da bu fonksiyonu yazmýþtýk
+                    player.ResetShiftToMax();
+                    break;
+            }
+        }
+    }
+
 }

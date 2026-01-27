@@ -13,7 +13,9 @@ MonoBehaviour:
   m_Name: Scrooge
   m_EditorClassIdentifier: 
   questName: Scrooge
-  description: dsadasd
+  description: Have over 800 gold
   type: 0
-  targetAmount: 0
-  rewardText: dasdsad
+  targetAmount: 800
+  rewardText: 'Reward: Rich Man''s Dagger'
+  rewardType: 0
+  rewardAmount: 0
