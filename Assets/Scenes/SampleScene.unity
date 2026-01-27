@@ -2086,7 +2086,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: 0, y: -8.30011}
+  m_AnchoredPosition: {x: 0, y: -8.300049}
   m_SizeDelta: {x: 0, y: 100}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!114 &448187558
@@ -2534,6 +2534,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   target: {fileID: 1988395663}
   smoothSpeed: 0.125
+  currentBounds: {fileID: 0}
 --- !u!224 &529317534 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 7695326855998578590, guid: b853c117ba40ec3459b51fc1a1daaad6, type: 3}
@@ -6366,6 +6367,10 @@ MonoBehaviour:
   playerTransform: {fileID: 1988395663}
   roomPrefabs:
   - {fileID: 1663763325813161598, guid: cdc1c637a20d4544fa651df1e97bd0ec, type: 3}
+  - {fileID: 3593429197512796908, guid: 82f796fbff06c1a429a90fe74d868e17, type: 3}
+  - {fileID: 6989258952826100690, guid: b393904b22617ce4390c1d96b634fd9b, type: 3}
+  - {fileID: 7365539614123856241, guid: da1f0fa2b1d7b4d47ae3ccfd434a7561, type: 3}
+  - {fileID: 9070547572088164800, guid: 079954258d2956648aaa52b90a7532bc, type: 3}
 --- !u!4 &1361928416
 Transform:
   m_ObjectHideFlags: 0

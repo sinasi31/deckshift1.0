@@ -2,55 +2,93 @@ using UnityEngine;
 
 public class CameraController : MonoBehaviour
 {
-    public Transform target; // Takip edilecek oyuncu
-    public float smoothSpeed = 0.125f; // Yumuþak takip hýzý
+    public Transform target;
+    public float smoothSpeed = 0.125f;
 
-    private BoxCollider2D currentBounds; // Odanýn sýnýrlarý
+    // Sýnýrlarý Editörde görelim diye public yaptým
+    public BoxCollider2D currentBounds;
+
     private Camera cam;
-
     private float camHalfHeight;
     private float camHalfWidth;
 
     private void Awake()
     {
         cam = GetComponent<Camera>();
-        // Kameranýn dikey ve yatay yarýçapýný hesapla (Zoom oranýna göre)
         camHalfHeight = cam.orthographicSize;
         camHalfWidth = camHalfHeight * cam.aspect;
     }
 
-    // LevelManager her yeni oda yarattýðýnda bu fonksiyonu çaðýrýp yeni sýnýrlarý verecek
     public void SetBounds(BoxCollider2D newBounds)
     {
         currentBounds = newBounds;
+
+        // Debug için konsola yazalým
+        if (currentBounds != null)
+            Debug.Log($"Kamera Sýnýrlarý Atandý: {newBounds.name} - Boyut: {newBounds.bounds.size}");
+        else
+            Debug.LogError("Kamera Sýnýrý (Bounds) NULL geldi! Obje ismini kontrol et.");
     }
 
     private void LateUpdate()
     {
         if (target == null) return;
 
-        // 1. Hedef pozisyon (Oyuncu)
-        Vector3 desiredPosition = new Vector3(target.position.x, target.position.y, transform.position.z);
+        // Hedef pozisyon (Z eksenini -10'da sabit tutuyoruz, ÇOK ÖNEMLÝ)
+        Vector3 desiredPosition = new Vector3(target.position.x, target.position.y, -10f);
 
-        // 2. Eðer bir sýnýr kutumuz varsa, kamerayý o kutunun içine hapset (Clamp)
         if (currentBounds != null)
         {
-            // Kutunun en saðý, solu, tepesi ve altý
-            float minX = currentBounds.bounds.min.x + camHalfWidth;
-            float maxX = currentBounds.bounds.max.x - camHalfWidth;
-            float minY = currentBounds.bounds.min.y + camHalfHeight;
-            float maxY = currentBounds.bounds.max.y - camHalfHeight;
+            Bounds bounds = currentBounds.bounds;
 
-            // Kameranýn gidebileceði x ve y deðerlerini kýsýtla
-            // (Mathf.Clamp: Deðer min'den küçükse min, max'tan büyükse max yapar)
-            float clampedX = Mathf.Clamp(desiredPosition.x, minX, maxX);
-            float clampedY = Mathf.Clamp(desiredPosition.y, minY, maxY);
+            // --- MATEMATÝKSEL DÜZELTME ---
+            // Eðer oda geniþliði kameradan küçükse, kamerayý odanýn ortasýna sabitle.
+            // Deðilse, kenarlara çarpýnca durdur (Clamp).
 
-            desiredPosition = new Vector3(clampedX, clampedY, transform.position.z);
+            float minX, maxX, minY, maxY;
+
+            // X EKSENÝ KONTROLÜ
+            if (bounds.size.x < camHalfWidth * 2)
+            {
+                // Oda kameradan dar -> Ortala
+                desiredPosition.x = bounds.center.x;
+            }
+            else
+            {
+                // Oda geniþ -> Sýnýrla
+                minX = bounds.min.x + camHalfWidth;
+                maxX = bounds.max.x - camHalfWidth;
+                desiredPosition.x = Mathf.Clamp(desiredPosition.x, minX, maxX);
+            }
+
+            // Y EKSENÝ KONTROLÜ
+            if (bounds.size.y < camHalfHeight * 2)
+            {
+                // Oda kameradan kýsa -> Ortala
+                desiredPosition.y = bounds.center.y;
+            }
+            else
+            {
+                // Oda yüksek -> Sýnýrla
+                minY = bounds.min.y + camHalfHeight;
+                maxY = bounds.max.y - camHalfHeight;
+                desiredPosition.y = Mathf.Clamp(desiredPosition.y, minY, maxY);
+            }
         }
 
-        // 3. Yumuþak geçiþ ile hareket et
+        // Yumuþak geçiþ
         Vector3 smoothedPosition = Vector3.Lerp(transform.position, desiredPosition, smoothSpeed);
         transform.position = smoothedPosition;
+    }
+
+    // --- BU KISIM ÇOK ÖNEMLÝ: GÖRSEL HATA AYIKLAMA ---
+    // Scene ekranýnda sýnýrlarý Kýrmýzý Kutu olarak çizer.
+    private void OnDrawGizmos()
+    {
+        if (currentBounds != null)
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawWireCube(currentBounds.bounds.center, currentBounds.bounds.size);
+        }
     }
 }
