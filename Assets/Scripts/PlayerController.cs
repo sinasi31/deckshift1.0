@@ -30,7 +30,8 @@ public class PlayerController : MonoBehaviour
     public GameObject diveImpactPrefab; 
     public float diveSpeed = 25f;        
     private bool isDiving = false;
-    
+    public GameObject dashEffectPrefab; // Yaptýðýn efekti buraya baðlayacaðýz
+
     [Header("Adrenaline VFX")]
     public GameObject ghostPrefab;     // Az önce yaptýðýn prefab
     public float adrenalineSpeedMult = 2f; // Hýz kaç katýna çýksýn? (2 katý)
@@ -377,6 +378,11 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator PerformDash(float dashDistance, int direction)
     {
+        if (dashEffectPrefab != null)
+        {
+            Instantiate(dashEffectPrefab, transform.position, Quaternion.identity);
+        }
+        
         PlayerState stateBeforeDash = currentState;
         ChangeState(PlayerState.Dashing);
         isInvincible = true;

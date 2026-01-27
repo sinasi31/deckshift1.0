@@ -10385,6 +10385,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 3283776623164260811, guid: 793631f470e29814da8521d7548720a4, type: 3}
     - target: {fileID: 5535401529240642686, guid: 340bbb3d789c2964d876f7f2e6408998, type: 3}
+      propertyPath: dashEffectPrefab
+      value: 
+      objectReference: {fileID: 360610054379895922, guid: 8c5d0b3cd252ba348ab3d0759f00ddb1, type: 3}
+    - target: {fileID: 5535401529240642686, guid: 340bbb3d789c2964d876f7f2e6408998, type: 3}
       propertyPath: diveImpactPrefab
       value: 
       objectReference: {fileID: 7676874937706828914, guid: 6a0b8832fb3a14a4caa7833f014e25fd, type: 3}
