@@ -7588,7 +7588,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerTransform: {fileID: 1988395663}
   roomPrefabs:
-  - {fileID: 1663763325813161598, guid: cdc1c637a20d4544fa651df1e97bd0ec, type: 3}
+  - {fileID: 6989258952826100690, guid: b393904b22617ce4390c1d96b634fd9b, type: 3}
 --- !u!4 &1361928416
 Transform:
   m_ObjectHideFlags: 0

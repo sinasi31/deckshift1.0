@@ -729,7 +729,10 @@ public class PlayerController : MonoBehaviour
                 Heal(biteHealAmount);
                 if (biteEffectPrefab != null)
                 {
-                    Instantiate(biteEffectPrefab, hitEnemy.transform.position, Quaternion.identity);
+                    GameObject vfx = Instantiate(biteEffectPrefab, hitEnemy.transform.position, Quaternion.identity);
+
+                    
+                    Destroy(vfx, 1.0f);
                 }
             }
         }
