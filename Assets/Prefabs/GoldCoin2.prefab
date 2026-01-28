@@ -28,8 +28,8 @@ Transform:
   m_GameObject: {fileID: 3793130994039728667}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 24.92, y: -22.46, z: 0.003952643}
-  m_LocalScale: {x: 9.068262, y: 9.068262, z: 9.068262}
+  m_LocalPosition: {x: 24.92, y: -22.83, z: 0.0039526}
+  m_LocalScale: {x: 0.46207455, y: 0.46207455, z: 0.46207455}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -78,7 +78,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: -1820954629, guid: fc125cd2b902af1428138adb4c7f6ec4, type: 3}
+  m_Sprite: {fileID: -6063682994864520046, guid: 2f24b67ff53fff1459ce2c65a1ad9d3e, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -127,7 +127,7 @@ PolygonCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 0.1, y: 0.11}
+    oldSize: {x: 3.77, y: 1.75}
     newSize: {x: 0.1, y: 0.11}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
@@ -152,6 +152,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d1796d7242754fd4386043338783a3c4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  minGold: 15
-  maxGold: 30
-  destroyOnPickup: 1
+  goldSound: {fileID: 8300000, guid: 2b9eee6feb3ba884ea9c5966bbd932db, type: 3}
+  soundVolume: 0.5
