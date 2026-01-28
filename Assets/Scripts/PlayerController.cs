@@ -6,6 +6,7 @@ using Unity.Cinemachine; // Eðer Cinemachine referansý gerekirse diye
 
 public class PlayerController : MonoBehaviour
 {
+
     private Rigidbody2D rb;
     private Animator animator;
 
@@ -36,6 +37,20 @@ public class PlayerController : MonoBehaviour
     [Header("VFX Settings")]
     public GameObject biteEffectPrefab;
     public GameObject leapEffectPrefab;
+    public TrailRenderer diveTrail;      
+    public GameObject diveImpactPrefab; 
+    public float diveSpeed = 25f;        
+    private bool isDiving = false;
+    public GameObject dashEffectPrefab; // Yaptýðýn efekti buraya baðlayacaðýz
+
+    [Header("Adrenaline VFX")]
+    public GameObject ghostPrefab;     // Az önce yaptýðýn prefab
+    public float adrenalineSpeedMult = 2f; // Hýz kaç katýna çýksýn? (2 katý)
+    public float ghostDelay = 0.05f;   // Ne sýklýkla hayalet çýksýn?
+
+    private float ghostTimer;
+    private bool isAdrenalineActive = false;
+    private float defaultMoveSpeed; // Eski hýzý hafýzada tutmak için
 
     [Header("Portal Settings")]
     public GameObject portalPrefab;
@@ -402,6 +417,11 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator PerformDash(float dashDistance, int direction)
     {
+        if (dashEffectPrefab != null)
+        {
+            Instantiate(dashEffectPrefab, transform.position, Quaternion.identity);
+        }
+        
         PlayerState stateBeforeDash = currentState;
         ChangeState(PlayerState.Dashing);
         isInvincible = true;
@@ -700,6 +720,9 @@ public class PlayerController : MonoBehaviour
     {
         ChangeState(PlayerState.CometDiving);
         rb.linearVelocity = new Vector2(0, -cometSpeed);
+        // --- BURAYI EKLE (Kuyruðu Aç) ---
+        if (diveTrail != null) diveTrail.emitting = true;
+        // -------------------------------
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
@@ -719,6 +742,19 @@ public class PlayerController : MonoBehaviour
     private void CometImpact()
     {
         ChangeState(PlayerState.Idle);
+        // --- BURAYI EKLE (Efektleri Yönet) ---
+        // 1. Kuyruðu kapat
+        if (diveTrail != null)
+        {
+            diveTrail.emitting = false;
+        }
+
+        // 2. Bizim yeni yaptýðýmýz patlama efektini yarat
+        if (diveImpactPrefab != null)
+        {
+            Instantiate(diveImpactPrefab, transform.position, Quaternion.identity);
+        }
+        // ------------------------------------
 
         Collider2D[] hitEnemies = Physics2D.OverlapCircleAll(transform.position, cometRadius, enemyLayer);
 
@@ -764,12 +800,20 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator AdrenalineSpeedBoostRoutine()
     {
+        // --- BURAYA EKLE (1) ---
+        isAdrenalineActive = true;
+        if (spriteRenderer != null) spriteRenderer.color = Color.red;
+        // -----------------------
         float originalSpeed = moveSpeed;
         moveSpeed *= speedBoostMultiplier;
 
         yield return new WaitForSeconds(adrenalineDuration);
 
         moveSpeed = originalSpeed;
+        // --- BURAYA EKLE (2) ---
+        if (spriteRenderer != null) spriteRenderer.color = Color.white;
+        isAdrenalineActive = false;
+        // -----------------------
     }
 
     public void LaunchFromCannon(Vector2 forceVector)
@@ -802,4 +846,6 @@ public class PlayerController : MonoBehaviour
             }
         }
     }
+
+    
 }
