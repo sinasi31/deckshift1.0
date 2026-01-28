@@ -1,11 +1,36 @@
+ï»¿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class HandUI : MonoBehaviour
 {
-    [Header("UI Ayarlarý")]
+    [Header("UI AyarlarÄ±")]
     public GameObject cardUIPrefab;
     public Transform handContainer;
+
+    [Header("Animasyon AyarlarÄ±")]
+    public Transform drawPilePosition;
+    public float cardFlySpeed = 80f;
+    public float dealDelay = 0.03f;
+
+    [Header("Ses Efektleri")]
+    public AudioClip drawSound; // Buraya ses dosyasÄ±nÄ± sÃ¼rÃ¼kleyeceksin
+    [Range(0f, 1f)] public float soundVolume = 0.5f;
+    private AudioSource audioSource;
+
+    // Havada kalan hayaletleri takip etmek iÃ§in liste
+    private List<GameObject> activeGhosts = new List<GameObject>();
+
+    private void Awake()
+    {
+        // Objenin Ã¼zerinde AudioSource var mÄ± diye bakar, yoksa ekler
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+        }
+    }
 
     private void OnEnable()
     {
@@ -17,58 +42,134 @@ public class HandUI : MonoBehaviour
         DeckManager.OnHandChanged -= UpdateHandDisplay;
     }
 
-    // Oyun baþlar baþlamaz eli çiz
     private void Start()
     {
-        // Biraz bekletelim ki DeckManager listeyi doldursun
-        Invoke("UpdateHandDisplay", 0.1f);
+        StartCoroutine(StartWithDelay());
     }
 
-    private void UpdateHandDisplay()
+    private IEnumerator StartWithDelay()
     {
-        // Önce temizle
-        foreach (Transform child in handContainer)
+        yield return new WaitForSeconds(0.2f);
+        UpdateHandDisplay(true);
+    }
+
+    public void UpdateHandDisplay(bool animate)
+    {
+        StopAllCoroutines();
+
+        // Hayalet TemizliÄŸi
+        foreach (GameObject ghost in activeGhosts)
         {
-            Destroy(child.gameObject);
+            if (ghost != null) Destroy(ghost);
+        }
+        activeGhosts.Clear();
+
+        // Kart TemizliÄŸi
+        while (handContainer.childCount > 0)
+        {
+            DestroyImmediate(handContainer.GetChild(0).gameObject);
         }
 
         if (DeckManager.instance == null) return;
 
         List<RuntimeCard> currentHand = DeckManager.instance.GetCurrentHand();
+        List<CardUI> createdCards = new List<CardUI>();
 
+        // KartlarÄ± Yarat
         for (int i = 0; i < currentHand.Count; i++)
         {
-            RuntimeCard card = currentHand[i];
-            GameObject cardUIObject = Instantiate(cardUIPrefab, handContainer);
+            GameObject cardObj = Instantiate(cardUIPrefab, handContainer);
+            CardUI ui = cardObj.GetComponent<CardUI>();
 
-            CardUI cardUI = cardUIObject.GetComponent<CardUI>();
-            if (cardUI != null)
+            if (ui != null)
             {
-                // ÖNEMLÝ: Setup'a gerçek index'i (i) gönderiyoruz. 
-                // CardUI kendi içinde bunu (i+1) yapýp ekrana yazacak.
-                cardUI.Setup(card, i);
+                ui.Setup(currentHand[i], i);
+                createdCards.Add(ui);
+            }
+
+            CanvasGroup cg = cardObj.GetComponent<CanvasGroup>();
+            if (cg == null) cg = cardObj.AddComponent<CanvasGroup>();
+
+            if (!animate || drawPilePosition == null)
+            {
+                cg.alpha = 1f;
+                cg.blocksRaycasts = true;
+            }
+            else
+            {
+                cg.alpha = 0f;
+                cg.blocksRaycasts = false;
             }
         }
-    }
 
-    public void AnimateCardFromHand(int index)
-    {
-        if (index < 0 || index >= handContainer.childCount) return;
+        LayoutRebuilder.ForceRebuildLayoutImmediate(handContainer.GetComponent<RectTransform>());
 
-        Transform cardTransform = handContainer.GetChild(index);
-
-        // Layout grubundan çýkar ki serbestçe uçabilsin
-        if (handContainer.parent != null)
-            cardTransform.SetParent(handContainer.parent);
-        else
-            cardTransform.SetParent(transform.root); // Garanti olsun
-
-        cardTransform.SetAsLastSibling();
-
-        CardUI cardUI = cardTransform.GetComponent<CardUI>();
-        if (cardUI != null)
+        if (animate && drawPilePosition != null && createdCards.Count > 0)
         {
-            cardUI.PlayUseAnimation();
+            StartCoroutine(SafeAnimateRoutine(createdCards));
         }
     }
+
+    private IEnumerator SafeAnimateRoutine(List<CardUI> targets)
+    {
+        yield return new WaitForEndOfFrame();
+
+        foreach (CardUI targetUI in targets)
+        {
+            if (targetUI == null) continue;
+
+            CanvasGroup targetCG = targetUI.GetComponent<CanvasGroup>();
+            if (targetCG == null) targetCG = targetUI.gameObject.AddComponent<CanvasGroup>();
+
+            // --- SESÄ° BURADA Ã‡ALIYORUZ ---
+            if (drawSound != null && audioSource != null)
+            {
+                // Pitch'i hafifÃ§e deÄŸiÅŸtiriyoruz (0.9 ile 1.1 arasÄ±) ki ses doÄŸal gelsin
+                audioSource.pitch = Random.Range(0.9f, 1.1f);
+                audioSource.PlayOneShot(drawSound, soundVolume);
+            }
+            // -----------------------------
+
+            // Ghost Yarat
+            GameObject ghost = Instantiate(cardUIPrefab, handContainer.parent);
+            ghost.transform.position = drawPilePosition.position;
+            ghost.transform.localScale = targetUI.transform.localScale;
+            activeGhosts.Add(ghost);
+
+            CardUI ghostUI = ghost.GetComponent<CardUI>();
+            if (ghostUI != null) ghostUI.Setup(targetUI.GetCard(), -1);
+
+            Destroy(ghost.GetComponent<CardHover>());
+            CanvasGroup ghostCG = ghost.GetComponent<CanvasGroup>();
+            if (!ghostCG) ghostCG = ghost.AddComponent<CanvasGroup>();
+            ghostCG.blocksRaycasts = false;
+            ghostCG.alpha = 1f;
+
+            float timer = 0f;
+            while (ghost != null && targetUI != null && timer < 0.5f)
+            {
+                timer += Time.deltaTime;
+                Vector3 targetPos = targetUI.transform.position;
+
+                if (Vector3.Distance(ghost.transform.position, targetPos) < 0.5f)
+                    break;
+
+                ghost.transform.position = Vector3.Lerp(ghost.transform.position, targetPos, Time.deltaTime * cardFlySpeed);
+                yield return null;
+            }
+
+            if (ghost != null)
+            {
+                activeGhosts.Remove(ghost);
+                Destroy(ghost);
+            }
+
+            targetCG.alpha = 1f;
+            targetCG.blocksRaycasts = true;
+
+            yield return new WaitForSeconds(dealDelay);
+        }
+    }
+
+    public void AnimateCardFromHand(int index) { }
 }

@@ -13,13 +13,19 @@ public class ShopItemUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
     public Button buyButton;
 
     [Header("Kart Bilgileri (Sadece Kartlar İçin)")]
-    public GameObject cardStatsPanel; // Shift ve Charge'ın olduğu kutu (Relicse kapatalım)
+    public GameObject cardStatsPanel; // Shift ve Charge'ın olduğu kutu
     public TextMeshProUGUI shiftText;  // Shift bedelini yazan text
     public TextMeshProUGUI chargeText; // Charge sayısını yazan text
 
     [Header("Hover / Tooltip")]
     public GameObject descriptionPanel;
     public TextMeshProUGUI descriptionText;
+
+    // --- SES AYARLARI EKLENDİ ---
+    [Header("Ses Efektleri")]
+    public AudioClip buySound; // Ses dosyasını buraya sürükle
+    [Range(0f, 1f)] public float soundVolume = 0.5f;
+    // ----------------------------
 
     private ShopSlotData myData;
     private ShopItemType type;
@@ -43,7 +49,6 @@ public class ShopItemUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
             descriptionPanel.SetActive(false);
     }
 
-    // --- BURAYI GÜNCELLEDİK ---
     public void SetupFromData(ShopSlotData data)
     {
         myData = data;
@@ -58,7 +63,7 @@ public class ShopItemUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
 
             if (cardStatsPanel) cardStatsPanel.SetActive(true);
             if (shiftText) shiftText.text = data.cardReference.shiftCost.ToString();
-            if(chargeText) chargeText.text = data.cardReference.maxUses.ToString();
+            if (chargeText) chargeText.text = data.cardReference.maxUses.ToString();
         }
         else if (type == ShopItemType.Relic)
         {
@@ -99,8 +104,18 @@ public class ShopItemUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
     public void OnClickBuy()
     {
         PlayerController player = GameManager.instance.player;
+
+        // Eğer parayı harcayabiliyorsa (Yani satın alma başarılıysa)
         if (player.TrySpendGold(price))
         {
+            // --- SESİ BURADA ÇALIYORUZ ---
+            if (buySound != null)
+            {
+                // Sesi kameranın olduğu pozisyonda çalıyoruz ki her yerden duyulsun
+                AudioSource.PlayClipAtPoint(buySound, Camera.main.transform.position, soundVolume);
+            }
+            // -----------------------------
+
             switch (type)
             {
                 case ShopItemType.Card:

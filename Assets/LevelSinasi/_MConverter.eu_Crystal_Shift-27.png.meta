@@ -1,0 +1,592 @@
+fileFormatVersion: 2
+guid: d8d124d3c20a89640abf96cdd0d80bbc
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -5496828501962058231
+    second: _MConverter.eu_Crystal_Shift-27_0
+  - first:
+      213: 8245423578351135409
+    second: _MConverter.eu_Crystal_Shift-27_1
+  - first:
+      213: -1810942529563265706
+    second: _MConverter.eu_Crystal_Shift-27_2
+  - first:
+      213: 3848781654174722746
+    second: _MConverter.eu_Crystal_Shift-27_3
+  - first:
+      213: -7646834294324344782
+    second: _MConverter.eu_Crystal_Shift-27_4
+  - first:
+      213: 3101649451404941179
+    second: _MConverter.eu_Crystal_Shift-27_5
+  - first:
+      213: 7374395945782562162
+    second: _MConverter.eu_Crystal_Shift-27_6
+  - first:
+      213: 7788890628050264955
+    second: _MConverter.eu_Crystal_Shift-27_7
+  - first:
+      213: 5674562049530870293
+    second: _MConverter.eu_Crystal_Shift-27_8
+  - first:
+      213: 8187182204111804229
+    second: _MConverter.eu_Crystal_Shift-27_9
+  - first:
+      213: 3589497019593482796
+    second: _MConverter.eu_Crystal_Shift-27_10
+  - first:
+      213: -5425431021357858093
+    second: _MConverter.eu_Crystal_Shift-27_11
+  - first:
+      213: 9091277096612027635
+    second: _MConverter.eu_Crystal_Shift-27_12
+  - first:
+      213: 1103527005921706505
+    second: _MConverter.eu_Crystal_Shift-27_13
+  - first:
+      213: -5382262534257192941
+    second: _MConverter.eu_Crystal_Shift-27_14
+  - first:
+      213: 4965504471019726674
+    second: _MConverter.eu_Crystal_Shift-27_15
+  - first:
+      213: -4685109339025380501
+    second: _MConverter.eu_Crystal_Shift-27_16
+  - first:
+      213: 7136110346799687347
+    second: _MConverter.eu_Crystal_Shift-27_17
+  - first:
+      213: 7885740642642507593
+    second: _MConverter.eu_Crystal_Shift-27_18
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 1846
+        width: 175
+        height: 74
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9061f45d99757b3b0800000000000000
+      internalID: -5496828501962058231
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_1
+      rect:
+        serializedVersion: 2
+        x: 132
+        y: 1658
+        width: 415
+        height: 225
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1baef32fe01ad6270800000000000000
+      internalID: 8245423578351135409
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_2
+      rect:
+        serializedVersion: 2
+        x: 811
+        y: 1373
+        width: 269
+        height: 547
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 655fbb83d5d3ed6e0800000000000000
+      internalID: -1810942529563265706
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_3
+      rect:
+        serializedVersion: 2
+        x: 729
+        y: 1784
+        width: 11
+        height: 42
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: abaef13d58e996530800000000000000
+      internalID: 3848781654174722746
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_4
+      rect:
+        serializedVersion: 2
+        x: 459
+        y: 1763
+        width: 34
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 238c58659bcf0e590800000000000000
+      internalID: -7646834294324344782
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_5
+      rect:
+        serializedVersion: 2
+        x: 500
+        y: 1692
+        width: 23
+        height: 69
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b77d6c82eb54b0b20800000000000000
+      internalID: 3101649451404941179
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_6
+      rect:
+        serializedVersion: 2
+        x: 543
+        y: 1576
+        width: 9
+        height: 181
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 27d437d9a0e175660800000000000000
+      internalID: 7374395945782562162
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_7
+      rect:
+        serializedVersion: 2
+        x: 716
+        y: 1702
+        width: 21
+        height: 54
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b732e4742c2b71c60800000000000000
+      internalID: 7788890628050264955
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_8
+      rect:
+        serializedVersion: 2
+        x: 70
+        y: 1066
+        width: 69
+        height: 468
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 51a33327e1810ce40800000000000000
+      internalID: 5674562049530870293
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_9
+      rect:
+        serializedVersion: 2
+        x: 98
+        y: 1220
+        width: 33
+        height: 412
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 547db7b46d6be9170800000000000000
+      internalID: 8187182204111804229
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_10
+      rect:
+        serializedVersion: 2
+        x: 122
+        y: 1032
+        width: 31
+        height: 181
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c226137758470d130800000000000000
+      internalID: 3589497019593482796
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_11
+      rect:
+        serializedVersion: 2
+        x: 75
+        y: 516
+        width: 89
+        height: 387
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3d284923b3ff4b4b0800000000000000
+      internalID: -5425431021357858093
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_12
+      rect:
+        serializedVersion: 2
+        x: 485
+        y: 696
+        width: 114
+        height: 222
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3fc543a0a54ba2e70800000000000000
+      internalID: 9091277096612027635
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_13
+      rect:
+        serializedVersion: 2
+        x: 634
+        y: 0
+        width: 446
+        height: 915
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 902830417f3805f00800000000000000
+      internalID: 1103527005921706505
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_14
+      rect:
+        serializedVersion: 2
+        x: 119
+        y: 162
+        width: 30
+        height: 222
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 310d4b5ddbc5e45b0800000000000000
+      internalID: -5382262534257192941
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_15
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 298
+        height: 88
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 257aebd020409e440800000000000000
+      internalID: 4965504471019726674
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_16
+      rect:
+        serializedVersion: 2
+        x: 370
+        y: 34
+        width: 17
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b6be68101e52bfeb0800000000000000
+      internalID: -4685109339025380501
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_17
+      rect:
+        serializedVersion: 2
+        x: 417
+        y: 31
+        width: 41
+        height: 15
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3b62cfa3d8e880360800000000000000
+      internalID: 7136110346799687347
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: _MConverter.eu_Crystal_Shift-27_18
+      rect:
+        serializedVersion: 2
+        x: 500
+        y: 35
+        width: 10
+        height: 21
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 94731938557cf6d60800000000000000
+      internalID: 7885740642642507593
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable: {}
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
