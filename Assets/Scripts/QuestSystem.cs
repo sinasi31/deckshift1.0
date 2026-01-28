@@ -6,21 +6,20 @@ public class QuestSystem : MonoBehaviour
     public static QuestSystem instance;
 
     [Header("UI Baðlantýlarý")]
-    public GameObject overlayPanel; // Siyah arka plan
-    public Transform container;     // Kaðýtlarýn dizileceði yer
-    public GameObject paperPrefab;  // Kaðýt prefabý
+    public GameObject overlayPanel;
+    public Transform container;     
+    public GameObject paperPrefab; 
 
     [Header("Görev Havuzu")]
-    public List<QuestData> allQuests; // Editörden sürükle
+    public List<QuestData> allQuests;
     public List<ActiveQuest> activeQuests = new List<ActiveQuest>();
 
     private void Awake()
     {
-        // Singleton & Kalýcýlýk
         if (instance == null)
         {
             instance = this;
-            DontDestroyOnLoad(gameObject); // Sahne deðiþse de silinme
+            DontDestroyOnLoad(gameObject); 
         }
         else
         {
@@ -30,7 +29,6 @@ public class QuestSystem : MonoBehaviour
 
     private void Start()
     {
-        // Baþlangýçta paneli kapat
         overlayPanel.SetActive(false);
     }
 
@@ -46,7 +44,7 @@ public class QuestSystem : MonoBehaviour
         {
             overlayPanel.SetActive(true);
             GenerateQuests();
-            Time.timeScale = 0; // Oyunu durdur (Player hareket edemesin)
+            Time.timeScale = 0;
         }
     }
     public void CloseBoard()
@@ -57,18 +55,13 @@ public class QuestSystem : MonoBehaviour
 
     void GenerateQuests()
     {
-        // Eski kaðýtlarý temizle
         foreach (Transform child in container) Destroy(child.gameObject);
-
-        // 3 tane rastgele görev seç ve oluþtur
         for (int i = 0; i < Mathf.Min(3, allQuests.Count); i++)
         {
             GameObject paper = Instantiate(paperPrefab, container);
 
-            // Layout Group buglarýný önlemek için scale'i resetle
             paper.transform.localScale = Vector3.one;
 
-            // Veriyi doldur
             paper.GetComponent<QuestPaper>().Setup(allQuests[i]);
         }
     }

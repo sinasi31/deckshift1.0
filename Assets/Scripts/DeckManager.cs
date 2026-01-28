@@ -7,6 +7,7 @@ public class DeckManager : MonoBehaviour
 {
     public static DeckManager instance;
     public static event Action OnHandChanged;
+    private List<RuntimeCard> exhaustPile = new List<RuntimeCard>();
 
     [Header("References")]
     public PlayerController player;
@@ -21,6 +22,10 @@ public class DeckManager : MonoBehaviour
     private int selectedIndex = -1;
     private bool isReloading = false;
 
+    public List<RuntimeCard> GetExhaustPile()
+    {
+        return exhaustPile;
+    }
     public List<RuntimeCard> GetCurrentHand()
     {
         return hand;
@@ -155,6 +160,15 @@ public class DeckManager : MonoBehaviour
         {
             Debug.LogWarning($"Kartýn kullaným hakký bitmiþ: {cardTemplate.cardName}");
             return;
+        }
+        if (playedCard.isInfinite || playedCard.currentUses > 0)
+        {
+            if (!cardTemplate.singleUse || playedCard.isInfinite)
+                discardPile.Add(playedCard);
+        }
+        else
+        {
+            exhaustPile.Add(playedCard);
         }
 
         if (cardTemplate.actionType != CardActionType.Portal)

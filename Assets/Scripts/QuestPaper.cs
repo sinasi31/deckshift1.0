@@ -28,11 +28,9 @@ public class QuestPaper : MonoBehaviour
     {
         Debug.Log($"Görev Kabul Edildi: {myData.questName}");
 
-        // Görseli deðiþtir
         acceptButton.interactable = false;
         acceptButton.GetComponentInChildren<TextMeshProUGUI>().text = "ACCEPTED";
 
-        // Manager'a haber ver (Birazdan yazacaðýz)
         QuestSystem.instance.AcceptQuest(myData);
     }
 }

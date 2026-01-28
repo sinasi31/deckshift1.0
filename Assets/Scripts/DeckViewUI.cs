@@ -19,10 +19,15 @@ public class DeckViewUI : MonoBehaviour
     public TextMeshProUGUI titleText;  // "Draw Pile" veya "Discard Pile" yazýsý
     public Button closeButton;         // Paneli kapatma butonu
 
+    [Header("Exhaust (Tükenenler)")]
+    public Button exhaustButton; // Bunu birazdan sað üst köþeye koyacaðýz
+    public TextMeshProUGUI exhaustCountText;
     private void Start()
     {
         // Panel baþlangýçta kapalý olsun
         if (viewPanel != null) viewPanel.SetActive(false);
+
+        if (exhaustButton) exhaustButton.onClick.AddListener(ShowExhaustPile);
 
         // Buton týklamalarýný baðla
         if (drawPileButton) drawPileButton.onClick.AddListener(ShowDrawPile);
@@ -32,6 +37,8 @@ public class DeckViewUI : MonoBehaviour
 
     private void Update()
     {
+        if (exhaustCountText && DeckManager.instance != null)
+            exhaustCountText.text = DeckManager.instance.GetExhaustPile().Count.ToString();
         // Sayaçlarý her karede güncelle (En kolayý bu)
         if (DeckManager.instance != null)
         {
@@ -88,7 +95,12 @@ public class DeckViewUI : MonoBehaviour
             }
         }
     }
-
+    public void ShowExhaustPile()
+    {
+        if (DeckManager.instance == null) return;
+        // Baþlýðý "EXHAUST PILE" yaparak paneli aç
+        OpenView("EXHAUST PILE", DeckManager.instance.GetExhaustPile());
+    }
     public void CloseView()
     {
         viewPanel.SetActive(false);
