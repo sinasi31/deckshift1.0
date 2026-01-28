@@ -1,121 +1,113 @@
-﻿using System.Collections;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using UnityEngine.EventSystems;
 
 public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
 {
-    [Header("Temel Görseller")]
+    [Header("Görseller")]
     public Image cardArtImage;
     public TextMeshProUGUI keyHintText;
-
-    [Header("Seçim Görselleri")]
     public GameObject selectionFrame;
-
-    public float selectionLiftAmount = 50f;
-
-    [Header("Mekanik Görseller")]
     public TextMeshProUGUI usesText;
     public Transform shiftCostContainer;
     public GameObject shiftPointPrefab;
 
-    [Header("Layout Ayarları (Nokta Hizalama)")]
-    public float firstDotXPosition = -25f; 
-    public float pointSpacing = 15f;       
+    [Header("Hizalama Ayarları")]
+    public float pointSpacing = 20f; // Noktalar arası boşluk (Bunu Inspector'dan değiştirebilirsin)
 
-    [Header("Hover (Açıklama) Ayarları")]
+    [Header("Hover")]
     public GameObject descriptionPanel;
     public TextMeshProUGUI descriptionText;
+    public float selectionLiftAmount = 50f;
 
     private RuntimeCard myCard;
     private int myIndex;
     private Vector3 originalScale;
     private RectTransform rectTransform;
-    private bool isInitialized = false;
+
+    public RuntimeCard GetCard()
+    {
+        return myCard;
+    }
 
     private void Awake()
     {
         rectTransform = GetComponent<RectTransform>();
         originalScale = transform.localScale;
-        isInitialized = true;
     }
 
     public void Setup(RuntimeCard card, int index)
     {
-        if (!isInitialized)
-        {
-            rectTransform = GetComponent<RectTransform>();
-            originalScale = transform.localScale;
-            isInitialized = true;
-        }
-
         myCard = card;
         myIndex = index;
 
         if (cardArtImage != null) cardArtImage.sprite = card.cardData.cardArt;
         if (keyHintText != null) keyHintText.text = $"[{index + 1}]";
 
+        // Açıklama
         if (descriptionPanel != null)
         {
             descriptionPanel.SetActive(false);
             if (descriptionText != null)
-            {
                 descriptionText.text = $"<b>{card.cardData.cardName}</b>\n\n{card.cardData.description}";
-            }
         }
 
+        // Uses
         if (usesText != null)
         {
-            if (card.isInfinite)
-                usesText.text = "∞";
+            if (card.isInfinite) usesText.text = "∞";
             else
             {
                 usesText.text = card.currentUses.ToString();
                 usesText.color = (card.currentUses == 1) ? Color.red : Color.white;
             }
         }
+
+        // --- YENİ HİZALAMA SİSTEMİ ---
         if (shiftCostContainer != null && shiftPointPrefab != null)
         {
+            // Önce eskileri temizle
             foreach (Transform child in shiftCostContainer) Destroy(child.gameObject);
 
             int cost = card.cardData.shiftCost;
+
+            // Eğer maliyet 0 ise hiçbir şey yapma
             if (cost > 0)
             {
+                // Toplam genişliği hesapla (Nokta sayısı - 1 * Boşluk)
+                float totalWidth = (cost - 1) * pointSpacing;
+
+                // Başlangıç noktası (Merkezden sola doğru yarım genişlik kadar git)
+                float startX = -totalWidth / 2f;
+
                 for (int i = 0; i < cost; i++)
                 {
-                    GameObject point = Instantiate(shiftPointPrefab, shiftCostContainer);
-                    RectTransform rt = point.GetComponent<RectTransform>();
+                    GameObject p = Instantiate(shiftPointPrefab, shiftCostContainer);
+                    RectTransform rt = p.GetComponent<RectTransform>();
 
-                    // İlk nokta sabit bir yerde başlar, diğerleri sağa doğru eklenir
-                    float xPos = firstDotXPosition + (i * pointSpacing);
-
-                    rt.anchoredPosition = new Vector2(xPos, 0f);
+                    // Pozisyonu ayarla: Başlangıç + (Sıra * Boşluk)
+                    rt.anchoredPosition = new Vector2(startX + (i * pointSpacing), 0f);
                 }
             }
         }
+        // -----------------------------
 
         UpdateSelectionVisual();
     }
 
     private void Update()
     {
-        if (myCard != null)
-        {
-            UpdateSelectionVisual();
-        }
+        if (myCard != null) UpdateSelectionVisual();
     }
 
     private void UpdateSelectionVisual()
     {
         bool isSelected = myCard.isSelected;
+        if (selectionFrame != null) selectionFrame.SetActive(isSelected);
 
-        if (selectionFrame != null)
-            selectionFrame.SetActive(isSelected);
-
-        Vector3 targetScale = isSelected ? originalScale * 1.1f : originalScale * 0.9f;
+        Vector3 targetScale = isSelected ? originalScale * 1.1f : originalScale;
         float targetY = isSelected ? selectionLiftAmount : 0f;
-
         float speed = Time.deltaTime * 15f;
 
         transform.localScale = Vector3.Lerp(transform.localScale, targetScale, speed);
@@ -132,10 +124,7 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     {
         if (eventData.button == PointerEventData.InputButton.Left)
         {
-            if (DeckManager.instance != null)
-            {
-                DeckManager.instance.SelectCard(myIndex);
-            }
+            if (DeckManager.instance != null) DeckManager.instance.SelectCard(myIndex);
         }
     }
 
@@ -150,47 +139,6 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
 
     public void OnPointerExit(PointerEventData eventData)
     {
-        if (descriptionPanel != null)
-        {
-            descriptionPanel.SetActive(false);
-        }
-    }
-
-    public void PlayUseAnimation()
-    {
-        CanvasGroup group = GetComponent<CanvasGroup>();
-        if (group == null) group = gameObject.AddComponent<CanvasGroup>();
-
-        group.interactable = false;
-        group.blocksRaycasts = false;
-
-        StartCoroutine(AnimateRoutine(group));
-    }
-
-    private IEnumerator AnimateRoutine(CanvasGroup group)
-    {
-        float timer = 0f;
-        float duration = 0.3f;
-
-        Vector3 startPos = transform.position;
-        Vector3 targetPos = startPos + (Vector3.up * 200f);
-
-        Vector3 startScale = transform.localScale;
-        Vector3 targetScale = originalScale * 1.3f;
-
-        while (timer < duration)
-        {
-            timer += Time.unscaledDeltaTime;
-            float t = timer / duration;
-            t = t * t * (3f - 2f * t);
-
-            transform.position = Vector3.Lerp(startPos, targetPos, t);
-            transform.localScale = Vector3.Lerp(startScale, targetScale, t);
-            if (group != null) group.alpha = Mathf.Lerp(1f, 0f, t);
-
-            yield return null;
-        }
-
-        Destroy(gameObject);
+        if (descriptionPanel != null) descriptionPanel.SetActive(false);
     }
 }

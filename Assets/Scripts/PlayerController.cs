@@ -1,12 +1,11 @@
-using System.Collections;
+ï»¿using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using System.Collections.Generic; // Listeler için gerekirse
-using Unity.Cinemachine; // Eðer Cinemachine referansý gerekirse diye
+using System.Collections.Generic;
+using Unity.Cinemachine;
 
 public class PlayerController : MonoBehaviour
 {
-
     private Rigidbody2D rb;
     private Animator animator;
 
@@ -15,11 +14,9 @@ public class PlayerController : MonoBehaviour
     public float groundCheckRadius = 0.2f;
     public LayerMask groundLayer;
 
-    // --- YENÝ EKLENEN: HAVA KONTROLLERÝ ---
     [Header("Air Settings")]
-    public int maxAirJumps = 1; // Havada kaç kere zýplayabilir? (Double jump için 1 yap)
+    public int maxAirJumps = 1;
     private int currentAirJumps = 0;
-    // --------------------------------------
 
     public GameObject platformPrefab;
     private SpriteRenderer spriteRenderer;
@@ -31,12 +28,14 @@ public class PlayerController : MonoBehaviour
     [Header("Fall Settings")]
     public float fallDamage = 20f;
 
-    [Header("Economy")]
+    [Header("Gold Settings")]
     public int currentGold = 0;
-    
+    public event System.Action<int> OnGoldChanged;
+
     [Header("Audio Settings")]
-    public AudioSource audioSource; // Sesi çalacak olan hoparlör
-    public AudioClip dashSound;     // Çalýnacak ses dosyasý (.wav veya .mp3)
+    public AudioClip hurtSound;
+    public AudioSource audioSource;
+    public AudioClip dashSound;
     public AudioClip fireballCastSound;
     public AudioClip cometDiveSound;
     public AudioClip phaseSound;
@@ -44,26 +43,33 @@ public class PlayerController : MonoBehaviour
     public AudioClip createPlatformSound;
     public AudioClip vampireBiteSound;
     public AudioClip glassVailSound;
-    public AudioClip deathSound;
+    public AudioClip jumpSound;
+    public AudioClip leapSound;
 
+    // --- SES AYARLARI (GÃœNCELLENDÄ°) ---
+    public AudioClip deathSound;
+    public float deathVolume = 1f; // Range kaldÄ±rÄ±ldÄ±, direkt 1
+    public AudioClip spendSound;
+    public float soundVolume = 1f; // Range kaldÄ±rÄ±ldÄ±, direkt 1
+    // ----------------------------------
 
     [Header("VFX Settings")]
     public GameObject biteEffectPrefab;
     public GameObject leapEffectPrefab;
-    public TrailRenderer diveTrail;      
-    public GameObject diveImpactPrefab; 
-    public float diveSpeed = 25f;        
+    public TrailRenderer diveTrail;
+    public GameObject diveImpactPrefab;
+    public float diveSpeed = 25f;
     private bool isDiving = false;
-    public GameObject dashEffectPrefab; // Yaptýðýn efekti buraya baðlayacaðýz
+    public GameObject dashEffectPrefab;
 
     [Header("Adrenaline VFX")]
-    public GameObject ghostPrefab;     // Az önce yaptýðýn prefab
-    public float adrenalineSpeedMult = 2f; // Hýz kaç katýna çýksýn? (2 katý)
-    public float ghostDelay = 0.05f;   // Ne sýklýkla hayalet çýksýn?
+    public GameObject ghostPrefab;
+    public float adrenalineSpeedMult = 2f;
+    public float ghostDelay = 0.05f;
 
     private float ghostTimer;
     private bool isAdrenalineActive = false;
-    private float defaultMoveSpeed; // Eski hýzý hafýzada tutmak için
+    private float defaultMoveSpeed;
 
     [Header("Portal Settings")]
     public GameObject portalPrefab;
@@ -95,6 +101,8 @@ public class PlayerController : MonoBehaviour
     public float CurrentHealth { get { return currentHealth; } }
     public float MaxHealth { get { return maxHealth; } }
 
+    private bool isDead = false; // Ã–ldÃ¼k mÃ¼ kontrolÃ¼
+
     [Header("Jump Settings")]
     public float defaultJumpForce = 10f;
 
@@ -115,7 +123,7 @@ public class PlayerController : MonoBehaviour
     public float speedBoostMultiplier = 1.5f;
 
     public PlayerState currentState;
-    private bool isGrounded; // Bu artýk Update'in en baþýnda hesaplanacak
+    private bool isGrounded;
 
     [Header("Combat Settings")]
     public GameObject fireballPrefab;
@@ -146,19 +154,17 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
-        // --- DÜZELTME: FÝZÝK KONTROLLERÝNÝ EN BAÞA ALDIK ---
-        // Böylece kart kullandýðýnda oyun senin yerde mi havada mý olduðunu önceden biliyor.
+        // Ã–ldÃ¼ysek hiÃ§bir input alma
+        if (isDead) return;
+
         bool wasGrounded = isGrounded;
         isGrounded = IsGroundedCheck();
         isWallDetected = WallCheck();
 
-        // Yere yeni bastýysak hava zýplama hakkýný sýfýrla
         if (isGrounded && !wasGrounded)
         {
             currentAirJumps = 0;
-            // Ýstersen buraya bir "Yere inme sesi" ekleyebilirsin
         }
-        // ----------------------------------------------------
 
         if (GameManager.instance != null && GameManager.instance.currentState == GameState.Paused)
         {
@@ -167,7 +173,6 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        // Kart inputlarý artýk isGrounded güncellendikten sonra çalýþýyor
         HandleCardInput();
 
         if (Input.GetKeyDown(KeyCode.E))
@@ -232,20 +237,30 @@ public class PlayerController : MonoBehaviour
     public void AddGold(int amount)
     {
         currentGold += amount;
+        OnGoldChanged?.Invoke(currentGold);
+
         if (QuestSystem.instance != null)
         {
             QuestSystem.instance.ReportEvent(QuestType.GoldAccumulate, amount);
         }
     }
+
+    // --- SES DÃœZELTMESÄ° YAPILDI ---
     public bool TrySpendGold(int amount)
     {
         if (currentGold >= amount)
         {
             currentGold -= amount;
+            OnGoldChanged?.Invoke(currentGold);
+            if (spendSound != null && audioSource != null)
+            {
+                audioSource.PlayOneShot(spendSound, soundVolume);
+            }
             return true;
         }
         return false;
     }
+    // -----------------------------
 
     private void UpdateAnimations()
     {
@@ -255,7 +270,6 @@ public class PlayerController : MonoBehaviour
         animator.SetFloat("yVelocity", rb.linearVelocity.y);
     }
 
-    // --- DÜZELTME: ZIPLAMA MANTIÐI GÜNCELLENDÝ ---
     private void HandleJumpInput()
     {
         if (currentState == PlayerState.WallSliding)
@@ -264,12 +278,10 @@ public class PlayerController : MonoBehaviour
         }
         else if (isGrounded)
         {
-            // Yerdeysek normal zýpla
             PerformJump(defaultJumpForce);
         }
         else
         {
-            // Havadaysak ve hakkýmýz varsa zýpla (Sonsuz zýplama engellendi)
             if (currentAirJumps < maxAirJumps && currentShift > 0)
             {
                 currentAirJumps++;
@@ -277,7 +289,6 @@ public class PlayerController : MonoBehaviour
             }
         }
     }
-    // ---------------------------------------------
 
     private void FixedUpdate()
     {
@@ -335,7 +346,10 @@ public class PlayerController : MonoBehaviour
         switch (type)
         {
             case CardActionType.Jump:
-                // Kartla zýplama: Buna sýnýr koymuyoruz, kart harcandýðý için ödül bu.
+                if (audioSource != null && leapSound != null)
+                {
+                    audioSource.PlayOneShot(leapSound);
+                }
                 rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
                 rb.AddForce(new Vector2(0f, value), ForceMode2D.Impulse);
                 if (leapEffectPrefab != null)
@@ -383,12 +397,10 @@ public class PlayerController : MonoBehaviour
 
             case CardActionType.PlatformCreate:
                 if (platformPrefab == null) return false;
-                // --- SES KODUNU BURAYA YAPIÞTIR ---
                 if (audioSource != null && createPlatformSound != null)
                 {
                     audioSource.PlayOneShot(createPlatformSound);
                 }
-                // ----------------------------------
                 Vector2 spawnPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
                 Instantiate(platformPrefab, spawnPosition, Quaternion.identity);
                 return true;
@@ -412,7 +424,7 @@ public class PlayerController : MonoBehaviour
                 }
                 else
                 {
-                    Debug.Log("Comet Dive için havada olmalýsýn!"); 
+                    Debug.Log("Comet Dive iÃ§in havada olmalÄ±sÄ±n!");
                     return false;
                 }
 
@@ -427,6 +439,12 @@ public class PlayerController : MonoBehaviour
     {
         if (currentShift > 0)
         {
+            if (audioSource != null && jumpSound != null)
+            {
+                audioSource.pitch = Random.Range(0.95f, 1.05f);
+                audioSource.PlayOneShot(jumpSound);
+                audioSource.pitch = 1f;
+            }
             currentShift--;
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
             rb.AddForce(new Vector2(0f, jumpForce), ForceMode2D.Impulse);
@@ -438,15 +456,13 @@ public class PlayerController : MonoBehaviour
     {
         if (audioSource != null && dashSound != null)
         {
-            // PlayOneShot: Sesi bir kez "ateþler". 
-            // Play() kullanýrsan önceki çalan sesi keser, OneShot kesmez (üst üste binebilir).
             audioSource.PlayOneShot(dashSound);
         }
         if (dashEffectPrefab != null)
         {
             Instantiate(dashEffectPrefab, transform.position, Quaternion.identity);
         }
-        
+
         PlayerState stateBeforeDash = currentState;
         ChangeState(PlayerState.Dashing);
         isInvincible = true;
@@ -479,13 +495,29 @@ public class PlayerController : MonoBehaviour
 
     public void TakeDamage(float damage)
     {
-        if (isInvincible) { return; }
+        // EÄŸer Ã¶lÃ¼msÃ¼zsek veya zaten Ã¶ldÃ¼ysek hasar (ve ses) yok
+        if (isInvincible || isDead) { return; }
+
         if (CameraShake.instance != null)
             CameraShake.instance.Shake(0.2f, 0.3f);
 
         tookDamageThisRoom = true;
         currentHealth = Mathf.Max(currentHealth - damage, 0f);
-        if (currentHealth <= 0) { Die(); }
+
+        // --- HASAR SESÄ° EKLENDÄ° ---
+        if (hurtSound != null && audioSource != null)
+        {
+            // Sesi Ã¼st Ã¼ste binebilecek ÅŸekilde Ã§al (Arka arkaya hasar alÄ±rsan ses kesilmez)
+            audioSource.PlayOneShot(hurtSound);
+        }
+        // ---------------------------
+
+        Debug.Log($"Hasar AlÄ±ndÄ±! Kalan Can: {currentHealth}");
+
+        if (currentHealth <= 0)
+        {
+            Die();
+        }
     }
 
     public void OnNewRoomEnter()
@@ -493,10 +525,42 @@ public class PlayerController : MonoBehaviour
         tookDamageThisRoom = false;
     }
 
+    // --- Ã–LÃœM SESÄ° DÃœZELTMESÄ° (Ã–NEMLÄ°) ---
     private void Die()
     {
+        if (isDead) return; // Zaten Ã¶ldÃ¼ysek tekrar Ã§alÄ±ÅŸma
+        isDead = true;
+
+        Debug.Log("ðŸ’€ Oyuncu Ã–ldÃ¼! Ses Ã‡alÄ±nÄ±yor...");
+
+        // 1. Sesi Ã‡al
+        if (deathSound != null)
+        {
+            if (Camera.main != null)
+                AudioSource.PlayClipAtPoint(deathSound, Camera.main.transform.position, deathVolume);
+            else
+                AudioSource.PlayClipAtPoint(deathSound, transform.position, deathVolume);
+        }
+        else
+        {
+            Debug.LogWarning("âŒ Death Sound AtanmamÄ±ÅŸ!");
+        }
+
+        // 2. Oyuncuyu Gizle (Yok olmuÅŸ gibi yap)
+        if (spriteRenderer != null) spriteRenderer.enabled = false;
+        if (rb != null) rb.simulated = false; // FiziÄŸi kapat
+
+        // 3. Biraz bekle sonra sahneyi yÃ¼kle (Ki ses duyulsun)
+        StartCoroutine(WaitAndReload());
+    }
+
+    private IEnumerator WaitAndReload()
+    {
+        // Sesin duyulmasÄ± iÃ§in 1.5 saniye bekle
+        yield return new WaitForSeconds(1.5f);
         SceneManager.LoadScene("GameOverScene");
     }
+    // -------------------------------------
 
     public bool IsGroundedCheck()
     {
@@ -650,7 +714,6 @@ public class PlayerController : MonoBehaviour
     {
         if (audioSource != null && vampireBiteSound != null)
         {
-            // Vampir sesi tatmin edici ve biraz "vahþi" olmalý
             audioSource.PlayOneShot(vampireBiteSound);
         }
 
@@ -680,7 +743,6 @@ public class PlayerController : MonoBehaviour
     {
         if (audioSource != null && glassVailSound != null)
         {
-            // Cam/Kristal sesleri tiz olduðu için net duyulur
             audioSource.PlayOneShot(glassVailSound);
         }
 
@@ -698,8 +760,6 @@ public class PlayerController : MonoBehaviour
     {
         if (audioSource != null && phaseSound != null)
         {
-            // Phase sesi genelde biraz daha derinden gelir, pitch (perde) ile oynayabiliriz
-            // ama þimdilik standart çalsýn:
             audioSource.PlayOneShot(phaseSound);
         }
         StartCoroutine(PhaseRoutine(duration));
@@ -771,9 +831,8 @@ public class PlayerController : MonoBehaviour
         }
         ChangeState(PlayerState.CometDiving);
         rb.linearVelocity = new Vector2(0, -cometSpeed);
-        // --- BURAYI EKLE (Kuyruðu Aç) ---
+
         if (diveTrail != null) diveTrail.emitting = true;
-        // -------------------------------
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
@@ -793,19 +852,16 @@ public class PlayerController : MonoBehaviour
     private void CometImpact()
     {
         ChangeState(PlayerState.Idle);
-        // --- BURAYI EKLE (Efektleri Yönet) ---
-        // 1. Kuyruðu kapat
+
         if (diveTrail != null)
         {
             diveTrail.emitting = false;
         }
 
-        // 2. Bizim yeni yaptýðýmýz patlama efektini yarat
         if (diveImpactPrefab != null)
         {
             Instantiate(diveImpactPrefab, transform.position, Quaternion.identity);
         }
-        // ------------------------------------
 
         Collider2D[] hitEnemies = Physics2D.OverlapCircleAll(transform.position, cometRadius, enemyLayer);
 
@@ -856,20 +912,18 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator AdrenalineSpeedBoostRoutine()
     {
-        // --- BURAYA EKLE (1) ---
         isAdrenalineActive = true;
         if (spriteRenderer != null) spriteRenderer.color = Color.red;
-        // -----------------------
+
         float originalSpeed = moveSpeed;
         moveSpeed *= speedBoostMultiplier;
 
         yield return new WaitForSeconds(adrenalineDuration);
 
         moveSpeed = originalSpeed;
-        // --- BURAYA EKLE (2) ---
+
         if (spriteRenderer != null) spriteRenderer.color = Color.white;
         isAdrenalineActive = false;
-        // -----------------------
     }
 
     public void LaunchFromCannon(Vector2 forceVector)
@@ -902,6 +956,4 @@ public class PlayerController : MonoBehaviour
             }
         }
     }
-
-    
 }

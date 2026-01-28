@@ -783,6 +783,8 @@ MonoBehaviour:
   chargeText: {fileID: 7445589312548185743}
   descriptionPanel: {fileID: 2080972395377713500}
   descriptionText: {fileID: 2642503498343805324}
+  buySound: {fileID: 0}
+  soundVolume: 1
 --- !u!1 &7203522212885564779
 GameObject:
   m_ObjectHideFlags: 0

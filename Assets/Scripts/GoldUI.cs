@@ -1,27 +1,41 @@
 using UnityEngine;
-using TMPro;
+using TMPro; // TextMeshPro kullandýðýný varsayýyorum
 
 public class GoldUI : MonoBehaviour
 {
-    [Header("UI Referanslarý")]
-    public TextMeshProUGUI goldText; // Sayýnýn yazacaðý yer
+    public TextMeshProUGUI goldText; // Inspector'dan Text'i buraya sürükle
 
-    // Eðer altýn deðiþmediyse boþuna text'i güncellemesin diye bir kontrol ekleyelim
-    private int lastGoldAmount = -1;
-
-    void Update()
+    private void Start()
     {
-        // GameManager veya Player var mý kontrol et
-        if (GameManager.instance != null && GameManager.instance.player != null)
-        {
-            int currentGold = GameManager.instance.player.currentGold;
+        // Oyun baþýnda Player'ý bulmaya çalýþ (GameManager veya Singleton üzerinden)
+        PlayerController player = FindFirstObjectByType<PlayerController>();
 
-            // Sadece sayý deðiþtiyse ekrana yaz (Performans dostu)
-            if (currentGold != lastGoldAmount)
-            {
-                goldText.text = currentGold.ToString();
-                lastGoldAmount = currentGold;
-            }
+        if (player != null)
+        {
+            // Event'e abone ol (Altýn deðiþince bana haber ver)
+            player.OnGoldChanged += UpdateGoldText;
+
+            // Baþlangýç miktarýný yazdýr
+            UpdateGoldText(player.currentGold);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        // Sahne deðiþirken abonelikten çýk (Hata vermemesi için)
+        PlayerController player = FindFirstObjectByType<PlayerController>();
+        if (player != null)
+        {
+            player.OnGoldChanged -= UpdateGoldText;
+        }
+    }
+
+    private void UpdateGoldText(int amount)
+    {
+        if (goldText != null)
+        {
+            // Ýstersen baþýna simge falan koyabilirsin: $"{amount} G"
+            goldText.text = amount.ToString();
         }
     }
 }
