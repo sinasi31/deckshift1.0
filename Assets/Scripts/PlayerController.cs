@@ -33,6 +33,19 @@ public class PlayerController : MonoBehaviour
 
     [Header("Economy")]
     public int currentGold = 0;
+    
+    [Header("Audio Settings")]
+    public AudioSource audioSource; // Sesi çalacak olan hoparlör
+    public AudioClip dashSound;     // Çalýnacak ses dosyasý (.wav veya .mp3)
+    public AudioClip fireballCastSound;
+    public AudioClip cometDiveSound;
+    public AudioClip phaseSound;
+    public AudioClip adrenalineSound;
+    public AudioClip createPlatformSound;
+    public AudioClip vampireBiteSound;
+    public AudioClip glassVailSound;
+    public AudioClip deathSound;
+
 
     [Header("VFX Settings")]
     public GameObject biteEffectPrefab;
@@ -370,6 +383,12 @@ public class PlayerController : MonoBehaviour
 
             case CardActionType.PlatformCreate:
                 if (platformPrefab == null) return false;
+                // --- SES KODUNU BURAYA YAPIÞTIR ---
+                if (audioSource != null && createPlatformSound != null)
+                {
+                    audioSource.PlayOneShot(createPlatformSound);
+                }
+                // ----------------------------------
                 Vector2 spawnPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
                 Instantiate(platformPrefab, spawnPosition, Quaternion.identity);
                 return true;
@@ -417,6 +436,12 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator PerformDash(float dashDistance, int direction)
     {
+        if (audioSource != null && dashSound != null)
+        {
+            // PlayOneShot: Sesi bir kez "ateþler". 
+            // Play() kullanýrsan önceki çalan sesi keser, OneShot kesmez (üst üste binebilir).
+            audioSource.PlayOneShot(dashSound);
+        }
         if (dashEffectPrefab != null)
         {
             Instantiate(dashEffectPrefab, transform.position, Quaternion.identity);
@@ -541,6 +566,10 @@ public class PlayerController : MonoBehaviour
 
     private void PerformFireball(float damageFromCard)
     {
+        if (audioSource != null && fireballCastSound != null)
+        {
+            audioSource.PlayOneShot(fireballCastSound);
+        }
         if (fireballPrefab == null || firePoint == null) return;
 
         Quaternion fireballRotation = (transform.localScale.x < 0) ? Quaternion.Euler(0, 180, 0) : Quaternion.identity;
@@ -619,6 +648,12 @@ public class PlayerController : MonoBehaviour
     }
     private void PerformVampiricBite(float damageAmount)
     {
+        if (audioSource != null && vampireBiteSound != null)
+        {
+            // Vampir sesi tatmin edici ve biraz "vahþi" olmalý
+            audioSource.PlayOneShot(vampireBiteSound);
+        }
+
         Collider2D hitEnemy = Physics2D.OverlapCircle(firePoint.position, biteRange, enemyLayer);
 
         if (hitEnemy != null)
@@ -643,6 +678,12 @@ public class PlayerController : MonoBehaviour
     }
     private void PerformGlassWail(float stunDuration)
     {
+        if (audioSource != null && glassVailSound != null)
+        {
+            // Cam/Kristal sesleri tiz olduðu için net duyulur
+            audioSource.PlayOneShot(glassVailSound);
+        }
+
         EnemyHealth[] allEnemies = FindObjectsByType<EnemyHealth>(FindObjectsSortMode.None);
 
         if (CameraShake.instance != null)
@@ -655,6 +696,12 @@ public class PlayerController : MonoBehaviour
     }
     private void PerformPhase(float duration)
     {
+        if (audioSource != null && phaseSound != null)
+        {
+            // Phase sesi genelde biraz daha derinden gelir, pitch (perde) ile oynayabiliriz
+            // ama þimdilik standart çalsýn:
+            audioSource.PlayOneShot(phaseSound);
+        }
         StartCoroutine(PhaseRoutine(duration));
     }
 
@@ -718,6 +765,10 @@ public class PlayerController : MonoBehaviour
     }
     private void PerformCometDive()
     {
+        if (audioSource != null && cometDiveSound != null)
+        {
+            audioSource.PlayOneShot(cometDiveSound);
+        }
         ChangeState(PlayerState.CometDiving);
         rb.linearVelocity = new Vector2(0, -cometSpeed);
         // --- BURAYI EKLE (Kuyruðu Aç) ---
@@ -772,6 +823,11 @@ public class PlayerController : MonoBehaviour
     }
     private void UseAdrenaline(float value)
     {
+        if (audioSource != null && adrenalineSound != null)
+        {
+            audioSource.PlayOneShot(adrenalineSound);
+        }
+
         float healthPercentage = currentHealth / maxHealth;
 
         if (CameraShake.instance != null) CameraShake.instance.Shake(0.1f, 0.5f);
