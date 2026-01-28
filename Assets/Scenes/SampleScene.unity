@@ -1434,6 +1434,8 @@ MonoBehaviour:
   cardUIPrefab: {fileID: 1348322462062635029, guid: fe02ae68f50b6ec4fb5e2778d2693f30, type: 3}
   titleText: {fileID: 753191022}
   closeButton: {fileID: 871992164}
+  exhaustButton: {fileID: 0}
+  exhaustCountText: {fileID: 0}
 --- !u!224 &211152066 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 7695326855998578590, guid: b853c117ba40ec3459b51fc1a1daaad6, type: 3}
@@ -2411,7 +2413,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: 0, y: -8.300049}
+  m_AnchoredPosition: {x: 0, y: -8.299927}
   m_SizeDelta: {x: 0, y: 100}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!114 &448187558
@@ -7324,7 +7326,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerTransform: {fileID: 1988395663}
   roomPrefabs:
-  - {fileID: 6989258952826100690, guid: b393904b22617ce4390c1d96b634fd9b, type: 3}
+  - {fileID: 7365539614123856241, guid: da1f0fa2b1d7b4d47ae3ccfd434a7561, type: 3}
 --- !u!4 &1361928416
 Transform:
   m_ObjectHideFlags: 0
