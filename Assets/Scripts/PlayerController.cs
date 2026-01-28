@@ -730,8 +730,6 @@ public class PlayerController : MonoBehaviour
                 if (biteEffectPrefab != null)
                 {
                     GameObject vfx = Instantiate(biteEffectPrefab, hitEnemy.transform.position, Quaternion.identity);
-
-                    
                     Destroy(vfx, 1.0f);
                 }
             }
