@@ -211,4 +211,13 @@ public class DeckManager : MonoBehaviour
         RuntimeCard newCardInstance = new RuntimeCard(newCardData);
         discardPile.Add(newCardInstance);
     }
+    public List<RuntimeCard> GetDrawPile()
+    {
+        return drawPile;
+    }
+
+    public List<RuntimeCard> GetDiscardPile()
+    {
+        return discardPile;
+    }
 }
