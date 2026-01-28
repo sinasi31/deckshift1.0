@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: e37bcb463881c9f428cfc77bed644af3
+guid: 3819b4ce96a77de4ba81993ed98b1ff9
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 1429464083344649065
-    second: portalmert_0
+      213: 7675826601332790545
+    second: coin_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,23 +100,23 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: portalmert_0
+      name: coin_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 64
-        height: 92
+        width: 37
+        height: 51
       alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+      pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 96befea920a76d310800000000000000
-      internalID: 1429464083344649065
+      spriteID: 1155fe920a3068a60800000000000000
+      internalID: 7675826601332790545
       vertices: []
       indices: 
       edges: []
@@ -125,7 +125,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: c0ddf8fa2bbfa8346aaf670702f764a2
+    spriteID: 
     internalID: 0
     vertices: []
     indices: 
@@ -134,8 +134,7 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable:
-      portalmert_0: 1429464083344649065
+    nameFileIdTable: {}
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

@@ -13,13 +13,16 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     [Header("Seçim Görselleri")]
     public GameObject selectionFrame;
 
-    // Kart seçilince ne kadar yukarı zıplasın? (Örn: 50 idealdir)
     public float selectionLiftAmount = 50f;
 
     [Header("Mekanik Görseller")]
     public TextMeshProUGUI usesText;
     public Transform shiftCostContainer;
     public GameObject shiftPointPrefab;
+
+    [Header("Layout Ayarları (Nokta Hizalama)")]
+    public float firstDotXPosition = -25f; 
+    public float pointSpacing = 15f;       
 
     [Header("Hover (Açıklama) Ayarları")]
     public GameObject descriptionPanel;
@@ -28,7 +31,7 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     private RuntimeCard myCard;
     private int myIndex;
     private Vector3 originalScale;
-    private RectTransform rectTransform; // UI Pozisyonu için gerekli
+    private RectTransform rectTransform;
     private bool isInitialized = false;
 
     private void Awake()
@@ -50,8 +53,8 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         myCard = card;
         myIndex = index;
 
-        cardArtImage.sprite = card.cardData.cardArt;
-        keyHintText.text = $"[{index + 1}]";
+        if (cardArtImage != null) cardArtImage.sprite = card.cardData.cardArt;
+        if (keyHintText != null) keyHintText.text = $"[{index + 1}]";
 
         if (descriptionPanel != null)
         {
@@ -72,13 +75,23 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
                 usesText.color = (card.currentUses == 1) ? Color.red : Color.white;
             }
         }
-
         if (shiftCostContainer != null && shiftPointPrefab != null)
         {
             foreach (Transform child in shiftCostContainer) Destroy(child.gameObject);
-            for (int i = 0; i < card.cardData.shiftCost; i++)
+
+            int cost = card.cardData.shiftCost;
+            if (cost > 0)
             {
-                Instantiate(shiftPointPrefab, shiftCostContainer);
+                for (int i = 0; i < cost; i++)
+                {
+                    GameObject point = Instantiate(shiftPointPrefab, shiftCostContainer);
+                    RectTransform rt = point.GetComponent<RectTransform>();
+
+                    // İlk nokta sabit bir yerde başlar, diğerleri sağa doğru eklenir
+                    float xPos = firstDotXPosition + (i * pointSpacing);
+
+                    rt.anchoredPosition = new Vector2(xPos, 0f);
+                }
             }
         }
 
@@ -100,22 +113,13 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         if (selectionFrame != null)
             selectionFrame.SetActive(isSelected);
 
-        // --- SCALE (BÜYÜME) AYARI ---
-        // Seçiliyse %10 büyüt, değilse orijinal boyutta kalsın (küçültmeyelim ki net dursun)
-        // Eğer seçili olmayanı küçültmek istersen 0.85f yapabilirsin.
         Vector3 targetScale = isSelected ? originalScale * 1.1f : originalScale * 0.9f;
-
-        // --- POZİSYON (YUKARI KALDIRMA) AYARI ---
-        // Seçiliyse Y ekseninde yukarı kaldır, değilse 0'a (yerine) indir.
         float targetY = isSelected ? selectionLiftAmount : 0f;
 
-        // Lerp ile yumuşak geçişler
-        float speed = Time.deltaTime * 15f; // Biraz hızlandırdım daha tepkisel olsun
+        float speed = Time.deltaTime * 15f;
 
-        // 1. Boyutlandır
         transform.localScale = Vector3.Lerp(transform.localScale, targetScale, speed);
 
-        // 2. Yukarı Taşı (Sadece Y eksenini değiştiriyoruz, X Layout Group tarafından yönetiliyor)
         if (rectTransform != null)
         {
             Vector2 currentPos = rectTransform.anchoredPosition;

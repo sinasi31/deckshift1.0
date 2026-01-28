@@ -14,7 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardName: Adrenaline
   description: 'Injects adrenaline. Above 50% HP: Slows down time to dodge attacks.
-    Below 50% HP: Restores health and grants movement speed.'
+
+    Below
+    50% HP: Restores health and grants movement speed.'
   cardArt: {fileID: 843832531658454368, guid: 1f1081c6226932041a4725f7d856cfb9, type: 3}
   actionType: 13
   actionValue: 30

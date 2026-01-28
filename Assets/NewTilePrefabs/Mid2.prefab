@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7923786465843660741}
   - component: {fileID: 3782648429364416286}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: main_lev_build_149
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -97,7 +97,7 @@ GameObject:
   m_Component:
   - component: {fileID: 5934107455109645141}
   - component: {fileID: 2232669177531690298}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Mid2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -177,7 +177,7 @@ GameObject:
   m_Component:
   - component: {fileID: 5572479208748894270}
   - component: {fileID: 7516406616026480310}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: main_lev_build_148
   m_TagString: Untagged
   m_Icon: {fileID: 0}

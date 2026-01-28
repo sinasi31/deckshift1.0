@@ -7,7 +7,6 @@ public class Portal : MonoBehaviour
 
     [Header("Görsel Efektler")]
     public GameObject rangeIndicator;
-    // --- YENÝ AYAR: Görsel boyut çarpaný ---
     [Tooltip("Eðer daire küçük kalýyorsa bu sayýyý artýr (örn: 1.1 veya 1.2)")]
     public float visualSizeMultiplier = 1.0f;
     // ---------------------------------------
@@ -23,21 +22,17 @@ public class Portal : MonoBehaviour
             traveller.TeleportTo(linkedPortal.transform.position);
         }
     }
-
-    // --- GÜNCELLENEN FONKSÝYON ---
     public void ShowRangeCircle(float range)
     {
         if (rangeIndicator != null)
         {
             rangeIndicator.SetActive(true);
 
-            // Yarýçap * 2 * Senin Çarpanýn
             float finalSize = range * 2f * visualSizeMultiplier;
 
             rangeIndicator.transform.localScale = new Vector3(finalSize, finalSize, 1);
         }
     }
-    // ----------------------------
 
     public void HideRangeCircle()
     {
@@ -49,7 +44,6 @@ public class Portal : MonoBehaviour
 
     public void Link(Portal otherPortal)
     {
-        // --- BURASI ÇOK ÖNEMLÝ: Baðlandýðý an daireyi gizle ---
         HideRangeCircle();
         // -----------------------------------------------------
 
@@ -59,8 +53,6 @@ public class Portal : MonoBehaviour
         spriteRenderer.color = Color.cyan;
         otherPortal.spriteRenderer.color = Color.red;
     }
-
-    // Obje yok olduðunda veya kapandýðýnda da garanti olsun diye gizle
     private void OnDisable()
     {
         HideRangeCircle();

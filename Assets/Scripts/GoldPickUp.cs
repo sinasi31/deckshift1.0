@@ -2,19 +2,26 @@ using UnityEngine;
 
 public class GoldPickup : MonoBehaviour
 {
-    public int goldAmount = 10; // Kaç altýn verecek?
+    [Header("Rastgele Altýn Aralýðý")]
+    public int minGold = 15; // En az kaç gelsin?
+    public int maxGold = 45; // En fazla kaç gelsin?
+
+    [Header("Ayarlar")]
     public bool destroyOnPickup = true;
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        // Sadece oyuncu toplasýn (Fireball toplamasýn)
+        // Sadece oyuncu toplasýn
         if (other.CompareTag("Player"))
         {
             PlayerController player = other.GetComponent<PlayerController>();
             if (player != null)
             {
-                player.AddGold(goldAmount);
-                // Buraya "Ching!" ses efekti ekleyebilirsin.
+                int randomAmount = Random.Range(minGold, maxGold + 1);
+
+                player.AddGold(randomAmount);
+
+                // Efekt veya ses buraya eklenebilir
                 if (destroyOnPickup) Destroy(gameObject);
             }
         }

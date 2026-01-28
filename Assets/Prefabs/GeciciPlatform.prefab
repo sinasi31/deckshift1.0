@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 8826343266929129851}
   - component: {fileID: 7220300601546570310}
   - component: {fileID: 9157869723760923654}
-  - component: {fileID: 3571616914529802263}
+  - component: {fileID: 7126616600106011763}
   m_Layer: 3
   m_Name: GeciciPlatform
   m_TagString: Untagged
@@ -135,7 +135,7 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 2.4644842, y: 0.7130097}
   m_EdgeRadius: 0
---- !u!114 &3571616914529802263
+--- !u!114 &7126616600106011763
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -144,7 +144,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 2884497646027804218}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4da80e3a7b57c7242aab39c57c033ed4, type: 3}
+  m_Script: {fileID: 11500000, guid: 2606e8f3c35c3bb4aa525cb932645622, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  lifeTime: 2
+  lifeTime: 5

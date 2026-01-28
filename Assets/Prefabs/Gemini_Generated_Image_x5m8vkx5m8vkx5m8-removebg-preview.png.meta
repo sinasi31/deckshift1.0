@@ -1,10 +1,13 @@
 fileFormatVersion: 2
-guid: e37bcb463881c9f428cfc77bed644af3
+guid: 102aee6f58d18014aac6a4bcad832be8
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 1429464083344649065
-    second: portalmert_0
+      213: 1170085454684832906
+    second: Gemini_Generated_Image_x5m8vkx5m8vkx5m8-removebg-preview_0
+  - first:
+      213: 7999016045921920313
+    second: Gemini_Generated_Image_x5m8vkx5m8vkx5m8-removebg-preview_1
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,23 +103,45 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: portalmert_0
+      name: Gemini_Generated_Image_x5m8vkx5m8vkx5m8-removebg-preview_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 64
-        height: 92
+        x: 106
+        y: 98
+        width: 466
+        height: 171
       alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+      pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 96befea920a76d310800000000000000
-      internalID: 1429464083344649065
+      spriteID: a84475b858afc3010800000000000000
+      internalID: 1170085454684832906
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Gemini_Generated_Image_x5m8vkx5m8vkx5m8-removebg-preview_1
+      rect:
+        serializedVersion: 2
+        x: 332
+        y: 249
+        width: 17
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 93563d196b6320f60800000000000000
+      internalID: 7999016045921920313
       vertices: []
       indices: 
       edges: []
@@ -125,7 +150,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: c0ddf8fa2bbfa8346aaf670702f764a2
+    spriteID: 
     internalID: 0
     vertices: []
     indices: 
@@ -134,8 +159,7 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable:
-      portalmert_0: 1429464083344649065
+    nameFileIdTable: {}
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

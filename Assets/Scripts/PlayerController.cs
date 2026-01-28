@@ -370,9 +370,7 @@ public class PlayerController : MonoBehaviour
                 PerformGlassWail(value);
                 return true;
 
-            // --- DÜZELTÝLEN COMET DIVE ---
             case CardActionType.CometDive:
-                // isGrounded artýk Update'in baþýnda güncellendiði için burasý doðru çalýþacak
                 if (!isGrounded)
                 {
                     PerformCometDive();
@@ -380,10 +378,9 @@ public class PlayerController : MonoBehaviour
                 }
                 else
                 {
-                    Debug.Log("Comet Dive için havada olmalýsýn!"); // Hata ayýklama için
+                    Debug.Log("Comet Dive için havada olmalýsýn!"); 
                     return false;
                 }
-            // -----------------------------
 
             case CardActionType.Adrenaline:
                 UseAdrenaline(value);
