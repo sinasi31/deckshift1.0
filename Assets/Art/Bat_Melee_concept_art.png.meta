@@ -1,10 +1,13 @@
 fileFormatVersion: 2
-guid: e43b97881060901419e6d4b341c0200e
+guid: 6ee5046f480260949bbc71d96fd6e706
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 908667957295616272
-    second: "Ads\u0131z tasar\u0131m (1)_0"
+      213: 8725588847453403835
+    second: Bat_Melee_concept_art_0
+  - first:
+      213: 1202719995028563540
+    second: Bat_Melee_concept_art_1
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +103,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: "Ads\u0131z tasar\u0131m (1)_0"
+      name: Bat_Melee_concept_art_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 920
-        height: 500
+        x: 9
+        y: 138
+        width: 411
+        height: 412
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +118,30 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 011926d51bc3c9c00800000000000000
-      internalID: 908667957295616272
+      spriteID: bbaf19c93d4871970800000000000000
+      internalID: 8725588847453403835
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bat_Melee_concept_art_1
+      rect:
+        serializedVersion: 2
+        x: 125
+        y: 105
+        width: 204
+        height: 29
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 456efe3967be0b010800000000000000
+      internalID: 1202719995028563540
       vertices: []
       indices: 
       edges: []
@@ -134,8 +159,7 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable:
-      "Ads\u0131z tasar\u0131m (1)_0": 908667957295616272
+    nameFileIdTable: {}
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

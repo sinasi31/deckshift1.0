@@ -1,4 +1,4 @@
-using Unity.Cinemachine;
+Ôªøusing Unity.Cinemachine;
 using System.Collections.Generic;
 using UnityEngine;
 public class LevelManager : MonoBehaviour
@@ -8,11 +8,11 @@ public class LevelManager : MonoBehaviour
     [Header("Referanslar")]
     public Transform playerTransform;
 
-    [Header("Oda Ayarlar˝")]
-    public List<GameObject> roomPrefabs; // T¸m odalar˝n listesi (Prefablar)
+    [Header("Oda Ayarlar√Ω")]
+    public List<GameObject> roomPrefabs; // T√ºm odalar√Ωn listesi (Prefablar)
 
-    // --- YEN›: HAVUZ S›STEM› ---
-    private List<int> availableRoomIndices = new List<int>(); // Hen¸z oynanmam˝˛ odalar˝n listesi
+    // --- YEN√ù: HAVUZ S√ùSTEM√ù ---
+    private List<int> availableRoomIndices = new List<int>(); // Hen√ºz oynanmam√Ω√æ odalar√Ωn listesi
     // ---------------------------
 
     private GameObject currentRoom;
@@ -36,7 +36,7 @@ public class LevelManager : MonoBehaviour
         SpawnNextRoom();
     }
 
-    // --- YEN›: HAVUZU DOLDURMA FONKS›YONU ---
+    // --- YEN√ù: HAVUZU DOLDURMA FONKS√ùYONU ---
     private void RefillRoomPool()
     {
         availableRoomIndices.Clear();
@@ -63,7 +63,7 @@ public class LevelManager : MonoBehaviour
         int selectedRoomIndex = availableRoomIndices[randomIndexInPool]; 
         availableRoomIndices.RemoveAt(randomIndexInPool);
 
-        Debug.Log($"SeÁilen Oda Indexi: {selectedRoomIndex}. Kalan Oda Say˝s˝: {availableRoomIndices.Count}");
+        Debug.Log($"Se√ßilen Oda Indexi: {selectedRoomIndex}. Kalan Oda Say√Ωs√Ω: {availableRoomIndices.Count}");
 
         GameObject selectedRoomPrefab = roomPrefabs[selectedRoomIndex];
         currentRoom = Instantiate(selectedRoomPrefab, Vector3.zero, Quaternion.identity);
@@ -71,7 +71,7 @@ public class LevelManager : MonoBehaviour
 
         if (vCam != null)
         {
-            // 2. Confiner Bile˛enini Bul
+            // 2. Confiner Bile√æenini Bul
             var confiner = vCam.GetComponent<CinemachineConfiner2D>();
 
             if (confiner != null)
@@ -103,6 +103,11 @@ public class LevelManager : MonoBehaviour
         if (DeckManager.instance != null)
         {
             DeckManager.instance.ReloadHand();
+        }
+        if (DeckManager.instance != null)
+        {
+            DeckManager.instance.ReloadHand(); // Eli yenile
+            DeckManager.instance.ResetRecallCost(); // --- YENƒ∞: Maliyeti 1'e geri √ßek ---
         }
     }
 }

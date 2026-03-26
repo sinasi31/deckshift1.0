@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+ï»¿using System.Collections.Generic;
 using UnityEngine;
 using System;
 using System.Collections;
@@ -6,17 +6,22 @@ using System.Collections;
 public class DeckManager : MonoBehaviour
 {
     public static DeckManager instance;
-
-    // DEĞİŞİKLİK: Event artık bir 'bool' taşıyor.
-    // true = Animasyonlu yenile (Start, Reload)
-    // false = Hızlı yenile (Kart oynama)
     public static event Action<bool> OnHandChanged;
+    public bool isNextCardFree = false;
+    [Header("Recall Settings")]
+    public int baseRecallCost = 1; // BaÅŸlangÄ±Ã§ maliyeti
+    public int currentRecallCost;  // Åu anki maliyet
+
+    public static System.Action<int> OnRecallCostChanged;
 
     [Header("Referanslar")]
     public PlayerController player;
 
-    [Header("Deste Ayarları")]
+    [Header("Deste AyarlarÃ½")]
     public List<CardData> startingDeck;
+
+    [Header("Special Cards")]
+    public CardData staggerCardData;
 
     private List<RuntimeCard> drawPile = new List<RuntimeCard>();
     private List<RuntimeCard> hand = new List<RuntimeCard>();
@@ -42,12 +47,14 @@ public class DeckManager : MonoBehaviour
 
     private void Start()
     {
+
         foreach (CardData data in startingDeck)
         {
             drawPile.Add(new RuntimeCard(data));
         }
         ShuffleDeck();
-        ReloadHand(); // Başlangıçta animasyon olsun
+        ReloadHand(); // BaÃ¾langÃ½Ã§ta animasyon olsun
+        ResetRecallCost();
     }
 
     public void SelectCard(int index)
@@ -60,7 +67,7 @@ public class DeckManager : MonoBehaviour
         selectedIndex = index;
         hand[selectedIndex].isSelected = true;
 
-        // Seçim değişikliğinde animasyona gerek yok (false)
+        // SeÃ§im deÃ°iÃ¾ikliÃ°inde animasyona gerek yok (false)
         OnHandChanged?.Invoke(false);
     }
 
@@ -71,7 +78,7 @@ public class DeckManager : MonoBehaviour
 
         selectedIndex = -1;
 
-        // Seçim iptalinde animasyona gerek yok (false)
+        // SeÃ§im iptalinde animasyona gerek yok (false)
         OnHandChanged?.Invoke(false);
     }
 
@@ -85,13 +92,17 @@ public class DeckManager : MonoBehaviour
     {
         if (index >= hand.Count) return;
 
+
         RuntimeCard playedCard = hand[index];
         CardData data = playedCard.cardData;
 
         int cost = data.shiftCost;
         if (SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.KineticDiscount))
             cost = Mathf.Max(0, cost - 1);
-
+        if (isNextCardFree)
+        {
+            cost = 0;
+        }
         if (player.GetCurrentShift() < cost) return;
         if (!playedCard.isInfinite && playedCard.currentUses <= 0) return;
 
@@ -101,22 +112,108 @@ public class DeckManager : MonoBehaviour
 
         if (success && !keepInHand)
         {
+
             hand.RemoveAt(index);
             selectedIndex = -1;
-
+            if (isNextCardFree)
+            {
+                isNextCardFree = false;
+            }
+            if (SkillManager.instance != null &&
+                SkillManager.instance.HasSkill(SkillType.EchoChamber) &&
+                UnityEngine.Random.value < 0.5f) // <--- BURASI DÃœZELDÃ
+            {
+                Debug.Log("ECHO CHAMBER: Ã‡ift Etki!");
+                // Ãkinci kez Ã§alÃ½Ã¾tÃ½r
+                player.ExecuteAction(data.actionType, data.actionValue, out bool _);
+            }
             if (!playedCard.isInfinite) playedCard.currentUses--;
 
             if ((playedCard.isInfinite || playedCard.currentUses > 0) && (!data.singleUse || playedCard.isInfinite))
                 discardPile.Add(playedCard);
             else
                 exhaustPile.Add(playedCard);
-
-            // KART OYNANDI: Animasyon İSTEMİYORUZ (false)
-            // Sadece eldeki boşluğu kapatmak için hızlı güncelleme.
             OnHandChanged?.Invoke(false);
         }
     }
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            TryRecall();
+        }
+        // Her karede kontrol etmek yerine sadece oyun akarken bak
+        if (GameManager.instance.currentState == GameState.Playing)
+        {
+            CheckForStaggerCondition();
+        }
+    }
+    public void ResetRecallCost()
+    {
+        currentRecallCost = baseRecallCost;
+        OnRecallCostChanged?.Invoke(currentRecallCost);
+    }
+    private void CheckForStaggerCondition()
+    {
+        // 1. Shift var mÃ½?
+        if (player.GetCurrentShift() > 0) return; // Shift varsa sorun yok
 
+        // 2. Eldeki kartlarÃ½n Charge'Ã½ var mÃ½?
+        foreach (RuntimeCard card in hand)
+        {
+            // Stagger kartÃ½nÃ½n kendisi hariÃ§, kullanÃ½labilir kart var mÃ½?
+            if (card.cardData != staggerCardData)
+            {
+                if (card.isInfinite || card.currentUses > 0) return; // KullanÃ½lacak kart var
+            }
+        }
+
+        // BURAYA GELDÃYSEK HÃÃ‡BÃR KAYNAK YOK DEMEKTÃR!
+        // Eline zaten Stagger kartÃ½ verdiysek tekrar verme
+        foreach (RuntimeCard card in hand)
+        {
+            if (card.cardData == staggerCardData) return;
+        }
+
+        Debug.Log("KAYNAKLAR TÃœKENDÃ! STAGGER KARTI VERÃLÃYOR...");
+        AddStaggerCardToHand();
+    }
+
+    private void AddStaggerCardToHand()
+    {
+        // Eli temizle (veya doluysa yer aÃ§)
+        // Senin oyununda el kapasitesi dolunca ne oluyor? 
+        // Acil durum olduÃ°u iÃ§in eldeki boÃ¾ bir yere veya direkt sona ekleyelim.
+
+        RuntimeCard staggerInstance = new RuntimeCard(staggerCardData);
+        hand.Add(staggerInstance);
+
+        // UI GÃ¼ncelle
+        OnHandChanged?.Invoke(true);
+    }
+    public void TryRecall()
+    {
+        // 1. Zaten el yenileniyorsa dur
+        if (isReloading) return;
+
+        // 2. Maliyet kontrolÃ¼
+        if (player.GetCurrentShift() < currentRecallCost)
+        {
+            Debug.Log("Yetersiz Shift! Recall yapÄ±lamÄ±yor.");
+            // Buraya "Yetersiz Enerji" sesi veya gÃ¶rseli eklenebilir
+            return;
+        }
+
+        // 3. Shift Harca
+        player.SpendShift(currentRecallCost);
+
+        // 4. Maliyeti ArtÄ±r (Level bitene kadar)
+        currentRecallCost++;
+        OnRecallCostChanged?.Invoke(currentRecallCost);
+
+        // 5. AsÄ±l iÅŸlemi baÅŸlat
+        ReloadHand();
+    }
     public void ReloadHand()
     {
         if (isReloading) return;
@@ -150,7 +247,7 @@ public class DeckManager : MonoBehaviour
             }
         }
 
-        // EL YENİLENDİ: Animasyon İSTİYORUZ (true)
+        // EL YENÃLENDÃ: Animasyon ÃSTÃYORUZ (true)
         OnHandChanged?.Invoke(true);
         isReloading = false;
     }
@@ -172,8 +269,8 @@ public class DeckManager : MonoBehaviour
         c.isSelected = false;
         hand.Add(c);
 
-        // Tek kart çekme: İsteğe bağlı. Şimdilik animasyonsuz olsun ki hızlı aksın.
-        // İstersen bunu 'true' yapabilirsin.
+        // Tek kart Ã§ekme: ÃsteÃ°e baÃ°lÃ½. Ãimdilik animasyonsuz olsun ki hÃ½zlÃ½ aksÃ½n.
+        // Ãstersen bunu 'true' yapabilirsin.
         OnHandChanged?.Invoke(false);
     }
 

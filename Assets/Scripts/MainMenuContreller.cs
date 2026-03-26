@@ -1,19 +1,43 @@
 using UnityEngine;
-using UnityEngine.SceneManagement; // Sahne deðiþimi için bu Kütüphane ÞART!
+using UnityEngine.SceneManagement;
 
 public class MainMenuController : MonoBehaviour
 {
-    // OYNA Butonuna basýnca çalýþacak
+    [Header("Paneller")]
+    public GameObject settingsPanel;
+    public GameObject tutorialPanel;
+
+    // PLAY butonu için
     public void PlayGame()
     {
-        // Build Settings listesindeki bir sonraki sahneye geç (Genelde oyun sahnesi)
+        // Build Settings'deki sýradaki sahneyi yükle
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
     }
 
-    // ÇIKIÞ Butonuna basýnca çalýþacak
+    // SETTINGS butonu için
+    public void OpenSettings()
+    {
+        settingsPanel.SetActive(true);
+    }
+
+    // HOW TO PLAY butonu için
+    public void OpenTutorial()
+    {
+        tutorialPanel.SetActive(true);
+    }
+
+    // QUIT butonu için
     public void QuitGame()
     {
-        Debug.Log("Oyundan Çýkýldý!"); // Unity Editöründe çýkýþ çalýþmaz, bunu konsola yazarýz.
+        Debug.Log("Çýkýþ yapýldý.");
         Application.Quit();
+    }
+
+    // Tutorial panelinin içindeki "Back" butonuna bunu baðlayabilirsin
+    // Ya da direkt Button'ýn OnClick olayýna TutorialPanel objesini sürükleyip
+    // GameObject.SetActive (false) yapabilirsin. Kodsuz çözüm :)
+    public void CloseTutorial()
+    {
+        tutorialPanel.SetActive(false);
     }
 }

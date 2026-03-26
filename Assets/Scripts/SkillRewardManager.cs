@@ -35,17 +35,8 @@ public class SkillRewardManager : MonoBehaviour
         offeredSkills.Clear();
         List<SkillType> pool = new List<SkillType>()
         {
-            SkillType.Recycle,
-            SkillType.VampiricAura,
-            SkillType.KineticDiscount,
-            SkillType.MaxShiftBonus,
             SkillType.InfinitySeal
         };
-
-        // Zaten sahip olunan "Unique" skilleri havuzdan çýkar (MaxShift ve Infinity hariç, onlar birikebilir)
-        if (SkillManager.instance.HasSkill(SkillType.Recycle)) pool.Remove(SkillType.Recycle);
-        if (SkillManager.instance.HasSkill(SkillType.VampiricAura)) pool.Remove(SkillType.VampiricAura);
-        if (SkillManager.instance.HasSkill(SkillType.KineticDiscount)) pool.Remove(SkillType.KineticDiscount);
 
         // Havuzdan rastgele 3 tane çek
         for (int i = 0; i < 3; i++)
@@ -64,9 +55,6 @@ public class SkillRewardManager : MonoBehaviour
                 skillButtons[i].gameObject.SetActive(true);
                 SkillType skill = offeredSkills[i];
 
-                // Butonun içindeki Textleri bul ve yaz (Basit buton yapýsý varsayýyorum)
-                // Eðer özel bir SkillUI prefabýn varsa CardUI gibi Setup yapabilirsin.
-                // Þimdilik butonun altýndaki Text (TMP)'yi deðiþtiriyoruz:
                 TextMeshProUGUI btnText = skillButtons[i].GetComponentInChildren<TextMeshProUGUI>();
                 if (btnText != null)
                 {
@@ -101,9 +89,6 @@ public class SkillRewardManager : MonoBehaviour
 
         switch (type)
         {
-            case SkillType.MaxShiftBonus:
-                GameManager.instance.player.IncreaseMaxShift(1);
-                break;
 
             case SkillType.InfinitySeal:
                 // Eldeki rastgele bir kartý sonsuz yap
@@ -135,11 +120,10 @@ public class SkillRewardManager : MonoBehaviour
     {
         switch (type)
         {
-            case SkillType.Recycle: return "<b>RECYCLE</b>\n\n+1 Shift when you kill an enemy.";
-            case SkillType.VampiricAura: return "<b>VAMPIRIC AURA</b>\n\nHeal +5 HP when you kill an enemy.";
-            case SkillType.KineticDiscount: return "<b>KINETIC DISCOUNT</b>\n\nAll cards cost -1 Shift.";
-            case SkillType.MaxShiftBonus: return "<b>HIGH VOLTAGE</b>\n\nIncrease Max Shift by +1.";
             case SkillType.InfinitySeal: return "<b>INFINITY SEAL</b>\n\nMake a random card in your hand INFINITE.";
+            case SkillType.EchoChamber: return "<b>ECHO CHAMBER</b>\n\nCards have a 50% chance to cast <color=purple>TWICE</color>.";
+            case SkillType.SpectralWings: return "<b>SPECTRAL WINGS</b>\n\nGrants an extra Mid-Air Jump that costs <color=green>0 SHIFT</color>.";
+            case SkillType.Overclock: return "<b>OVERCLOCK</b>\n\nKilling an enemy makes your next card cost <color=yellow>0 SHIFT</color>.";
             default: return "Unknown Skill";
         }
     }

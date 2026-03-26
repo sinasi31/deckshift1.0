@@ -105,7 +105,7 @@ public class PlayerController : MonoBehaviour
 
     [Header("Jump Settings")]
     public float defaultJumpForce = 10f;
-
+    private bool freeAirJumpUsed = false;
     [Header("Shift Settings")]
     public int maxShift = 3;
     public int currentShift;
@@ -137,6 +137,14 @@ public class PlayerController : MonoBehaviour
     public float interactionRange = 2f;
     public LayerMask interactableLayer;
 
+    [Header("Stagger Settings")]
+    public int staggerCount = 0;
+    public int maxStaggerUses = 3; // 3 kere kullanırsa ölür
+    public float staggerJumpForce = 5f; // Normal zıplamanın yarısı kadar
+    public float staggerDamage = 5f;    // Çok az hasar
+    public float staggerRadius = 2f;    // Yakındaki düşmanlara vurur
+    public GameObject staggerEffect;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -159,6 +167,11 @@ public class PlayerController : MonoBehaviour
 
         bool wasGrounded = isGrounded;
         isGrounded = IsGroundedCheck();
+        if (isGrounded)
+        {
+            currentAirJumps = 0;
+            freeAirJumpUsed = false; // Yere inince hak geri gelir
+        }
         isWallDetected = WallCheck();
 
         if (isGrounded && !wasGrounded)
@@ -280,12 +293,34 @@ public class PlayerController : MonoBehaviour
         {
             PerformJump(defaultJumpForce);
         }
-        else
+        else // Havadaysak
         {
+            // --- SPECTRAL WINGS (Bedava Double Jump) ---
+            bool hasWings = SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.SpectralWings);
+
+            // Eğer skill varsa ve henüz kullanmadıysak:
+            if (hasWings && !freeAirJumpUsed)
+            {
+                // Shift harcamadan zıpla!
+                freeAirJumpUsed = true;
+
+                // Shift azaltmadan direkt fizik uygula ve state değiştir
+                rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
+                rb.AddForce(new Vector2(0f, defaultJumpForce), ForceMode2D.Impulse);
+                ChangeState(PlayerState.Jumping);
+
+                // Efekt/Ses
+                if (audioSource != null && jumpSound != null) audioSource.PlayOneShot(jumpSound);
+                Debug.Log("SPECTRAL WINGS: Bedava Zıplama!");
+                return; // Normal zıplama koduna girmeden çık
+            }
+            // -------------------------------------------
+
+            // Normal Shiftli Air Jump (Eğer skill yoksa veya kullanıldıysa)
             if (currentAirJumps < maxAirJumps && currentShift > 0)
             {
                 currentAirJumps++;
-                PerformJump(defaultJumpForce);
+                PerformJump(defaultJumpForce); // Bu fonksiyon Shift harcıyor
             }
         }
     }
@@ -366,6 +401,9 @@ public class PlayerController : MonoBehaviour
 
             case CardActionType.Phase:
                 PerformPhase(value);
+                return true;
+            case CardActionType.Stagger:
+                PerformStagger();
                 return true;
 
             case CardActionType.DashForward:
@@ -497,6 +535,10 @@ public class PlayerController : MonoBehaviour
     {
         // Eğer ölümsüzsek veya zaten öldüysek hasar (ve ses) yok
         if (isInvincible || isDead) { return; }
+        if (RelicManager.instance != null)
+        {
+            RelicManager.instance.OnPlayerTakeDamage();
+        }
 
         if (CameraShake.instance != null)
             CameraShake.instance.Shake(0.2f, 0.3f);
@@ -940,6 +982,37 @@ public class PlayerController : MonoBehaviour
         rb.bodyType = RigidbodyType2D.Dynamic;
         rb.AddForce(forceVector, ForceMode2D.Impulse);
         ChangeState(PlayerState.Jumping);
+    }
+
+    private void PerformStagger()
+    {
+        staggerCount++;
+        Debug.Log($"STAGGER KULLANILDI! ({staggerCount}/{maxStaggerUses})");
+
+        // 1. Acınası Zıplama
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
+        rb.AddForce(Vector2.up * staggerJumpForce, ForceMode2D.Impulse);
+
+        // 2. Etrafa Düşük Hasar Ver
+        Collider2D[] enemies = Physics2D.OverlapCircleAll(transform.position, staggerRadius, enemyLayer);
+        foreach (Collider2D enemy in enemies)
+        {
+            EnemyHealth eHealth = enemy.GetComponent<EnemyHealth>();
+            if (eHealth != null)
+            {
+                eHealth.TakeDamage(staggerDamage);
+            }
+        }
+
+        // Efekt varsa oynat
+        if (staggerEffect != null) Instantiate(staggerEffect, transform.position, Quaternion.identity);
+
+        // 3. Ölüm Kontrolü
+        if (staggerCount >= maxStaggerUses)
+        {
+            Debug.Log("KALBİN DAYANAMADI! ÖLÜYORSUN...");
+            Die();
+        }
     }
 
     private void CheckInteraction()

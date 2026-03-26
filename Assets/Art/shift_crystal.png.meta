@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: f00ee7690d9092444b925b6002c3deda
+guid: 573b1ebc1b18d0b459b7f22ec5139506
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -1060216102709445368
-    second: png-transparent-computer-icons-gemstone-crystal-gemstone_0
+      213: 8878566123309801515
+    second: shift_crystal_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: png-transparent-computer-icons-gemstone-crystal-gemstone_0
+      name: shift_crystal_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 920
-        height: 500
+        width: 19
+        height: 32
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 80dbad4621b5941f0800000000000000
-      internalID: -1060216102709445368
+      spriteID: b20a2b639d0073b70800000000000000
+      internalID: 8878566123309801515
       vertices: []
       indices: 
       edges: []
@@ -134,8 +134,7 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable:
-      png-transparent-computer-icons-gemstone-crystal-gemstone_0: -1060216102709445368
+    nameFileIdTable: {}
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

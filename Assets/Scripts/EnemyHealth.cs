@@ -1,16 +1,16 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 
 public class EnemyHealth : MonoBehaviour
 {
-    [Header("Can Ayarları")]
+    [Header("Can AyarlarÃ½")]
     public float maxHealth = 30f;
     private float currentHealth;
     private SpriteRenderer spriteRenderer;
 
-    [Header("Stun (Sersemletme) Ayarları")]
-    [Tooltip("Stun yediğinde devre dışı bırakılacak scriptleri buraya sürükle (Örn: PatrolEnemy, Turret).")]
+    [Header("Stun (Sersemletme) AyarlarÃ½")]
+    [Tooltip("Stun yediÃ°inde devre dÃ½Ã¾Ã½ bÃ½rakÃ½lacak scriptleri buraya sÃ¼rÃ¼kle (Ã–rn: PatrolEnemy, Turret).")]
     public List<MonoBehaviour> scriptsToDisable; 
     [Header("Efektler")]
     public GameObject damagePopupPrefab; 
@@ -28,16 +28,26 @@ public class EnemyHealth : MonoBehaviour
         if (enemySprite != null) originalColor = enemySprite.color;
     }
 
-    // --- HASAR BÖLÜMÜ ---
-    public void TakeDamage(float damage)
+    // --- HASAR BÃ–LÃœMÃœ ---
+    public void TakeDamage(float damage, Transform damageSource = null)
     {
         currentHealth -= damage;
         HitStop.instance.Stop(0.05f);
         HitStop.instance.Stop(0.15f);
-        Debug.Log($"{gameObject.name} hasar aldı! Kalan Can: {currentHealth}");
+        Debug.Log($"{gameObject.name} hasar aldÃ½! Kalan Can: {currentHealth}");
         if (spriteRenderer != null)
         {
             StartCoroutine(FlashRoutine());
+        }
+        ShieldEnemy shield = GetComponent<ShieldEnemy>();
+        if (shield != null && damageSource != null)
+        {
+            if (shield.IsBlocking(damageSource.position))
+            {
+                Debug.Log("BLOKLANDI! (Metal Sesi Ã‡al)");
+                // Ä°stersen burada "CLANG!" diye ses veya kÄ±vÄ±lcÄ±m efekti Ã§Ä±kar
+                return; // Hasar alma, fonksiyondan Ã§Ä±k.
+            }
         }
 
         if (damagePopupPrefab != null)
@@ -55,46 +65,49 @@ public class EnemyHealth : MonoBehaviour
     }
     private System.Collections.IEnumerator FlashRoutine()
     {
-        // Rengi Kırmızı (veya istediğin renk) yap
+        // Rengi KÃ½rmÃ½zÃ½ (veya istediÃ°in renk) yap
         spriteRenderer.color = Color.red;
 
-        // Çok kısa bekle (0.1 saniye)
+        // Ã‡ok kÃ½sa bekle (0.1 saniye)
         yield return new WaitForSeconds(0.1f);
 
-        // Rengi normale (Beyaz) döndür
+        // Rengi normale (Beyaz) dÃ¶ndÃ¼r
         spriteRenderer.color = Color.white;
     }
     private void Die()
     {
+        if (RelicManager.instance != null)
+        {
+            RelicManager.instance.OnEnemyKilled();
+        }
         if (QuestSystem.instance != null)
         {
-            // 1. Normal Kill Görevleri için:
+            // 1. Normal Kill GÃ¶revleri iÃ§in:
             QuestSystem.instance.ReportEvent(QuestType.KillEnemy, 1);
 
-            // 2. Air Kill (Havada Öldürme) Kontrolü:
-            // Oyuncuyu bul ve havada mı diye bak
+            // 2. Air Kill (Havada Ã–ldÃ¼rme) KontrolÃ¼:
+            // Oyuncuyu bul ve havada mÃ½ diye bak
             PlayerController player = FindFirstObjectByType<PlayerController>();
             if (player != null && !player.IsGroundedCheck())
             {
                 QuestSystem.instance.ReportEvent(QuestType.AirKill, 1);
             }
         }
-        Debug.Log($"{gameObject.name} öldü!");
+        Debug.Log($"{gameObject.name} Ã¶ldÃ¼!");
 
         if (SkillManager.instance != null)
         {
-            // 1. RECYCLE: +1 Shift
-            if (SkillManager.instance.HasSkill(SkillType.Recycle))
+            // --- OVERCLOCK TETÃKLEME ---
+            if (SkillManager.instance.HasSkill(SkillType.Overclock))
             {
-                if (GameManager.instance != null && GameManager.instance.player != null)
-                    GameManager.instance.player.AddShift(1);
+                if (DeckManager.instance != null)
+                {
+                    DeckManager.instance.isNextCardFree = true;
+                    Debug.Log("OVERCLOCK AKTÃF: Sonraki kart bedava!");
+                    // Ãstersen burada oyuncunun Ã¼stÃ¼nde "FREE!" yazÃ½sÃ½ veya bir efekt Ã§Ã½karabilirsin.
+                }
             }
-
-            if (SkillManager.instance.HasSkill(SkillType.VampiricAura))
-            {
-                if (GameManager.instance != null && GameManager.instance.player != null)
-                    GameManager.instance.player.Heal(5); // 5 Can ver
-            }
+            // ---------------------------
         }
         Destroy(gameObject);
     }
@@ -125,6 +138,6 @@ public class EnemyHealth : MonoBehaviour
 
         if (enemySprite != null) enemySprite.color = originalColor;
         isStunned = false;
-        Debug.Log($"{gameObject.name} ÇÖZÜLDÜ!");
+        Debug.Log($"{gameObject.name} Ã‡Ã–ZÃœLDÃœ!");
     }
 }

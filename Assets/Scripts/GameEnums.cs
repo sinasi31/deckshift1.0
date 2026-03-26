@@ -27,16 +27,17 @@ public enum CardActionType
     Phase,
     CometDive,
     Adrenaline,
+    Stagger
 }
 
 public enum SkillType
 {
     None,
-    Recycle,        // Düþman ölünce +1 Shift
-    VampiricAura,   // Düþman ölünce Can
-    KineticDiscount,// Kart maliyetleri -1
-    MaxShiftBonus,  // Max Shift +1 (YENÝ)
-    InfinitySeal    // Bir karta sonsuz kullaným (YENÝ)
+    InfinitySeal,   // (Eski favorimiz)
+    EchoChamber,    // %50 Çift Etki
+    SpectralWings,  // Bedava Air Jump
+    Overclock,
+    KineticDiscount// Kill = Sonraki Kart Bedava
 }
 public enum Rarity
 {

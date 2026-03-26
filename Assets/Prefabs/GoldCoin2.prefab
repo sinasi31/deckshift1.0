@@ -152,5 +152,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d1796d7242754fd4386043338783a3c4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  goldAmount: 25
   goldSound: {fileID: 8300000, guid: 2b9eee6feb3ba884ea9c5966bbd932db, type: 3}
   soundVolume: 0.5
