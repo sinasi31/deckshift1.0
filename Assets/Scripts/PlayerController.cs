@@ -8,12 +8,16 @@ public class PlayerController : MonoBehaviour
 {
     private Rigidbody2D rb;
     private Animator animator;
+
+    [Header("Visual Settings")]
+    public GameObject visualModel; // YENİ: Hiyerarşideki PF Skeleton objesini buraya sürükleyeceğiz!
+
     [Header("Jump Feel Settings")]
-    public float fallMultiplier = 2.5f;     // Düşerken yerçekimini ne kadar katlayalım?
-    public float lowJumpMultiplier = 2f;    // Tuşu erken bırakırsa ne kadar hızlı düşsün?
+    public float fallMultiplier = 2.5f;
+    public float lowJumpMultiplier = 2f;
 
     [Header("Durumlar")]
-    public bool isPeeking = false; // Etrafa bakıyor mu?
+    public bool isPeeking = false;
 
     [Header("Physics Checks")]
     public Transform groundCheck;
@@ -25,7 +29,6 @@ public class PlayerController : MonoBehaviour
     private int currentAirJumps = 0;
 
     public GameObject platformPrefab;
-    private SpriteRenderer spriteRenderer;
     private bool isPhasing = false;
     private float verticalInput;
     private Vector3 originalScale;
@@ -51,13 +54,10 @@ public class PlayerController : MonoBehaviour
     public AudioClip glassVailSound;
     public AudioClip jumpSound;
     public AudioClip leapSound;
-
-    // --- SES AYARLARI (GÜNCELLENDİ) ---
     public AudioClip deathSound;
-    public float deathVolume = 1f; // Range kaldırıldı, direkt 1
+    public float deathVolume = 1f;
     public AudioClip spendSound;
-    public float soundVolume = 1f; // Range kaldırıldı, direkt 1
-    // ----------------------------------
+    public float soundVolume = 1f;
 
     [Header("VFX Settings")]
     public GameObject biteEffectPrefab;
@@ -107,11 +107,12 @@ public class PlayerController : MonoBehaviour
     public float CurrentHealth { get { return currentHealth; } }
     public float MaxHealth { get { return maxHealth; } }
 
-    private bool isDead = false; // Öldük mü kontrolü
+    private bool isDead = false;
 
     [Header("Jump Settings")]
     public float defaultJumpForce = 10f;
     private bool freeAirJumpUsed = false;
+
     [Header("Shift Settings")]
     public int maxShift = 3;
     public int currentShift;
@@ -145,17 +146,17 @@ public class PlayerController : MonoBehaviour
 
     [Header("Stagger Settings")]
     public int staggerCount = 0;
-    public int maxStaggerUses = 3; // 3 kere kullanırsa ölür
-    public float staggerJumpForce = 5f; // Normal zıplamanın yarısı kadar
-    public float staggerDamage = 5f;    // Çok az hasar
-    public float staggerRadius = 2f;    // Yakındaki düşmanlara vurur
+    public int maxStaggerUses = 3;
+    public float staggerJumpForce = 5f;
+    public float staggerDamage = 5f;
+    public float staggerRadius = 2f;
     public GameObject staggerEffect;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
-        spriteRenderer = GetComponent<SpriteRenderer>();
-        animator = GetComponent<Animator>();
+        // GÜNCELLENDİ: Artık kendi üzerimizde değil, child objedeki (PF Skeleton) Animator'ı arıyoruz.
+        animator = GetComponentInChildren<Animator>();
     }
 
     void Start()
@@ -170,11 +171,10 @@ public class PlayerController : MonoBehaviour
     {
         if (isPeeking)
         {
-            // Karakterin sağa sola kaymasını durdur, ama havadaysa düşmeye devam etsin
             rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
-            return; // Aşağıdaki yürüme, zıplama, kart oynama kodlarını İPTAL ET
+            return;
         }
-        // Öldüysek hiçbir input alma
+
         if (isDead) return;
 
         bool wasGrounded = isGrounded;
@@ -182,7 +182,7 @@ public class PlayerController : MonoBehaviour
         if (isGrounded)
         {
             currentAirJumps = 0;
-            freeAirJumpUsed = false; // Yere inince hak geri gelir
+            freeAirJumpUsed = false;
         }
         isWallDetected = WallCheck();
 
@@ -226,15 +226,14 @@ public class PlayerController : MonoBehaviour
 
             verticalInput = 0;
         }
-        // --- BETTER JUMP MANTIĞI ---
 
+        // --- BETTER JUMP MANTIĞI ---
         if (rb.linearVelocity.y < 0)
         {
             rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (fallMultiplier - 1) * Time.deltaTime;
         }
         else if (rb.linearVelocity.y > 0 && !Input.GetKey(KeyCode.Space))
         {
-            // Tuşu erken bıraktığı için yerçekimini lowJumpMultiplier kadar artırıp zıplamayı kes
             rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (lowJumpMultiplier - 1) * Time.deltaTime;
         }
 
@@ -281,7 +280,6 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // --- SES DÜZELTMESİ YAPILDI ---
     public bool TrySpendGold(int amount)
     {
         if (currentGold >= amount)
@@ -296,14 +294,19 @@ public class PlayerController : MonoBehaviour
         }
         return false;
     }
-    // -----------------------------
 
     private void UpdateAnimations()
     {
         if (animator == null) return;
-        animator.SetFloat("Speed", Mathf.Abs(moveInput));
+
+        // GÜNCELLENDİ: Yeni paket "MovingBlend" kullanıyor (0.0 Durma, 1.0 Koşma)
+        float movingBlend = (Mathf.Abs(moveInput) > 0.1f) ? 1.0f : 0.0f;
+        animator.SetFloat("MovingBlend", movingBlend);
+
+        // GÜNCELLENDİ: Yeni paket "SpeedVertical" kullanıyor
+        animator.SetFloat("SpeedVertical", rb.linearVelocity.y);
+
         animator.SetBool("IsGrounded", isGrounded);
-        animator.SetFloat("yVelocity", rb.linearVelocity.y);
     }
 
     private void HandleJumpInput()
@@ -316,34 +319,26 @@ public class PlayerController : MonoBehaviour
         {
             PerformJump(defaultJumpForce);
         }
-        else // Havadaysak
+        else
         {
-            // --- SPECTRAL WINGS (Bedava Double Jump) ---
             bool hasWings = SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.SpectralWings);
 
-            // Eğer skill varsa ve henüz kullanmadıysak:
             if (hasWings && !freeAirJumpUsed)
             {
-                // Shift harcamadan zıpla!
                 freeAirJumpUsed = true;
-
-                // Shift azaltmadan direkt fizik uygula ve state değiştir
                 rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
                 rb.AddForce(new Vector2(0f, defaultJumpForce), ForceMode2D.Impulse);
                 ChangeState(PlayerState.Jumping);
 
-                // Efekt/Ses
                 if (audioSource != null && jumpSound != null) audioSource.PlayOneShot(jumpSound);
                 Debug.Log("SPECTRAL WINGS: Bedava Zıplama!");
-                return; // Normal zıplama koduna girmeden çık
+                return;
             }
-            // -------------------------------------------
 
-            // Normal Shiftli Air Jump (Eğer skill yoksa veya kullanıldıysa)
             if (currentAirJumps < maxAirJumps && currentShift > 0)
             {
                 currentAirJumps++;
-                PerformJump(defaultJumpForce); // Bu fonksiyon Shift harcıyor
+                PerformJump(defaultJumpForce);
             }
         }
     }
@@ -556,7 +551,6 @@ public class PlayerController : MonoBehaviour
 
     public void TakeDamage(float damage)
     {
-        // Eğer ölümsüzsek veya zaten öldüysek hasar (ve ses) yok
         if (isInvincible || isDead) { return; }
         if (RelicManager.instance != null)
         {
@@ -569,13 +563,13 @@ public class PlayerController : MonoBehaviour
         tookDamageThisRoom = true;
         currentHealth = Mathf.Max(currentHealth - damage, 0f);
 
-        // --- HASAR SESİ EKLENDİ ---
         if (hurtSound != null && audioSource != null)
         {
-            // Sesi üst üste binebilecek şekilde çal (Arka arkaya hasar alırsan ses kesilmez)
             audioSource.PlayOneShot(hurtSound);
         }
-        // ---------------------------
+
+        // GÜNCELLENDİ: Yeni paket hasar yeme animasyonu tetikleyicisi
+        if (animator != null) animator.SetTrigger("InjuredFront");
 
         Debug.Log($"Hasar Alındı! Kalan Can: {currentHealth}");
 
@@ -590,15 +584,13 @@ public class PlayerController : MonoBehaviour
         tookDamageThisRoom = false;
     }
 
-    // --- ÖLÜM SESİ DÜZELTMESİ (ÖNEMLİ) ---
     private void Die()
     {
-        if (isDead) return; // Zaten öldüysek tekrar çalışma
+        if (isDead) return;
         isDead = true;
 
         Debug.Log("💀 Oyuncu Öldü! Ses Çalınıyor...");
 
-        // 1. Sesi Çal
         if (deathSound != null)
         {
             if (Camera.main != null)
@@ -606,26 +598,20 @@ public class PlayerController : MonoBehaviour
             else
                 AudioSource.PlayClipAtPoint(deathSound, transform.position, deathVolume);
         }
-        else
-        {
-            Debug.LogWarning("❌ Death Sound Atanmamış!");
-        }
 
-        // 2. Oyuncuyu Gizle (Yok olmuş gibi yap)
-        if (spriteRenderer != null) spriteRenderer.enabled = false;
-        if (rb != null) rb.simulated = false; // Fiziği kapat
+        // GÜNCELLENDİ: Yeni paket ölüm animasyonu tetikleyicisi
+        if (animator != null) animator.SetBool("IsDead", true);
 
-        // 3. Biraz bekle sonra sahneyi yükle (Ki ses duyulsun)
+        if (rb != null) rb.simulated = false;
+
         StartCoroutine(WaitAndReload());
     }
 
     private IEnumerator WaitAndReload()
     {
-        // Sesin duyulması için 1.5 saniye bekle
         yield return new WaitForSeconds(1.5f);
         SceneManager.LoadScene("GameOverScene");
     }
-    // -------------------------------------
 
     public bool IsGroundedCheck()
     {
@@ -724,6 +710,7 @@ public class PlayerController : MonoBehaviour
         if (amount <= 0) return;
         currentShift = Mathf.Max(0, currentShift - amount);
     }
+
     private bool TryPlacePortal(out bool keepCard)
     {
         keepCard = false;
@@ -775,6 +762,7 @@ public class PlayerController : MonoBehaviour
             return true;
         }
     }
+
     private void PerformVampiricBite(float damageAmount)
     {
         if (audioSource != null && vampireBiteSound != null)
@@ -805,6 +793,7 @@ public class PlayerController : MonoBehaviour
     {
         currentHealth = Mathf.Min(currentHealth + amount, maxHealth);
     }
+
     private void PerformGlassWail(float stunDuration)
     {
         if (audioSource != null && glassVailSound != null)
@@ -822,6 +811,7 @@ public class PlayerController : MonoBehaviour
             enemy.Stun(stunDuration);
         }
     }
+
     private void PerformPhase(float duration)
     {
         if (audioSource != null && phaseSound != null)
@@ -846,12 +836,9 @@ public class PlayerController : MonoBehaviour
         Physics2D.IgnoreLayerCollision(playerLayer, groundLayer, true);
         Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, true);
 
-        if (spriteRenderer != null)
-        {
-            Color color = spriteRenderer.color;
-            color.a = 0.4f;
-            spriteRenderer.color = color;
-        }
+        // GÜNCELLENDİ: SkinnedMeshRenderer'larda direkt materyal rengi değiştirmek shader'a bağlı olduğu için 
+        // şimdilik alfa değişimi kodunu yorum satırı yaptık. Gerekirse ileride çözeriz.
+        // if (spriteRenderer != null) ... 
 
         yield return new WaitForSeconds(duration);
 
@@ -860,20 +847,17 @@ public class PlayerController : MonoBehaviour
 
         rb.gravityScale = originalGravity;
 
-        if (spriteRenderer != null)
-        {
-            Color color = spriteRenderer.color;
-            color.a = 1f;
-            spriteRenderer.color = color;
-        }
+        // if (spriteRenderer != null) ...
 
         isPhasing = false;
     }
+
     public void IncreaseMaxShift(int amount)
     {
         maxShift += amount;
         currentShift += amount;
     }
+
     public void EnterCannon(Transform cannonTransform)
     {
         ChangeState(PlayerState.InCannon);
@@ -881,14 +865,13 @@ public class PlayerController : MonoBehaviour
         rb.linearVelocity = Vector2.zero;
         rb.bodyType = RigidbodyType2D.Kinematic;
 
-
-        if (GetComponent<SpriteRenderer>() != null)
-            GetComponent<SpriteRenderer>().enabled = false;
+        // GÜNCELLENDİ: Artık SpriteRenderer yerine yeni görsel modeli (visualModel) açıp kapatıyoruz.
+        if (visualModel != null) visualModel.SetActive(false);
 
         transform.position = cannonTransform.position;
-
         transform.SetParent(cannonTransform);
     }
+
     private void PerformCometDive()
     {
         if (audioSource != null && cometDiveSound != null)
@@ -919,10 +902,7 @@ public class PlayerController : MonoBehaviour
     {
         ChangeState(PlayerState.Idle);
 
-        if (diveTrail != null)
-        {
-            diveTrail.emitting = false;
-        }
+        if (diveTrail != null) diveTrail.emitting = false;
 
         if (diveImpactPrefab != null)
         {
@@ -943,6 +923,7 @@ public class PlayerController : MonoBehaviour
         if (CameraShake.instance != null) CameraShake.instance.Shake(0.3f, 0.5f);
         if (cometImpactEffect != null) Instantiate(cometImpactEffect, transform.position, Quaternion.identity);
     }
+
     private void UseAdrenaline(float value)
     {
         if (audioSource != null && adrenalineSound != null)
@@ -979,7 +960,9 @@ public class PlayerController : MonoBehaviour
     private IEnumerator AdrenalineSpeedBoostRoutine()
     {
         isAdrenalineActive = true;
-        if (spriteRenderer != null) spriteRenderer.color = Color.red;
+
+        // GÜNCELLENDİ: SkinnedMesh rengi şimdilik değiştirilmiyor
+        // if (spriteRenderer != null) spriteRenderer.color = Color.red;
 
         float originalSpeed = moveSpeed;
         moveSpeed *= speedBoostMultiplier;
@@ -988,7 +971,7 @@ public class PlayerController : MonoBehaviour
 
         moveSpeed = originalSpeed;
 
-        if (spriteRenderer != null) spriteRenderer.color = Color.white;
+        // if (spriteRenderer != null) spriteRenderer.color = Color.white;
         isAdrenalineActive = false;
     }
 
@@ -999,8 +982,8 @@ public class PlayerController : MonoBehaviour
         transform.rotation = Quaternion.identity;
         transform.position = new Vector3(transform.position.x, transform.position.y, 0f);
 
-        if (GetComponent<SpriteRenderer>() != null)
-            GetComponent<SpriteRenderer>().enabled = true;
+        // GÜNCELLENDİ: Görsel modeli geri aç
+        if (visualModel != null) visualModel.SetActive(true);
 
         rb.bodyType = RigidbodyType2D.Dynamic;
         rb.AddForce(forceVector, ForceMode2D.Impulse);
@@ -1012,11 +995,9 @@ public class PlayerController : MonoBehaviour
         staggerCount++;
         Debug.Log($"STAGGER KULLANILDI! ({staggerCount}/{maxStaggerUses})");
 
-        // 1. Acınası Zıplama
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
         rb.AddForce(Vector2.up * staggerJumpForce, ForceMode2D.Impulse);
 
-        // 2. Etrafa Düşük Hasar Ver
         Collider2D[] enemies = Physics2D.OverlapCircleAll(transform.position, staggerRadius, enemyLayer);
         foreach (Collider2D enemy in enemies)
         {
@@ -1027,10 +1008,8 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        // Efekt varsa oynat
         if (staggerEffect != null) Instantiate(staggerEffect, transform.position, Quaternion.identity);
 
-        // 3. Ölüm Kontrolü
         if (staggerCount >= maxStaggerUses)
         {
             Debug.Log("KALBİN DAYANAMADI! ÖLÜYORSUN...");
