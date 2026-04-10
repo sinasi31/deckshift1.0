@@ -8,6 +8,12 @@ public class PlayerController : MonoBehaviour
 {
     private Rigidbody2D rb;
     private Animator animator;
+    [Header("Jump Feel Settings")]
+    public float fallMultiplier = 2.5f;     // Düşerken yerçekimini ne kadar katlayalım?
+    public float lowJumpMultiplier = 2f;    // Tuşu erken bırakırsa ne kadar hızlı düşsün?
+
+    [Header("Durumlar")]
+    public bool isPeeking = false; // Etrafa bakıyor mu?
 
     [Header("Physics Checks")]
     public Transform groundCheck;
@@ -162,6 +168,12 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+        if (isPeeking)
+        {
+            // Karakterin sağa sola kaymasını durdur, ama havadaysa düşmeye devam etsin
+            rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
+            return; // Aşağıdaki yürüme, zıplama, kart oynama kodlarını İPTAL ET
+        }
         // Öldüysek hiçbir input alma
         if (isDead) return;
 
@@ -213,6 +225,17 @@ public class PlayerController : MonoBehaviour
                 moveInput = 0;
 
             verticalInput = 0;
+        }
+        // --- BETTER JUMP MANTIĞI ---
+
+        if (rb.linearVelocity.y < 0)
+        {
+            rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (fallMultiplier - 1) * Time.deltaTime;
+        }
+        else if (rb.linearVelocity.y > 0 && !Input.GetKey(KeyCode.Space))
+        {
+            // Tuşu erken bıraktığı için yerçekimini lowJumpMultiplier kadar artırıp zıplamayı kes
+            rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (lowJumpMultiplier - 1) * Time.deltaTime;
         }
 
         if (!isPhasing)
