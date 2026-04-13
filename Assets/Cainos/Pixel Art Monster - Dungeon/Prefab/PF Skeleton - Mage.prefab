@@ -4952,6 +4952,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2377005024943048759, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+      propertyPath: m_LayerOverridePriority
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 2524859759681394429, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
       propertyPath: renderers.Array.size
       value: 2
