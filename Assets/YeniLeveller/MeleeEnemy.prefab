@@ -1,0 +1,107 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &1888434220028289400
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 709385175306154498, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -60.79
+      objectReference: {fileID: 0}
+    - target: {fileID: 709385175306154498, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 13.25
+      objectReference: {fileID: 0}
+    - target: {fileID: 709385175306154498, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 709385175306154498, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 709385175306154498, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 709385175306154498, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 709385175306154498, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 709385175306154498, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 709385175306154498, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 709385175306154498, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5164379758955276693, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6418267430543814824, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+      propertyPath: m_Name
+      value: MeleeEnemy
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 6418267430543814824, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3541157975474843176}
+    - targetCorrespondingSourceObject: {fileID: 6418267430543814824, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7970200218222573164}
+  m_SourcePrefab: {fileID: 100100000, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+--- !u!1 &4838929585779216848 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6418267430543814824, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+  m_PrefabInstance: {fileID: 1888434220028289400}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &3541157975474843176
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4838929585779216848}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: facc39d94e9e8054e9b5fb215579a41a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  aggroRange: 5
+  attackRange: 1.5
+  attackCooldown: 1.5
+  damage: 15
+  damageDelay: 0.5
+  knockbackPower: 5
+--- !u!114 &7970200218222573164
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4838929585779216848}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4813e138349d3bd47bc9e51b493d345a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxHealth: 30
+  scriptsToDisable: []
+  damagePopupPrefab: {fileID: 0}

@@ -4508,7 +4508,7 @@ MonoBehaviour:
   m_Intensity: 1
   m_LightVolumeIntensity: 1
   m_LightVolumeEnabled: 0
-  m_ApplyToSortingLayers: 0000000029d7d51f0d15db82
+  m_ApplyToSortingLayers: 0000000029d7d51f0d15db82f70aa0c7
   m_LightCookieSprite: {fileID: 0}
   m_DeprecatedPointLightCookieSprite: {fileID: 0}
   m_LightOrder: 0
@@ -8446,7 +8446,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerTransform: {fileID: 1988395663}
   roomPrefabs:
-  - {fileID: 5024799896762568664, guid: ba3361c4a3e3fd64f8fb5304fbc503de, type: 3}
+  - {fileID: 6451403925772677439, guid: d0f3066e702c5c64b907fff84c0300b0, type: 3}
 --- !u!4 &1361928416
 Transform:
   m_ObjectHideFlags: 0
@@ -10963,13 +10963,28 @@ PrefabInstance:
     - {fileID: 4376744426795614935, guid: 5509adfb025d9e44294a6087e6be0cfe, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 558674790209946070, guid: 5509adfb025d9e44294a6087e6be0cfe, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1705162791}
   m_SourcePrefab: {fileID: 100100000, guid: 5509adfb025d9e44294a6087e6be0cfe, type: 3}
 --- !u!4 &1705162785 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6272025494794191740, guid: 5509adfb025d9e44294a6087e6be0cfe, type: 3}
   m_PrefabInstance: {fileID: 1705162784}
   m_PrefabAsset: {fileID: 0}
+--- !u!210 &1705162791
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1098523155}
+  m_Enabled: 1
+  m_SortingLayerID: -945812745
+  m_SortingLayer: 2
+  m_SortingOrder: 1000
+  m_SortAtRoot: 0
 --- !u!1 &1707423227
 GameObject:
   m_ObjectHideFlags: 0
@@ -14490,7 +14505,7 @@ PrefabInstance:
       objectReference: {fileID: 22100000, guid: 5f06f150b687a5e49bcb3f5ace3ebe29, type: 2}
     - target: {fileID: 961685934743726727, guid: 340bbb3d789c2964d876f7f2e6408998, type: 3}
       propertyPath: m_GravityScale
-      value: 1.5
+      value: 1.25
       objectReference: {fileID: 0}
     - target: {fileID: 1817860827524851732, guid: 340bbb3d789c2964d876f7f2e6408998, type: 3}
       propertyPath: m_LocalPosition.y
@@ -14594,7 +14609,7 @@ PrefabInstance:
       objectReference: {fileID: 360610054379895922, guid: 8c5d0b3cd252ba348ab3d0759f00ddb1, type: 3}
     - target: {fileID: 5535401529240642686, guid: 340bbb3d789c2964d876f7f2e6408998, type: 3}
       propertyPath: defaultJumpForce
-      value: 20
+      value: 10
       objectReference: {fileID: 0}
     - target: {fileID: 5535401529240642686, guid: 340bbb3d789c2964d876f7f2e6408998, type: 3}
       propertyPath: diveImpactPrefab

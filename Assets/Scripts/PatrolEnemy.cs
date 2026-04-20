@@ -1,7 +1,11 @@
-using UnityEngine;
+﻿using UnityEngine;
+using Cainos.PixelArtMonster_Dungeon; // YENİ: Paketin kütüphanesi
 
 public class PatrolEnemy : MonoBehaviour
 {
+    [Header("Görsel Bağlantı (YENİ)")]
+    public PixelMonster pixelMonster; // YENİ: Yeni karakterin animasyon kodu
+
     [Header("Movement Settings")]
     public float moveSpeed = 2f;
     public float damage = 10f;
@@ -21,11 +25,16 @@ public class PatrolEnemy : MonoBehaviour
 
     private void Start()
     {
+        // Otomatik bulmaya çalış
+        if (pixelMonster == null) pixelMonster = GetComponentInChildren<PixelMonster>();
+
         rb.linearVelocity = new Vector2(moveSpeed, 0);
-        Vector3 fixScale = transform.localScale;
-        fixScale.x *= -1;
-        transform.localScale = fixScale;
-        // --- D�ZELTME B�T��� ---
+
+        // YENİ: Başlangıç yönünü yeni bedene söyle
+        UpdateVisualFacing();
+
+        // YENİ: Karaktere "Yürü" emrini ver (0 durma, 1 yürüme/koşma blendidir)
+        if (pixelMonster != null) pixelMonster.MovingBlend = 1f;
     }
 
     private void Update()
@@ -41,11 +50,23 @@ public class PatrolEnemy : MonoBehaviour
     private void Flip()
     {
         isFacingRight = !isFacingRight;
-        rb.linearVelocity = new Vector2(moveSpeed * (isFacingRight ? 1 : -1), 0);
+        rb.linearVelocity = new Vector2(moveSpeed * (isFacingRight ? 1 : -1), rb.linearVelocity.y);
 
-        Vector3 newScale = transform.localScale;
-        newScale.x *= -1;
-        transform.localScale = newScale;
+        // ESKİ localScale ile objeyi yamultan kodu SİLDİK
+        // Onun yerine yön bilgisini PixelMonster'a iletiyoruz
+        UpdateVisualFacing();
+    }
+
+    // YENİ: Sadece yeni bedeni döndüren fonksiyon
+    private void UpdateVisualFacing()
+    {
+        if (pixelMonster != null)
+        {
+            if (isFacingRight)
+                pixelMonster.Facing = PixelMonster.FacingType.Right;
+            else
+                pixelMonster.Facing = PixelMonster.FacingType.Left;
+        }
     }
 
     private void OnCollisionEnter2D(Collision2D other)
@@ -54,6 +75,9 @@ public class PatrolEnemy : MonoBehaviour
         if (player != null)
         {
             player.TakeDamage(damage);
+
+            // YENİ: Oyuncuya çarpınca saldırı animasyonu oynatsın
+            if (pixelMonster != null) pixelMonster.Attack();
         }
     }
 
@@ -65,20 +89,24 @@ public class PatrolEnemy : MonoBehaviour
             Gizmos.DrawWireSphere(groundCheckPoint.position, groundCheckRadius);
         }
     }
+
     private void OnDisable()
     {
         if (rb != null)
         {
-            
-            rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
-            rb.linearVelocity = Vector2.zero; 
+            rb.linearVelocity = Vector2.zero;
         }
+        // Kapanırken animasyonu durdur
+        if (pixelMonster != null) pixelMonster.MovingBlend = 0f;
     }
+
     private void OnEnable()
     {
         if (rb != null)
         {
-            rb.linearVelocity = new Vector2(moveSpeed * (isFacingRight ? 1 : -1), 0);
+            rb.linearVelocity = new Vector2(moveSpeed * (isFacingRight ? 1 : -1), rb.linearVelocity.y);
         }
+        // Açılırken animasyonu başlat
+        if (pixelMonster != null) pixelMonster.MovingBlend = 1f;
     }
 }
