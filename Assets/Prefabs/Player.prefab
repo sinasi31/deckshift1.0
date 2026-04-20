@@ -176,7 +176,7 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 101
+  m_SortingOrder: 5000
   m_Sprite: {fileID: 5958457827856790607, guid: cc818309cd8b3784da3a51e8b3d9902d, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -227,16 +227,44 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f3fefc9eaa3fd9e4f9c701dbeb94e5cb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  visualModel: {fileID: 0}
+  fallMultiplier: 2.5
+  lowJumpMultiplier: 2
+  isPeeking: 0
   groundCheck: {fileID: 7554435225037546090}
   groundCheckRadius: 0.2
   groundLayer:
     serializedVersion: 2
     m_Bits: 2057
+  maxAirJumps: 1
   platformPrefab: {fileID: 2884497646027804218, guid: 0c30a27df86ca3d4485ef29c36533548, type: 3}
   fallDamage: 20
   currentGold: 0
+  hurtSound: {fileID: 0}
+  audioSource: {fileID: 0}
+  dashSound: {fileID: 0}
+  fireballCastSound: {fileID: 0}
+  cometDiveSound: {fileID: 0}
+  phaseSound: {fileID: 0}
+  adrenalineSound: {fileID: 0}
+  createPlatformSound: {fileID: 0}
+  vampireBiteSound: {fileID: 0}
+  glassVailSound: {fileID: 0}
+  jumpSound: {fileID: 0}
+  leapSound: {fileID: 0}
+  deathSound: {fileID: 0}
+  deathVolume: 1
+  spendSound: {fileID: 0}
+  soundVolume: 1
   biteEffectPrefab: {fileID: 0}
   leapEffectPrefab: {fileID: 0}
+  diveTrail: {fileID: 0}
+  diveImpactPrefab: {fileID: 0}
+  diveSpeed: 25
+  dashEffectPrefab: {fileID: 0}
+  ghostPrefab: {fileID: 0}
+  adrenalineSpeedMult: 2
+  ghostDelay: 0.05
   portalPrefab: {fileID: 908333651306973326, guid: 794d2df75acd43b45bb5028c806b3b7e, type: 3}
   portalMaxRange: 10
   portalCost: 2
@@ -270,6 +298,12 @@ MonoBehaviour:
   interactableLayer:
     serializedVersion: 2
     m_Bits: 0
+  staggerCount: 0
+  maxStaggerUses: 3
+  staggerJumpForce: 5
+  staggerDamage: 5
+  staggerRadius: 2
+  staggerEffect: {fileID: 0}
 --- !u!114 &2763489764456714898
 MonoBehaviour:
   m_ObjectHideFlags: 0
