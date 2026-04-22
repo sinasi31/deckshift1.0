@@ -1,17 +1,17 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\",
+  "WorkspaceRootPath": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|c:\\users\\efe\\documents\\github\\deckshift1.0\\assets\\scripts\\levelmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|c:\\users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\assets\\scripts\\camerafollow.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\camerafollow.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|c:\\users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\assets\\scripts\\levelmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\levelmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|c:\\users\\efe\\documents\\github\\deckshift1.0\\assets\\scripts\\rangedenemyai.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{424B7FD4-4C73-41A1-FF46-4112EB7D0928}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\rangedenemyai.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Library\\PackageCache\\com.unity.render-pipelines.universal@fd2e729c5297\\Runtime\\UniversalRenderPipeline.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Library\\PackageCache\\com.unity.render-pipelines.universal@fd2e729c5297\\Runtime\\UniversalRenderPipeline.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Library\\PackageCache\\com.unity.render-pipelines.universal@fd2e729c5297\\Runtime\\UniversalRenderPipeline.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
@@ -22,49 +22,46 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 1,
               "Title": "LevelManager.cs",
-              "DocumentMoniker": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Assets\\Scripts\\LevelManager.cs",
+              "DocumentMoniker": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\LevelManager.cs",
               "RelativeDocumentMoniker": "Assets\\Scripts\\LevelManager.cs",
-              "ToolTip": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Assets\\Scripts\\LevelManager.cs",
+              "ToolTip": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\LevelManager.cs",
               "RelativeToolTip": "Assets\\Scripts\\LevelManager.cs",
-              "ViewState": "AgIAADkAAAAAAAAAAAAqwFIAAABQAAAAAAAAAA==",
+              "ViewState": "AgIAADAAAAAAAAAAAAASwFYAAAAJAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-22T13:16:05.769Z",
+              "WhenOpened": "2026-04-22T14:30:22.44Z",
               "EditorCaption": ""
             },
             {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{cce594b6-0c39-4442-ba28-10c64ac7e89f}"
-            },
-            {
               "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "RangedEnemyAI.cs",
-              "DocumentMoniker": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Assets\\Scripts\\RangedEnemyAI.cs",
-              "RelativeDocumentMoniker": "Assets\\Scripts\\RangedEnemyAI.cs",
-              "ToolTip": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Assets\\Scripts\\RangedEnemyAI.cs",
-              "RelativeToolTip": "Assets\\Scripts\\RangedEnemyAI.cs",
-              "ViewState": "AgIAADgAAAAAAAAAAADwv1QAAAABAAAAAAAAAA==",
+              "DocumentIndex": 0,
+              "Title": "CameraFollow.cs",
+              "DocumentMoniker": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\CameraFollow.cs",
+              "RelativeDocumentMoniker": "Assets\\Scripts\\CameraFollow.cs",
+              "ToolTip": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Assets\\Scripts\\CameraFollow.cs",
+              "RelativeToolTip": "Assets\\Scripts\\CameraFollow.cs",
+              "ViewState": "AgIAABsAAAAAAAAAAADwv0YAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-16T07:38:17.442Z",
+              "WhenOpened": "2026-04-22T14:25:36.126Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 2,
               "Title": "UniversalRenderPipeline.cs",
-              "DocumentMoniker": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Library\\PackageCache\\com.unity.render-pipelines.universal@fd2e729c5297\\Runtime\\UniversalRenderPipeline.cs",
+              "DocumentMoniker": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Library\\PackageCache\\com.unity.render-pipelines.universal@fd2e729c5297\\Runtime\\UniversalRenderPipeline.cs",
               "RelativeDocumentMoniker": "Library\\PackageCache\\com.unity.render-pipelines.universal@fd2e729c5297\\Runtime\\UniversalRenderPipeline.cs",
-              "ToolTip": "C:\\Users\\Efe\\Documents\\GitHub\\deckshift1.0\\Library\\PackageCache\\com.unity.render-pipelines.universal@fd2e729c5297\\Runtime\\UniversalRenderPipeline.cs",
+              "ToolTip": "C:\\Users\\pc\\roguelike platformer deck\\dekcshift\\deckshift1.0\\Library\\PackageCache\\com.unity.render-pipelines.universal@fd2e729c5297\\Runtime\\UniversalRenderPipeline.cs",
               "RelativeToolTip": "Library\\PackageCache\\com.unity.render-pipelines.universal@fd2e729c5297\\Runtime\\UniversalRenderPipeline.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABgAAABCAAAAAAAAAA==",
+              "ViewState": "AgIAABUAAAAAAAAAAAAAABgAAABCAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-10T18:46:56.086Z"
+              "WhenOpened": "2026-04-10T18:46:56.086Z",
+              "EditorCaption": ""
             }
           ]
         }

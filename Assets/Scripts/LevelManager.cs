@@ -1,6 +1,7 @@
 ﻿using Unity.Cinemachine;
 using System.Collections.Generic;
 using UnityEngine;
+
 public class LevelManager : MonoBehaviour
 {
     public static LevelManager instance;
@@ -8,19 +9,17 @@ public class LevelManager : MonoBehaviour
     [Header("Referanslar")]
     public Transform playerTransform;
 
-    [Header("Oda Ayarlarý")]
-    public List<GameObject> roomPrefabs; // Tüm odalarýn listesi (Prefablar)
+    [Header("Oda Ayarları")]
+    public List<GameObject> roomPrefabs;
 
-    // --- YENÝ: HAVUZ SÝSTEMÝ ---
-    private List<int> availableRoomIndices = new List<int>(); // Henüz oynanmamýþ odalarýn listesi
-    // ---------------------------
-
+    private List<int> availableRoomIndices = new List<int>();
     private GameObject currentRoom;
 
     private void Awake()
     {
         if (instance == null) { instance = this; }
         else { Destroy(gameObject); }
+
         if (playerTransform == null)
         {
             GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
@@ -30,13 +29,10 @@ public class LevelManager : MonoBehaviour
 
     private void Start()
     {
-        // Havuzu ilk kez doldur
         RefillRoomPool();
-
         SpawnNextRoom();
     }
 
-    // --- YENÝ: HAVUZU DOLDURMA FONKSÝYONU ---
     private void RefillRoomPool()
     {
         availableRoomIndices.Clear();
@@ -46,7 +42,6 @@ public class LevelManager : MonoBehaviour
         }
         Debug.Log("Oda havuzu yenilendi/dolduruldu.");
     }
-    // ----------------------------------------
 
     public void SpawnNextRoom()
     {
@@ -59,37 +54,36 @@ public class LevelManager : MonoBehaviour
         {
             RefillRoomPool();
         }
-        int randomIndexInPool = Random.Range(0, availableRoomIndices.Count); 
-        int selectedRoomIndex = availableRoomIndices[randomIndexInPool]; 
+
+        int randomIndexInPool = Random.Range(0, availableRoomIndices.Count);
+        int selectedRoomIndex = availableRoomIndices[randomIndexInPool];
         availableRoomIndices.RemoveAt(randomIndexInPool);
 
-        Debug.Log($"Seçilen Oda Indexi: {selectedRoomIndex}. Kalan Oda Sayýsý: {availableRoomIndices.Count}");
+        Debug.Log($"Seçilen Oda Indexi: {selectedRoomIndex}. Kalan Oda Sayısı: {availableRoomIndices.Count}");
 
         GameObject selectedRoomPrefab = roomPrefabs[selectedRoomIndex];
         currentRoom = Instantiate(selectedRoomPrefab, Vector3.zero, Quaternion.identity);
-        var vCam = FindFirstObjectByType<CinemachineCamera>();
 
-        if (vCam != null)
+        Transform boundsObj = currentRoom.transform.Find("CameraBounds");
+        if (boundsObj != null)
         {
-            // 2. Confiner Bileþenini Bul
-            var confiner = vCam.GetComponent<CinemachineConfiner2D>();
-
-            if (confiner != null)
+            Debug.Log("CameraBounds bulundu: " + boundsObj.name);
+            BoxCollider2D[] zones = boundsObj.GetComponentsInChildren<BoxCollider2D>();
+            Debug.Log("Zone sayısı: " + zones.Length);
+            CameraFollow cam = Camera.main.GetComponent<CameraFollow>();
+            if (cam != null)
             {
-                Transform boundsObj = currentRoom.transform.Find("CameraBounds");
-
-                if (boundsObj != null)
-                {
-                    Collider2D boundsCollider = boundsObj.GetComponent<CompositeCollider2D>();
-
-                    confiner.BoundingShape2D = boundsCollider;
-                    confiner.InvalidateBoundingShapeCache();
-                }
-                else
-                {
-                    Debug.LogError("CameraBounds BULUNAMADI! Prefab içindeki ismi kontrol et.");
-                }
+                cam.SetZones(zones);
+                Debug.Log("SetZones çağrıldı!");
             }
+            else
+            {
+                Debug.LogError("CameraFollow bulunamadı!");
+            }
+        }
+        else
+        {
+            Debug.LogError("CameraBounds objesi bulunamadı!");
         }
 
         Transform entryPoint = currentRoom.transform.Find("GirisNoktasi");
@@ -104,14 +98,11 @@ public class LevelManager : MonoBehaviour
                 playerController.SetCurrentEntryPoint(entryPoint.position);
             }
         }
+
         if (DeckManager.instance != null)
         {
             DeckManager.instance.ReloadHand();
-        }
-        if (DeckManager.instance != null)
-        {
-            DeckManager.instance.ReloadHand(); // Eli yenile
-            DeckManager.instance.ResetRecallCost(); // --- YENİ: Maliyeti 1'e geri çek ---
+            DeckManager.instance.ResetRecallCost();
         }
     }
 }
