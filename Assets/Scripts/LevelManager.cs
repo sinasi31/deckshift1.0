@@ -80,10 +80,14 @@ public class LevelManager : MonoBehaviour
 
                 if (boundsObj != null)
                 {
-                    Collider2D boundsCollider = boundsObj.GetComponent<Collider2D>();
+                    Collider2D boundsCollider = boundsObj.GetComponent<CompositeCollider2D>();
 
                     confiner.BoundingShape2D = boundsCollider;
                     confiner.InvalidateBoundingShapeCache();
+                }
+                else
+                {
+                    Debug.LogError("CameraBounds BULUNAMADI! Prefab içindeki ismi kontrol et.");
                 }
             }
         }
