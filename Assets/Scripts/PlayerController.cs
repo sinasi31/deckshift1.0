@@ -355,7 +355,18 @@ public class PlayerController : MonoBehaviour
         }
         else if (currentState != PlayerState.Dashing && currentState != PlayerState.KnockedBack && currentState != PlayerState.CometDiving)
         {
-            rb.linearVelocity = new Vector2(moveInput * moveSpeed, rb.linearVelocity.y);
+            if (isGrounded)
+            {
+                rb.linearVelocity = new Vector2(moveInput * moveSpeed, rb.linearVelocity.y);
+            }
+            else
+            {
+                // Havadayken yatay hızı koru, ama input ile biraz kontrol ver
+                float airControl = 0.7f;
+                float targetX = moveInput * moveSpeed;
+                float newX = Mathf.Lerp(rb.linearVelocity.x, targetX, airControl * Time.fixedDeltaTime * 5f);
+                rb.linearVelocity = new Vector2(newX, rb.linearVelocity.y);
+            }
         }
     }
 
@@ -503,7 +514,7 @@ public class PlayerController : MonoBehaviour
             }
             currentShift--;
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
-            rb.AddForce(new Vector2(0f, jumpForce), ForceMode2D.Impulse);
+            rb.AddForce(new Vector2(moveInput * jumpForce * 1f, jumpForce), ForceMode2D.Impulse);
             ChangeState(PlayerState.Jumping);
         }
     }
