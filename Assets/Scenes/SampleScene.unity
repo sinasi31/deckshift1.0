@@ -5913,7 +5913,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
-  m_AnchoredPosition: {x: 0, y: 88.689}
+  m_AnchoredPosition: {x: 0, y: 88.68945}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!114 &871992168
@@ -7768,7 +7768,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -24.36206, y: 0}
+  m_AnchoredPosition: {x: -24.362305, y: 0}
   m_SizeDelta: {x: -920, y: -280}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1257228395
@@ -8451,10 +8451,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerTransform: {fileID: 1988395663}
   roomPrefabs:
-  - {fileID: 8878139818867148303, guid: 2f45d8bf04375b342b4043a32c04a4dc, type: 3}
-  - {fileID: 3910532149720474984, guid: 99e8840405500d245a733bec7c1e5889, type: 3}
-  - {fileID: 7937581221952600193, guid: f1643df793b7def498d57f12d13c6efe, type: 3}
-  - {fileID: 635766636009674316, guid: 3625746d16e0e464ba85e470691faa0f, type: 3}
+  - {fileID: 1843502735663899364, guid: ae33473386e5e9042ba576d3615d97d9, type: 3}
 --- !u!4 &1361928416
 Transform:
   m_ObjectHideFlags: 0
@@ -9627,7 +9624,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -48.164062, y: -4.8498535}
+  m_AnchoredPosition: {x: -48.164062, y: -4.8496094}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 1, y: 1}
 --- !u!114 &1533516046
