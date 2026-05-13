@@ -49,18 +49,16 @@ namespace Cainos.LucidEditor
 
             if (isHidden) return;
 
-            LucidEditorGUILayout.BeginLayoutIndent(EditorGUI.indentLevel + indent);
             if (!isEditable) EditorGUI.BeginDisabledGroup(true);
             {
-                //object value = ReflectionUtil.GetValue(parentObject, name);
-                //LucidEditorGUILayout.ReadOnlyField(Name, value, value.GetType());
-                if ( GetPropertyType(info, out SerializedPropertyType serialzedProertyType))
+                LucidEditorUtility.PushIndentLevel(EditorGUI.indentLevel + indent);
+                if (GetPropertyType(info, out SerializedPropertyType serialzedProertyType))
                 {
-                    Draw_Internal( serialzedProertyType);
+                    Draw_Internal(serialzedProertyType);
                 }
+                LucidEditorUtility.PopIndentLevel();
             }
             if (!isEditable) EditorGUI.EndDisabledGroup();
-            LucidEditorGUILayout.EndLayoutIndent();
 
             foreach (PropertyProcessor processor in processors) processor.OnAfterDrawProperty();
         }
@@ -70,59 +68,61 @@ namespace Cainos.LucidEditor
             var emptyOptions = new GUILayoutOption[0];
             EditorGUILayout.BeginHorizontal(emptyOptions);
 
+            var guiContent = new GUIContent(Name, tooltip);
+
             if (serialzedProertyType == SerializedPropertyType.Integer)
             {
                 var oldValue = (int)GetValue();
-                var newValue = EditorGUILayout.IntField(Name, oldValue, emptyOptions);
+                var newValue = EditorGUILayout.IntField(guiContent, oldValue, emptyOptions);
                 if (oldValue != newValue)
                     SetValue(newValue);
             }
             else if (serialzedProertyType == SerializedPropertyType.Float)
             {
                 var oldValue = (float)GetValue();
-                var newValue = EditorGUILayout.FloatField(Name, oldValue, emptyOptions);
+                var newValue = EditorGUILayout.FloatField(guiContent, oldValue, emptyOptions);
                 if (oldValue != newValue)
                    SetValue(newValue);
             }
             else if (serialzedProertyType == SerializedPropertyType.Boolean)
             {
                 var oldValue = (bool)GetValue();
-                var newValue = EditorGUILayout.Toggle(Name, oldValue, emptyOptions);
+                var newValue = EditorGUILayout.Toggle(guiContent, oldValue, emptyOptions);
                 if (oldValue != newValue)
                     SetValue(newValue);
             }
             else if (serialzedProertyType == SerializedPropertyType.String)
             {
                 var oldValue = (string)GetValue();
-                var newValue = EditorGUILayout.TextField(Name, oldValue, emptyOptions);
+                var newValue = EditorGUILayout.TextField(guiContent, oldValue, emptyOptions);
                 if (oldValue != newValue)
                     SetValue(newValue);
             }
             else if (serialzedProertyType == SerializedPropertyType.Vector2)
             {
                 var oldValue = (Vector2)GetValue();
-                var newValue = EditorGUILayout.Vector2Field(Name, oldValue, emptyOptions);
+                var newValue = EditorGUILayout.Vector2Field(guiContent, oldValue, emptyOptions);
                 if (oldValue != newValue)
                     SetValue(newValue);
             }
             else if (serialzedProertyType == SerializedPropertyType.Vector3)
             {
                 var oldValue = (Vector3)GetValue();
-                var newValue = EditorGUILayout.Vector3Field(Name, oldValue, emptyOptions);
+                var newValue = EditorGUILayout.Vector3Field(guiContent, oldValue, emptyOptions);
                 if (oldValue != newValue)
                     SetValue(newValue);
             }
             else if (serialzedProertyType == SerializedPropertyType.Enum)
             {
                 var oldValue = (Enum)GetValue();
-                var newValue = EditorGUILayout.EnumPopup(Name, oldValue, emptyOptions);
+                var newValue = EditorGUILayout.EnumPopup(guiContent, oldValue, emptyOptions);
                 if (oldValue != newValue)
                     SetValue(newValue);
             }
             else if (serialzedProertyType == SerializedPropertyType.Color)
             {
                 var oldValue = (Color)GetValue();
-                var newValue = EditorGUILayout.ColorField(Name, oldValue, emptyOptions);
+                var newValue = EditorGUILayout.ColorField(guiContent, oldValue, emptyOptions);
                 if (oldValue != newValue)
                     SetValue(newValue);
             }
@@ -130,7 +130,7 @@ namespace Cainos.LucidEditor
             else if (serialzedProertyType == SerializedPropertyType.ObjectReference)
             {
                 var oldValue = (UnityEngine.Object)GetValue();
-                var newValue = LucidEditorGUILayout.ObjectField(Name, oldValue, info.PropertyType, !TryGetAttribute<AssetsOnlyAttribute>(out _), emptyOptions);
+                var newValue = LucidEditorGUILayout.ObjectField(guiContent, oldValue, info.PropertyType, !TryGetAttribute<AssetsOnlyAttribute>(out _), emptyOptions);
                 if (oldValue != newValue)
                     SetValue(newValue);
             }

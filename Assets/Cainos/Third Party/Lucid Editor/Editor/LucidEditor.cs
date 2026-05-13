@@ -1,13 +1,14 @@
+﻿using Cainos.LucidEditor;
+using System.Collections.Generic;
 using System.Linq;
-using UnityEngine;
 using UnityEditor;
-using Cainos.LucidEditor;
+using UnityEngine;
 
 namespace Cainos.LucidEditor
 {
     public class LucidEditor : UnityEditor.Editor
     {
-        private InspectorProperty[] properties;
+        protected InspectorProperty[] properties;
 
         internal bool hideMonoScript;
         //internal bool disableEditor;
@@ -40,7 +41,7 @@ namespace Cainos.LucidEditor
             serializedObject.ApplyModifiedProperties();
         }
 
-        private void InitializeProperties()
+        protected void InitializeProperties()
         {
             properties = InspectorPropertyUtil.GroupProperties(InspectorPropertyUtil.CreateProperties(serializedObject)).ToArray();
             foreach (InspectorProperty property in properties)
@@ -81,7 +82,45 @@ namespace Cainos.LucidEditor
             }
         }
 
+        //find a InspectorProperty in the editor target object by its name
+        protected InspectorProperty FindProperty(string propertyName)
+        {
+            return FindPropertyRecursive(properties, propertyName);
+        }
+
+        // find a InspectorProperty in the editor target object by its name recursively
+        private InspectorProperty FindPropertyRecursive(IEnumerable<InspectorProperty> props, string propertyName)
+        {
+            if (props == null) return null;
+            foreach (var prop in props)
+            {
+                // check if this is the property we want
+                if (prop.name == propertyName) return prop;
+
+                // if this is a group, search its children
+                if (prop is InspectorPropertyGroup group)
+                {
+                    var found = FindPropertyRecursive(group.childProperties, propertyName);
+                    if (found != null) return found;
+                }
+            }
+            return null;
+        }
+
+        //set tooltip for a given property, usually should be used in OnEnabled, will override tooltip added by the TooltipAttribute
+        protected void SetTooltip( string property, string tooltip)
+        {
+            if (properties == null) InitializeProperties();
+            var prop = FindProperty(property);
+            if (prop)
+            {
+                prop.tooltip = tooltip;
+            }
+        }
+
     }
+
+
 
     //[CanEditMultipleObjects]
     //[CustomEditor(typeof(MonoBehaviour), true)]

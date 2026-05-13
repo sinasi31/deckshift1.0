@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Linq;
@@ -154,14 +154,15 @@ namespace Cainos.LucidEditor
                     {
                         if (_isInGroup && serializedProperty.isArray && serializedProperty.propertyType != SerializedPropertyType.String) EditorGUI.indentLevel++;
 
+                        //create label
                         GUIContent label;
-                        if (hideLabel)
+                        if (hideLabel) 
                         {
                             label = GUIContent.none;
                         }
                         else
                         {
-                            label = new GUIContent(displayName);
+                            label = new GUIContent(displayName, tooltip);
                         }
 
                         if (LucidEditorUtility.horizontalGroupCount > 0 && serializedProperty.propertyType != SerializedPropertyType.Generic)

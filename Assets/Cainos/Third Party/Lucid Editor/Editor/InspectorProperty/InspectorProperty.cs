@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using UnityEditor;
+using UnityEngine;
 
 namespace Cainos.LucidEditor
 {
@@ -51,6 +52,9 @@ namespace Cainos.LucidEditor
             this.displayName = name;
             this.name = name;
             this.attributes = attributes;
+
+            // automatically extract tooltip from TooltipAttribute if it exists
+            if (TryGetAttribute<TooltipAttribute>(out var tooltipAttribute)) tooltip = tooltipAttribute.tooltip;
         }
 
         public int order;
@@ -59,6 +63,7 @@ namespace Cainos.LucidEditor
         public bool hideLabel;
         public int indent;
         public string displayName;
+        public string tooltip;                                  // the tooltip to display
         public bool allowSceneObject = true;
 
         public bool isInGroup => _isInGroup;
@@ -81,6 +86,11 @@ namespace Cainos.LucidEditor
             displayName = string.Empty;
             allowSceneObject = true;
             _changed = false;
+        }
+
+        public static implicit operator bool(InspectorProperty property)
+        {
+            return property != null;
         }
     }
 

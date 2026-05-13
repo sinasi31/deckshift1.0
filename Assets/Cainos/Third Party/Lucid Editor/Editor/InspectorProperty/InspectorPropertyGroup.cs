@@ -19,7 +19,8 @@ namespace Cainos.LucidEditor
         public readonly int groupDepth;
         private readonly PropertyGroupProcessor processor;
 
-        public bool isExpanded = true;
+        public bool isExpanded = true;              // is this ground expanded
+        public bool drawChildren = true;            // draw children during foldout fade, some group have open and close animation, so drawChildren may still be true while isExpanded is false
 
         private List<InspectorProperty> _childProperties = new List<InspectorProperty>();
         public IReadOnlyList<InspectorProperty> childProperties => _childProperties.AsReadOnly();
@@ -39,7 +40,7 @@ namespace Cainos.LucidEditor
             if (!isEditable) EditorGUI.BeginDisabledGroup(true);
             if (indent > 0) LucidEditorGUILayout.BeginLayoutIndent(indent);
             {
-                if (isExpanded)
+                if (drawChildren)
                 {
                     foreach (InspectorProperty property in childProperties.OrderBy(x => x.order))
                     {
