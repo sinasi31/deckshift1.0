@@ -344,10 +344,10 @@ public class PlayerController : MonoBehaviour
 
         // GÜNCELLENDİ: Yeni paket "MovingBlend" kullanıyor (0.0 Durma, 1.0 Koşma)
         float movingBlend = (Mathf.Abs(moveInput) > 0.1f) ? 1.0f : 0.0f;
-        animator.SetFloat("MovingBlend", movingBlend);
+        animator.SetFloat("MoveBlendX", movingBlend);
 
         // GÜNCELLENDİ: Yeni paket "SpeedVertical" kullanıyor
-        animator.SetFloat("SpeedVertical", rb.linearVelocity.y);
+        animator.SetFloat("VelocityY", rb.linearVelocity.y);
 
         animator.SetBool("IsGrounded", isGrounded);
     }
