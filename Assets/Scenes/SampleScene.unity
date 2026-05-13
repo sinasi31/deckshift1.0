@@ -8218,9 +8218,9 @@ MonoBehaviour:
   player: {fileID: 1988395664}
   startingDeck:
   - {fileID: 11400000, guid: 788a6406bf04dcb498f55317f601f2b7, type: 2}
-  - {fileID: 11400000, guid: 7714926994241fe46b0e14f010dcb23c, type: 2}
+  - {fileID: 11400000, guid: 4ed05ca2f31dc07448877e4390a4ee60, type: 2}
   - {fileID: 11400000, guid: f9f9c514781f8a94681c0e4854777871, type: 2}
-  - {fileID: 11400000, guid: 5aa353438259d5a45b5b0cd62b5b78bf, type: 2}
+  - {fileID: 11400000, guid: 37698d1e7ae28e54c902f9fd0a2475e6, type: 2}
   staggerCardData: {fileID: 11400000, guid: 05d4bd0adf108bd46b120738ac1c1c36, type: 2}
   handCapacity: 4
 --- !u!4 &1329495661
@@ -8447,7 +8447,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerTransform: {fileID: 1988395663}
   roomPrefabs:
-  - {fileID: 6451403925772677439, guid: d0f3066e702c5c64b907fff84c0300b0, type: 3}
+  - {fileID: 635766636009674316, guid: 3625746d16e0e464ba85e470691faa0f, type: 3}
 --- !u!4 &1361928416
 Transform:
   m_ObjectHideFlags: 0
@@ -14853,7 +14853,7 @@ PrefabInstance:
     - target: {fileID: 5535401529240642686, guid: 340bbb3d789c2964d876f7f2e6408998, type: 3}
       propertyPath: biteEffectPrefab
       value: 
-      objectReference: {fileID: 3283776623164260811, guid: 793631f470e29814da8521d7548720a4, type: 3}
+      objectReference: {fileID: 6823200998282874702, guid: 8f8fe12323625f5499b2853dd2ad3e58, type: 3}
     - target: {fileID: 5535401529240642686, guid: 340bbb3d789c2964d876f7f2e6408998, type: 3}
       propertyPath: dashEffectPrefab
       value: 
