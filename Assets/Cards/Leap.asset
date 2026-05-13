@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardName: Leap
   description: Perform a high jump.
-  cardArt: {fileID: 109312664051975032, guid: 4e2c2f9557d618b4bbc5f383f2b29583, type: 3}
+  cardArt: {fileID: 6899668083397809698, guid: cae1f32c8f9635249b7c6c33ff63fe77, type: 3}
   actionType: 0
   actionValue: 10
   singleUse: 0
