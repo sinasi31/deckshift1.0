@@ -10,6 +10,7 @@ public class SlotMachineUI : MonoBehaviour
 
     [Header("UI Referansları")]
     public GameObject slotPanel;
+    [SerializeField] private GameObject gameplayHUD;
     public TextMeshProUGUI resultText;
     public Button closeButton;
 
@@ -42,8 +43,10 @@ public class SlotMachineUI : MonoBehaviour
         currentMachineObject = machineObj;
 
         // 1. Oyunu Dondur ve Paneli Aç
-        Time.timeScale = 0f;
+        if (GameManager.instance != null) GameManager.instance.RequestPause();
         slotPanel.SetActive(true);
+        if (HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(true);
+        if (gameplayHUD != null) gameplayHUD.SetActive(false);
         if (closeButton != null) closeButton.gameObject.SetActive(false);
         if (resultText != null) resultText.text = "SPINNING...";
 
@@ -122,8 +125,10 @@ public class SlotMachineUI : MonoBehaviour
 
     public void ClosePanel()
     {
+        if (gameplayHUD != null) gameplayHUD.SetActive(true);
         slotPanel.SetActive(false);
-        Time.timeScale = 1f;
+        if (GameManager.instance != null) GameManager.instance.ReleasePause();
+        if (HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(false);
         if (currentMachineObject != null) Destroy(currentMachineObject);
     }
 

@@ -3,11 +3,11 @@ using UnityEngine.SceneManagement;
 
 public class ExitDoor : MonoBehaviour
 {
-    [Header("Tür Ayarý (ÖNEMLÝ)")]
+    [Header("Tï¿½r Ayarï¿½ (ï¿½NEMLï¿½)")]
     public bool isSceneLoader = false; 
     public string sceneToLoad = "GameScene"; 
 
-    [Header("Etkileþim Ayarlarý")]
+    [Header("Etkileï¿½im Ayarlarï¿½")]
     public KeyCode interactKey = KeyCode.E;
     public GameObject interactionPopup; 
 
@@ -47,11 +47,14 @@ public class ExitDoor : MonoBehaviour
 
     private void PerformExit()
     {
+        if (hasBeenTriggered) return;
+        hasBeenTriggered = true;
+
         if (interactionPopup != null) interactionPopup.SetActive(false);
 
         if (isSceneLoader)
         {
-            Debug.Log("Hub'dan çýkýlýyor, oyun baþlýyor...");
+            Debug.Log("Hub'dan ï¿½ï¿½kï¿½lï¿½yor, oyun baï¿½lï¿½yor...");
 
             if (QuestSystem.instance != null) QuestSystem.instance.CloseBoard();
 
@@ -59,8 +62,6 @@ public class ExitDoor : MonoBehaviour
         }
         else
         {
-            hasBeenTriggered = true; 
-
             if (currentPlayer != null && !currentPlayer.TookDamageThisRoom)
             {
                 AchievementManager.instance.OnRoomClearedFlawlessly();

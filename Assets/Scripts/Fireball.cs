@@ -37,13 +37,15 @@ public class Fireball : MonoBehaviour
         {
             hasHit = true;
             targetHealth.TakeDamage(damage);
+            if (CameraShake.instance != null)
+                CameraShake.instance.Shake(0.15f, 0.5f);
             CreateExplosionEffect();
             Destroy(gameObject);
             return;
         }
         if (other.isTrigger)
         {
-            return; 
+            return;
         }
 
         // Duvar kontrolü
@@ -52,15 +54,6 @@ public class Fireball : MonoBehaviour
             hasHit = true;
             CreateExplosionEffect();
             Destroy(gameObject);
-        }
-        if (targetHealth != null)
-        {
-            hasHit = true;
-            targetHealth.TakeDamage(damage);
-            if (CameraShake.instance != null)
-                CameraShake.instance.Shake(0.15f, 0.5f);
-            Destroy(gameObject);
-            return;
         }
 
     }

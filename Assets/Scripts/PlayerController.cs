@@ -8,6 +8,7 @@ public class PlayerController : MonoBehaviour
 {
     private Rigidbody2D rb;
     private Animator animator;
+    private Camera mainCamera;
 
     [Header("Visual Settings")]
     public GameObject visualModel; // YENİ: Hiyerarşideki PF Skeleton objesini buraya sürükleyeceğiz!
@@ -22,6 +23,8 @@ public class PlayerController : MonoBehaviour
     [Header("Physics Checks")]
     public Transform groundCheck;
     public float groundCheckRadius = 0.2f;
+    public Transform ceilingCheck;
+    public float ceilingCheckRadius = 0.2f;
     public LayerMask groundLayer;
 
     [Header("Air Settings")]
@@ -36,6 +39,8 @@ public class PlayerController : MonoBehaviour
 
     [Header("Fall Settings")]
     public float fallDamage = 20f;
+
+    private float _headBounceCooldown;
 
     [Header("Gold Settings")]
     public int currentGold = 0;
@@ -57,6 +62,7 @@ public class PlayerController : MonoBehaviour
     public AudioClip deathSound;
     public float deathVolume = 1f;
     public AudioClip spendSound;
+    public AudioClip warningSoundClip;
     public float soundVolume = 1f;
 
     [Header("VFX Settings")]
@@ -152,11 +158,44 @@ public class PlayerController : MonoBehaviour
     public float staggerRadius = 2f;
     public GameObject staggerEffect;
 
+    // Gravity reversal state
+    private bool isGravityReversed = false;
+    private float originalGravityScale;
+    private Coroutine gravityReversalCoroutine;
+    private float visualRotationZ = 0f;
+    private Vector3 originalVisualLocalPos;
+    private float originalVisualScaleX;
+    private bool isFacingRight = true;
+
+    [Header("Gravity Reversal")]
+    // Tune in Play mode: feet should just touch the ceiling when flipped
+    [SerializeField] private float visualFlipYOffset = 2.0f;
+
+    // Cached renderer for warning flash (same approach as EnemyHealth)
+    private SkinnedMeshRenderer playerSkinnedRenderer;
+    private bool playerRendererHasColor;
+    private Color playerRendererOriginalColor;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
-        // GÜNCELLENDİ: Artık kendi üzerimizde değil, child objedeki (PF Skeleton) Animator'ı arıyoruz.
         animator = GetComponentInChildren<Animator>();
+        mainCamera = Camera.main;
+
+        // Cache SkinnedMeshRenderer for gravity-reversal warning flash
+        playerSkinnedRenderer = GetComponentInChildren<SkinnedMeshRenderer>(true);
+        if (playerSkinnedRenderer != null)
+        {
+            playerRendererHasColor = playerSkinnedRenderer.material.HasProperty("_Color");
+            if (playerRendererHasColor)
+                playerRendererOriginalColor = playerSkinnedRenderer.material.color;
+        }
+
+        if (visualModel != null)
+        {
+            originalVisualLocalPos = visualModel.transform.localPosition;
+            originalVisualScaleX = visualModel.transform.localScale.x;
+        }
     }
 
     void Start()
@@ -228,13 +267,17 @@ public class PlayerController : MonoBehaviour
         }
 
         // --- BETTER JUMP MANTIĞI ---
-        if (rb.linearVelocity.y < 0)
+        // gravitySign flips fall/low-jump-cut direction when gravity is reversed.
+        // Fall check: velocity dot gravitySign < 0 means moving against gravity (falling).
+        // Low-jump cut: velocity dot gravitySign > 0 means rising; multiplied force sign follows.
+        float gravitySign = isGravityReversed ? -1f : 1f;
+        if (rb.linearVelocity.y * gravitySign < 0)
         {
-            rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (fallMultiplier - 1) * Time.deltaTime;
+            rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (fallMultiplier - 1) * Time.deltaTime * gravitySign;
         }
-        else if (rb.linearVelocity.y > 0 && !Input.GetKey(KeyCode.Space))
+        else if (rb.linearVelocity.y * gravitySign > 0 && !Input.GetKey(KeyCode.Space))
         {
-            rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (lowJumpMultiplier - 1) * Time.deltaTime;
+            rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (lowJumpMultiplier - 1) * Time.deltaTime * gravitySign;
         }
 
         if (!isPhasing)
@@ -386,8 +429,8 @@ public class PlayerController : MonoBehaviour
             else { ChangeState(PlayerState.Idle); }
         }
 
-        if (moveInput > 0 && transform.localScale.x < 0) { Flip(); }
-        else if (moveInput < 0 && transform.localScale.x > 0) { Flip(); }
+        if (moveInput > 0 && !isFacingRight) { Flip(); }
+        else if (moveInput < 0 && isFacingRight) { Flip(); }
     }
 
     private void ChangeState(PlayerState newState)
@@ -396,11 +439,22 @@ public class PlayerController : MonoBehaviour
         currentState = newState;
     }
 
+    // Applies isFacingRight to visualModel.localScale.x, accounting for the 180° Z
+    // rotation that reverses the visual X axis during gravity reversal.
+    private void ApplyVisualFacing()
+    {
+        if (visualModel == null) return;
+        float sign = (isFacingRight ? 1f : -1f) * (isGravityReversed ? -1f : 1f);
+        visualModel.transform.localScale = new Vector3(
+            originalVisualScaleX * sign,
+            visualModel.transform.localScale.y,
+            visualModel.transform.localScale.z);
+    }
+
     private void Flip()
     {
-        Vector3 newScale = transform.localScale;
-        newScale.x *= -1;
-        transform.localScale = newScale;
+        isFacingRight = !isFacingRight;
+        ApplyVisualFacing();
     }
 
     public bool ExecuteAction(CardActionType type, float value, out bool keepCardInHand)
@@ -440,7 +494,7 @@ public class PlayerController : MonoBehaviour
                 if (currentState != PlayerState.Dashing)
                 {
                     int direction = (type == CardActionType.DashForward) ? 1 : -1;
-                    direction *= (int)Mathf.Sign(transform.localScale.x);
+                    direction *= isFacingRight ? 1 : -1;
                     StartCoroutine(PerformDash(value, direction));
                     return true;
                 }
@@ -464,11 +518,12 @@ public class PlayerController : MonoBehaviour
 
             case CardActionType.PlatformCreate:
                 if (platformPrefab == null) return false;
+                if (mainCamera == null) return false;
                 if (audioSource != null && createPlatformSound != null)
                 {
                     audioSource.PlayOneShot(createPlatformSound);
                 }
-                Vector2 spawnPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+                Vector2 spawnPosition = mainCamera.ScreenToWorldPoint(Input.mousePosition);
                 Instantiate(platformPrefab, spawnPosition, Quaternion.identity);
                 return true;
 
@@ -498,6 +553,10 @@ public class PlayerController : MonoBehaviour
             case CardActionType.Adrenaline:
                 UseAdrenaline(value);
                 return true;
+
+            case CardActionType.ReverseGravity:
+                StartGravityReversal();
+                return true;
         }
         return false;
     }
@@ -514,7 +573,8 @@ public class PlayerController : MonoBehaviour
             }
             currentShift--;
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
-            rb.AddForce(new Vector2(moveInput * jumpForce * 1f, jumpForce), ForceMode2D.Impulse);
+            float jumpDir = isGravityReversed ? -1f : 1f;
+            rb.AddForce(new Vector2(moveInput * jumpForce * 1f, jumpDir * jumpForce), ForceMode2D.Impulse);
             ChangeState(PlayerState.Jumping);
         }
     }
@@ -626,13 +686,18 @@ public class PlayerController : MonoBehaviour
 
     public bool IsGroundedCheck()
     {
+        if (isGravityReversed)
+        {
+            if (ceilingCheck == null) return false;
+            return Physics2D.OverlapCircle(ceilingCheck.position, ceilingCheckRadius, groundLayer);
+        }
         return Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
     }
 
     private void PerformWallJump()
     {
         Flip();
-        rb.linearVelocity = new Vector2(wallJumpForce.x * transform.localScale.x, wallJumpForce.y);
+        rb.linearVelocity = new Vector2(wallJumpForce.x * (isFacingRight ? 1f : -1f), wallJumpForce.y);
         ChangeState(PlayerState.Jumping);
     }
 
@@ -645,7 +710,7 @@ public class PlayerController : MonoBehaviour
 
     private bool WallCheck()
     {
-        return Physics2D.Raycast(wallCheck.position, Vector2.right * transform.localScale.x, wallCheckDistance, groundLayer);
+        return Physics2D.Raycast(wallCheck.position, Vector2.right * (isFacingRight ? 1f : -1f), wallCheckDistance, groundLayer);
     }
 
     private void OnDrawGizmos()
@@ -655,10 +720,15 @@ public class PlayerController : MonoBehaviour
             Gizmos.color = IsGroundedCheck() ? Color.green : Color.red;
             Gizmos.DrawWireSphere(groundCheck.position, groundCheckRadius);
         }
+        if (ceilingCheck != null)
+        {
+            Gizmos.color = isGravityReversed ? Color.green : Color.cyan;
+            Gizmos.DrawWireSphere(ceilingCheck.position, ceilingCheckRadius);
+        }
         if (wallCheck != null)
         {
             Gizmos.color = Color.blue;
-            Gizmos.DrawLine(wallCheck.position, wallCheck.position + (Vector3.right * transform.localScale.x * wallCheckDistance));
+            Gizmos.DrawLine(wallCheck.position, wallCheck.position + (Vector3.right * (isFacingRight ? 1f : -1f) * wallCheckDistance));
         }
         if (firePoint != null)
         {
@@ -677,7 +747,26 @@ public class PlayerController : MonoBehaviour
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (other.CompareTag("DeathZone"))
+        {
             FallAndRespawn();
+            return;
+        }
+
+        if (currentState == PlayerState.CometDiving) return;
+
+        if (rb.linearVelocity.y < -0.1f)
+        {
+            if (RelicManager.instance == null || !RelicManager.instance.HasRelic("PogoBoots")) return;
+            EnemyHealth eHealth = other.GetComponentInParent<EnemyHealth>();
+            if (eHealth != null)
+            {
+                float enemyTopY = other.bounds.center.y + other.bounds.extents.y * 0.5f;
+                Debug.Log($"[HeadBounce Trigger] {other.gameObject.name}, playerY: {transform.position.y:F2}, enemyTopY: {enemyTopY:F2}, velocity.y: {rb.linearVelocity.y:F2}");
+
+                if (transform.position.y > enemyTopY)
+                    TriggerHeadBounce(eHealth);
+            }
+        }
     }
 
     private void FallAndRespawn()
@@ -698,7 +787,7 @@ public class PlayerController : MonoBehaviour
         }
         if (fireballPrefab == null || firePoint == null) return;
 
-        Quaternion fireballRotation = (transform.localScale.x < 0) ? Quaternion.Euler(0, 180, 0) : Quaternion.identity;
+        Quaternion fireballRotation = !isFacingRight ? Quaternion.Euler(0, 180, 0) : Quaternion.identity;
         GameObject fireballInstance = Instantiate(fireballPrefab, firePoint.position, fireballRotation);
 
         Fireball fireballScript = fireballInstance.GetComponent<Fireball>();
@@ -726,8 +815,9 @@ public class PlayerController : MonoBehaviour
     {
         keepCard = false;
         if (portalPrefab == null) return false;
+        if (mainCamera == null) return false;
 
-        Vector2 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        Vector2 mousePos = mainCamera.ScreenToWorldPoint(Input.mousePosition);
 
         if (firstPortalInstance == null)
         {
@@ -906,7 +996,32 @@ public class PlayerController : MonoBehaviour
             {
                 CometImpact();
             }
+            return;
         }
+
+        if (RelicManager.instance == null || !RelicManager.instance.HasRelic("PogoBoots")) return;
+        EnemyHealth eHealth = collision.gameObject.GetComponentInParent<EnemyHealth>();
+        if (eHealth != null)
+        {
+            ContactPoint2D contact = collision.GetContact(0);
+            Debug.Log($"[HeadBounce] Collision: {collision.gameObject.name}, normal.y: {contact.normal.y:F2}, velocity.y: {rb.linearVelocity.y:F2}, canBounce: {eHealth.canBeHeadBounced}");
+
+            if (contact.normal.y > 0.7f)
+                TriggerHeadBounce(eHealth);
+        }
+    }
+
+    private void TriggerHeadBounce(EnemyHealth eHealth)
+    {
+        if (!eHealth.canBeHeadBounced) return;
+        if (Time.time < _headBounceCooldown) return;
+
+        _headBounceCooldown = Time.time + 0.3f;
+        eHealth.TakeDamage(8f);
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0f);
+        rb.AddForce(Vector2.up * defaultJumpForce * 0.7f, ForceMode2D.Impulse);
+        AddShift(1);
+        if (CameraShake.instance != null) CameraShake.instance.Shake(0.1f, 0.2f);
     }
 
     private void CometImpact()
@@ -1042,5 +1157,89 @@ public class PlayerController : MonoBehaviour
                 return;
             }
         }
+    }
+
+    // --- Floor is Lava card (ReverseGravity) ---
+
+    private void StartGravityReversal()
+    {
+        // Stop any existing effect so re-plays refresh the timer instead of stacking
+        if (gravityReversalCoroutine != null)
+            StopCoroutine(gravityReversalCoroutine);
+        gravityReversalCoroutine = StartCoroutine(GravityReversalRoutine());
+    }
+
+    private IEnumerator GravityReversalRoutine()
+    {
+        bool wasAlreadyReversed = isGravityReversed;
+
+        if (!wasAlreadyReversed)
+        {
+            // First activation: flip gravity, rotate visual upside-down
+            isGravityReversed = true;
+            ApplyVisualFacing();
+            originalGravityScale = rb.gravityScale;
+            rb.gravityScale = -originalGravityScale;
+            yield return StartCoroutine(LerpVisualTransform(0f, 180f, originalVisualLocalPos.y, originalVisualLocalPos.y + visualFlipYOffset, 0.15f));
+            // Wait until 0.5s before the 5s mark (5.0 - 0.5 - 0.15 initial rotation = 4.35s)
+            yield return new WaitForSeconds(4.35f);
+        }
+        else
+        {
+            // Re-play while already reversed: gravity and visual already set, just restart timer
+            yield return new WaitForSeconds(4.5f);
+        }
+
+        // Warning at t=4.5s: sound + visual strobe
+        if (warningSoundClip != null && audioSource != null)
+            audioSource.PlayOneShot(warningSoundClip, soundVolume);
+        yield return StartCoroutine(WarningFlashRoutine());
+
+        // t=5.0s: gravity snaps back instantly, visual lerps back
+        rb.gravityScale = originalGravityScale;
+        isGravityReversed = false;
+        ApplyVisualFacing();
+        yield return StartCoroutine(LerpVisualTransform(180f, 0f, originalVisualLocalPos.y + visualFlipYOffset, originalVisualLocalPos.y, 0.15f));
+
+        gravityReversalCoroutine = null;
+    }
+
+    private IEnumerator LerpVisualTransform(float fromZ, float toZ, float fromY, float toY, float duration)
+    {
+        if (visualModel == null) yield break;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            visualRotationZ = Mathf.LerpAngle(fromZ, toZ, t);
+            float newY = Mathf.Lerp(fromY, toY, t);
+            visualModel.transform.localRotation = Quaternion.Euler(0f, 0f, visualRotationZ);
+            visualModel.transform.localPosition = new Vector3(originalVisualLocalPos.x, newY, originalVisualLocalPos.z);
+            yield return null;
+        }
+        // Snap to exact targets to avoid float drift
+        visualRotationZ = toZ;
+        visualModel.transform.localRotation = Quaternion.Euler(0f, 0f, visualRotationZ);
+        visualModel.transform.localPosition = new Vector3(originalVisualLocalPos.x, toY, originalVisualLocalPos.z);
+    }
+
+    private IEnumerator WarningFlashRoutine()
+    {
+        // 3 rapid on/off cycles ≈ 0.5s total
+        for (int i = 0; i < 3; i++)
+        {
+            SetPlayerFlashColor(Color.white);
+            yield return new WaitForSeconds(0.083f);
+            SetPlayerFlashColor(playerRendererOriginalColor);
+            yield return new WaitForSeconds(0.083f);
+        }
+    }
+
+    private void SetPlayerFlashColor(Color color)
+    {
+        if (playerSkinnedRenderer != null && playerRendererHasColor)
+            playerSkinnedRenderer.material.SetColor("_Color", color);
     }
 }

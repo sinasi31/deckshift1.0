@@ -65,10 +65,11 @@ public class HandUI : MonoBehaviour
         activeGhosts.Clear();
 
         // Kart Temizliği
-        while (handContainer.childCount > 0)
-        {
-            DestroyImmediate(handContainer.GetChild(0).gameObject);
-        }
+        List<GameObject> toDestroy = new List<GameObject>();
+        foreach (Transform child in handContainer)
+            toDestroy.Add(child.gameObject);
+        foreach (GameObject go in toDestroy)
+            Destroy(go);
 
         if (DeckManager.instance == null) return;
 

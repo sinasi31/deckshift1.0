@@ -1,31 +1,44 @@
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.Audio;
 
 public class SettingsMenu : MonoBehaviour
 {
-    [Header("UI Elemanlarý")]
+    [Header("UI ElemanlarÄ±")]
     public Slider volumeSlider;
-    public GameObject settingsPanel; // Panelin kendisi (Kapatmak için)
+    public Toggle showEnemyNumbersToggle;
+    public GameObject settingsPanel;
+
+    // EnemyHealthBar scriptleri bu event'i dinleyerek sayÄ±larÄ± gÃ¶ster/gizler
+    public static System.Action<bool> OnShowNumbersChanged;
 
     void Start()
     {
-        // Oyun açýldýðýnda ses seviyesi neyse slider oraya gelsin
         if (volumeSlider != null)
         {
             volumeSlider.value = AudioListener.volume;
-            // Slider oynatýldýðýnda SetVolume fonksiyonunu çalýþtýr
             volumeSlider.onValueChanged.AddListener(SetVolume);
+        }
+
+        if (showEnemyNumbersToggle != null)
+        {
+            bool showNumbers = PlayerPrefs.GetInt("ShowEnemyNumbers", 1) == 1;
+            showEnemyNumbersToggle.isOn = showNumbers;
+            showEnemyNumbersToggle.onValueChanged.AddListener(SetShowEnemyNumbers);
         }
     }
 
-    // Slider bu fonksiyonu tetikleyecek
     public void SetVolume(float volume)
     {
-        AudioListener.volume = volume; // Oyunun genel sesini ayarlar
+        AudioListener.volume = volume;
     }
 
-    // Back butonuna bu fonksiyonu ver
+    public void SetShowEnemyNumbers(bool show)
+    {
+        PlayerPrefs.SetInt("ShowEnemyNumbers", show ? 1 : 0);
+        PlayerPrefs.Save();
+        OnShowNumbersChanged?.Invoke(show);
+    }
+
     public void CloseSettings()
     {
         settingsPanel.SetActive(false);

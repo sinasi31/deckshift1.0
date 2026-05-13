@@ -5,13 +5,13 @@ public class PauseMenu : MonoBehaviour
 {
     public static bool GameIsPaused = false;
 
-    [Header("UI Referanslarý")]
-    public GameObject pauseMenuUI;    // Az önce yaptýðýn Panel
-    public GameObject settingsMenuUI; // Eðer ayarlar penceresi yaparsan buraya baðlarsýn
+    [Header("UI Referanslarï¿½")]
+    public GameObject pauseMenuUI;    // Az ï¿½nce yaptï¿½ï¿½ï¿½n Panel
+    public GameObject settingsMenuUI; // Eï¿½er ayarlar penceresi yaparsan buraya baï¿½larsï¿½n
 
     void Update()
     {
-        // ESC'ye basýnca menüyü aç/kapat
+        // ESC'ye basï¿½nca menï¿½yï¿½ aï¿½/kapat
         if (Input.GetKeyDown(KeyCode.Escape))
         {
             if (GameIsPaused)
@@ -30,12 +30,12 @@ public class PauseMenu : MonoBehaviour
         pauseMenuUI.SetActive(false);
 
         if (settingsMenuUI != null)
-            settingsMenuUI.SetActive(false); // Ayarlar açýksa onu da kapat
+            settingsMenuUI.SetActive(false); // Ayarlar aï¿½ï¿½ksa onu da kapat
 
-        Time.timeScale = 1f; // Zamaný tekrar akýt
+        if (GameManager.instance != null) GameManager.instance.ReleasePause();
         GameIsPaused = false;
 
-        // Eðer GameManager varsa durumu güncelle (Opsiyonel)
+        // Eï¿½er GameManager varsa durumu gï¿½ncelle (Opsiyonel)
         if (GameManager.instance != null)
             GameManager.instance.currentState = GameState.Playing;
     }
@@ -43,7 +43,7 @@ public class PauseMenu : MonoBehaviour
     void Pause()
     {
         pauseMenuUI.SetActive(true);
-        Time.timeScale = 0f; // Zamaný dondur (Fizik, hareket her þey durur)
+        if (GameManager.instance != null) GameManager.instance.RequestPause();
         GameIsPaused = true;
 
         if (GameManager.instance != null)
@@ -52,20 +52,20 @@ public class PauseMenu : MonoBehaviour
 
     public void LoadMenu()
     {
-        Time.timeScale = 1f; // ÇOK ÖNEMLÝ: Menüye dönerken zamaný düzeltmezsen oyun donuk kalýr.
-        SceneManager.LoadScene("MainMenu"); // Senin menü sahnenin adý neyse buraya onu yaz
+        Time.timeScale = 1f; // ï¿½OK ï¿½NEMLï¿½: Menï¿½ye dï¿½nerken zamanï¿½ dï¿½zeltmezsen oyun donuk kalï¿½r.
+        SceneManager.LoadScene("MainMenu"); // Senin menï¿½ sahnenin adï¿½ neyse buraya onu yaz
     }
 
     public void QuitGame()
     {
-        Debug.Log("Oyundan Çýkýlýyor..."); // Editörde çýkýþ çalýþmaz, bunu konsola yazar
+        Debug.Log("Oyundan ï¿½ï¿½kï¿½lï¿½yor..."); // Editï¿½rde ï¿½ï¿½kï¿½ï¿½ ï¿½alï¿½ï¿½maz, bunu konsola yazar
         Application.Quit();
     }
     public GameObject settingsPanel;
     public void OpenSettings()
     {
-        pauseMenuUI.SetActive(false); // Pause menüsünü gizle
-        settingsPanel.SetActive(true); // Ayarlarý aç
+        pauseMenuUI.SetActive(false); // Pause menï¿½sï¿½nï¿½ gizle
+        settingsPanel.SetActive(true); // Ayarlarï¿½ aï¿½
     }
 
     public void CloseSettings()

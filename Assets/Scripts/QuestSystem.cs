@@ -5,12 +5,12 @@ public class QuestSystem : MonoBehaviour
 {
     public static QuestSystem instance;
 
-    [Header("UI Baðlantýlarý")]
+    [Header("UI Baï¿½lantï¿½larï¿½")]
     public GameObject overlayPanel;
     public Transform container;     
     public GameObject paperPrefab; 
 
-    [Header("Görev Havuzu")]
+    [Header("Gï¿½rev Havuzu")]
     public List<QuestData> allQuests;
     public List<ActiveQuest> activeQuests = new List<ActiveQuest>();
 
@@ -32,7 +32,7 @@ public class QuestSystem : MonoBehaviour
         overlayPanel.SetActive(false);
     }
 
-    // "E"ye basýnca bu çaðrýlacak
+    // "E"ye basï¿½nca bu ï¿½aï¿½rï¿½lacak
     public void ToggleBoard()
     {
         bool isActive = overlayPanel.activeSelf;
@@ -44,13 +44,13 @@ public class QuestSystem : MonoBehaviour
         {
             overlayPanel.SetActive(true);
             GenerateQuests();
-            Time.timeScale = 0;
+            if (GameManager.instance != null) GameManager.instance.RequestPause();
         }
     }
     public void CloseBoard()
     {
         overlayPanel.SetActive(false);
-        Time.timeScale = 1; 
+        if (GameManager.instance != null) GameManager.instance.ReleasePause();
     }
 
     void GenerateQuests()
@@ -70,13 +70,13 @@ public class QuestSystem : MonoBehaviour
     {
         foreach (var q in activeQuests) { if (q.data == quest) return; }
         activeQuests.Add(new ActiveQuest(quest));
-        Debug.Log($"Görev Takibi Baþladý: {quest.questName}");
+        Debug.Log($"Gï¿½rev Takibi Baï¿½ladï¿½: {quest.questName}");
     }
     [System.Serializable]
     public class ActiveQuest
     {
-        public QuestData data;      // Hangi görev?
-        public int currentAmount;   // Þu an kaç yaptýk? (Örn: 1/3)
+        public QuestData data;      // Hangi gï¿½rev?
+        public int currentAmount;   // ï¿½u an kaï¿½ yaptï¿½k? (ï¿½rn: 1/3)
         public bool isCompleted;    // Bitti mi?
 
         public ActiveQuest(QuestData quest)
@@ -94,7 +94,7 @@ public class QuestSystem : MonoBehaviour
             if (quest.data.type == type)
             {
                 quest.currentAmount += amount;
-                Debug.Log($"{quest.data.questName} Ýlerlemesi: {quest.currentAmount}/{quest.data.targetAmount}");
+                Debug.Log($"{quest.data.questName} ï¿½lerlemesi: {quest.currentAmount}/{quest.data.targetAmount}");
 
                 CheckCompletion(quest);
             }
@@ -106,13 +106,13 @@ public class QuestSystem : MonoBehaviour
         if (quest.currentAmount >= quest.data.targetAmount)
         {
             quest.isCompleted = true;
-            Debug.Log($"GÖREV TAMAMLANDI! Ödül: {quest.data.rewardText}");
+            Debug.Log($"Gï¿½REV TAMAMLANDI! ï¿½dï¿½l: {quest.data.rewardText}");
             GiveReward(quest.data);
         }
     }
     private void GiveReward(QuestData data)
     {
-        // Oyuncuyu bul (Sahne deðiþse bile bulur)
+        // Oyuncuyu bul (Sahne deï¿½iï¿½se bile bulur)
         PlayerController player = FindFirstObjectByType<PlayerController>();
 
         if (player != null)
@@ -121,7 +121,7 @@ public class QuestSystem : MonoBehaviour
             {
                 case RewardType.Gold:
                     player.AddGold(data.rewardAmount);
-                    Debug.Log($"{data.rewardAmount} Altýn Eklendi!");
+                    Debug.Log($"{data.rewardAmount} Altï¿½n Eklendi!");
                     break;
 
                 case RewardType.Heal:
@@ -129,7 +129,7 @@ public class QuestSystem : MonoBehaviour
                     break;
 
                 case RewardType.ShiftCharge:
-                    player.IncreaseMaxShift(data.rewardAmount); // PlayerController'da bu fonksiyonu yazmýþtýk
+                    player.IncreaseMaxShift(data.rewardAmount); // PlayerController'da bu fonksiyonu yazmï¿½ï¿½tï¿½k
                     player.ResetShiftToMax();
                     break;
             }
