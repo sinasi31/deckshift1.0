@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardName: Dash
   description: Launch forward.
-  cardArt: {fileID: -5771381502418914927, guid: fa4fd7bb605a1634ea48a6f9eb9eda13, type: 3}
+  cardArt: {fileID: 5856864715565434644, guid: f7fd369158eae5d48b2f87e0351668ed, type: 3}
   actionType: 1
   actionValue: 10
   singleUse: 0
