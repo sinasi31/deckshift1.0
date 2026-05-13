@@ -27,14 +27,15 @@ public enum CardActionType
     Phase,
     CometDive,
     Adrenaline,
-    Stagger
+    Stagger,
+    ReverseGravity
 }
 
 public enum SkillType
 {
     None,
     InfinitySeal,   // (Eski favorimiz)
-    EchoChamber,    // %50 Çift Etki
+    EchoChamber,    // %50 ï¿½ift Etki
     SpectralWings,  // Bedava Air Jump
     Overclock,
     KineticDiscount// Kill = Sonraki Kart Bedava

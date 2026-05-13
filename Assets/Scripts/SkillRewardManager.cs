@@ -7,11 +7,11 @@ public class SkillRewardManager : MonoBehaviour
 {
     public static SkillRewardManager instance;
 
-    [Header("UI Referanslarý")]
+    [Header("UI Referanslarï¿½")]
     public GameObject skillRewardPanel; // Panel objesi
     public List<Button> skillButtons;   // 3 adet buton
 
-    // Rastgele seçim için havuz
+    // Rastgele seï¿½im iï¿½in havuz
     private List<SkillType> offeredSkills = new List<SkillType>();
 
     private void Awake()
@@ -28,17 +28,17 @@ public class SkillRewardManager : MonoBehaviour
     {
         // 1. Oyunu Durdur
         GameManager.instance.SetGameState(GameState.Paused);
-        Time.timeScale = 0f;
+        if (GameManager.instance != null) GameManager.instance.RequestPause();
         skillRewardPanel.SetActive(true);
 
-        // 2. Rastgele 3 Farklý Skill Seç
+        // 2. Rastgele 3 Farklï¿½ Skill Seï¿½
         offeredSkills.Clear();
         List<SkillType> pool = new List<SkillType>()
         {
             SkillType.InfinitySeal
         };
 
-        // Havuzdan rastgele 3 tane çek
+        // Havuzdan rastgele 3 tane ï¿½ek
         for (int i = 0; i < 3; i++)
         {
             if (pool.Count == 0) break;
@@ -47,7 +47,7 @@ public class SkillRewardManager : MonoBehaviour
             pool.RemoveAt(r);
         }
 
-        // 3. Butonlarý Doldur
+        // 3. Butonlarï¿½ Doldur
         for (int i = 0; i < skillButtons.Count; i++)
         {
             if (i < offeredSkills.Count)
@@ -77,40 +77,40 @@ public class SkillRewardManager : MonoBehaviour
         SkillType selected = offeredSkills[index];
         ApplySkillEffect(selected);
 
-        // Ekraný Kapat ve Devam Et
+        // Ekranï¿½ Kapat ve Devam Et
         skillRewardPanel.SetActive(false);
-        Time.timeScale = 1f;
+        if (GameManager.instance != null) GameManager.instance.ReleasePause();
         GameManager.instance.SetGameState(GameState.Playing);
     }
 
     private void ApplySkillEffect(SkillType type)
     {
-        Debug.Log($"SEÇÝLEN ÖDÜL: {type}");
+        Debug.Log($"SEï¿½ï¿½LEN ï¿½Dï¿½L: {type}");
 
         switch (type)
         {
 
             case SkillType.InfinitySeal:
-                // Eldeki rastgele bir kartý sonsuz yap
+                // Eldeki rastgele bir kartï¿½ sonsuz yap
                 List<RuntimeCard> hand = DeckManager.instance.GetCurrentHand();
                 if (hand.Count > 0)
                 {
                     int r = Random.Range(0, hand.Count);
                     hand[r].isInfinite = true;
-                    // UI Güncellemesini tetiklemek için el deðiþikliði bildirimi
-                    // (DeckManager.cs içinde public static Action OnHandChanged var)
-                    // Ancak dýþarýdan tetikleyemeyiz, basitçe log atalým, oyuncu kart oynayýnca düzelir.
+                    // UI Gï¿½ncellemesini tetiklemek iï¿½in el deï¿½iï¿½ikliï¿½i bildirimi
+                    // (DeckManager.cs iï¿½inde public static Action OnHandChanged var)
+                    // Ancak dï¿½ï¿½arï¿½dan tetikleyemeyiz, basitï¿½e log atalï¿½m, oyuncu kart oynayï¿½nca dï¿½zelir.
                     Debug.Log("Bir kart SONSUZ oldu!");
                 }
                 else
                 {
-                    // Elde kart yoksa boþa gitmesin
+                    // Elde kart yoksa boï¿½a gitmesin
                     GameManager.instance.player.IncreaseMaxShift(1);
                 }
                 break;
 
             default:
-                // Diðerleri pasif skilldir, Manager'a kaydet
+                // Diï¿½erleri pasif skilldir, Manager'a kaydet
                 SkillManager.instance.UnlockSkill(type);
                 break;
         }

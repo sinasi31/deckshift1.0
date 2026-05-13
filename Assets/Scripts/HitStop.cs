@@ -8,14 +8,22 @@ public class HitStop : MonoBehaviour
 
     private void Awake()
     {
-        if (instance == null) instance = this;
+        if (instance == null)
+        {
+            instance = this;
+        }
+        else if (instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
     }
 
     public void Stop(float duration)
     {
         if (isWaiting) return;
 
-        // Zamaný durdur
+        // Zamanï¿½ durdur
         Time.timeScale = 0.0f;
         StartCoroutine(Wait(duration));
     }
@@ -24,10 +32,10 @@ public class HitStop : MonoBehaviour
     {
         isWaiting = true;
 
-        // Gerçek dünyada bekle (Oyun donduðu için WaitForSecondsRealtime þart)
+        // Gerï¿½ek dï¿½nyada bekle (Oyun donduï¿½u iï¿½in WaitForSecondsRealtime ï¿½art)
         yield return new WaitForSecondsRealtime(duration);
 
-        // Zamaný devam ettir
+        // Zamanï¿½ devam ettir
         Time.timeScale = 1.0f;
         isWaiting = false;
     }

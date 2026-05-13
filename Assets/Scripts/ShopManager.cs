@@ -8,35 +8,36 @@ public class ShopManager : MonoBehaviour
 
     [Header("UI Panel")]
     public GameObject shopPanel;
+    [SerializeField] private GameObject gameplayHUD;
     public TextMeshProUGUI playerGoldText;
 
     [Header("Genel Havuzlar")]
     public List<CardData> allCardsPool;
     public List<RelicData> allRelicsPool;
 
-    [Header("Servis Ýkonlarý")]
+    [Header("Servis ï¿½konlarï¿½")]
     public Sprite healIcon;
-    public Sprite shiftIcon; // <-- YENÝ: Shift ikonu için bunu sürükle
+    public Sprite shiftIcon; // <-- YENï¿½: Shift ikonu iï¿½in bunu sï¿½rï¿½kle
 
-    [Header("Dükkan Raflarý (UI Slotlar)")]
-    // Unity'de buraya 5 tane slot sürükle
+    [Header("Dï¿½kkan Raflarï¿½ (UI Slotlar)")]
+    // Unity'de buraya 5 tane slot sï¿½rï¿½kle
     public List<ShopItemUI> cardSlots;
-    // Unity'de buraya 3 tane slot sürükle
+    // Unity'de buraya 3 tane slot sï¿½rï¿½kle
     public List<ShopItemUI> relicSlots;
 
     // ARTIK 2 AYRI SLOTUMUZ VAR
     public ShopItemUI healServiceSlot;
-    public ShopItemUI shiftServiceSlot; // <-- YENÝ: +3 Shift slotu
+    public ShopItemUI shiftServiceSlot; // <-- YENï¿½: +3 Shift slotu
 
-    // ÞU AN AÇIK OLAN MARKET
+    // ï¿½U AN Aï¿½IK OLAN MARKET
     private Shopkeeper currentShopkeeper;
 
-    [Header("Servis Fiyatlarý")]
+    [Header("Servis Fiyatlarï¿½")]
     public int healCost = 50;
     public int healAmount = 30;
 
-    public int shiftCost = 75; // <-- YENÝ: Shift fiyatý
-    public int shiftAmount = 3; // <-- YENÝ: Kaç shift vereceði
+    public int shiftCost = 75; // <-- YENï¿½: Shift fiyatï¿½
+    public int shiftAmount = 3; // <-- YENï¿½: Kaï¿½ shift vereceï¿½i
 
     private void Awake()
     {
@@ -52,23 +53,27 @@ public class ShopManager : MonoBehaviour
     {
         currentShopkeeper = shop;
         GameManager.instance.SetGameState(GameState.Paused);
-        Time.timeScale = 0f;
+        if (GameManager.instance != null) GameManager.instance.RequestPause();
         shopPanel.SetActive(true);
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.None;
 
         UpdateGoldUI();
         LoadShopContent();
+        if (HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(true);
+        if (gameplayHUD != null) gameplayHUD.SetActive(false);
     }
 
     public void CloseShop()
     {
+        if (gameplayHUD != null) gameplayHUD.SetActive(true);
         shopPanel.SetActive(false);
-        Time.timeScale = 1f;
+        if (GameManager.instance != null) GameManager.instance.ReleasePause();
         GameManager.instance.SetGameState(GameState.Playing);
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.Confined;
         currentShopkeeper = null;
+        if (HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(false);
     }
 
     private void UpdateGoldUI()
@@ -90,7 +95,7 @@ public class ShopManager : MonoBehaviour
 
     private void LoadShopContent()
     {
-        // 1. Önce tüm slotlarý kapat (Temizlik)
+        // 1. ï¿½nce tï¿½m slotlarï¿½ kapat (Temizlik)
         foreach (var slot in cardSlots) slot.gameObject.SetActive(false);
         foreach (var slot in relicSlots) slot.gameObject.SetActive(false);
         if (healServiceSlot) healServiceSlot.gameObject.SetActive(false);
@@ -104,7 +109,7 @@ public class ShopManager : MonoBehaviour
 
         foreach (ShopSlotData data in currentShopkeeper.myInventory)
         {
-            // Kartlarý Diz (Listenin boyutu kadar)
+            // Kartlarï¿½ Diz (Listenin boyutu kadar)
             if (data.itemType == ShopItemType.Card && cardIndex < cardSlots.Count)
             {
                 ShopItemUI slot = cardSlots[cardIndex];
@@ -130,7 +135,7 @@ public class ShopManager : MonoBehaviour
                 healCost,
                 $"Restores <color=green>{healAmount} HP</color>.",
                 () => {
-                    // Satýn alýnýnca çalýþacak kod:
+                    // Satï¿½n alï¿½nï¿½nca ï¿½alï¿½ï¿½acak kod:
                     GameManager.instance.player.Heal(healAmount);
                 }
             );

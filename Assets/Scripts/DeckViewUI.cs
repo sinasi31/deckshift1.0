@@ -1,35 +1,31 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections.Generic;
 
 public class DeckViewUI : MonoBehaviour
 {
-    [Header("Butonlar & Sayaçlar")]
-    public Button drawPileButton;      // Sað alttaki Deste butonu
-    public TextMeshProUGUI drawCountText; // Üzerindeki sayý
+    [Header("Butonlar & SayaÃ§lar")]
+    public Button drawPileButton;
+    public TextMeshProUGUI drawCountText;
+    public Button discardPileButton;
+    public TextMeshProUGUI discardCountText;
 
-    public Button discardPileButton;   // Sol alttaki Iskarta butonu
-    public TextMeshProUGUI discardCountText; // Üzerindeki sayý
+    [Header("AÃ§Ä±lÄ±r Pencere (Pop-up)")]
+    public GameObject viewPanel;
+    public Transform cardContainer;
+    public GameObject cardUIPrefab;
+    public TextMeshProUGUI titleText;
+    public Button closeButton;
 
-    [Header("Açýlýr Pencere (Pop-up)")]
-    public GameObject viewPanel;       // Tüm ekraný kaplayan panel
-    public Transform cardContainer;    // Kartlarýn dizileceði kutu (Grid Layout)
-    public GameObject cardUIPrefab;    // Kart görsel prefabý
-    public TextMeshProUGUI titleText;  // "Draw Pile" veya "Discard Pile" yazýsý
-    public Button closeButton;         // Paneli kapatma butonu
-
-    [Header("Exhaust (Tükenenler)")]
-    public Button exhaustButton; // Bunu birazdan sað üst köþeye koyacaðýz
+    [Header("Exhaust (TÃ¼kenenler)")]
+    public Button exhaustButton;
     public TextMeshProUGUI exhaustCountText;
+
     private void Start()
     {
-        // Panel baþlangýçta kapalý olsun
         if (viewPanel != null) viewPanel.SetActive(false);
-
         if (exhaustButton) exhaustButton.onClick.AddListener(ShowExhaustPile);
-
-        // Buton týklamalarýný baðla
         if (drawPileButton) drawPileButton.onClick.AddListener(ShowDrawPile);
         if (discardPileButton) discardPileButton.onClick.AddListener(ShowDiscardPile);
         if (closeButton) closeButton.onClick.AddListener(CloseView);
@@ -39,70 +35,66 @@ public class DeckViewUI : MonoBehaviour
     {
         if (exhaustCountText && DeckManager.instance != null)
             exhaustCountText.text = DeckManager.instance.GetExhaustPile().Count.ToString();
-        // Sayaçlarý her karede güncelle (En kolayý bu)
+
         if (DeckManager.instance != null)
         {
             if (drawCountText)
                 drawCountText.text = DeckManager.instance.GetDrawPile().Count.ToString();
-
             if (discardCountText)
                 discardCountText.text = DeckManager.instance.GetDiscardPile().Count.ToString();
         }
     }
 
-    // Deste Butonuna basýnca
     public void ShowDrawPile()
     {
         if (DeckManager.instance == null) return;
         OpenView("DRAW PILE", DeckManager.instance.GetDrawPile());
     }
 
-    // Iskarta Butonuna basýnca
     public void ShowDiscardPile()
     {
         if (DeckManager.instance == null) return;
         OpenView("DISCARD PILE", DeckManager.instance.GetDiscardPile());
     }
 
-    // Ortak Görüntüleme Fonksiyonu
+    public void ShowExhaustPile()
+    {
+        if (DeckManager.instance == null) return;
+        OpenView("EXHAUST PILE", DeckManager.instance.GetExhaustPile());
+    }
+
     private void OpenView(string title, List<RuntimeCard> cardsToList)
     {
         viewPanel.SetActive(true);
         if (titleText) titleText.text = title;
 
-        // 1. Önceki kartlarý temizle
+        // Hand drawer'Ä± kilitle
+        if (HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(true);
+
         foreach (Transform child in cardContainer)
         {
             Destroy(child.gameObject);
         }
 
-        // 2. Yeni kartlarý yarat
         foreach (RuntimeCard card in cardsToList)
         {
             GameObject cardObj = Instantiate(cardUIPrefab, cardContainer);
-
-            // Mevcut CardUI scriptini kullanýyoruz
             CardUI ui = cardObj.GetComponent<CardUI>();
             if (ui != null)
             {
-                // Index önemli deðil, sadece görüntüleme yapýyoruz (-1 verdim)
                 ui.Setup(card, -1);
-
-                // Týklanma özelliðini kapatalým ki pop-up içinden kart oynamasýnlar
                 CanvasGroup group = cardObj.GetComponent<CanvasGroup>();
                 if (group == null) group = cardObj.AddComponent<CanvasGroup>();
-                group.blocksRaycasts = false; // Týklamayý engeller
+                group.blocksRaycasts = false;
             }
         }
     }
-    public void ShowExhaustPile()
-    {
-        if (DeckManager.instance == null) return;
-        // Baþlýðý "EXHAUST PILE" yaparak paneli aç
-        OpenView("EXHAUST PILE", DeckManager.instance.GetExhaustPile());
-    }
+
     public void CloseView()
     {
         viewPanel.SetActive(false);
+
+        // Hand drawer kilidini aÃ§
+        if (HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(false);
     }
 }
