@@ -14,6 +14,10 @@ public class QuestSystem : MonoBehaviour
     public List<QuestData> allQuests;
     public List<ActiveQuest> activeQuests = new List<ActiveQuest>();
 
+    public event System.Action<ActiveQuest> OnQuestAccepted;
+    public event System.Action<ActiveQuest> OnQuestProgress;
+    public event System.Action<ActiveQuest> OnQuestCompleted;
+
     private void Awake()
     {
         if (instance == null)
@@ -69,8 +73,10 @@ public class QuestSystem : MonoBehaviour
     public void AcceptQuest(QuestData quest)
     {
         foreach (var q in activeQuests) { if (q.data == quest) return; }
-        activeQuests.Add(new ActiveQuest(quest));
+        ActiveQuest newQuest = new ActiveQuest(quest);
+        activeQuests.Add(newQuest);
         Debug.Log($"G�rev Takibi Ba�lad�: {quest.questName}");
+        OnQuestAccepted?.Invoke(newQuest);
     }
     [System.Serializable]
     public class ActiveQuest
@@ -96,6 +102,7 @@ public class QuestSystem : MonoBehaviour
                 quest.currentAmount += amount;
                 Debug.Log($"{quest.data.questName} �lerlemesi: {quest.currentAmount}/{quest.data.targetAmount}");
 
+                OnQuestProgress?.Invoke(quest);
                 CheckCompletion(quest);
             }
         }
@@ -106,6 +113,7 @@ public class QuestSystem : MonoBehaviour
         if (quest.currentAmount >= quest.data.targetAmount)
         {
             quest.isCompleted = true;
+            OnQuestCompleted?.Invoke(quest);
             Debug.Log($"G�REV TAMAMLANDI! �d�l: {quest.data.rewardText}");
             GiveReward(quest.data);
         }

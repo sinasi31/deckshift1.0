@@ -4,7 +4,7 @@ using UnityEngine.UI;
 
 public class QuestPaper : MonoBehaviour
 {
-    [Header("UI Elemanlarý")]
+    [Header("UI Elemanlarï¿½")]
     public TextMeshProUGUI titleText;
     public TextMeshProUGUI descText;
     public TextMeshProUGUI rewardText;
@@ -19,17 +19,18 @@ public class QuestPaper : MonoBehaviour
         descText.text = data.description;
         rewardText.text = data.rewardText;
 
-        // Butona týklanýnca ne olacaðýný burada kodla baðlýyoruz
+        // Butona tï¿½klanï¿½nca ne olacaï¿½ï¿½nï¿½ burada kodla baï¿½lï¿½yoruz
         acceptButton.onClick.RemoveAllListeners();
         acceptButton.onClick.AddListener(OnAccept);
     }
 
     void OnAccept()
     {
-        Debug.Log($"Görev Kabul Edildi: {myData.questName}");
+        Debug.Log($"Gï¿½rev Kabul Edildi: {myData.questName}");
 
         acceptButton.interactable = false;
-        acceptButton.GetComponentInChildren<TextMeshProUGUI>().text = "ACCEPTED";
+        var label = acceptButton.GetComponentInChildren<TextMeshProUGUI>();
+        if (label != null) label.text = "ACCEPTED";
 
         QuestSystem.instance.AcceptQuest(myData);
     }
