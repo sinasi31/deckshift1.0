@@ -528,7 +528,7 @@ public class PlayerController : MonoBehaviour
                 return true;
 
             case CardActionType.Fireball:
-                PerformFireball(value);
+                StartCoroutine(FireballCastRoutine(value));
                 return true;
 
             case CardActionType.Portal:
@@ -795,6 +795,34 @@ public class PlayerController : MonoBehaviour
         Fireball fireballScript = fireballInstance.GetComponent<Fireball>();
         if (fireballScript != null)
             fireballScript.damage = damageFromCard;
+    }
+
+    private IEnumerator FireballCastRoutine(float damageFromCard)
+    {
+        // Clip: "Pixel Character - Attack Cast", 30 frames at 30fps = 1.0s total.
+        // OnAttackCast animation event fires at t=0.361s (frame ~10.8) — the exact frame
+        // Cainos designed for projectile release, and sits at ~36% of the clip.
+        float spawnDelay = 0.36f;
+
+        // After spawning, hold IsAttacking true briefly so the animation finishes
+        // its follow-through before the layer returns to idle. The Cast state exits
+        // on its own ExitTime at ~0.8s, so this only prevents re-triggering.
+        float clearAttackingDelay = 0.15f;
+
+        if (animator != null)
+        {
+            animator.SetInteger("AttackAction", 14);
+            animator.SetBool("IsAttacking", true);
+        }
+
+        yield return new WaitForSeconds(spawnDelay);
+
+        PerformFireball(damageFromCard);
+
+        yield return new WaitForSeconds(clearAttackingDelay);
+
+        if (animator != null)
+            animator.SetBool("IsAttacking", false);
     }
 
     public void AddShift(int amount)
