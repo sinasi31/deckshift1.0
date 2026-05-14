@@ -14,6 +14,7 @@ public class LevelManager : MonoBehaviour
 
     private List<int> availableRoomIndices = new List<int>();
     private GameObject currentRoom;
+    private bool hasSpawnedFirstRoom = false;
 
     private void Awake()
     {
@@ -55,9 +56,36 @@ public class LevelManager : MonoBehaviour
             RefillRoomPool();
         }
 
-        int randomIndexInPool = Random.Range(0, availableRoomIndices.Count);
-        int selectedRoomIndex = availableRoomIndices[randomIndexInPool];
-        availableRoomIndices.RemoveAt(randomIndexInPool);
+        int selectedRoomIndex;
+        if (!hasSpawnedFirstRoom)
+        {
+            hasSpawnedFirstRoom = true;
+            selectedRoomIndex = 0;
+            availableRoomIndices.Remove(0);
+        }
+        else
+        {
+            // Strip hub (index 0) from the pool — it may have re-entered via a refill above.
+            availableRoomIndices.Remove(0);
+
+            // If stripping hub left the pool empty, refill and strip again.
+            if (availableRoomIndices.Count == 0)
+            {
+                RefillRoomPool();
+                availableRoomIndices.Remove(0);
+            }
+
+            if (availableRoomIndices.Count > 0)
+            {
+                int randomIndexInPool = Random.Range(0, availableRoomIndices.Count);
+                selectedRoomIndex = availableRoomIndices[randomIndexInPool];
+                availableRoomIndices.RemoveAt(randomIndexInPool);
+            }
+            else
+            {
+                selectedRoomIndex = 0; // only one prefab in the list; fall back to hub
+            }
+        }
 
         Debug.Log($"Seçilen Oda Indexi: {selectedRoomIndex}. Kalan Oda Sayısı: {availableRoomIndices.Count}");
 

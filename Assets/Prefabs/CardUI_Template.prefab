@@ -98,14 +98,13 @@ MonoBehaviour:
   cardArtImage: {fileID: 8868451491149757183}
   keyHintText: {fileID: 2830840458789938183}
   selectionFrame: {fileID: 0}
-  selectionLiftAmount: 15
   usesText: {fileID: 6412727748792265617}
   shiftCostContainer: {fileID: 7680781251493001575}
   shiftPointPrefab: {fileID: 8286457728324993697, guid: 1c54d578c7ea78f4d927fc07af7c3094, type: 3}
-  firstDotXPosition: 2
   pointSpacing: 20
   descriptionPanel: {fileID: 5038333479525192227}
   descriptionText: {fileID: 3845021027272694664}
+  selectionLiftAmount: 15
 --- !u!114 &939063093196623195
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -479,14 +478,14 @@ RectTransform:
   m_GameObject: {fileID: 5561904916074074413}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1.6827487, y: 0.61399806, z: 0.6064178}
+  m_LocalScale: {x: 1.519135, y: 0.554299, z: 0.5474558}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 2043679840996299669}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -585, y: 179}
+  m_AnchoredPosition: {x: -518, y: 179}
   m_SizeDelta: {x: 278.927, y: 56.237}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &7651313599443503167
@@ -756,7 +755,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
-  m_AnchoredPosition: {x: -216, y: 161}
+  m_AnchoredPosition: {x: 46, y: 145.3}
   m_SizeDelta: {x: 0, y: 20}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!1 &8177983152467928108

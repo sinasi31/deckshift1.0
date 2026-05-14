@@ -2418,9 +2418,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 37698d1e7ae28e54c902f9fd0a2475e6, type: 2}
   - {fileID: 11400000, guid: 7714926994241fe46b0e14f010dcb23c, type: 2}
   allRelicsPool:
-  - {fileID: 11400000, guid: fc0a745f5c2ac0b48a11c6904e8740ad, type: 2}
-  - {fileID: 11400000, guid: 725ba5b1c724cc549be3c29733632cb3, type: 2}
   - {fileID: 11400000, guid: de572fb6a583df144b6669a3cbee2bc9, type: 2}
+  - {fileID: 11400000, guid: 725ba5b1c724cc549be3c29733632cb3, type: 2}
+  - {fileID: 11400000, guid: 455b2f54bc410fe41836ecf31c6ec249, type: 2}
   healIcon: {fileID: -205270267638800340, guid: ba4ddf2b7efc51b4d8eb0fb5d81e0d71, type: 3}
   shiftIcon: {fileID: 1429464083344649065, guid: e37bcb463881c9f428cfc77bed644af3, type: 3}
   cardSlots:
@@ -3603,7 +3603,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 88, y: 0}
+  m_AnchoredPosition: {x: 43, y: -209}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0.5}
 --- !u!114 &498330509
@@ -8457,10 +8457,18 @@ MonoBehaviour:
   currentRecallCost: 0
   player: {fileID: 8822436801064664179}
   startingDeck:
-  - {fileID: 11400000, guid: 788a6406bf04dcb498f55317f601f2b7, type: 2}
+  - {fileID: 11400000, guid: 37698d1e7ae28e54c902f9fd0a2475e6, type: 2}
   - {fileID: 11400000, guid: 7714926994241fe46b0e14f010dcb23c, type: 2}
   - {fileID: 11400000, guid: f9f9c514781f8a94681c0e4854777871, type: 2}
+  - {fileID: 11400000, guid: 26ab3f4e031f6eb4198d3c3e6942ff07, type: 2}
+  - {fileID: 11400000, guid: 788a6406bf04dcb498f55317f601f2b7, type: 2}
+  - {fileID: 11400000, guid: f9f9c514781f8a94681c0e4854777871, type: 2}
+  - {fileID: 11400000, guid: 5a5a5f031de93eb47aa35dc69d7c61e0, type: 2}
+  - {fileID: 11400000, guid: b3132bd486128a34183f125375419fd5, type: 2}
   - {fileID: 11400000, guid: 5aa353438259d5a45b5b0cd62b5b78bf, type: 2}
+  - {fileID: 11400000, guid: 2b6b5dacabc9303428fb6c97dad09625, type: 2}
+  - {fileID: 11400000, guid: 523cee4ce9c65d749ba3e978c44ae531, type: 2}
+  - {fileID: 11400000, guid: 4ed05ca2f31dc07448877e4390a4ee60, type: 2}
   staggerCardData: {fileID: 11400000, guid: 05d4bd0adf108bd46b120738ac1c1c36, type: 2}
   handCapacity: 4
 --- !u!4 &1329495661
@@ -8688,10 +8696,11 @@ MonoBehaviour:
   playerTransform: {fileID: 5274940026035738714}
   roomPrefabs:
   - {fileID: 1843502735663899364, guid: fe0a360a69bc6e143b2cc2ca9e83d6c9, type: 3}
-  - {fileID: 1843502735663899364, guid: fe0a360a69bc6e143b2cc2ca9e83d6c9, type: 3}
-  - {fileID: 1843502735663899364, guid: fe0a360a69bc6e143b2cc2ca9e83d6c9, type: 3}
-  - {fileID: 1843502735663899364, guid: fe0a360a69bc6e143b2cc2ca9e83d6c9, type: 3}
-  - {fileID: 1843502735663899364, guid: fe0a360a69bc6e143b2cc2ca9e83d6c9, type: 3}
+  - {fileID: 8878139818867148303, guid: 2f45d8bf04375b342b4043a32c04a4dc, type: 3}
+  - {fileID: 3910532149720474984, guid: 99e8840405500d245a733bec7c1e5889, type: 3}
+  - {fileID: 635766636009674316, guid: 3625746d16e0e464ba85e470691faa0f, type: 3}
+  - {fileID: 7937581221952600193, guid: f1643df793b7def498d57f12d13c6efe, type: 3}
+  - {fileID: 5945455368163326805, guid: a6fc938686ab0ff4da8952eb9a83bda8, type: 3}
 --- !u!4 &1361928416
 Transform:
   m_ObjectHideFlags: 0
@@ -14559,6 +14568,14 @@ PrefabInstance:
     - target: {fileID: 182352444585531103, guid: 418762c5259557645bc3ca542f249d74, type: 3}
       propertyPath: m_LocalPosition.y
       value: -0.00975
+      objectReference: {fileID: 0}
+    - target: {fileID: 1641162466347240171, guid: 418762c5259557645bc3ca542f249d74, type: 3}
+      propertyPath: maxShift
+      value: 40
+      objectReference: {fileID: 0}
+    - target: {fileID: 1641162466347240171, guid: 418762c5259557645bc3ca542f249d74, type: 3}
+      propertyPath: currentGold
+      value: 500
       objectReference: {fileID: 0}
     - target: {fileID: 1641162466347240171, guid: 418762c5259557645bc3ca542f249d74, type: 3}
       propertyPath: visualFlipYOffset
