@@ -8,6 +8,12 @@ public class RelicManager : MonoBehaviour
     // Oyuncunun şu anda sahip olduğu tüm pasif eşyaların (Relic) listesi
     private List<RelicData> ownedRelics = new List<RelicData>();
 
+    // Fired each time a new relic is successfully added; RelicHUD subscribes to this.
+    public event System.Action<RelicData> OnRelicAdded;
+
+    // Read-only view of the owned list for HUD population on Start.
+    public IReadOnlyList<RelicData> OwnedRelics => ownedRelics;
+
     private void Awake()
     {
         if (instance == null)
@@ -35,7 +41,7 @@ public class RelicManager : MonoBehaviour
         ownedRelics.Add(newRelic);
         Debug.Log($"Yeni eşya kazanıldı: {newRelic.relicName}");
 
-        // TODO: UI'da bir yere bu eşyanın ikonunu ekle
+        OnRelicAdded?.Invoke(newRelic);
     }
 
     /// <summary>
