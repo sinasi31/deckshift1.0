@@ -105,4 +105,12 @@ public class LevelManager : MonoBehaviour
             DeckManager.instance.ResetRecallCost();
         }
     }
+
+    // Returns true when the active room has a HubMarker on its root.
+    // Uses currentRoom — the single authoritative field set by SpawnNextRoom.
+    public bool IsCurrentRoomHub()
+    {
+        if (currentRoom == null) return false;
+        return currentRoom.GetComponent<HubMarker>() != null;
+    }
 }

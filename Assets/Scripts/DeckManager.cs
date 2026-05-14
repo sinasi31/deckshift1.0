@@ -106,7 +106,11 @@ public class DeckManager : MonoBehaviour
         if (player.GetCurrentShift() < cost) return;
         if (!playedCard.isInfinite && playedCard.currentUses <= 0) return;
 
-        if (data.actionType != CardActionType.Portal) player.SpendShift(cost);
+        if (data.actionType != CardActionType.Portal)
+        {
+            if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
+                player.SpendShift(cost);
+        }
 
         bool success = player.ExecuteAction(data.actionType, data.actionValue, out bool keepInHand);
 
@@ -127,9 +131,10 @@ public class DeckManager : MonoBehaviour
                 // Ýkinci kez çalýþtýr
                 player.ExecuteAction(data.actionType, data.actionValue, out bool _);
             }
-            if (!playedCard.isInfinite) playedCard.currentUses--;
+            bool inHub = LevelManager.instance != null && LevelManager.instance.IsCurrentRoomHub();
+            if (!playedCard.isInfinite && !inHub) playedCard.currentUses--;
 
-            if ((playedCard.isInfinite || playedCard.currentUses > 0) && (!data.singleUse || playedCard.isInfinite))
+            if (inHub || (playedCard.isInfinite || playedCard.currentUses > 0) && (!data.singleUse || playedCard.isInfinite))
                 discardPile.Add(playedCard);
             else
                 exhaustPile.Add(playedCard);
@@ -155,6 +160,8 @@ public class DeckManager : MonoBehaviour
     }
     private void CheckForStaggerCondition()
     {
+        if (LevelManager.instance != null && LevelManager.instance.IsCurrentRoomHub()) return;
+
         // 1. Shift var mý?
         if (player.GetCurrentShift() > 0) return; // Shift varsa sorun yok
 
@@ -205,11 +212,15 @@ public class DeckManager : MonoBehaviour
         }
 
         // 3. Shift Harca
-        player.SpendShift(currentRecallCost);
+        if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
+            player.SpendShift(currentRecallCost);
 
         // 4. Maliyeti Artır (Level bitene kadar)
-        currentRecallCost++;
-        OnRecallCostChanged?.Invoke(currentRecallCost);
+        if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
+        {
+            currentRecallCost++;
+            OnRecallCostChanged?.Invoke(currentRecallCost);
+        }
 
         // 5. Asıl işlemi başlat
         ReloadHand();

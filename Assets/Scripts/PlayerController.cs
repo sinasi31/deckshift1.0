@@ -571,7 +571,8 @@ public class PlayerController : MonoBehaviour
                 audioSource.PlayOneShot(jumpSound);
                 audioSource.pitch = 1f;
             }
-            currentShift--;
+            if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
+                currentShift--;
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
             float jumpDir = isGravityReversed ? -1f : 1f;
             rb.AddForce(new Vector2(moveInput * jumpForce * 1f, jumpDir * jumpForce), ForceMode2D.Impulse);
@@ -771,7 +772,8 @@ public class PlayerController : MonoBehaviour
 
     private void FallAndRespawn()
     {
-        TakeDamage(fallDamage);
+        if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
+            TakeDamage(fallDamage);
         if (currentHealth > 0)
         {
             rb.linearVelocity = Vector2.zero;
@@ -851,7 +853,8 @@ public class PlayerController : MonoBehaviour
                 return false;
             }
 
-            SpendShift(finalCost);
+            if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
+                SpendShift(finalCost);
 
             GameObject p2 = Instantiate(portalPrefab, mousePos, Quaternion.identity);
             Portal secondPortal = p2.GetComponent<Portal>();
