@@ -6,9 +6,10 @@ using Unity.Cinemachine;
 
 public class PlayerController : MonoBehaviour
 {
-    private Rigidbody2D rb;
+    internal Rigidbody2D rb;
     private Animator animator;
-    private Camera mainCamera;
+    internal Camera mainCamera;
+    private CardActionExecutor cardActionExecutor;
 
     [Header("Visual Settings")]
     public GameObject visualModel; // YENİ: Hiyerarşideki PF Skeleton objesini buraya sürükleyeceğiz!
@@ -136,7 +137,7 @@ public class PlayerController : MonoBehaviour
     public float speedBoostMultiplier = 1.5f;
 
     public PlayerState currentState;
-    private bool isGrounded;
+    internal bool isGrounded;
 
     [Header("Combat Settings")]
     public GameObject fireballPrefab;
@@ -165,7 +166,7 @@ public class PlayerController : MonoBehaviour
     private float visualRotationZ = 0f;
     private Vector3 originalVisualLocalPos;
     private float originalVisualScaleX;
-    private bool isFacingRight = true;
+    internal bool isFacingRight = true;
 
     [Header("Gravity Reversal")]
     // Tune in Play mode: feet should just touch the ceiling when flipped
@@ -181,6 +182,7 @@ public class PlayerController : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponentInChildren<Animator>();
         mainCamera = Camera.main;
+        cardActionExecutor = GetComponent<CardActionExecutor>();
 
         // Cache SkinnedMeshRenderer for gravity-reversal warning flash
         playerSkinnedRenderer = GetComponentInChildren<SkinnedMeshRenderer>(true);
@@ -433,7 +435,7 @@ public class PlayerController : MonoBehaviour
         else if (moveInput < 0 && isFacingRight) { Flip(); }
     }
 
-    private void ChangeState(PlayerState newState)
+    internal void ChangeState(PlayerState newState)
     {
         if (currentState == newState) return;
         currentState = newState;
@@ -459,106 +461,7 @@ public class PlayerController : MonoBehaviour
 
     public bool ExecuteAction(CardActionType type, float value, out bool keepCardInHand)
     {
-        keepCardInHand = false;
-
-        switch (type)
-        {
-            case CardActionType.Jump:
-                if (audioSource != null && leapSound != null)
-                {
-                    audioSource.PlayOneShot(leapSound);
-                }
-                rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
-                rb.AddForce(new Vector2(0f, value), ForceMode2D.Impulse);
-                if (leapEffectPrefab != null)
-                {
-                    Vector3 spawnPos = transform.position + new Vector3(0f, -0.8f, 0f);
-                    Instantiate(leapEffectPrefab, spawnPos, Quaternion.identity);
-                }
-                ChangeState(PlayerState.Jumping);
-                return true;
-
-            case CardActionType.VampiricBite:
-                PerformVampiricBite(value);
-                return true;
-
-            case CardActionType.Phase:
-                PerformPhase(value);
-                return true;
-            case CardActionType.Stagger:
-                PerformStagger();
-                return true;
-
-            case CardActionType.DashForward:
-            case CardActionType.DashBackward:
-                if (currentState != PlayerState.Dashing)
-                {
-                    int direction = (type == CardActionType.DashForward) ? 1 : -1;
-                    direction *= isFacingRight ? 1 : -1;
-                    StartCoroutine(PerformDash(value, direction));
-                    return true;
-                }
-                return false;
-
-            case CardActionType.WallCling:
-                StartCoroutine(ActivateWallCling(value));
-                return true;
-
-            case CardActionType.DrawCards:
-                if (DeckManager.instance != null)
-                {
-                    for (int i = 0; i < Mathf.RoundToInt(value); i++)
-                        DeckManager.instance.DrawCard();
-                }
-                return true;
-
-            case CardActionType.GainJumpCharges:
-                AddShift(Mathf.RoundToInt(value));
-                return true;
-
-            case CardActionType.PlatformCreate:
-                if (platformPrefab == null) return false;
-                if (mainCamera == null) return false;
-                if (audioSource != null && createPlatformSound != null)
-                {
-                    audioSource.PlayOneShot(createPlatformSound);
-                }
-                Vector2 spawnPosition = mainCamera.ScreenToWorldPoint(Input.mousePosition);
-                Instantiate(platformPrefab, spawnPosition, Quaternion.identity);
-                return true;
-
-            case CardActionType.Fireball:
-                StartCoroutine(FireballCastRoutine(value));
-                return true;
-
-            case CardActionType.Portal:
-                return TryPlacePortal(out keepCardInHand);
-
-            case CardActionType.GlassWail:
-                PerformGlassWail(value);
-                return true;
-
-            case CardActionType.CometDive:
-                if (!isGrounded)
-                {
-                    PerformCometDive();
-                    return true;
-                }
-                else
-                {
-                    Debug.Log("Comet Dive için havada olmalısın!");
-                    return false;
-                }
-
-            case CardActionType.Adrenaline:
-                UseAdrenaline(value);
-                return true;
-
-            case CardActionType.ReverseGravity:
-                StartGravityReversal();
-                return true;
-        }
-        return false;
+        return cardActionExecutor.TryExecute(type, value, out keepCardInHand);
     }
 
     private void PerformJump(float jumpForce)
@@ -580,7 +483,7 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    private IEnumerator PerformDash(float dashDistance, int direction)
+    internal IEnumerator PerformDash(float dashDistance, int direction)
     {
         if (audioSource != null && dashSound != null)
         {
@@ -702,7 +605,7 @@ public class PlayerController : MonoBehaviour
         ChangeState(PlayerState.Jumping);
     }
 
-    private IEnumerator ActivateWallCling(float duration)
+    internal IEnumerator ActivateWallCling(float duration)
     {
         canWallCling = true;
         yield return new WaitForSeconds(duration);
@@ -797,7 +700,7 @@ public class PlayerController : MonoBehaviour
             fireballScript.damage = damageFromCard;
     }
 
-    private IEnumerator FireballCastRoutine(float damageFromCard)
+    internal IEnumerator FireballCastRoutine(float damageFromCard)
     {
         // Clip: "Pixel Character - Attack Cast", 30 frames at 30fps = 1.0s total.
         // OnAttackCast animation event fires at t=0.361s (frame ~10.8) — the exact frame
@@ -841,7 +744,7 @@ public class PlayerController : MonoBehaviour
         currentShift = Mathf.Max(0, currentShift - amount);
     }
 
-    private bool TryPlacePortal(out bool keepCard)
+    internal bool TryPlacePortal(out bool keepCard)
     {
         keepCard = false;
         if (portalPrefab == null) return false;
@@ -895,7 +798,7 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    private void PerformVampiricBite(float damageAmount)
+    internal void PerformVampiricBite(float damageAmount)
     {
         if (audioSource != null && vampireBiteSound != null)
         {
@@ -926,7 +829,7 @@ public class PlayerController : MonoBehaviour
         currentHealth = Mathf.Min(currentHealth + amount, maxHealth);
     }
 
-    private void PerformGlassWail(float stunDuration)
+    internal void PerformGlassWail(float stunDuration)
     {
         if (audioSource != null && glassVailSound != null)
         {
@@ -944,7 +847,7 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    private void PerformPhase(float duration)
+    internal void PerformPhase(float duration)
     {
         if (audioSource != null && phaseSound != null)
         {
@@ -1004,7 +907,7 @@ public class PlayerController : MonoBehaviour
         transform.SetParent(cannonTransform);
     }
 
-    private void PerformCometDive()
+    internal void PerformCometDive()
     {
         if (audioSource != null && cometDiveSound != null)
         {
@@ -1081,7 +984,7 @@ public class PlayerController : MonoBehaviour
         if (cometImpactEffect != null) Instantiate(cometImpactEffect, transform.position, Quaternion.identity);
     }
 
-    private void UseAdrenaline(float value)
+    internal void UseAdrenaline(float value)
     {
         if (audioSource != null && adrenalineSound != null)
         {
@@ -1147,7 +1050,7 @@ public class PlayerController : MonoBehaviour
         ChangeState(PlayerState.Jumping);
     }
 
-    private void PerformStagger()
+    internal void PerformStagger()
     {
         staggerCount++;
         Debug.Log($"STAGGER KULLANILDI! ({staggerCount}/{maxStaggerUses})");
@@ -1192,7 +1095,7 @@ public class PlayerController : MonoBehaviour
 
     // --- Floor is Lava card (ReverseGravity) ---
 
-    private void StartGravityReversal()
+    internal void StartGravityReversal()
     {
         // Stop any existing effect so re-plays refresh the timer instead of stacking
         if (gravityReversalCoroutine != null)
