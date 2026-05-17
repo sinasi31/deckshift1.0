@@ -15,12 +15,14 @@ public class MeleeEnemyAI : MonoBehaviour
     public float knockbackPower = 5f;    // Vurunca oyuncuyu ne kadar geri itecek?
 
     private MonsterController controller;
+    private EnemyHealth health;
     private Transform player;
     private float lastAttackTime;
 
     void Start()
     {
         controller = GetComponent<MonsterController>();
+        health = GetComponent<EnemyHealth>();
         GameObject p = GameObject.FindGameObjectWithTag("Player");
         if (p != null) player = p.transform;
     }
@@ -35,6 +37,8 @@ public class MeleeEnemyAI : MonoBehaviour
 
         controller.inputMove = Vector2.zero;
         controller.inputAttack = false;
+
+        if (health != null && health.IsStunned) return;
 
         float distance = Vector2.Distance(transform.position, player.position);
 

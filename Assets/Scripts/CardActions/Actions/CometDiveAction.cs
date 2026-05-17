@@ -1,4 +1,3 @@
-using System.Collections;
 using UnityEngine;
 
 public class CometDiveAction : CardAction
@@ -9,15 +8,12 @@ public class CometDiveAction : CardAction
     public override bool Execute(PlayerController player, float value, out bool keepCardInHand)
     {
         keepCardInHand = false;
-        if (!player.isGrounded)
-        {
-            player.PerformCometDive();
-            return true;
-        }
-        else
+        if (player.isGrounded)
         {
             Debug.Log("Comet Dive için havada olmalısın!");
             return false;
         }
+        player.StartCometDive();
+        return true;
     }
 }

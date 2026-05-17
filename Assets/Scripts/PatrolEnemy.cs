@@ -16,11 +16,14 @@ public class PatrolEnemy : MonoBehaviour
     public LayerMask groundLayer;
 
     private Rigidbody2D rb;
+    private EnemyHealth health;
     private bool isFacingRight = true;
+    private bool wasStunned = false;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
+        health = GetComponent<EnemyHealth>();
     }
 
     private void Start()
@@ -39,6 +42,24 @@ public class PatrolEnemy : MonoBehaviour
 
     private void Update()
     {
+        bool stunned = health != null && health.IsStunned;
+
+        if (stunned)
+        {
+            rb.linearVelocity = Vector2.zero;
+            if (pixelMonster != null) pixelMonster.MovingBlend = 0f;
+            wasStunned = true;
+            return;
+        }
+
+        if (wasStunned)
+        {
+            // Resume patrol velocity after stun ends
+            rb.linearVelocity = new Vector2(moveSpeed * (isFacingRight ? 1 : -1), rb.linearVelocity.y);
+            if (pixelMonster != null) pixelMonster.MovingBlend = 1f;
+            wasStunned = false;
+        }
+
         bool isGrounded = Physics2D.OverlapCircle(groundCheckPoint.position, groundCheckRadius, groundLayer);
 
         if (!isGrounded)

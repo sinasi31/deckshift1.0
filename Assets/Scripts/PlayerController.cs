@@ -70,9 +70,6 @@ public class PlayerController : MonoBehaviour
     public GameObject biteEffectPrefab;
     public GameObject leapEffectPrefab;
     public TrailRenderer diveTrail;
-    public GameObject diveImpactPrefab;
-    public float diveSpeed = 25f;
-    private bool isDiving = false;
     public GameObject dashEffectPrefab;
     [SerializeField] internal float dashImpulse = 18f;
     [SerializeField] internal float dashIFrameDuration = 0.15f;
@@ -89,7 +86,6 @@ public class PlayerController : MonoBehaviour
     [Header("Portal Settings")]
     public GameObject portalPrefab;
     public float portalMaxRange = 10f;
-    public int portalCost = 2;
     private Portal firstPortalInstance;
 
     [Header("Wall Settings")]
@@ -424,7 +420,7 @@ public class PlayerController : MonoBehaviour
         if (isGrounded && (currentState == PlayerState.Jumping || currentState == PlayerState.KnockedBack || currentState == PlayerState.WallSliding))
             ChangeState(PlayerState.Idle);
 
-        if (isGrounded && currentState != PlayerState.Dashing)
+        if (isGrounded && currentState != PlayerState.Dashing && currentState != PlayerState.CometDiving)
         {
             if (moveInput != 0) { ChangeState(PlayerState.Running); }
             else { ChangeState(PlayerState.Idle); }
@@ -496,6 +492,7 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator KnockbackRoutine(Vector2 knockbackForce)
     {
+        if (currentState == PlayerState.CometDiving) EndCometDive();
         ChangeState(PlayerState.KnockedBack);
         rb.linearVelocity = Vector2.zero;
         rb.AddForce(knockbackForce, ForceMode2D.Impulse);
@@ -543,6 +540,7 @@ public class PlayerController : MonoBehaviour
     {
         if (isDead) return;
         isDead = true;
+        if (currentState == PlayerState.CometDiving) EndCometDive();
 
         Debug.Log("💀 Oyuncu Öldü! Ses Çalınıyor...");
 
@@ -648,6 +646,7 @@ public class PlayerController : MonoBehaviour
 
     private void FallAndRespawn()
     {
+        if (currentState == PlayerState.CometDiving) EndCometDive();
         if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
             TakeDamage(fallDamage);
         if (currentHealth > 0)
@@ -717,7 +716,7 @@ public class PlayerController : MonoBehaviour
         currentShift = Mathf.Max(0, currentShift - amount);
     }
 
-    internal bool TryPlacePortal(out bool keepCard)
+    internal bool TryPlacePortal(out bool keepCard, int shiftCost)
     {
         keepCard = false;
         if (portalPrefab == null) return false;
@@ -744,7 +743,7 @@ public class PlayerController : MonoBehaviour
                 return false;
             }
 
-            int finalCost = portalCost;
+            int finalCost = shiftCost;
 
             if (SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.KineticDiscount))
             {
@@ -774,26 +773,24 @@ public class PlayerController : MonoBehaviour
     internal void PerformVampiricBite(float damageAmount)
     {
         if (audioSource != null && vampireBiteSound != null)
-        {
             audioSource.PlayOneShot(vampireBiteSound);
-        }
 
-        Collider2D hitEnemy = Physics2D.OverlapCircle(firePoint.position, biteRange, enemyLayer);
-
-        if (hitEnemy != null)
+        // ~0 = all layers: avoids the AeroBat/MeleeEnemy Default-layer miss from enemyLayer mask.
+        // GetComponentInParent finds EnemyHealth even when the collider is on a child.
+        Collider2D[] hits = Physics2D.OverlapCircleAll(firePoint.position, biteRange, ~0);
+        foreach (Collider2D hit in hits)
         {
-            EnemyHealth targetHealth = hitEnemy.GetComponent<EnemyHealth>();
+            EnemyHealth targetHealth = hit.GetComponentInParent<EnemyHealth>();
+            if (targetHealth == null) continue;
 
-            if (targetHealth != null)
+            targetHealth.TakeDamage(damageAmount);
+            Heal(biteHealAmount);
+            if (biteEffectPrefab != null)
             {
-                targetHealth.TakeDamage(damageAmount);
-                Heal(biteHealAmount);
-                if (biteEffectPrefab != null)
-                {
-                    GameObject vfx = Instantiate(biteEffectPrefab, hitEnemy.transform.position, Quaternion.identity);
-                    Destroy(vfx, 1.0f);
-                }
+                GameObject vfx = Instantiate(biteEffectPrefab, hit.transform.position, Quaternion.identity);
+                Destroy(vfx, 1.0f);
             }
+            return; // one bite, one target
         }
     }
 
@@ -880,16 +877,13 @@ public class PlayerController : MonoBehaviour
         transform.SetParent(cannonTransform);
     }
 
-    internal void PerformCometDive()
+    internal void StartCometDive()
     {
-        if (audioSource != null && cometDiveSound != null)
-        {
-            audioSource.PlayOneShot(cometDiveSound);
-        }
         ChangeState(PlayerState.CometDiving);
-        rb.linearVelocity = new Vector2(0, -cometSpeed);
-
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, -cometSpeed);
         if (diveTrail != null) diveTrail.emitting = true;
+        if (audioSource != null && cometDiveSound != null)
+            audioSource.PlayOneShot(cometDiveSound);
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
@@ -897,12 +891,8 @@ public class PlayerController : MonoBehaviour
         if (currentState == PlayerState.CometDiving)
         {
             bool isGround = (groundLayer.value & (1 << collision.gameObject.layer)) > 0;
-            bool isEnemy = (enemyLayer.value & (1 << collision.gameObject.layer)) > 0;
-
-            if (isGround || isEnemy)
-            {
-                CometImpact();
-            }
+            if (isGround)
+                LandCometDive();
             return;
         }
 
@@ -931,30 +921,28 @@ public class PlayerController : MonoBehaviour
         if (CameraShake.instance != null) CameraShake.instance.Shake(0.1f, 0.2f);
     }
 
-    private void CometImpact()
+    private void EndCometDive()
     {
-        ChangeState(PlayerState.Idle);
-
         if (diveTrail != null) diveTrail.emitting = false;
+    }
 
-        if (diveImpactPrefab != null)
+    private void LandCometDive()
+    {
+        Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, cometRadius, ~0);
+        HashSet<EnemyHealth> damaged = new HashSet<EnemyHealth>();
+        foreach (Collider2D hit in hits)
         {
-            Instantiate(diveImpactPrefab, transform.position, Quaternion.identity);
-        }
-
-        Collider2D[] hitEnemies = Physics2D.OverlapCircleAll(transform.position, cometRadius, enemyLayer);
-
-        foreach (Collider2D enemy in hitEnemies)
-        {
-            EnemyHealth eHealth = enemy.GetComponent<EnemyHealth>();
-            if (eHealth != null)
-            {
+            EnemyHealth eHealth = hit.GetComponentInParent<EnemyHealth>();
+            if (eHealth != null && damaged.Add(eHealth))
                 eHealth.TakeDamage(cometDamage);
-            }
         }
 
-        if (CameraShake.instance != null) CameraShake.instance.Shake(0.3f, 0.5f);
-        if (cometImpactEffect != null) Instantiate(cometImpactEffect, transform.position, Quaternion.identity);
+        if (cometImpactEffect != null)
+            Instantiate(cometImpactEffect, transform.position, Quaternion.identity);
+        if (CameraShake.instance != null) CameraShake.instance.Shake(0.15f, 0.5f);
+
+        EndCometDive();
+        ChangeState(PlayerState.Idle);
     }
 
     internal void UseAdrenaline(float value)

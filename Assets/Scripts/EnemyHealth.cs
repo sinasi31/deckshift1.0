@@ -1,6 +1,5 @@
 using UnityEngine;
 using System.Collections;
-using System.Collections.Generic;
 
 public class EnemyHealth : MonoBehaviour
 {
@@ -14,21 +13,23 @@ public class EnemyHealth : MonoBehaviour
     public GameObject healthBarPrefab;
     public Vector2 headBarOffset = new Vector2(0f, 1f);
 
-    [Header("Stun (Sersemletme) Ayarları")]
-    [Tooltip("Stun yediğinde devre dışı bırakılacak scriptleri buraya sürükle (Örn: PatrolEnemy, Turret).")]
-    public List<MonoBehaviour> scriptsToDisable;
+    [Header("Stun")]
+    [SerializeField] private SpriteRenderer[] stunSpriteRenderers = new SpriteRenderer[0];
+    [SerializeField] private SkinnedMeshRenderer[] stunSkinnedRenderers = new SkinnedMeshRenderer[0];
 
     [Header("Efektler")]
     public GameObject damagePopupPrefab;
 
     private float currentHealth;
 
-    // Stun için orijinal renk
-    private SpriteRenderer enemySprite;
-    private Color originalColor;
-    private bool isStunned = false;
+    // Polled by AI scripts — they return early while this is true.
+    public bool IsStunned { get; private set; }
 
-    // Hasar flash — SpriteRenderer ve SkinnedMeshRenderer desteklenir
+    private Color[] stunSpriteOriginalColors;
+    private Color[] stunSkinnedOriginalColors;
+    private Coroutine stunRoutineRef;
+
+    // Damage flash — SpriteRenderer and SkinnedMeshRenderer both supported
     private SpriteRenderer flashSpriteRenderer;
     private SkinnedMeshRenderer flashSkinnedRenderer;
     private Color flashSpriteOriginalColor;
@@ -41,11 +42,21 @@ public class EnemyHealth : MonoBehaviour
     {
         currentHealth = maxHealth;
 
-        // Stun renk referansı (root SpriteRenderer)
-        enemySprite = GetComponent<SpriteRenderer>();
-        if (enemySprite != null) originalColor = enemySprite.color;
+        stunSpriteOriginalColors = new Color[stunSpriteRenderers.Length];
+        for (int i = 0; i < stunSpriteRenderers.Length; i++)
+        {
+            if (stunSpriteRenderers[i] != null)
+                stunSpriteOriginalColors[i] = stunSpriteRenderers[i].color;
+        }
 
-        // Flash renderer: SkinnedMeshRenderer öncelikli (AeroBat gibi), yoksa SpriteRenderer
+        stunSkinnedOriginalColors = new Color[stunSkinnedRenderers.Length];
+        for (int i = 0; i < stunSkinnedRenderers.Length; i++)
+        {
+            if (stunSkinnedRenderers[i] != null && stunSkinnedRenderers[i].material.HasProperty("_Color"))
+                stunSkinnedOriginalColors[i] = stunSkinnedRenderers[i].material.color;
+        }
+
+        // Flash renderer: SkinnedMeshRenderer first (AeroBat etc.), fallback SpriteRenderer
         flashSkinnedRenderer = GetComponentInChildren<SkinnedMeshRenderer>(true);
         if (flashSkinnedRenderer != null)
         {
@@ -56,7 +67,6 @@ public class EnemyHealth : MonoBehaviour
         flashSpriteRenderer = GetComponentInChildren<SpriteRenderer>(true);
         if (flashSpriteRenderer != null) flashSpriteOriginalColor = flashSpriteRenderer.color;
 
-        // Health bar spawn
         if (healthBarPrefab != null)
         {
             GameObject barGO = Instantiate(healthBarPrefab);
@@ -71,7 +81,6 @@ public class EnemyHealth : MonoBehaviour
         }
     }
 
-    // --- HASAR BÖLÜMÜ ---
     public void TakeDamage(float damage, Transform damageSource = null)
     {
         currentHealth -= damage;
@@ -99,18 +108,14 @@ public class EnemyHealth : MonoBehaviour
         healthBar?.SetHealth(currentHealth, maxHealth);
 
         if (currentHealth <= 0)
-        {
             Die();
-        }
     }
 
     private IEnumerator FlashRoutine()
     {
-        // SkinnedMeshRenderer (AeroBat vb.) beyaz flash
         if (flashSkinnedRenderer != null && flashSkinnedHasColor)
             flashSkinnedRenderer.material.SetColor("_Color", Color.white);
 
-        // SpriteRenderer beyaz flash
         if (flashSpriteRenderer != null)
             flashSpriteRenderer.color = Color.white;
 
@@ -153,29 +158,41 @@ public class EnemyHealth : MonoBehaviour
         Destroy(gameObject);
     }
 
+    // Calling Stun while already stunned extends the duration (cancels old timer, starts fresh).
     public void Stun(float duration)
     {
-        if (isStunned) return;
-        StartCoroutine(StunRoutine(duration));
+        if (stunRoutineRef != null)
+            StopCoroutine(stunRoutineRef);
+        stunRoutineRef = StartCoroutine(StunRoutine(duration));
     }
 
     private IEnumerator StunRoutine(float duration)
     {
-        isStunned = true;
-
-        foreach (var script in scriptsToDisable)
-            if (script != null) script.enabled = false;
-
-        if (enemySprite != null) enemySprite.color = Color.blue;
+        IsStunned = true;
+        for (int i = 0; i < stunSpriteRenderers.Length; i++)
+        {
+            if (stunSpriteRenderers[i] != null) stunSpriteRenderers[i].color = Color.blue;
+        }
+        for (int i = 0; i < stunSkinnedRenderers.Length; i++)
+        {
+            if (stunSkinnedRenderers[i] != null && stunSkinnedRenderers[i].material.HasProperty("_Color"))
+                stunSkinnedRenderers[i].material.SetColor("_Color", Color.blue);
+        }
         Debug.Log($"{gameObject.name} DONDU!");
 
         yield return new WaitForSeconds(duration);
 
-        foreach (var script in scriptsToDisable)
-            if (script != null) script.enabled = true;
-
-        if (enemySprite != null) enemySprite.color = originalColor;
-        isStunned = false;
+        IsStunned = false;
+        for (int i = 0; i < stunSpriteRenderers.Length; i++)
+        {
+            if (stunSpriteRenderers[i] != null) stunSpriteRenderers[i].color = stunSpriteOriginalColors[i];
+        }
+        for (int i = 0; i < stunSkinnedRenderers.Length; i++)
+        {
+            if (stunSkinnedRenderers[i] != null && stunSkinnedRenderers[i].material.HasProperty("_Color"))
+                stunSkinnedRenderers[i].material.SetColor("_Color", stunSkinnedOriginalColors[i]);
+        }
+        stunRoutineRef = null;
         Debug.Log($"{gameObject.name} ÇÖZÜLDÜ!");
     }
 }

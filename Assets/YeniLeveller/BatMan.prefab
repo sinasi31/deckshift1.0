@@ -68,6 +68,22 @@ PrefabInstance:
       propertyPath: m_BodyType
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 5946757459841159558, guid: 4d7507a06ac2dc847b8d0d893c01eaa5, type: 3}
+      propertyPath: stunSpriteRenderers.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5946757459841159558, guid: 4d7507a06ac2dc847b8d0d893c01eaa5, type: 3}
+      propertyPath: stunSkinnedRenderers.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5946757459841159558, guid: 4d7507a06ac2dc847b8d0d893c01eaa5, type: 3}
+      propertyPath: 'stunSpriteRenderers.Array.data[0]'
+      value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 5946757459841159558, guid: 4d7507a06ac2dc847b8d0d893c01eaa5, type: 3}
+      propertyPath: 'stunSkinnedRenderers.Array.data[0]'
+      value: 
+      objectReference: {fileID: 7794456711026379285}
     m_RemovedComponents:
     - {fileID: 4974319120112828237, guid: 4d7507a06ac2dc847b8d0d893c01eaa5, type: 3}
     - {fileID: 2012188161917317062, guid: 4d7507a06ac2dc847b8d0d893c01eaa5, type: 3}
@@ -234,6 +250,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9417f4774a985e84aa085a73471db9fe, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!137 &7794456711026379285 stripped
+SkinnedMeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 3980274292033509584, guid: 1ebc58d4111596149afc5ae562471986, type: 3}
+  m_PrefabInstance: {fileID: 6563925493843088069}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &7795546390018060620 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3979184628404528009, guid: 1ebc58d4111596149afc5ae562471986, type: 3}

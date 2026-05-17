@@ -178,7 +178,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealth: 30
-  scriptsToDisable: []
+  stunSpriteRenderers:
+  - {fileID: 5505643352708025967}
+  stunSkinnedRenderers: []
   damagePopupPrefab: {fileID: 0}
 --- !u!114 &8319536949109224149
 MonoBehaviour:

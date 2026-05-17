@@ -67,6 +67,11 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 7970200218222573164}
   m_SourcePrefab: {fileID: 100100000, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+--- !u!137 &4620261557865731894 stripped
+SkinnedMeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 6497400698399929934, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+  m_PrefabInstance: {fileID: 1888434220028289400}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &4838929585779216848 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 6418267430543814824, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
@@ -103,5 +108,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealth: 30
-  scriptsToDisable: []
+  canBeHeadBounced: 1
+  healthBarPrefab: {fileID: 0}
+  headBarOffset: {x: 0, y: 1}
+  stunSpriteRenderers:
+  - {fileID: 0}
+  stunSkinnedRenderers:
+  - {fileID: 4620261557865731894}
   damagePopupPrefab: {fileID: 0}

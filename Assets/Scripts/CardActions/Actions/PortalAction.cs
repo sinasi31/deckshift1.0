@@ -1,4 +1,3 @@
-using System.Collections;
 using UnityEngine;
 
 public class PortalAction : CardAction
@@ -7,6 +6,6 @@ public class PortalAction : CardAction
 
     public override bool Execute(PlayerController player, float value, out bool keepCardInHand)
     {
-        return player.TryPlacePortal(out keepCardInHand);
+        return player.TryPlacePortal(out keepCardInHand, Mathf.RoundToInt(value));
     }
 }

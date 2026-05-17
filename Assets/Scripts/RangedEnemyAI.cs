@@ -13,6 +13,7 @@ public class RangedEnemyAI : MonoBehaviour
     public float yTolerance = 1.5f;
 
     private MonsterController controller;
+    private EnemyHealth health;
     private PixelMonster pm; // Yüzünü dönmesi için eklendi
     private Transform player;
     private float lastAttackTime;
@@ -20,6 +21,7 @@ public class RangedEnemyAI : MonoBehaviour
     void Start()
     {
         controller = GetComponent<MonsterController>();
+        health = GetComponent<EnemyHealth>();
         pm = GetComponent<PixelMonster>();
 
         GameObject p = GameObject.FindGameObjectWithTag("Player");
@@ -36,6 +38,8 @@ public class RangedEnemyAI : MonoBehaviour
 
         controller.inputMove = Vector2.zero;
         controller.inputAttack = false;
+
+        if (health != null && health.IsStunned) return;
 
         float distance = Vector2.Distance(transform.position, player.position);
         float yDifference = Mathf.Abs(player.position.y - transform.position.y); // Yükseklik farkı

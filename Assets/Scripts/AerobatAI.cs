@@ -29,6 +29,7 @@ public class AeroBatAI : MonoBehaviour
     public GameObject alertIcon;
 
     private Rigidbody2D rb;
+    private EnemyHealth health;
     private Transform player;
     private Vector3 startPos;
 
@@ -41,6 +42,7 @@ public class AeroBatAI : MonoBehaviour
     private void Start()
     {
         rb = GetComponent<Rigidbody2D>();
+        health = GetComponent<EnemyHealth>();
         startPos = transform.position;
 
         GameObject p = GameObject.FindGameObjectWithTag("Player");
@@ -52,6 +54,11 @@ public class AeroBatAI : MonoBehaviour
     private void FixedUpdate()
     {
         if (player == null) return;
+        if (health != null && health.IsStunned)
+        {
+            rb.linearVelocity = Vector2.zero;
+            return;
+        }
 
         switch (currentState)
         {
@@ -73,6 +80,7 @@ public class AeroBatAI : MonoBehaviour
     private void Update()
     {
         if (player == null) return;
+        if (health != null && health.IsStunned) return;
 
         // Idle'dayken oyuncuyu kontrol et
         if (currentState == State.Idle)
@@ -123,6 +131,13 @@ public class AeroBatAI : MonoBehaviour
         yield return new WaitForSeconds(windUpTime);
 
         if (alertIcon != null) alertIcon.SetActive(false);
+
+        // Stunned during wind-up: abort rather than launching a ghost dive.
+        if (health != null && health.IsStunned)
+        {
+            currentState = State.Idle;
+            yield break;
+        }
 
         diveTarget = player.position;
         diveTimer = 0f;
