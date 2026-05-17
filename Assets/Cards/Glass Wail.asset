@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 27701a6f0f52d86438cb67605f92527c, type: 3}
   m_Name: Glass Wail
   m_EditorClassIdentifier: 
-  cardName: 
-  description: Stuns all nearby enemies for 3 seconds. Breaks after use.
-  cardArt: {fileID: 0}
+  cardName: Glass Wail
+  description: 'Stuns all enemies for 10 seconds. '
+  cardArt: {fileID: 6126700809067087963, guid: d4053d6d812103d46953073292ab0e7d, type: 3}
   actionType: 10
-  actionValue: 500
+  actionValue: 10
   singleUse: 1
-  shiftCost: 2
+  shiftCost: 0
   maxUses: 1

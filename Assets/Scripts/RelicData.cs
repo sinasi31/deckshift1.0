@@ -10,6 +10,7 @@ public class RelicData : ScriptableObject
     [TextArea]
     public string description;
     public Sprite relicArt;
+    public Rarity rarity;
 
     // TODO: Nadirlik (Rarity) gibi þeyler de buraya eklenebilir (Common, Epic, Legendary)
 }

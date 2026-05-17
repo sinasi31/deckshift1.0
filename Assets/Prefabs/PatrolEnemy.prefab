@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 6505065351007540142}
   - component: {fileID: 3339397666568596744}
   - component: {fileID: 3726729032928614124}
+  - component: {fileID: 7043704574654365103}
   m_Layer: 11
   m_Name: PatrolEnemy
   m_TagString: Untagged
@@ -30,8 +31,8 @@ Transform:
   m_GameObject: {fileID: 3803665411137259555}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.33, y: -2.8, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: 1.3311, y: -2.8051, z: 0}
+  m_LocalScale: {x: 0.5176669, y: 0.5176669, z: 0.5176669}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4771012582291030345}
@@ -80,13 +81,13 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_Sprite: {fileID: 7482667652216324306, guid: 311925a002f4447b3a28927169b83ea6, type: 3}
+  m_SortingOrder: 2
+  m_Sprite: {fileID: -2506806188812462326, guid: 6cad9c2ba5189794b8d3d2406e1cf888, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 1, y: 1}
+  m_Size: {x: 3.41, y: 4.31}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
@@ -153,17 +154,17 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0}
+  m_Offset: {x: 0.39998507, y: -0.1368919}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 1, y: 1}
-    newSize: {x: 1, y: 1}
+    oldSize: {x: 3.41, y: 4.31}
+    newSize: {x: 3.41, y: 4.31}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 1, y: 1}
+  m_Size: {x: 2.4874058, y: 4.15384}
   m_EdgeRadius: 0
 --- !u!114 &3339397666568596744
 MonoBehaviour:
@@ -196,9 +197,33 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4813e138349d3bd47bc9e51b493d345a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHealth: 30
-  scriptsToDisable:
-  - {fileID: 3339397666568596744}
+  maxHealth: 10
+  stunSpriteRenderers:
+  - {fileID: 4406904524148746246}
+  stunSkinnedRenderers: []
+  damagePopupPrefab: {fileID: 2036397937272019125, guid: c4cd6b8e18cb9d141b1b0f9fa894bc1f, type: 3}
+--- !u!95 &7043704574654365103
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3803665411137259555}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: f7ee637c72a374744bcf877e4a1f44cd, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &8083074988721256616
 GameObject:
   m_ObjectHideFlags: 0
@@ -224,7 +249,7 @@ Transform:
   m_GameObject: {fileID: 8083074988721256616}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.478, y: -0.486, z: 0}
+  m_LocalPosition: {x: -0.82, y: -1.84, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

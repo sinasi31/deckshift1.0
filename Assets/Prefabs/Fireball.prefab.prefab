@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 8324526200269074279}
   - component: {fileID: 3101831543337624085}
   - component: {fileID: -5960682082996986560}
+  - component: {fileID: -6405273238894449273}
   m_Layer: 10
   m_Name: Fireball.prefab
   m_TagString: Untagged
@@ -31,7 +32,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -12.66, y: -2.22, z: 0}
-  m_LocalScale: {x: 0.38128, y: 0.38128, z: 0.38128}
+  m_LocalScale: {x: 3.0236206, y: 3.0236206, z: 3.0236206}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -80,7 +81,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: -2413806693520163455, guid: a86470a33a6bf42c4b3595704624658b, type: 3}
+  m_Sprite: {fileID: 5353841184698615464, guid: 29c97c90705c9c347abdab5a5736a144, type: 3}
   m_Color: {r: 0.9811321, g: 0.013883919, b: 0.013883919, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -152,8 +153,8 @@ CircleCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0}
-  m_Radius: 0.5
+  m_Offset: {x: 0.0021838066, y: 0.0021838855}
+  m_Radius: 0.1374759
 --- !u!114 &3101831543337624085
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -168,6 +169,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   speed: 15
   lifeTime: 3
+  explosionEffect: {fileID: 7254208443641311414, guid: 8aca44dbf844a7a4899d5cd52b7b744a, type: 3}
   damage: 10
 --- !u!114 &-5960682082996986560
 MonoBehaviour:
@@ -179,5 +181,17 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 57d7b939ac2342744b9d7e228d5671bd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &-6405273238894449273
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6847861146471343392}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 36f9e7b3e2649e54893454c90e037d30, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 

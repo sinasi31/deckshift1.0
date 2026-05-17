@@ -10,12 +10,13 @@ public class RewardManager : MonoBehaviour
     [Header("References")]
     public GameObject rewardScreen;
 
-    // --- DEÐÝÞÝKLÝK: Artýk Button listesi deðil, CardUI listesi tutuyoruz ---
+    // --- DEï¿½ï¿½ï¿½ï¿½KLï¿½K: Artï¿½k Button listesi deï¿½il, CardUI listesi tutuyoruz ---
     public List<CardUI> rewardCardSlots;
-    // --- BÝTÝÞ ---
+    // --- Bï¿½Tï¿½ï¿½ ---
 
     private List<CardData> offeredCards = new List<CardData>();
     private int bonusCardIndex = -1;
+    private bool isShowing = false;
 
     private void Awake()
     {
@@ -30,13 +31,16 @@ public class RewardManager : MonoBehaviour
 
     public void ShowRewardScreen()
     {
+        if (isShowing) return;
+        isShowing = true;
+
         offeredCards.Clear();
         bonusCardIndex = -1;
 
         List<CardData> cardPool = AchievementManager.instance.GetAvailableCardPool();
         GameManager.instance.SetGameState(GameState.Paused);
 
-        // 3 Kart Seç
+        // 3 Kart Seï¿½
         for (int i = 0; i < 3; i++)
         {
             if (cardPool.Count == 0) break;
@@ -45,11 +49,11 @@ public class RewardManager : MonoBehaviour
             cardPool.RemoveAt(randomIndex);
         }
 
-        // Bonus þansý
+        // Bonus ï¿½ansï¿½
         if (offeredCards.Count > 0)
             bonusCardIndex = Random.Range(0, offeredCards.Count);
 
-        // Kartlarý UI'a yerleþtir
+        // Kartlarï¿½ UI'a yerleï¿½tir
         for (int i = 0; i < rewardCardSlots.Count; i++)
         {
             if (i < offeredCards.Count)
@@ -59,22 +63,22 @@ public class RewardManager : MonoBehaviour
 
                 CardData data = offeredCards[i];
 
-                // --- GÖRSEL KURULUM (En Önemli Kýsým) ---
-                // CardUI'ýn kendi Setup fonksiyonunu kullanýyoruz!
-                // Görsel olmasý için geçici bir RuntimeCard oluþturuyoruz.
+                // --- Gï¿½RSEL KURULUM (En ï¿½nemli Kï¿½sï¿½m) ---
+                // CardUI'ï¿½n kendi Setup fonksiyonunu kullanï¿½yoruz!
+                // Gï¿½rsel olmasï¿½ iï¿½in geï¿½ici bir RuntimeCard oluï¿½turuyoruz.
                 RuntimeCard visualCard = new RuntimeCard(data);
 
-                // Bonus varsa açýklamasýný güncelle (Sadece görsel için)
+                // Bonus varsa aï¿½ï¿½klamasï¿½nï¿½ gï¿½ncelle (Sadece gï¿½rsel iï¿½in)
                 if (i == bonusCardIndex)
                 {
-                    // Not: Bu kalýcý veriyi deðiþtirmez, sadece visualCard'ý etkiler
-                    // (CardUI scriptinde descriptionText'i description'dan aldýðýmýzý varsayarsak)
-                    // Ancak CardData ScriptableObject olduðu için açýklamayý kodla deðiþtirmek riskli olabilir.
-                    // Þimdilik bonusu göstermek için basit bir yöntem:
+                    // Not: Bu kalï¿½cï¿½ veriyi deï¿½iï¿½tirmez, sadece visualCard'ï¿½ etkiler
+                    // (CardUI scriptinde descriptionText'i description'dan aldï¿½ï¿½ï¿½mï¿½zï¿½ varsayarsak)
+                    // Ancak CardData ScriptableObject olduï¿½u iï¿½in aï¿½ï¿½klamayï¿½ kodla deï¿½iï¿½tirmek riskli olabilir.
+                    // ï¿½imdilik bonusu gï¿½stermek iï¿½in basit bir yï¿½ntem:
                     Debug.Log($"Kart {i} BONUSLU (+1 Shift)");
                 }
 
-                // Setup'ý çaðýr (Bu; resmi, frame'i, daireleri her þeyi ayarlar!)
+                // Setup'ï¿½ ï¿½aï¿½ï¿½r (Bu; resmi, frame'i, daireleri her ï¿½eyi ayarlar!)
                 slot.Setup(visualCard, i + 1);
 
                 // --- BUTON TIKLAMA OLAYI ---
@@ -94,7 +98,7 @@ public class RewardManager : MonoBehaviour
         }
 
         rewardScreen.SetActive(true);
-        Time.timeScale = 0f;
+        if (GameManager.instance != null) GameManager.instance.RequestPause();
     }
 
     public void SelectCard(int cardIndex)
@@ -107,8 +111,9 @@ public class RewardManager : MonoBehaviour
             GameManager.instance.player.AddShift(1);
         }
 
+        isShowing = false;
         rewardScreen.SetActive(false);
-        Time.timeScale = 1f;
+        if (GameManager.instance != null) GameManager.instance.ReleasePause();
         GameManager.instance.SetGameState(GameState.Playing);
         LevelManager.instance.SpawnNextRoom();
     }

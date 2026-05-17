@@ -1,3 +1,4 @@
+ï»¿using Unity.Cinemachine;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -6,57 +7,138 @@ public class LevelManager : MonoBehaviour
     public static LevelManager instance;
 
     [Header("Referanslar")]
-    public Transform playerTransform; // Oyuncunun Transform'u
+    public Transform playerTransform;
 
-    [Header("Oda Ayarlarý")]
-    public List<GameObject> roomPrefabs; // Oluþturulabilecek tüm oda prefab'larýnýn listesi
+    [Header("Oda AyarlarÄ±")]
+    public List<GameObject> roomPrefabs;
 
+    private List<int> availableRoomIndices = new List<int>();
     private GameObject currentRoom;
-    private Transform currentExitPoint;
+    private bool hasSpawnedFirstRoom = false;
 
     private void Awake()
     {
         if (instance == null) { instance = this; }
         else { Destroy(gameObject); }
+
+        if (playerTransform == null)
+        {
+            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+            if (playerObj != null) playerTransform = playerObj.transform;
+        }
     }
 
     private void Start()
     {
-        // Oyuna ilk odayý yaratarak baþla
+        RefillRoomPool();
         SpawnNextRoom();
+    }
+
+    private void RefillRoomPool()
+    {
+        availableRoomIndices.Clear();
+        for (int i = 0; i < roomPrefabs.Count; i++)
+        {
+            availableRoomIndices.Add(i);
+        }
+        Debug.Log("Oda havuzu yenilendi/dolduruldu.");
     }
 
     public void SpawnNextRoom()
     {
-        // Eðer mevcut bir oda varsa, önce onu yok et
-        if (currentRoom != null)
+        TemporaryObject[] junk = FindObjectsByType<TemporaryObject>(FindObjectsSortMode.None);
+        foreach (TemporaryObject obj in junk) Destroy(obj.gameObject);
+
+        if (currentRoom != null) Destroy(currentRoom);
+
+        if (availableRoomIndices.Count == 0)
         {
-            Destroy(currentRoom);
+            RefillRoomPool();
         }
 
-        // Listeden rastgele bir oda prefab'ý seç
-        int randomIndex = Random.Range(0, roomPrefabs.Count);
-        GameObject selectedRoomPrefab = roomPrefabs[randomIndex];
-
-        // Yeni odayý (0,0,0) pozisyonunda yarat
-        currentRoom = Instantiate(selectedRoomPrefab, Vector3.zero, Quaternion.identity);
-
-        // Yeni odanýn giriþ noktasýný bul
-        Transform entryPoint = currentRoom.transform.Find("GirisNoktasi");
-
-        // Oyuncuyu yeni odanýn giriþ noktasýna ýþýnla
-        if (entryPoint != null && playerTransform != null)
+        int selectedRoomIndex;
+        if (!hasSpawnedFirstRoom)
         {
-            playerTransform.position = entryPoint.position;
-            playerTransform.GetComponent<PlayerController>().OnNewRoomEnter();
-            PlayerController playerController = playerTransform.GetComponent<PlayerController>();
-            playerController.OnNewRoomEnter();
-            playerController.SetCurrentEntryPoint(entryPoint.position);
-
+            hasSpawnedFirstRoom = true;
+            selectedRoomIndex = 0;
+            availableRoomIndices.Remove(0);
         }
         else
         {
-            Debug.LogError("Yeni odanýn Giriþ Noktasý bulunamadý veya oyuncu referansý eksik!");
+            // Strip hub (index 0) from the pool â€” it may have re-entered via a refill above.
+            availableRoomIndices.Remove(0);
+
+            // If stripping hub left the pool empty, refill and strip again.
+            if (availableRoomIndices.Count == 0)
+            {
+                RefillRoomPool();
+                availableRoomIndices.Remove(0);
+            }
+
+            if (availableRoomIndices.Count > 0)
+            {
+                int randomIndexInPool = Random.Range(0, availableRoomIndices.Count);
+                selectedRoomIndex = availableRoomIndices[randomIndexInPool];
+                availableRoomIndices.RemoveAt(randomIndexInPool);
+            }
+            else
+            {
+                selectedRoomIndex = 0; // only one prefab in the list; fall back to hub
+            }
         }
+
+        Debug.Log($"SeÃ§ilen Oda Indexi: {selectedRoomIndex}. Kalan Oda SayÄ±sÄ±: {availableRoomIndices.Count}");
+
+        GameObject selectedRoomPrefab = roomPrefabs[selectedRoomIndex];
+        currentRoom = Instantiate(selectedRoomPrefab, Vector3.zero, Quaternion.identity);
+
+        Transform boundsObj = currentRoom.transform.Find("CameraBounds");
+        if (boundsObj != null)
+        {
+            Debug.Log("CameraBounds bulundu: " + boundsObj.name);
+            BoxCollider2D[] zones = boundsObj.GetComponentsInChildren<BoxCollider2D>();
+            Debug.Log("Zone sayÄ±sÄ±: " + zones.Length);
+            CameraFollow cam = Camera.main.GetComponent<CameraFollow>();
+            if (cam != null)
+            {
+                cam.SetZones(zones);
+                Debug.Log("SetZones Ã§aÄŸrÄ±ldÄ±!");
+            }
+            else
+            {
+                Debug.LogError("CameraFollow bulunamadÄ±!");
+            }
+        }
+        else
+        {
+            Debug.LogError("CameraBounds objesi bulunamadÄ±!");
+        }
+
+        Transform entryPoint = currentRoom.transform.Find("GirisNoktasi");
+        if (entryPoint != null && playerTransform != null)
+        {
+            playerTransform.position = entryPoint.position;
+
+            PlayerController playerController = playerTransform.GetComponent<PlayerController>();
+            if (playerController != null)
+            {
+                playerController.OnNewRoomEnter();
+                playerController.SetCurrentEntryPoint(entryPoint.position);
+            }
+        }
+
+        if (DeckManager.instance != null)
+        {
+            DeckManager.instance.ReloadHand();
+            DeckManager.instance.ResetRecallCost();
+        }
+    }
+
+    // Returns true when the active room has a HubMarker on its root.
+    // Uses currentRoom â€” the single authoritative field set by SpawnNextRoom.
+    public bool IsCurrentRoomHub()
+    {
+        if (currentRoom == null) return false;
+        return currentRoom.GetComponent<HubMarker>() != null;
     }
 }

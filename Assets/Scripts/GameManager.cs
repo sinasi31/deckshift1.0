@@ -9,7 +9,7 @@ public enum GameState
 public class GameManager : MonoBehaviour
 {
     public static GameManager instance;
-    public PlayerController player; // Player'ý bulmak için hala önemli
+    public PlayerController player; // Player'ï¿½ bulmak iï¿½in hala ï¿½nemli
 
     public GameState currentState;
 
@@ -27,6 +27,20 @@ public class GameManager : MonoBehaviour
         Debug.Log("Game state changed to: " + newState);
     }
 
-    // --- BURADAKÝ TÜM JUMP CHARGE KODLARI SÝLÝNDÝ ---
-    // (Update, Start, AddCharges, ve deðiþkenler)
+    private int pauseDepth = 0;
+
+    public void RequestPause()
+    {
+        pauseDepth++;
+        if (pauseDepth == 1) Time.timeScale = 0f;
+    }
+
+    public void ReleasePause()
+    {
+        pauseDepth = Mathf.Max(0, pauseDepth - 1);
+        if (pauseDepth == 0) Time.timeScale = 1f;
+    }
+
+    // --- BURADAKï¿½ Tï¿½M JUMP CHARGE KODLARI Sï¿½Lï¿½NDï¿½ ---
+    // (Update, Start, AddCharges, ve deï¿½iï¿½kenler)
 }

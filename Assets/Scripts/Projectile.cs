@@ -2,10 +2,9 @@ using UnityEngine;
 
 public class Projectile : MonoBehaviour
 {
-    public float speed = 10f; // Merminin hýzý
-    public float lifeTime = 3f; // Merminin sahnede kalacaðý süre
-    public float damage = 10f;  // Merminin vereceði hasar
-
+    public float speed = 10f; 
+    public float lifeTime = 3f; 
+    public float damage = 10f;  
     private Rigidbody2D rb;
 
     private void Awake()
@@ -15,29 +14,31 @@ public class Projectile : MonoBehaviour
 
     void Start()
     {
-        // Yaratýldýktan 'lifeTime' saniye sonra kendini yok et
         Destroy(gameObject, lifeTime);
     }
 
-    // Bu fonksiyon, mermiyi belirli bir yöne doðru fýrlatmak için dýþarýdan çaðrýlacak
     public void Launch(Vector2 direction)
     {
         rb.linearVelocity = direction.normalized * speed;
+        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+        transform.rotation = Quaternion.Euler(0, 0, angle);
     }
-
-    // Bir þeye çarptýðýnda...
-    private void OnTriggerEnter2D(Collider2D other)
+    void OnTriggerEnter2D(Collider2D other)
     {
-        // Çarptýðý þey oyuncu mu?
+        if (other.isTrigger)
+        {
+            return;
+        }
         PlayerController player = other.GetComponent<PlayerController>();
         if (player != null)
         {
-            // Oyuncuya hasar ver
-            player.TakeDamage(damage);
+            player.TakeDamage(damage); // Hasar ver
+            Destroy(gameObject); // Mermiyi yok et
+            return;
         }
-
-        // Mermi, oyuncuya veya baþka bir þeye (duvar gibi) çarptýðýnda kendini yok et.
-        // Not: 'Ground' katmanýna sahip duvarlar gibi þeylerin de bir Collider'ý olmalý.
-        Destroy(gameObject);
+        if (other.GetComponent<EnemyHealth>() == null)
+        {
+            Destroy(gameObject); // Duvara çarptý, yok et
+        }
     }
 }

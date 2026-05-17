@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardName: Fireball
   description: Fire a Fireball that deals 15 damage
-  cardArt: {fileID: 0}
+  cardArt: {fileID: 7472728042676297033, guid: e66e3168bd068ff4e960d31c056e3e4e, type: 3}
   actionType: 7
   actionValue: 15
   singleUse: 0
   shiftCost: 0
-  maxUses: 3
+  maxUses: 6

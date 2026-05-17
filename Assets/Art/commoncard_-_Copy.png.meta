@@ -103,12 +103,12 @@ TextureImporter:
       name: commoncard_-_Copy_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 59
-        height: 94
+        x: 1
+        y: 1
+        width: 57
+        height: 91
       alignment: 0
-      pivot: {x: 0, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -121,11 +121,33 @@ TextureImporter:
       indices: 
       edges: []
       weights: []
+    - serializedVersion: 2
+      name: commoncard_-_Copy_1
+      rect:
+        serializedVersion: 2
+        x: 30
+        y: 70
+        width: 1
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 57f6b519b4cfb1e47a2912d3a93d35ed
+      internalID: -953260725
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
     outline: []
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 
+    spriteID: 597ba7f4c6e83db4a8dc3b76206507db
     internalID: 0
     vertices: []
     indices: 
@@ -136,6 +158,7 @@ TextureImporter:
       entries: []
     nameFileIdTable:
       commoncard_-_Copy_0: -6795663199175653850
+      commoncard_-_Copy_1: -953260725
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

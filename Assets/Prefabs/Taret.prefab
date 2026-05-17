@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 6682800146444715725}
   - component: {fileID: 4470832548366921458}
   - component: {fileID: 4083053409723435075}
-  m_Layer: 9
+  m_Layer: 11
   m_Name: Taret
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -151,7 +151,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   projectilePrefab: {fileID: 4286991970044149987, guid: 6b73fab4fba96814294a378972349c17, type: 3}
   firePoint: {fileID: 624914422611531266}
-  fireRate: 2
+  fireRate: 6
 --- !u!114 &4083053409723435075
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -165,8 +165,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealth: 15
-  scriptsToDisable:
-  - {fileID: 4470832548366921458}
+  stunSpriteRenderers:
+  - {fileID: 4463137626891186151}
+  stunSkinnedRenderers: []
+  damagePopupPrefab: {fileID: 2036397937272019125, guid: c4cd6b8e18cb9d141b1b0f9fa894bc1f, type: 3}
 --- !u!1 &5450092081969174536
 GameObject:
   m_ObjectHideFlags: 0
@@ -176,7 +178,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 624914422611531266}
-  m_Layer: 9
+  m_Layer: 11
   m_Name: FirePoint
   m_TagString: Untagged
   m_Icon: {fileID: 0}

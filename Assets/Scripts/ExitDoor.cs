@@ -1,35 +1,77 @@
 using UnityEngine;
+using UnityEngine.SceneManagement; 
 
 public class ExitDoor : MonoBehaviour
 {
+    [Header("Tï¿½r Ayarï¿½ (ï¿½NEMLï¿½)")]
+    public bool isSceneLoader = false; 
+    public string sceneToLoad = "GameScene"; 
+
+    [Header("Etkileï¿½im Ayarlarï¿½")]
+    public KeyCode interactKey = KeyCode.E;
+    public GameObject interactionPopup; 
+
     private bool hasBeenTriggered = false;
+    private bool isPlayerInRange = false;
+    private PlayerController currentPlayer;
+
+    private void Update()
+    {
+        if (isPlayerInRange && !hasBeenTriggered && Input.GetKeyDown(interactKey))
+        {
+            PerformExit();
+        }
+    }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        // Sadece bir kere çalýþsýn ve sadece oyuncu tetiklesin
-        if (hasBeenTriggered || !other.CompareTag("Player")) return;
+        if (hasBeenTriggered) return;
 
-        PlayerController player = other.GetComponent<PlayerController>();
-        if (player != null)
+        if (other.CompareTag("Player"))
         {
-            hasBeenTriggered = true;
-            Debug.Log("Çýkýþ kapýsýna ulaþýldý! Ödül ekraný açýlýyor...");
+            isPlayerInRange = true;
+            currentPlayer = other.GetComponent<PlayerController>();
+            if (interactionPopup != null) interactionPopup.SetActive(true);
+        }
+    }
 
-            // Hasarsýzlýk kontrolü
-            if (!player.TookDamageThisRoom)
+    private void OnTriggerExit2D(Collider2D other)
+    {
+        if (other.CompareTag("Player"))
+        {
+            isPlayerInRange = false;
+            currentPlayer = null;
+            if (interactionPopup != null) interactionPopup.SetActive(false);
+        }
+    }
+
+    private void PerformExit()
+    {
+        if (hasBeenTriggered) return;
+        hasBeenTriggered = true;
+
+        if (interactionPopup != null) interactionPopup.SetActive(false);
+
+        if (isSceneLoader)
+        {
+            Debug.Log("Hub'dan ï¿½ï¿½kï¿½lï¿½yor, oyun baï¿½lï¿½yor...");
+
+            if (QuestSystem.instance != null) QuestSystem.instance.CloseBoard();
+
+            SceneManager.LoadScene(sceneToLoad);
+        }
+        else
+        {
+            if (currentPlayer != null && !currentPlayer.TookDamageThisRoom)
             {
                 AchievementManager.instance.OnRoomClearedFlawlessly();
+
+                if (QuestSystem.instance != null) QuestSystem.instance.ReportEvent(QuestType.NoDamageRoom, 1);
             }
 
-            // Ödül ekranýný çaðýr
-            // Eðer RewardManager yoksa veya hata verirse oyun burada takýlýr.
             if (RewardManager.instance != null)
             {
                 RewardManager.instance.ShowRewardScreen();
-            }
-            else
-            {
-                Debug.LogError("ExitDoor Hatasý: RewardManager bulunamadý!");
             }
         }
     }

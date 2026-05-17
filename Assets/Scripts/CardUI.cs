@@ -1,81 +1,144 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using UnityEngine.EventSystems; // Hover iþlemleri için bu kütüphane þart!
+using UnityEngine.EventSystems;
 
-// Artýk kartýmýz fare hareketlerini dinleyecek (IPointer...)
-public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
 {
-    [Header("Temel Görseller")]
-    public Image cardArtImage; // Kartýn resmi
-    public TextMeshProUGUI keyHintText; // [1], [2] yazýsý
+    [Header("GÃ¶rseller")]
+    public Image cardArtImage;
+    public TextMeshProUGUI keyHintText;
+    public GameObject selectionFrame;
+    public TextMeshProUGUI usesText;
+    public Transform shiftCostContainer;
+    public GameObject shiftPointPrefab;
 
-    [Header("Mekanik Görseller")]
-    public TextMeshProUGUI usesText; // Büyük Daire
-    public Transform shiftCostContainer; // Küçük Dairelerin Kutusu
-    public GameObject shiftPointPrefab;  // Küçük Daire Prefabý
+    [Header("Hizalama AyarlarÄ±")]
+    public float pointSpacing = 20f; // Noktalar arasÄ± boÅŸluk (Bunu Inspector'dan deÄŸiÅŸtirebilirsin)
 
-    [Header("Hover (Açýklama) Ayarlarý")]
-    public GameObject descriptionPanel; // Fare üzerine gelince açýlacak kutu
-    public TextMeshProUGUI descriptionText; // O kutunun içindeki yazý
+    [Header("Hover")]
+    public GameObject descriptionPanel;
+    public TextMeshProUGUI descriptionText;
+    public float selectionLiftAmount = 50f;
 
-    // Setup sýrasýnda kartýn açýklamasýný panele yazacaðýz ama paneli gizli tutacaðýz
-    public void Setup(RuntimeCard card, int keyHintNumber)
+    private RuntimeCard myCard;
+    private int myIndex;
+    private Vector3 originalScale;
+    private RectTransform rectTransform;
+
+    public RuntimeCard GetCard()
     {
-        // 1. Resmi ve Ýpucunu ayarla (Ýsim artýk resimde olduðu için koda gerek yok)
-        cardArtImage.sprite = card.cardData.cardArt;
-        keyHintText.text = $"[{keyHintNumber}]";
+        return myCard;
+    }
 
-        // 2. Açýklama Metnini Hazýrla (Ama henüz gösterme)
+    private void Awake()
+    {
+        rectTransform = GetComponent<RectTransform>();
+        originalScale = transform.localScale;
+    }
+
+    public void Setup(RuntimeCard card, int index)
+    {
+        myCard = card;
+        myIndex = index;
+
+        if (cardArtImage != null) cardArtImage.sprite = card.cardData.cardArt;
+        if (keyHintText != null) keyHintText.text = $"[{index + 1}]";
+
+        // AÃ§Ä±klama
         if (descriptionPanel != null)
         {
-            descriptionPanel.SetActive(false); // Baþlangýçta gizle
+            descriptionPanel.SetActive(false);
             if (descriptionText != null)
-            {
-                // Ýstersen kartýn ismini de açýklamaya ekleyebilirsin
                 descriptionText.text = $"<b>{card.cardData.cardName}</b>\n\n{card.cardData.description}";
-            }
         }
 
-        // 3. Kullaným Hakký (Büyük Daire)
+        // Uses
         if (usesText != null)
         {
-            usesText.text = card.currentUses.ToString();
-            if (card.currentUses == 1) usesText.color = Color.red;
-            else usesText.color = Color.white;
+            if (card.isInfinite) usesText.text = "âˆž";
+            else
+            {
+                usesText.text = card.currentUses.ToString();
+                usesText.color = (card.currentUses == 1) ? Color.red : Color.white;
+            }
         }
 
-        // 4. Shift Maliyeti (Küçük Daireler)
+        // --- YENÄ° HÄ°ZALAMA SÄ°STEMÄ° ---
         if (shiftCostContainer != null && shiftPointPrefab != null)
         {
+            // Ã–nce eskileri temizle
             foreach (Transform child in shiftCostContainer) Destroy(child.gameObject);
-            for (int i = 0; i < card.cardData.shiftCost; i++)
+
+            int cost = card.cardData.shiftCost;
+
+            // EÄŸer maliyet 0 ise hiÃ§bir ÅŸey yapma
+            if (cost > 0)
             {
-                Instantiate(shiftPointPrefab, shiftCostContainer);
+                // Toplam geniÅŸliÄŸi hesapla (Nokta sayÄ±sÄ± - 1 * BoÅŸluk)
+                float totalWidth = (cost - 1) * pointSpacing;
+
+                // BaÅŸlangÄ±Ã§ noktasÄ± (Merkezden sola doÄŸru yarÄ±m geniÅŸlik kadar git)
+                float startX = -totalWidth / 2f;
+
+                for (int i = 0; i < cost; i++)
+                {
+                    GameObject p = Instantiate(shiftPointPrefab, shiftCostContainer);
+                    RectTransform rt = p.GetComponent<RectTransform>();
+
+                    // Pozisyonu ayarla: BaÅŸlangÄ±Ã§ + (SÄ±ra * BoÅŸluk)
+                    rt.anchoredPosition = new Vector2(startX + (i * pointSpacing), 0f);
+                }
             }
+        }
+        // -----------------------------
+
+        UpdateSelectionVisual();
+    }
+
+    private void Update()
+    {
+        if (myCard != null) UpdateSelectionVisual();
+    }
+
+    private void UpdateSelectionVisual()
+    {
+        bool isSelected = myCard.isSelected;
+        if (selectionFrame != null) selectionFrame.SetActive(isSelected);
+
+        Vector3 targetScale = isSelected ? originalScale * 1.1f : originalScale;
+        float targetY = isSelected ? selectionLiftAmount : 0f;
+        float speed = Time.deltaTime * 15f;
+
+        transform.localScale = Vector3.Lerp(transform.localScale, targetScale, speed);
+
+        if (rectTransform != null)
+        {
+            Vector2 currentPos = rectTransform.anchoredPosition;
+            Vector2 targetPos = new Vector2(currentPos.x, targetY);
+            rectTransform.anchoredPosition = Vector2.Lerp(currentPos, targetPos, speed);
         }
     }
 
-    // --- HOVER (FARE ÜZERÝNE GELÝNCE) ---
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (eventData.button == PointerEventData.InputButton.Left)
+        {
+            if (DeckManager.instance != null) DeckManager.instance.SelectCard(myIndex);
+        }
+    }
+
     public void OnPointerEnter(PointerEventData eventData)
     {
-        // Fare kartýn üzerine geldiðinde paneli aç
         if (descriptionPanel != null)
         {
             descriptionPanel.SetActive(true);
-
-            // Panelin her zaman en önde görünmesi için (diðer kartlarýn altýnda kalmasýn)
             descriptionPanel.transform.SetAsLastSibling();
         }
     }
 
-    // --- HOVER ÇIKIÞ (FARE GÝDÝNCE) ---
     public void OnPointerExit(PointerEventData eventData)
     {
-        // Fare karttan ayrýldýðýnda paneli kapat
-        if (descriptionPanel != null)
-        {
-            descriptionPanel.SetActive(false);
-        }
+        if (descriptionPanel != null) descriptionPanel.SetActive(false);
     }
 }

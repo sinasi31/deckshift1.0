@@ -15,6 +15,6 @@ public class GameOverUI : MonoBehaviour
     public void GoToMainMenu()
     {
         // TODO: Ana Menü sahnenin adýný buraya yaz.
-        SceneManager.LoadScene("MainMenuScene");
+        SceneManager.LoadScene("MainMenu");
     }
 }

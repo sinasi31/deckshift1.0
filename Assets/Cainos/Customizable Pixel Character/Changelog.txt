@@ -1,0 +1,99 @@
+﻿Customizable Pixel Character
+
+2.4.5
+	- Add revive animation.
+	- Add inspector tooltips.
+	- Update included [Lucid Editor] to 1.1.0.
+	- Several bugs fixed.
+
+2.4.4
+	- Add demo UI.
+	- Add character audio placeholder script.
+
+2.4.3
+	- Improve URP 2D lighting support in Unity 6.
+
+2.4.2
+	- Improve swim animations.
+
+2.4.1
+	- Some minor bugs fixed.
+
+2.4.0
+	- Add swimming capabilities to the character controller.
+
+2.3.7
+	- Fix alpha issue with Unity 6 URP 2D Lighting.
+
+2.3.6
+	- Fix shader errors in Unity 6.
+
+2.3.5
+	- Add [Attack Speed Mul] and [Attack Cooldown] to character controller.
+
+2.3.4
+	- Some minor bugs fixed.
+
+2.3.3
+	- Add [Alpha] paramter to [Pixel Character] and [Weapon] to control overall transparency.
+
+2.3.2
+	- Character movement improved.
+
+2.3.1
+	- Several bugs fixed.
+
+2.3.0
+	- Add new attack action [Cast] with projectile shooting.
+
+2.2.0
+	- Add dodging mechanism.
+	- Several bugs fixed.
+
+2.1.1
+	- Some minor bugs fixed.
+
+2.1.0
+	- Character animation event handling improved.
+	- Several bugs fixed.
+
+2.0.0
+	- Add 30 new character presets.
+	- Character controller greatly improved with auto stair, ladder climb, ledge climb, dash, one-way platform mechanism and more.
+
+1.4.0
+	- Update included [Pixel Art Platformer - Village Props] asset pack to 2.2.0.
+
+1.3.1
+	- Add URP 3D lighting support.
+
+1.3.0
+	- Fix compatibility issues with [Pixel Art Platformer - Dungeon].
+	- All shaders remade with Amplify Shader Editor.
+	- Move 2D Lit shaders to a patch.
+
+1.2.5
+	- Fix issues with 2D lit shaders in build.
+
+1.2.4
+	- Add URP 2D lighting support.
+	- Update physics settings for smoother movement.
+
+1.2.3
+	- Update included [Pixel Art Platformer - Village Props] asset pack to 2.1.0.
+
+1.2.2
+	- Updated document to add tutorial for making animation.
+
+1.2.1
+	- Character control adjustment.
+	- Possible rendering issues fixed.
+
+1.2.0
+	- Several bugs fixed.
+
+1.1.0
+	- Update included [Pixel Art Platformer - Village Props] to 2.0.0.
+
+1.0.0
+	- First Release.

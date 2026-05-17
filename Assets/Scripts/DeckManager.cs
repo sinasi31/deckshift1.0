@@ -1,60 +1,272 @@
-using System.Collections.Generic;
+Ôªøusing System.Collections.Generic;
 using UnityEngine;
 using System;
+using System.Collections;
 
 public class DeckManager : MonoBehaviour
 {
     public static DeckManager instance;
-    public static event Action OnHandChanged;
+    public static event Action<bool> OnHandChanged;
+    public bool isNextCardFree = false;
+    [Header("Recall Settings")]
+    public int baseRecallCost = 1; // Ba≈ülangƒ±√ß maliyeti
+    public int currentRecallCost;  // ≈ûu anki maliyet
 
-    [Header("References")]
+    public static System.Action<int> OnRecallCostChanged;
+
+    [Header("Referanslar")]
     public PlayerController player;
 
-    [Header("Deck Settings")]
+    [Header("Deste Ayarlar√Ω")]
     public List<CardData> startingDeck;
+
+    [Header("Special Cards")]
+    public CardData staggerCardData;
+
     private List<RuntimeCard> drawPile = new List<RuntimeCard>();
     private List<RuntimeCard> hand = new List<RuntimeCard>();
     private List<RuntimeCard> discardPile = new List<RuntimeCard>();
-    public int handCapacity = 4;
+    private List<RuntimeCard> exhaustPile = new List<RuntimeCard>();
 
-    public List<RuntimeCard> GetCurrentHand()
-    {
-        return hand;
-    }
+    public int handCapacity = 4;
+    private int selectedIndex = -1;
+    private bool isReloading = false;
+
+    // Getterlar
+    public List<RuntimeCard> GetDrawPile() { return drawPile; }
+    public List<RuntimeCard> GetDiscardPile() { return discardPile; }
+    public List<RuntimeCard> GetExhaustPile() { return exhaustPile; }
+    public List<RuntimeCard> GetCurrentHand() { return hand; }
+    public int GetSelectedIndex() { return selectedIndex; }
 
     private void Awake()
     {
-        if (instance == null) { instance = this; }
-        else { Destroy(gameObject); }
+        if (instance == null) instance = this;
+        else Destroy(gameObject);
     }
 
     private void Start()
     {
+
         foreach (CardData data in startingDeck)
         {
-            RuntimeCard newCardInstance = new RuntimeCard(data);
-            drawPile.Add(newCardInstance);
+            drawPile.Add(new RuntimeCard(data));
         }
         ShuffleDeck();
-        for (int i = 0; i < handCapacity; i++)
-        {
-            DrawCard();
-        }
-        OnHandChanged?.Invoke();
+        ReloadHand(); // Ba√ælang√Ω√ßta animasyon olsun
+        ResetRecallCost();
     }
 
-    void Update()
+    public void SelectCard(int index)
     {
-        if (GameManager.instance.currentState != GameState.Playing) return;
-        if (Input.GetKeyDown(KeyCode.Alpha1)) PlayCard(0);
-        if (Input.GetKeyDown(KeyCode.Alpha2)) PlayCard(1);
-        if (Input.GetKeyDown(KeyCode.Alpha3)) PlayCard(2);
-        if (Input.GetKeyDown(KeyCode.Alpha4)) PlayCard(3);
+        if (isReloading || index < 0 || index >= hand.Count) return;
+
+        if (selectedIndex != -1 && selectedIndex < hand.Count)
+            hand[selectedIndex].isSelected = false;
+
+        selectedIndex = index;
+        hand[selectedIndex].isSelected = true;
+
+        // Se√ßim de√∞i√æikli√∞inde animasyona gerek yok (false)
+        OnHandChanged?.Invoke(false);
+    }
+
+    public void DeselectCard()
+    {
+        if (selectedIndex != -1 && selectedIndex < hand.Count)
+            hand[selectedIndex].isSelected = false;
+
+        selectedIndex = -1;
+
+        // Se√ßim iptalinde animasyona gerek yok (false)
+        OnHandChanged?.Invoke(false);
+    }
+
+    public void TryCastSelectedCard()
+    {
+        if (isReloading || selectedIndex == -1) return;
+        PlayCard(selectedIndex);
+    }
+
+    private void PlayCard(int index)
+    {
+        if (index >= hand.Count) return;
+
+
+        RuntimeCard playedCard = hand[index];
+        CardData data = playedCard.cardData;
+
+        int cost = data.shiftCost;
+        if (SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.KineticDiscount))
+            cost = Mathf.Max(0, cost - 1);
+        if (isNextCardFree)
+        {
+            cost = 0;
+        }
+        if (player.GetCurrentShift() < cost) return;
+        if (!playedCard.isInfinite && playedCard.currentUses <= 0) return;
+
+        if (data.actionType != CardActionType.Portal)
+        {
+            if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
+                player.SpendShift(cost);
+        }
+
+        bool success = player.ExecuteAction(data.actionType, data.actionValue, out bool keepInHand);
+
+        if (success && !keepInHand)
+        {
+
+            hand.RemoveAt(index);
+            selectedIndex = -1;
+            if (isNextCardFree)
+            {
+                isNextCardFree = false;
+            }
+            if (SkillManager.instance != null &&
+                SkillManager.instance.HasSkill(SkillType.EchoChamber) &&
+                UnityEngine.Random.value < 0.5f) // <--- BURASI D√úZELD√ù
+            {
+                Debug.Log("ECHO CHAMBER: √áift Etki!");
+                // √ùkinci kez √ßal√Ω√æt√Ωr
+                player.ExecuteAction(data.actionType, data.actionValue, out bool _);
+            }
+            bool inHub = LevelManager.instance != null && LevelManager.instance.IsCurrentRoomHub();
+            if (!playedCard.isInfinite && !inHub) playedCard.currentUses--;
+
+            if (inHub || (playedCard.isInfinite || playedCard.currentUses > 0) && (!data.singleUse || playedCard.isInfinite))
+                discardPile.Add(playedCard);
+            else
+                exhaustPile.Add(playedCard);
+            OnHandChanged?.Invoke(false);
+        }
+    }
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            TryRecall();
+        }
+        // Her karede kontrol etmek yerine sadece oyun akarken bak
+        if (GameManager.instance.currentState == GameState.Playing)
+        {
+            CheckForStaggerCondition();
+        }
+    }
+    public void ResetRecallCost()
+    {
+        currentRecallCost = baseRecallCost;
+        OnRecallCostChanged?.Invoke(currentRecallCost);
+    }
+    private void CheckForStaggerCondition()
+    {
+        if (LevelManager.instance != null && LevelManager.instance.IsCurrentRoomHub()) return;
+
+        // 1. Shift var m√Ω?
+        if (player.GetCurrentShift() > 0) return; // Shift varsa sorun yok
+
+        // 2. Eldeki kartlar√Ωn Charge'√Ω var m√Ω?
+        foreach (RuntimeCard card in hand)
+        {
+            // Stagger kart√Ωn√Ωn kendisi hari√ß, kullan√Ωlabilir kart var m√Ω?
+            if (card.cardData != staggerCardData)
+            {
+                if (card.isInfinite || card.currentUses > 0) return; // Kullan√Ωlacak kart var
+            }
+        }
+
+        // BURAYA GELD√ùYSEK H√ù√áB√ùR KAYNAK YOK DEMEKT√ùR!
+        // Eline zaten Stagger kart√Ω verdiysek tekrar verme
+        foreach (RuntimeCard card in hand)
+        {
+            if (card.cardData == staggerCardData) return;
+        }
+
+        Debug.Log("KAYNAKLAR T√úKEND√ù! STAGGER KARTI VER√ùL√ùYOR...");
+        AddStaggerCardToHand();
+    }
+
+    private void AddStaggerCardToHand()
+    {
+        // Eli temizle (veya doluysa yer a√ß)
+        // Senin oyununda el kapasitesi dolunca ne oluyor? 
+        // Acil durum oldu√∞u i√ßin eldeki bo√æ bir yere veya direkt sona ekleyelim.
+
+        RuntimeCard staggerInstance = new RuntimeCard(staggerCardData);
+        hand.Add(staggerInstance);
+
+        // UI G√ºncelle
+        OnHandChanged?.Invoke(true);
+    }
+    public void TryRecall()
+    {
+        // 1. Zaten el yenileniyorsa dur
+        if (isReloading) return;
+
+        // 2. Maliyet kontrol√º
+        if (player.GetCurrentShift() < currentRecallCost)
+        {
+            Debug.Log("Yetersiz Shift! Recall yapƒ±lamƒ±yor.");
+            // Buraya "Yetersiz Enerji" sesi veya g√∂rseli eklenebilir
+            return;
+        }
+
+        // 3. Shift Harca
+        if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
+            player.SpendShift(currentRecallCost);
+
+        // 4. Maliyeti Artƒ±r (Level bitene kadar)
+        if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
+        {
+            currentRecallCost++;
+            OnRecallCostChanged?.Invoke(currentRecallCost);
+        }
+
+        // 5. Asƒ±l i≈ülemi ba≈ülat
+        ReloadHand();
+    }
+    public void ReloadHand()
+    {
+        if (isReloading) return;
+        StartCoroutine(ReloadRoutine());
+    }
+
+    private IEnumerator ReloadRoutine()
+    {
+        isReloading = true;
+        DeselectCard();
+        yield return new WaitForSeconds(0.2f);
+
+        discardPile.AddRange(hand);
+        hand.Clear();
+
+        for (int i = 0; i < handCapacity; i++)
+        {
+            if (drawPile.Count == 0 && discardPile.Count > 0)
+            {
+                drawPile.AddRange(discardPile);
+                discardPile.Clear();
+                ShuffleDeck();
+            }
+
+            if (drawPile.Count > 0)
+            {
+                RuntimeCard c = drawPile[0];
+                drawPile.RemoveAt(0);
+                c.isSelected = false;
+                hand.Add(c);
+            }
+        }
+
+        // EL YEN√ùLEND√ù: Animasyon √ùST√ùYORUZ (true)
+        OnHandChanged?.Invoke(true);
+        isReloading = false;
     }
 
     public void DrawCard()
     {
         if (hand.Count >= handCapacity) return;
+
         if (drawPile.Count == 0)
         {
             if (discardPile.Count == 0) return;
@@ -63,102 +275,30 @@ public class DeckManager : MonoBehaviour
             ShuffleDeck();
         }
 
-        RuntimeCard drawnCard = drawPile[0];
+        RuntimeCard c = drawPile[0];
         drawPile.RemoveAt(0);
-        hand.Add(drawnCard);
-    }
+        c.isSelected = false;
+        hand.Add(c);
 
-    // --- D‹ZELT›LM›ﬁ VE SKILL ENTEGREL› PLAYCARD FONKS›YONU ---
-    private void PlayCard(int handIndex)
-    {
-        if (handIndex >= hand.Count) return;
-
-        // Dei˛kenleri SADECE BURADA tan˝ml˝yoruz
-        RuntimeCard playedCard = hand[handIndex];
-        CardData cardTemplate = playedCard.cardData;
-
-        // --- SKILL KONTROL‹: Kinetic Discount ---
-        int finalCost = cardTemplate.shiftCost;
-        if (SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.KineticDiscount))
-        {
-            finalCost = Mathf.Max(0, finalCost - 1);
-        }
-        // ----------------------------------------
-
-        // 1. Shift Maliyet Kontrol¸
-        if (player.GetCurrentShift() < finalCost)
-        {
-            Debug.LogWarning($"Yeterli SHIFT yok! Gerekli: {finalCost}");
-            return;
-        }
-
-        // 2. Kullan˝m Hakk˝ Kontrol¸ (Sonsuz deilse)
-        if (!playedCard.isInfinite && playedCard.currentUses <= 0)
-        {
-            Debug.LogWarning($"Kart˝n kullan˝m hakk˝ bitmi˛: {cardTemplate.cardName}");
-            return;
-        }
-
-        // --- Kart˝ Oyna ---
-        // Portal gibi ˆzel kartlar shift'i kendi iÁinde harcayabilir, 
-        // standart kartlar iÁin burada harc˝yoruz.
-        if (cardTemplate.actionType != CardActionType.Portal)
-        {
-            player.SpendShift(finalCost);
-        }
-
-        bool success = player.ExecuteAction(cardTemplate.actionType, cardTemplate.actionValue, out bool keepInHand);
-
-        if (success)
-        {
-            // Eer kart (Portal'˝n ilk a˛amas˝ gibi) elde kalmal˝ysa Á˝k.
-            if (keepInHand) return;
-
-            // --- KULLANIM HAKKI D‹ﬁME ---
-            if (!playedCard.isInfinite)
-            {
-                playedCard.currentUses--;
-                Debug.Log($"{cardTemplate.cardName} oynand˝. Kalan: {playedCard.currentUses}");
-            }
-            else
-            {
-                Debug.Log($"{cardTemplate.cardName} (SONSUZ) oynand˝.");
-            }
-            // ----------------------------
-
-            hand.RemoveAt(handIndex);
-
-            // Kart˝ Mezarl˝a Gˆnder (Sonsuzsa veya hakk˝ varsa)
-            if (playedCard.isInfinite || playedCard.currentUses > 0)
-            {
-                if (!cardTemplate.singleUse || playedCard.isInfinite)
-                    discardPile.Add(playedCard);
-            }
-            else
-            {
-                Debug.Log($"{cardTemplate.cardName} bitti, silindi.");
-            }
-
-            DrawCard();
-            OnHandChanged?.Invoke();
-        }
-    }
-    // -----------------------------------------------------------
-
-    private void ShuffleDeck()
-    {
-        for (int i = 0; i < drawPile.Count; i++)
-        {
-            RuntimeCard temp = drawPile[i];
-            int randomIndex = UnityEngine.Random.Range(i, drawPile.Count);
-            drawPile[i] = drawPile[randomIndex];
-            drawPile[randomIndex] = temp;
-        }
+        // Tek kart √ßekme: √ùste√∞e ba√∞l√Ω. √ûimdilik animasyonsuz olsun ki h√Ωzl√Ω aks√Ωn.
+        // √ùstersen bunu 'true' yapabilirsin.
+        OnHandChanged?.Invoke(false);
     }
 
     public void AddCardToDeck(CardData newCardData)
     {
         RuntimeCard newCardInstance = new RuntimeCard(newCardData);
         discardPile.Add(newCardInstance);
+    }
+
+    private void ShuffleDeck()
+    {
+        for (int i = 0; i < drawPile.Count; i++)
+        {
+            RuntimeCard temp = drawPile[i];
+            int rnd = UnityEngine.Random.Range(i, drawPile.Count);
+            drawPile[i] = drawPile[rnd];
+            drawPile[rnd] = temp;
+        }
     }
 }

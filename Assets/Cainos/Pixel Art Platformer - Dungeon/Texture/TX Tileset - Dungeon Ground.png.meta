@@ -1,0 +1,1231 @@
+fileFormatVersion: 2
+guid: 1061b915ffc9af143a59aa0d12c234dd
+AssetOrigin:
+  serializedVersion: 1
+  productId: 237109
+  packageName: Pixel Art Platformer - Dungeon
+  packageVersion: 1.1.6
+  assetPath: Assets/Cainos/Pixel Art Platformer - Dungeon/Texture/TX Tileset - Dungeon
+    Ground.png
+  uploadId: 849070
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -3388272840388637939
+    second: TX Tileset - Dungeon Ground_0
+  - first:
+      213: 5359350115097096438
+    second: TX Tileset - Dungeon Ground_1
+  - first:
+      213: 885175801024636886
+    second: TX Tileset - Dungeon Ground_2
+  - first:
+      213: -2673224722707060007
+    second: TX Tileset - Dungeon Ground_3
+  - first:
+      213: -1854161201983580277
+    second: TX Tileset - Dungeon Ground_4
+  - first:
+      213: -242940400640730147
+    second: TX Tileset - Dungeon Ground_5
+  - first:
+      213: 2887103795553085377
+    second: TX Tileset - Dungeon Ground_6
+  - first:
+      213: -6762715957748228702
+    second: TX Tileset - Dungeon Ground_7
+  - first:
+      213: 3028592875256768203
+    second: TX Tileset - Dungeon Ground_8
+  - first:
+      213: -4482834494123852019
+    second: TX Tileset - Dungeon Ground_9
+  - first:
+      213: 2639602985172974801
+    second: TX Tileset - Dungeon Ground_10
+  - first:
+      213: 3241087660977826100
+    second: TX Tileset - Dungeon Ground_11
+  - first:
+      213: -4186619554635365670
+    second: TX Tileset - Dungeon Ground_12
+  - first:
+      213: -609685444077149542
+    second: TX Tileset - Dungeon Ground_13
+  - first:
+      213: 5036346968373183818
+    second: TX Tileset - Dungeon Ground_14
+  - first:
+      213: -4662095724766923944
+    second: TX Tileset - Dungeon Ground_15
+  - first:
+      213: 1344873726828432172
+    second: TX Tileset - Dungeon Ground_16
+  - first:
+      213: -8303203020849985523
+    second: TX Tileset - Dungeon Ground_17
+  - first:
+      213: 263964799013056089
+    second: TX Tileset - Dungeon Ground_18
+  - first:
+      213: -9113779324802192108
+    second: TX Tileset - Dungeon Ground_19
+  - first:
+      213: -3485778461313817859
+    second: TX Tileset - Dungeon Ground_20
+  - first:
+      213: 766314752130801302
+    second: TX Tileset - Dungeon Ground_21
+  - first:
+      213: -7240667514917694187
+    second: TX Tileset - Dungeon Ground_22
+  - first:
+      213: 5436096311341994893
+    second: TX Tileset - Dungeon Ground_23
+  - first:
+      213: -6004135235218782250
+    second: TX Tileset - Dungeon Ground_24
+  - first:
+      213: -6516772130626499316
+    second: TX Tileset - Dungeon Ground_25
+  - first:
+      213: -5314195783140392850
+    second: TX Tileset - Dungeon Ground_26
+  - first:
+      213: 3117455342958928327
+    second: TX Tileset - Dungeon Ground_27
+  - first:
+      213: 2808047591914581973
+    second: TX Tileset - Dungeon Ground_28
+  - first:
+      213: -5780428628695527163
+    second: TX Tileset - Dungeon Ground_29
+  - first:
+      213: 3755448288563037906
+    second: TX Tileset - Dungeon Ground_30
+  - first:
+      213: -167065917520339739
+    second: TX Tileset - Dungeon Ground_31
+  - first:
+      213: -5328788430918940576
+    second: TX Tileset - Dungeon Ground_32
+  - first:
+      213: -4269317743268546628
+    second: TX Tileset - Dungeon Ground_33
+  - first:
+      213: -677243907851968277
+    second: TX Tileset - Dungeon Ground_34
+  - first:
+      213: -1394413282413705952
+    second: TX Tileset - Dungeon Ground_35
+  - first:
+      213: -7258746696467338394
+    second: TX Tileset - Dungeon Ground_36
+  - first:
+      213: 8617780412844314420
+    second: TX Tileset - Dungeon Ground_37
+  - first:
+      213: -7401450915220183007
+    second: TX Tileset - Dungeon Ground_38
+  - first:
+      213: 287784518778721619
+    second: TX Tileset - Dungeon Ground_39
+  - first:
+      213: -5627381442710996783
+    second: TX Tileset - Dungeon Ground_40
+  - first:
+      213: 7957291361221781099
+    second: TX Tileset - Dungeon Ground_41
+  - first:
+      213: -6153330453200785531
+    second: TX Tileset - Dungeon Ground_42
+  - first:
+      213: -3105400077931089277
+    second: TX Tileset - Dungeon Ground_43
+  - first:
+      213: -1561983332601517583
+    second: TX Tileset - Dungeon Ground_44
+  - first:
+      213: -806568310979184617
+    second: TX Tileset - Dungeon Ground_45
+  - first:
+      213: 6339284136159612657
+    second: TX Tileset - Dungeon Ground_46
+  - first:
+      213: -7419034299374645848
+    second: TX Tileset - Dungeon Ground_47
+  - first:
+      213: 5418166011694451376
+    second: TX Tileset - Dungeon Ground_48
+  - first:
+      213: -628676511575280721
+    second: TX Tileset - Dungeon Ground_49
+  - first:
+      213: 7559324795686312747
+    second: TX Tileset - Dungeon Ground_50
+  - first:
+      213: -8404992648370706704
+    second: TX Tileset - Dungeon Ground_51
+  - first:
+      213: -3279199656942556695
+    second: TX Tileset - Dungeon Ground_52
+  - first:
+      213: -4870021809299029770
+    second: TX Tileset - Dungeon Ground_53
+  - first:
+      213: 5431371854027416600
+    second: TX Tileset - Dungeon Ground_54
+  - first:
+      213: -3249201300551318427
+    second: TX Tileset - Dungeon Ground_55
+  - first:
+      213: 3693115926021676607
+    second: TX Tileset - Dungeon Ground_56
+  - first:
+      213: 306380172908077515
+    second: TX Tileset - Dungeon Ground_57
+  - first:
+      213: -5099155337960029227
+    second: TX Tileset - Dungeon Ground_58
+  - first:
+      213: -5400615139801570102
+    second: TX Tileset - Dungeon Ground_59
+  - first:
+      213: 2103312348645628242
+    second: TX Tileset - Dungeon Ground_60
+  - first:
+      213: -7464134634922863902
+    second: TX Tileset - Dungeon Ground_61
+  - first:
+      213: -9149440058283483208
+    second: TX Tileset - Dungeon Ground_62
+  - first:
+      213: -2797854029059573939
+    second: TX Tileset - Dungeon Ground_63
+  - first:
+      213: -3356660147729433398
+    second: TX Tileset - Dungeon Ground_64
+  - first:
+      213: -3419763793512698811
+    second: TX Tileset - Dungeon Ground_65
+  - first:
+      213: 3266356009596127613
+    second: TX Tileset - Dungeon Ground_66
+  - first:
+      213: -5691514693816042720
+    second: TX Tileset - Dungeon Ground_67
+  - first:
+      213: 447931552929646835
+    second: TX Tileset - Dungeon Ground_68
+  - first:
+      213: 2370263419866501579
+    second: TX Tileset - Dungeon Ground_69
+  - first:
+      213: -3349765543092702944
+    second: TX Tileset - Dungeon Ground_70
+  - first:
+      213: -4422600869530878849
+    second: TX Tileset - Dungeon Ground_71
+  - first:
+      213: 6374214349180675391
+    second: TX Tileset - Dungeon Ground_72
+  - first:
+      213: -2404420605595317586
+    second: TX Tileset - Dungeon Ground_73
+  - first:
+      213: -228986931128837915
+    second: TX Tileset - Dungeon Ground_74
+  - first:
+      213: -8849436432422191286
+    second: TX Tileset - Dungeon Ground_75
+  - first:
+      213: -1476619995480847944
+    second: TX Tileset - Dungeon Ground_76
+  - first:
+      213: 5307135048239593542
+    second: TX Tileset - Dungeon Ground_77
+  - first:
+      213: -1748271774361854071
+    second: TX Tileset - Dungeon Ground_78
+  - first:
+      213: 1546922261975129113
+    second: TX Tileset - Dungeon Ground_79
+  - first:
+      213: -8700193163538519813
+    second: TX Tileset - Dungeon Ground_80
+  - first:
+      213: -2895059493278022967
+    second: TX Tileset - Dungeon Ground_81
+  - first:
+      213: 8589999927704152321
+    second: TX Tileset - Dungeon Ground_82
+  - first:
+      213: 2052611419342659270
+    second: TX Tileset - Dungeon Ground_83
+  - first:
+      213: 2077866101367612848
+    second: TX Tileset - Dungeon Ground_84
+  - first:
+      213: 5067832888397483140
+    second: TX Tileset - Dungeon Ground_85
+  - first:
+      213: 4235521037609662008
+    second: TX Tileset - Dungeon Ground_86
+  - first:
+      213: -1276781479690437412
+    second: TX Tileset - Dungeon Ground_87
+  - first:
+      213: 9040156394450152847
+    second: TX Tileset - Dungeon Ground_88
+  - first:
+      213: 4806299749235374143
+    second: TX Tileset - Dungeon Ground_89
+  - first:
+      213: -5464083701857788769
+    second: TX Tileset - Dungeon Ground_90
+  - first:
+      213: -2505043765802490191
+    second: TX Tileset - Dungeon Ground_91
+  - first:
+      213: 8668779264410019599
+    second: TX Tileset - Dungeon Ground_92
+  - first:
+      213: 2844425216087827076
+    second: TX Tileset - Dungeon Ground_93
+  - first:
+      213: 8989206911675377240
+    second: TX Tileset - Dungeon Ground_94
+  - first:
+      213: -1450517135887038777
+    second: TX Tileset - Dungeon Ground_95
+  - first:
+      213: -6884613693717589447
+    second: TX Tileset - Dungeon Ground_96
+  - first:
+      213: 2417856907323595870
+    second: TX Tileset - Dungeon Ground_97
+  - first:
+      213: 4066261263427333775
+    second: TX Tileset - Dungeon Ground_98
+  - first:
+      213: -3274278738906461386
+    second: TX Tileset - Dungeon Ground_99
+  - first:
+      213: -3892692624628520680
+    second: TX Tileset - Dungeon Ground_100
+  - first:
+      213: -7667830761376677382
+    second: TX Tileset - Dungeon Ground_101
+  - first:
+      213: -951786469434356911
+    second: TX Tileset - Dungeon Ground_102
+  - first:
+      213: -4191141517116497839
+    second: TX Tileset - Dungeon Ground_103
+  - first:
+      213: 4953913373526722358
+    second: TX Tileset - Dungeon Ground_104
+  - first:
+      213: -5711605815712493858
+    second: TX Tileset - Dungeon Ground_105
+  - first:
+      213: 5694996719313997990
+    second: TX Tileset - Dungeon Ground_106
+  - first:
+      213: -7984650116106752275
+    second: TX Tileset - Dungeon Ground_107
+  - first:
+      213: -1135911259602526539
+    second: TX Tileset - Dungeon Ground_108
+  - first:
+      213: -6557952557290642993
+    second: TX Tileset - Dungeon Ground_109
+  - first:
+      213: -4435289037503303737
+    second: TX Tileset - Dungeon Ground_110
+  - first:
+      213: 5090146264638648368
+    second: TX Tileset - Dungeon Ground_111
+  - first:
+      213: 8197658343931148943
+    second: TX Tileset - Dungeon Ground_112
+  - first:
+      213: -2588115824820480558
+    second: TX Tileset - Dungeon Ground_113
+  - first:
+      213: -7537379965746332583
+    second: TX Tileset - Dungeon Ground_114
+  - first:
+      213: 2770597668256822334
+    second: TX Tileset - Dungeon Ground_115
+  - first:
+      213: 1987967478492638784
+    second: TX Tileset - Dungeon Ground_116
+  - first:
+      213: -5721379637563999372
+    second: TX Tileset - Dungeon Ground_117
+  - first:
+      213: 5238962836943975138
+    second: TX Tileset - Dungeon Ground_118
+  - first:
+      213: 8776590475621953766
+    second: TX Tileset - Dungeon Ground_119
+  - first:
+      213: -1903572801973903888
+    second: TX Tileset - Dungeon Ground_120
+  - first:
+      213: 547045783821461041
+    second: TX Tileset - Dungeon Ground_121
+  - first:
+      213: 2049111677613439354
+    second: TX Tileset - Dungeon Ground_122
+  - first:
+      213: 9118679271948376879
+    second: TX Tileset - Dungeon Ground_123
+  - first:
+      213: 2865387602713009673
+    second: TX Tileset - Dungeon Ground_124
+  - first:
+      213: -76196164430537204
+    second: TX Tileset - Dungeon Ground_125
+  - first:
+      213: 4365824842414179418
+    second: TX Tileset - Dungeon Ground_126
+  - first:
+      213: 7659563456704972360
+    second: TX Tileset - Dungeon Ground_127
+  - first:
+      213: 4840719999327983616
+    second: TX Tileset - Dungeon Ground_128
+  - first:
+      213: -8887317992102723268
+    second: TX Tileset - Dungeon Ground_129
+  - first:
+      213: 5803620419423765757
+    second: TX Tileset - Dungeon Ground_130
+  - first:
+      213: 4342405800837973936
+    second: TX Tileset - Dungeon Ground_131
+  - first:
+      213: -7417453663819865002
+    second: TX Tileset - Dungeon Ground_132
+  - first:
+      213: -1871655425206218225
+    second: TX Tileset - Dungeon Ground_133
+  - first:
+      213: 6328189220037171721
+    second: TX Tileset - Dungeon Ground_134
+  - first:
+      213: -772856377750705404
+    second: TX Tileset - Dungeon Ground_135
+  - first:
+      213: -8064489249323300745
+    second: TX Tileset - Dungeon Ground_136
+  - first:
+      213: 274030312745944294
+    second: TX Tileset - Dungeon Ground_137
+  - first:
+      213: -2617937114785531846
+    second: TX Tileset - Dungeon Ground_138
+  - first:
+      213: 6741005871599099518
+    second: TX Tileset - Dungeon Ground_139
+  - first:
+      213: 1172097186280029528
+    second: TX Tileset - Dungeon Ground_140
+  - first:
+      213: -3081287918720502710
+    second: TX Tileset - Dungeon Ground_141
+  - first:
+      213: -601865014245927036
+    second: TX Tileset - Dungeon Ground_142
+  - first:
+      213: -2272859634191210628
+    second: TX Tileset - Dungeon Ground_143
+  - first:
+      213: -3223547843172306111
+    second: TX Tileset - Dungeon Ground_144
+  - first:
+      213: 7417610154187009227
+    second: TX Tileset - Dungeon Ground_145
+  - first:
+      213: 8571057118017691630
+    second: TX Tileset - Dungeon Ground_146
+  - first:
+      213: 2782301197333844766
+    second: TX Tileset - Dungeon Ground_147
+  - first:
+      213: 1539568444567149563
+    second: TX Tileset - Dungeon Ground_148
+  - first:
+      213: -3973583889286672503
+    second: TX Tileset - Dungeon Ground_149
+  - first:
+      213: 3426831674588388126
+    second: TX Tileset - Dungeon Ground_150
+  - first:
+      213: -7120082084106348275
+    second: TX Tileset - Dungeon Ground_151
+  - first:
+      213: 2711548228862099702
+    second: TX Tileset - Dungeon Ground_152
+  - first:
+      213: -7816344410809530643
+    second: TX Tileset - Dungeon Ground_153
+  - first:
+      213: 6741490617384917700
+    second: TX Tileset - Dungeon Ground_154
+  - first:
+      213: 1404553866358391883
+    second: TX Tileset - Dungeon Ground_155
+  - first:
+      213: 8165537292740110983
+    second: TX Tileset - Dungeon Ground_156
+  - first:
+      213: -4305509039170423144
+    second: TX Tileset - Dungeon Ground_157
+  - first:
+      213: 4913630116868880586
+    second: TX Tileset - Dungeon Ground_158
+  - first:
+      213: -7918083020411200526
+    second: TX Tileset - Dungeon Ground_159
+  - first:
+      213: 1800683288181752565
+    second: TX Tileset - Dungeon Ground_160
+  - first:
+      213: 5053186142521430336
+    second: TX Tileset - Dungeon Ground_161
+  - first:
+      213: -7438858786595300259
+    second: TX Tileset - Dungeon Ground_162
+  - first:
+      213: -1422098498407263905
+    second: TX Tileset - Dungeon Ground_163
+  - first:
+      213: 6794851856931817048
+    second: TX Tileset - Dungeon Ground_164
+  - first:
+      213: 318500910131231972
+    second: TX Tileset - Dungeon Ground_165
+  - first:
+      213: -8659077309274385309
+    second: TX Tileset - Dungeon Ground_166
+  - first:
+      213: -8367657544845151325
+    second: TX Tileset - Dungeon Ground_167
+  - first:
+      213: 1463735032827975232
+    second: TX Tileset - Dungeon Ground_168
+  - first:
+      213: 4023983602116395612
+    second: TX Tileset - Dungeon Ground_169
+  - first:
+      213: 390098172557496674
+    second: TX Tileset - Dungeon Ground_170
+  - first:
+      213: 2425098721836813838
+    second: TX Tileset - Dungeon Ground_171
+  - first:
+      213: 5579972753147548134
+    second: TX Tileset - Dungeon Ground_172
+  - first:
+      213: -8256134485590455167
+    second: TX Tileset - Dungeon Ground_173
+  - first:
+      213: 379580755411206911
+    second: TX Tileset - Dungeon Ground_174
+  - first:
+      213: 2467693317841681088
+    second: TX Tileset - Dungeon Ground_175
+  - first:
+      213: -2287814501006893724
+    second: TX Tileset - Dungeon Ground_176
+  - first:
+      213: 7434551169722010661
+    second: TX Tileset - Dungeon Ground_177
+  - first:
+      213: 7829865163351233215
+    second: TX Tileset - Dungeon Ground_178
+  - first:
+      213: -721226275672573397
+    second: TX Tileset - Dungeon Ground_179
+  - first:
+      213: -1380164443309435023
+    second: TX Tileset - Dungeon Ground_180
+  - first:
+      213: 8786157848889714531
+    second: TX Tileset - Dungeon Ground_181
+  - first:
+      213: -8806919164337324584
+    second: TX Tileset - Dungeon Ground_182
+  - first:
+      213: -366183151840816647
+    second: TX Tileset - Dungeon Ground_183
+  - first:
+      213: 9217803618775693259
+    second: TX Tileset - Dungeon Ground_184
+  - first:
+      213: 6828428753368126737
+    second: TX Tileset - Dungeon Ground_185
+  - first:
+      213: -6921069572347751551
+    second: TX Tileset - Dungeon Ground_186
+  - first:
+      213: -2943183344234375717
+    second: TX Tileset - Dungeon Ground_187
+  - first:
+      213: 3763120723225340056
+    second: TX Tileset - Dungeon Ground_188
+  - first:
+      213: 3156489083730347365
+    second: TX Tileset - Dungeon Ground_189
+  - first:
+      213: -8771874443627039667
+    second: TX Tileset - Dungeon Ground_190
+  - first:
+      213: -1173277600685929605
+    second: TX Tileset - Dungeon Ground_191
+  - first:
+      213: 6482160191198980839
+    second: TX Tileset - Dungeon Ground_192
+  - first:
+      213: -5205015944953769768
+    second: TX Tileset - Dungeon Ground_193
+  - first:
+      213: -3448884800401157795
+    second: TX Tileset - Dungeon Ground_194
+  - first:
+      213: -3941329155518847647
+    second: TX Tileset - Dungeon Ground_195
+  - first:
+      213: -2213898337601500280
+    second: TX Tileset - Dungeon Ground_196
+  - first:
+      213: -6550508523413293867
+    second: TX Tileset - Dungeon Ground_197
+  - first:
+      213: -2435614184865585564
+    second: TX Tileset - Dungeon Ground_198
+  - first:
+      213: -7511428757917472188
+    second: TX Tileset - Dungeon Ground_199
+  - first:
+      213: 7705035775190118895
+    second: TX Tileset - Dungeon Ground_200
+  - first:
+      213: 6926884295510221326
+    second: TX Tileset - Dungeon Ground_201
+  - first:
+      213: 7214780040835913744
+    second: TX Tileset - Dungeon Ground_202
+  - first:
+      213: -4152764020530952901
+    second: TX Tileset - Dungeon Ground_203
+  - first:
+      213: 5138436879713985685
+    second: TX Tileset - Dungeon Ground_204
+  - first:
+      213: 3986861971072433710
+    second: TX Tileset - Dungeon Ground_205
+  - first:
+      213: 6846566432549585272
+    second: TX Tileset - Dungeon Ground_206
+  - first:
+      213: -7981838236568688546
+    second: TX Tileset - Dungeon Ground_207
+  - first:
+      213: -559675340594773666
+    second: TX Tileset - Dungeon Ground_208
+  - first:
+      213: -2149107046914053917
+    second: TX Tileset - Dungeon Ground_209
+  - first:
+      213: -4167472049385126406
+    second: TX Tileset - Dungeon Ground_210
+  - first:
+      213: -3067978594279103875
+    second: TX Tileset - Dungeon Ground_211
+  - first:
+      213: -3224503850871948095
+    second: TX Tileset - Dungeon Ground_212
+  - first:
+      213: -5712749864490782853
+    second: TX Tileset - Dungeon Ground_213
+  - first:
+      213: 423816160678749177
+    second: TX Tileset - Dungeon Ground_214
+  - first:
+      213: -4617515881229827715
+    second: TX Tileset - Dungeon Ground_215
+  - first:
+      213: 4323580788373065218
+    second: TX Tileset - Dungeon Ground_216
+  - first:
+      213: 6063887636951850251
+    second: TX Tileset - Dungeon Ground_217
+  - first:
+      213: -2300593430157411857
+    second: TX Tileset - Dungeon Ground_218
+  - first:
+      213: 1703605705812162349
+    second: TX Tileset - Dungeon Ground_219
+  - first:
+      213: -805379050432135900
+    second: TX Tileset - Dungeon Ground_220
+  - first:
+      213: 1087308666139765045
+    second: TX Tileset - Dungeon Ground_221
+  - first:
+      213: 3338822201755497254
+    second: TX Tileset - Dungeon Ground_222
+  - first:
+      213: -3035283125206368197
+    second: TX Tileset - Dungeon Ground_223
+  - first:
+      213: 9173931461199542921
+    second: TX Tileset - Dungeon Ground_224
+  - first:
+      213: 5909147414781197695
+    second: TX Tileset - Dungeon Ground_225
+  - first:
+      213: -1974846876868846763
+    second: TX Tileset - Dungeon Ground_226
+  - first:
+      213: 1273058641979673382
+    second: TX Tileset - Dungeon Ground_227
+  - first:
+      213: 845190742645042397
+    second: TX Tileset - Dungeon Ground_228
+  - first:
+      213: -5066885696606397828
+    second: TX Tileset - Dungeon Ground_229
+  - first:
+      213: 6462244773470920443
+    second: TX Tileset - Dungeon Ground_230
+  - first:
+      213: -1938076252032495337
+    second: TX Tileset - Dungeon Ground_231
+  - first:
+      213: 8976355888146554287
+    second: TX Tileset - Dungeon Ground_232
+  - first:
+      213: 1139109892287140542
+    second: TX Tileset - Dungeon Ground_233
+  - first:
+      213: -4248030764224074317
+    second: TX Tileset - Dungeon Ground_234
+  - first:
+      213: -5594365403315531890
+    second: TX Tileset - Dungeon Ground_235
+  - first:
+      213: 595591082648247373
+    second: TX Tileset - Dungeon Ground_236
+  - first:
+      213: -644302299795771980
+    second: TX Tileset - Dungeon Ground_237
+  - first:
+      213: -2889077548399960676
+    second: TX Tileset - Dungeon Ground_238
+  - first:
+      213: 1805803797142976849
+    second: TX Tileset - Dungeon Ground_239
+  - first:
+      213: -2750459602715002036
+    second: TX Tileset - Dungeon Ground_240
+  - first:
+      213: -6043455969127593384
+    second: TX Tileset - Dungeon Ground_241
+  - first:
+      213: 5564475806285474399
+    second: TX Tileset - Dungeon Ground_242
+  - first:
+      213: 1290705723627283971
+    second: TX Tileset - Dungeon Ground_243
+  - first:
+      213: -7406593211105635672
+    second: TX Tileset - Dungeon Ground_244
+  - first:
+      213: 8870034222949254857
+    second: TX Tileset - Dungeon Ground_245
+  - first:
+      213: -7901650777427022096
+    second: TX Tileset - Dungeon Ground_246
+  - first:
+      213: -8941923055698636291
+    second: TX Tileset - Dungeon Ground_247
+  - first:
+      213: 5451080302451530208
+    second: TX Tileset - Dungeon Ground_248
+  - first:
+      213: -9202160938734596978
+    second: TX Tileset - Dungeon Ground_249
+  - first:
+      213: -8675418933128610115
+    second: TX Tileset - Dungeon Ground_250
+  - first:
+      213: 2275291972047491160
+    second: TX Tileset - Dungeon Ground_251
+  - first:
+      213: -3080090537340369189
+    second: TX Tileset - Dungeon Ground_252
+  - first:
+      213: 4273284280504435512
+    second: TX Tileset - Dungeon Ground_253
+  - first:
+      213: -8121910590206547962
+    second: TX Tileset - Dungeon Ground_254
+  - first:
+      213: 6418188606106268938
+    second: TX Tileset - Dungeon Ground_255
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 0
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 32
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 1
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Server
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: TX Tileset - Dungeon Ground_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 416
+        width: 96
+        height: 96
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: d0b0882bdcf6af0d0800000000000000
+      internalID: -3388272840388637939
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TX Tileset - Dungeon Ground_1
+      rect:
+        serializedVersion: 2
+        x: 128
+        y: 448
+        width: 64
+        height: 64
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 6f0bf4dd88c306a40800000000000000
+      internalID: 5359350115097096438
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TX Tileset - Dungeon Ground_2
+      rect:
+        serializedVersion: 2
+        x: 224
+        y: 448
+        width: 32
+        height: 64
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 6d768df73b6c84c00800000000000000
+      internalID: 885175801024636886
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TX Tileset - Dungeon Ground_3
+      rect:
+        serializedVersion: 2
+        x: 288
+        y: 480
+        width: 64
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 9dae04e274cc6ead0800000000000000
+      internalID: -2673224722707060007
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TX Tileset - Dungeon Ground_4
+      rect:
+        serializedVersion: 2
+        x: 384
+        y: 448
+        width: 32
+        height: 64
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: b871577e532b446e0800000000000000
+      internalID: -1854161201983580277
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TX Tileset - Dungeon Ground_5
+      rect:
+        serializedVersion: 2
+        x: 448
+        y: 448
+        width: 32
+        height: 64
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: ddbd7362ef6e0acf0800000000000000
+      internalID: -242940400640730147
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TX Tileset - Dungeon Ground_6
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 288
+        width: 96
+        height: 96
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 1c7af930b9d011820800000000000000
+      internalID: 2887103795553085377
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TX Tileset - Dungeon Ground_7
+      rect:
+        serializedVersion: 2
+        x: 128
+        y: 0
+        width: 384
+        height: 416
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 2ad1d85baa10622a0800000000000000
+      internalID: -6762715957748228702
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TX Tileset - Dungeon Ground_8
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 160
+        width: 32
+        height: 96
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: bc665f28c29b70a20800000000000000
+      internalID: 3028592875256768203
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TX Tileset - Dungeon Ground_9
+      rect:
+        serializedVersion: 2
+        x: 64
+        y: 224
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: d0f31e657c5c9c1c0800000000000000
+      internalID: -4482834494123852019
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TX Tileset - Dungeon Ground_10
+      rect:
+        serializedVersion: 2
+        x: 64
+        y: 160
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 1dcbb470ee0c1a420800000000000000
+      internalID: 2639602985172974801
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TX Tileset - Dungeon Ground_11
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 96
+        width: 96
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 4392c7e3e08aafc20800000000000000
+      internalID: 3241087660977826100
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TX Tileset - Dungeon Ground_12
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 32
+        width: 96
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: ad2414c52b326e5c0800000000000000
+      internalID: -4186619554635365670
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      TX Tileset - Dungeon Ground_0: -3388272840388637939
+      TX Tileset - Dungeon Ground_1: 5359350115097096438
+      TX Tileset - Dungeon Ground_10: 2639602985172974801
+      TX Tileset - Dungeon Ground_11: 3241087660977826100
+      TX Tileset - Dungeon Ground_12: -4186619554635365670
+      TX Tileset - Dungeon Ground_2: 885175801024636886
+      TX Tileset - Dungeon Ground_3: -2673224722707060007
+      TX Tileset - Dungeon Ground_4: -1854161201983580277
+      TX Tileset - Dungeon Ground_5: -242940400640730147
+      TX Tileset - Dungeon Ground_6: 2887103795553085377
+      TX Tileset - Dungeon Ground_7: -6762715957748228702
+      TX Tileset - Dungeon Ground_8: 3028592875256768203
+      TX Tileset - Dungeon Ground_9: -4482834494123852019
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
