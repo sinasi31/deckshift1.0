@@ -74,6 +74,8 @@ public class PlayerController : MonoBehaviour
     public float diveSpeed = 25f;
     private bool isDiving = false;
     public GameObject dashEffectPrefab;
+    [SerializeField] internal float dashImpulse = 18f;
+    [SerializeField] internal float dashIFrameDuration = 0.15f;
 
     [Header("Adrenaline VFX")]
     public GameObject ghostPrefab;
@@ -96,7 +98,6 @@ public class PlayerController : MonoBehaviour
     public float wallSlideSpeed = 2f;
     public Vector2 wallJumpForce = new Vector2(10f, 15f);
     private bool isWallDetected;
-    private bool canWallCling = false;
     private bool isWallSliding;
 
     [Header("Quest Tracking")]
@@ -417,9 +418,7 @@ public class PlayerController : MonoBehaviour
 
     private void HandleStateTransitions()
     {
-        if (canWallCling && !isGrounded && isWallDetected && moveInput != 0)
-            ChangeState(PlayerState.WallSliding);
-        else if (currentState == PlayerState.WallSliding && (!isWallDetected || moveInput == 0))
+        if (currentState == PlayerState.WallSliding && (!isWallDetected || moveInput == 0))
             ChangeState(PlayerState.Jumping);
 
         if (isGrounded && (currentState == PlayerState.Jumping || currentState == PlayerState.KnockedBack || currentState == PlayerState.WallSliding))
@@ -483,30 +482,11 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    internal IEnumerator PerformDash(float dashDistance, int direction)
+    internal IEnumerator DashIFrames(float duration)
     {
-        if (audioSource != null && dashSound != null)
-        {
-            audioSource.PlayOneShot(dashSound);
-        }
-        if (dashEffectPrefab != null)
-        {
-            Instantiate(dashEffectPrefab, transform.position, Quaternion.identity);
-        }
-
-        PlayerState stateBeforeDash = currentState;
-        ChangeState(PlayerState.Dashing);
         isInvincible = true;
-        float originalGravity = rb.gravityScale;
-        rb.gravityScale = 0;
-        rb.linearVelocity = new Vector2(direction * dashDistance, 0);
-        yield return new WaitForSeconds(0.3f);
-        rb.linearVelocity = Vector2.zero;
-        rb.gravityScale = originalGravity;
+        yield return new WaitForSeconds(duration);
         isInvincible = false;
-
-        if (isGrounded) ChangeState(PlayerState.Idle);
-        else ChangeState(PlayerState.Jumping);
     }
 
     public void ApplyKnockback(Vector2 knockbackForce)
@@ -603,13 +583,6 @@ public class PlayerController : MonoBehaviour
         Flip();
         rb.linearVelocity = new Vector2(wallJumpForce.x * (isFacingRight ? 1f : -1f), wallJumpForce.y);
         ChangeState(PlayerState.Jumping);
-    }
-
-    internal IEnumerator ActivateWallCling(float duration)
-    {
-        canWallCling = true;
-        yield return new WaitForSeconds(duration);
-        canWallCling = false;
     }
 
     private bool WallCheck()

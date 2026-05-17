@@ -20,22 +20,18 @@ public class CardActionExecutor : MonoBehaviour
 
         actions = new Dictionary<CardActionType, CardAction>
         {
-            { CardActionType.Jump,            new JumpAction()            },
-            { CardActionType.DashForward,     new DashForwardAction()     },
-            { CardActionType.DashBackward,    new DashBackwardAction()    },
-            { CardActionType.WallCling,       new WallClingAction()       },
-            { CardActionType.DrawCards,       new DrawCardsAction()       },
-            { CardActionType.GainJumpCharges, new GainJumpChargesAction() },
-            { CardActionType.PlatformCreate,  new PlatformCreateAction()  },
-            { CardActionType.Fireball,        new FireballAction()        },
-            { CardActionType.Portal,          new PortalAction()          },
-            { CardActionType.VampiricBite,    new VampiricBiteAction()    },
-            { CardActionType.GlassWail,       new GlassWailAction()       },
-            { CardActionType.Phase,           new PhaseAction()           },
-            { CardActionType.CometDive,       new CometDiveAction()       },
-            { CardActionType.Adrenaline,      new AdrenalineAction()      },
-            { CardActionType.Stagger,         new StaggerAction()         },
-            { CardActionType.ReverseGravity,  new ReverseGravityAction()  },
+            { CardActionType.Jump,           new JumpAction()           },
+            { CardActionType.Dash,           new DashAction()           },
+            { CardActionType.PlatformCreate, new PlatformCreateAction() },
+            { CardActionType.Fireball,       new FireballAction()       },
+            { CardActionType.Portal,         new PortalAction()         },
+            { CardActionType.VampiricBite,   new VampiricBiteAction()   },
+            { CardActionType.GlassWail,      new GlassWailAction()      },
+            { CardActionType.Phase,          new PhaseAction()          },
+            { CardActionType.CometDive,      new CometDiveAction()      },
+            { CardActionType.Adrenaline,     new AdrenalineAction()     },
+            { CardActionType.Stagger,        new StaggerAction()        },
+            { CardActionType.ReverseGravity, new ReverseGravityAction() },
         };
     }
 
