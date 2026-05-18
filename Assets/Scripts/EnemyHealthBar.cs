@@ -84,6 +84,15 @@ public class EnemyHealthBar : MonoBehaviour
             canvas.sortingLayerID = enemySR.sortingLayerID;
             canvas.sortingOrder = enemySR.sortingOrder + 10;
         }
+        else
+        {
+            SkinnedMeshRenderer enemySMR = enemy.GetComponentInChildren<SkinnedMeshRenderer>();
+            if (enemySMR != null)
+            {
+                canvas.sortingLayerID = enemySMR.sortingLayerID;
+                canvas.sortingOrder = enemySMR.sortingOrder + 10;
+            }
+        }
 
         if (followTarget != null)
             transform.position = followTarget.position + worldOffset;
