@@ -171,12 +171,18 @@ public class PlayerController : MonoBehaviour
     private bool playerRendererHasColor;
     private Color playerRendererOriginalColor;
 
+    [Header("Phase Visual")]
+    [SerializeField] internal SkinnedMeshRenderer[] phaseVisuals;
+    private Coroutine phaseVisualCoroutine;
+    private CapsuleCollider2D capsuleCollider;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponentInChildren<Animator>();
         mainCamera = Camera.main;
         cardActionExecutor = GetComponent<CardActionExecutor>();
+        capsuleCollider = GetComponent<CapsuleCollider2D>();
 
         // Cache SkinnedMeshRenderer for gravity-reversal warning flash
         playerSkinnedRenderer = GetComponentInChildren<SkinnedMeshRenderer>(true);
@@ -200,6 +206,7 @@ public class PlayerController : MonoBehaviour
         currentHealth = maxHealth;
         currentShift = maxShift;
         ChangeState(PlayerState.Idle);
+
     }
 
     void Update()
@@ -830,26 +837,89 @@ public class PlayerController : MonoBehaviour
         rb.linearVelocity = Vector2.zero;
 
         int playerLayer = LayerMask.NameToLayer("Player");
-        int groundLayer = LayerMask.NameToLayer("Ground");
-        int enemyLayer = LayerMask.NameToLayer("Enemy");
+        int groundLayerIndex = LayerMask.NameToLayer("Ground");
+        int enemyLayerIndex = LayerMask.NameToLayer("Enemy");
 
-        Physics2D.IgnoreLayerCollision(playerLayer, groundLayer, true);
-        Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, true);
+        Physics2D.IgnoreLayerCollision(playerLayer, groundLayerIndex, true);
+        Physics2D.IgnoreLayerCollision(playerLayer, enemyLayerIndex, true);
 
-        // GÜNCELLENDİ: SkinnedMeshRenderer'larda direkt materyal rengi değiştirmek shader'a bağlı olduğu için 
-        // şimdilik alfa değişimi kodunu yorum satırı yaptık. Gerekirse ileride çözeriz.
-        // if (spriteRenderer != null) ... 
+        // Pass duration + 1.5f so the pulse covers the maximum possible extension time.
+        // PhaseRoutine always stops it explicitly; the extra headroom just prevents a
+        // static mid-pulse tint if wall-stuck extension runs to the full 1s cap.
+        phaseVisualCoroutine = StartCoroutine(PhaseVisualRoutine(duration + 1.5f));
 
         yield return new WaitForSeconds(duration);
 
-        Physics2D.IgnoreLayerCollision(playerLayer, groundLayer, false);
-        Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, false);
+        float extensionTime = 0f;
+        while (IsCollidingWithGround() && extensionTime < 1f)
+        {
+            yield return new WaitForSeconds(0.1f);
+            extensionTime += 0.1f;
+        }
+        if (IsCollidingWithGround())
+        {
+            float ejectDir = isGravityReversed ? -1f : 1f;
+            transform.position += new Vector3(0, 0.5f * ejectDir, 0);
+        }
+
+        if (phaseVisualCoroutine != null) { StopCoroutine(phaseVisualCoroutine); phaseVisualCoroutine = null; }
+        RestorePhaseVisuals();
+
+        Physics2D.IgnoreLayerCollision(playerLayer, groundLayerIndex, false);
+        Physics2D.IgnoreLayerCollision(playerLayer, enemyLayerIndex, false);
 
         rb.gravityScale = originalGravity;
 
-        // if (spriteRenderer != null) ...
-
         isPhasing = false;
+    }
+
+    private IEnumerator PhaseVisualRoutine(float duration)
+    {
+        if (phaseVisuals == null || phaseVisuals.Length == 0) yield break;
+
+        MaterialPropertyBlock block = new MaterialPropertyBlock();
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            float pulse = (Mathf.Sin(Time.time * Mathf.PI * 4f) + 1f) * 0.5f;
+            block.SetFloat("_Alpha", Mathf.Lerp(0.3f, 0.6f, pulse));
+            for (int i = 0; i < phaseVisuals.Length; i++)
+            {
+                if (phaseVisuals[i] == null) continue;
+                phaseVisuals[i].SetPropertyBlock(block);
+            }
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        // Safety net: restore if PhaseRoutine doesn't stop this coroutine first.
+        block.SetFloat("_Alpha", 1f);
+        for (int i = 0; i < phaseVisuals.Length; i++)
+        {
+            if (phaseVisuals[i] == null) continue;
+            phaseVisuals[i].SetPropertyBlock(block);
+        }
+    }
+
+    private void RestorePhaseVisuals()
+    {
+        if (phaseVisuals == null) return;
+        MaterialPropertyBlock block = new MaterialPropertyBlock();
+        block.SetFloat("_Alpha", 1f);
+        for (int i = 0; i < phaseVisuals.Length; i++)
+        {
+            if (phaseVisuals[i] == null) continue;
+            phaseVisuals[i].SetPropertyBlock(block);
+        }
+    }
+
+    private bool IsCollidingWithGround()
+    {
+        if (capsuleCollider == null) return false;
+        Bounds b = capsuleCollider.bounds;
+        // 0.9f shrink avoids a false positive from the player barely touching the floor normally
+        return Physics2D.OverlapBox(b.center, b.size * 0.9f, 0f, groundLayer);
     }
 
     public void IncreaseMaxShift(int amount)
