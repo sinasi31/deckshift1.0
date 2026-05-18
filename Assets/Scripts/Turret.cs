@@ -7,13 +7,16 @@ public class Turret : MonoBehaviour
     public GameObject projectilePrefab;
     public Transform firePoint;
 
-    [Header("Ateþ Ayarlarý")]
+    [Header("Ateï¿½ Ayarlarï¿½")]
     public float fireRate = 2f;
     private Transform playerTransform;
+    private EnemyHealth health;
 
     void Start()
     {
-        // BURADA ESKÝDEN CAN KODLARI VARDI, ARTIK YOK.
+        // BURADA ESKï¿½DEN CAN KODLARI VARDI, ARTIK YOK.
+
+        health = GetComponent<EnemyHealth>();
 
         GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
         if (playerObject != null)
@@ -29,6 +32,7 @@ public class Turret : MonoBehaviour
         while (true)
         {
             yield return new WaitForSeconds(fireRate);
+            if (health != null && health.IsStunned) continue;
             Fire();
         }
     }
@@ -48,7 +52,7 @@ public class Turret : MonoBehaviour
             projectile.Launch(fireDirection);
         }
     }
-    // Turret.cs içine ekle:
+    // Turret.cs iï¿½ine ekle:
     private void OnDisable()
     {
         StopAllCoroutines();

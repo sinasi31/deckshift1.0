@@ -13,15 +13,22 @@ public class ShieldEnemy : MonoBehaviour
 
     // Bloklama durumunu görselleştirmek için (Opsiyonel)
     private SpriteRenderer sr;
+    private EnemyHealth health;
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         sr = GetComponent<SpriteRenderer>();
+        health = GetComponent<EnemyHealth>();
     }
 
     private void Update()
     {
+        if (health != null && health.IsStunned)
+        {
+            rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
+            return;
+        }
         Move();
     }
 

@@ -12,7 +12,8 @@ public class JumpAction : CardAction
         if (player.audioSource != null && player.leapSound != null)
             player.audioSource.PlayOneShot(player.leapSound);
         player.rb.linearVelocity = new Vector2(player.rb.linearVelocity.x, 0);
-        player.rb.AddForce(new Vector2(0f, value), ForceMode2D.Impulse);
+        float jumpDir = player.isGravityReversed ? -1f : 1f;
+        player.rb.AddForce(new Vector2(0f, value * jumpDir), ForceMode2D.Impulse);
         if (player.leapEffectPrefab != null)
         {
             Vector3 spawnPos = player.transform.position + new Vector3(0f, -0.8f, 0f);

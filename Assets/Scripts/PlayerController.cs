@@ -38,9 +38,6 @@ public class PlayerController : MonoBehaviour
     private Vector3 originalScale;
     private Vector3 currentRoomEntryPoint;
 
-    [Header("Fall Settings")]
-    public float fallDamage = 20f;
-
     private float _headBounceCooldown;
 
     [Header("Gold Settings")]
@@ -157,7 +154,7 @@ public class PlayerController : MonoBehaviour
     public GameObject staggerEffect;
 
     // Gravity reversal state
-    private bool isGravityReversed = false;
+    internal bool isGravityReversed = false;
     private float originalGravityScale;
     private Coroutine gravityReversalCoroutine;
     private float visualRotationZ = 0f;
@@ -629,16 +626,19 @@ public class PlayerController : MonoBehaviour
 
         if (currentState == PlayerState.CometDiving) return;
 
-        if (rb.linearVelocity.y < -0.1f)
+        bool fallingDown = isGravityReversed ? rb.linearVelocity.y > 0.1f : rb.linearVelocity.y < -0.1f;
+        if (fallingDown)
         {
             if (RelicManager.instance == null || !RelicManager.instance.HasRelic("PogoBoots")) return;
             EnemyHealth eHealth = other.GetComponentInParent<EnemyHealth>();
             if (eHealth != null)
             {
                 float enemyTopY = other.bounds.center.y + other.bounds.extents.y * 0.5f;
+                float enemyBottomY = other.bounds.center.y - other.bounds.extents.y * 0.5f;
                 Debug.Log($"[HeadBounce Trigger] {other.gameObject.name}, playerY: {transform.position.y:F2}, enemyTopY: {enemyTopY:F2}, velocity.y: {rb.linearVelocity.y:F2}");
 
-                if (transform.position.y > enemyTopY)
+                bool positionOk = isGravityReversed ? transform.position.y < enemyBottomY : transform.position.y > enemyTopY;
+                if (positionOk)
                     TriggerHeadBounce(eHealth);
             }
         }
@@ -647,13 +647,8 @@ public class PlayerController : MonoBehaviour
     private void FallAndRespawn()
     {
         if (currentState == PlayerState.CometDiving) EndCometDive();
-        if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
-            TakeDamage(fallDamage);
-        if (currentHealth > 0)
-        {
-            rb.linearVelocity = Vector2.zero;
-            transform.position = currentRoomEntryPoint;
-        }
+        rb.linearVelocity = Vector2.zero;
+        transform.position = currentRoomEntryPoint;
     }
 
     private void PerformFireball(float damageFromCard)
@@ -903,7 +898,8 @@ public class PlayerController : MonoBehaviour
             ContactPoint2D contact = collision.GetContact(0);
             Debug.Log($"[HeadBounce] Collision: {collision.gameObject.name}, normal.y: {contact.normal.y:F2}, velocity.y: {rb.linearVelocity.y:F2}, canBounce: {eHealth.canBeHeadBounced}");
 
-            if (contact.normal.y > 0.7f)
+            bool normalFromBelow = isGravityReversed ? contact.normal.y < -0.7f : contact.normal.y > 0.7f;
+            if (normalFromBelow)
                 TriggerHeadBounce(eHealth);
         }
     }
@@ -916,7 +912,8 @@ public class PlayerController : MonoBehaviour
         _headBounceCooldown = Time.time + 0.3f;
         eHealth.TakeDamage(8f);
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0f);
-        rb.AddForce(Vector2.up * defaultJumpForce * 0.7f, ForceMode2D.Impulse);
+        float bounceDir = isGravityReversed ? -1f : 1f;
+        rb.AddForce(Vector2.up * defaultJumpForce * 0.7f * bounceDir, ForceMode2D.Impulse);
         AddShift(1);
         if (CameraShake.instance != null) CameraShake.instance.Shake(0.1f, 0.2f);
     }
@@ -1017,7 +1014,8 @@ public class PlayerController : MonoBehaviour
         Debug.Log($"STAGGER KULLANILDI! ({staggerCount}/{maxStaggerUses})");
 
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
-        rb.AddForce(Vector2.up * staggerJumpForce, ForceMode2D.Impulse);
+        float jumpDir = isGravityReversed ? -1f : 1f;
+        rb.AddForce(Vector2.up * staggerJumpForce * jumpDir, ForceMode2D.Impulse);
 
         Collider2D[] enemies = Physics2D.OverlapCircleAll(transform.position, staggerRadius, enemyLayer);
         foreach (Collider2D enemy in enemies)
