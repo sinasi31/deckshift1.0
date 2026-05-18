@@ -107,7 +107,6 @@ public class EnemyHealthBar : MonoBehaviour
         // Üst katman anında düşer
         targetFill = ratio;
         fillImmediate.fillAmount = ratio;
-        Debug.Log($"[EnemyHealthBar] SetHealth called: current={current}, max={max}, ratio={ratio}, fillImmediate.fillAmount(after assignment)={fillImmediate.fillAmount}, fillImmediate.type={fillImmediate.type}, fillImmediate.sprite={(fillImmediate.sprite == null ? "NULL" : fillImmediate.sprite.name)}");
 
         // Tam canda bar görünmez kalsın
         if (current < max)
@@ -191,6 +190,7 @@ public class EnemyHealthBar : MonoBehaviour
         GameObject go = MakeChild(name, parent);
         Image img = go.AddComponent<Image>();
         img.color = color;
+        img.sprite = UnityEngine.Resources.GetBuiltinResource<Sprite>("UI/Skin/UISprite.psd");
         return img;
     }
 
