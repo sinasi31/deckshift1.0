@@ -39,7 +39,7 @@ public class EnemyHealthBar : MonoBehaviour
     }
 
     const float CANVAS_SCALE = 0.01f;
-    const float BAR_HEIGHT_PX = 16f;
+    const float BAR_HEIGHT_PX = 24f;
     const float DELAYED_SPEED = 2f;
     const float FADE_DELAY = 3f;
     const float FADE_SPEED = 2f;
@@ -62,9 +62,6 @@ public class EnemyHealthBar : MonoBehaviour
 
     void LateUpdate()
     {
-        if (followTarget != null && fillImmediate != null)
-            Debug.Log($"[HealthBar LateUpdate] follow={followTarget.name} immediate.fillAmount={fillImmediate.fillAmount:F3} delayed.fillAmount={fillDelayed.fillAmount:F3} targetFill={targetFill:F3} delayedFill={delayedFill:F3}");
-
         if (followTarget != null)
             transform.position = followTarget.position + worldOffset;
 
@@ -124,7 +121,6 @@ public class EnemyHealthBar : MonoBehaviour
         // Üst katman anında düşer
         targetFill = ratio;
         fillImmediate.fillAmount = ratio;
-        Debug.Log($"[HealthBar SetHealth] current={current}/{max} ratio={ratio:F3} fillImmediate.fillAmount={fillImmediate.fillAmount:F3} type={fillImmediate.type} sprite={(fillImmediate.sprite==null?"NULL":fillImmediate.sprite.name)} method={fillImmediate.fillMethod} origin={fillImmediate.fillOrigin}");
 
         // Tam canda bar görünmez kalsın
         if (current < max)
