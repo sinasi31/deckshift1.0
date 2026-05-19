@@ -24,6 +24,20 @@ public class EnemyHealthBar : MonoBehaviour
     private bool isDamaged = false;
     private float currentHP, maxHP;
 
+    private static Sprite cachedWhiteSprite;
+
+    private static Sprite GetWhiteSprite()
+    {
+        if (cachedWhiteSprite == null)
+        {
+            Texture2D tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            tex.SetPixel(0, 0, Color.white);
+            tex.Apply();
+            cachedWhiteSprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 100f);
+        }
+        return cachedWhiteSprite;
+    }
+
     const float CANVAS_SCALE = 0.01f;
     const float BAR_HEIGHT_PX = 16f;
     const float DELAYED_SPEED = 2f;
@@ -194,7 +208,7 @@ public class EnemyHealthBar : MonoBehaviour
         GameObject go = MakeChild(name, parent);
         Image img = go.AddComponent<Image>();
         img.color = color;
-        img.sprite = UnityEngine.Resources.GetBuiltinResource<Sprite>("UI/Skin/UISprite.psd");
+        img.sprite = GetWhiteSprite();
         return img;
     }
 
