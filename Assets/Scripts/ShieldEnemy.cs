@@ -75,6 +75,12 @@ public class ShieldEnemy : MonoBehaviour
         return false; // Bloklanmadı, hasar al.
     }
 
+    public bool IsBlocking()
+    {
+        if (GameManager.instance == null || GameManager.instance.player == null) return false;
+        return IsBlocking(GameManager.instance.player.transform.position);
+    }
+
     // Oyuncuya çarpınca hasar ver
     private void OnCollisionEnter2D(Collision2D other)
     {

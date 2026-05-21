@@ -115,10 +115,10 @@ public class RelicManager : MonoBehaviour
                 foreach (Collider2D enemy in enemies)
                 {
                     // Düşmanın can scriptine eriş (Script adın EnemyHealth ise)
-                    EnemyHealth eHealth = enemy.GetComponent<EnemyHealth>();
-                    if (eHealth != null)
+                    IDamageable target = enemy.GetComponentInParent<IDamageable>();
+                    if (target != null)
                     {
-                        eHealth.TakeDamage(20f); // 20 Hasar yansıt
+                        target.TakeDamage(20f); // 20 Hasar yansıt
                     }
                 }
                 Debug.Log("🌵 Spiked Carapace: Düşmanlara hasar yansıtıldı!");

@@ -703,11 +703,11 @@ public class PlayerController : MonoBehaviour
         Collider2D[] hits = Physics2D.OverlapCircleAll(firePoint.position, biteRange, ~0);
         foreach (Collider2D hit in hits)
         {
-            EnemyHealth targetHealth = hit.GetComponentInParent<EnemyHealth>();
+            IDamageable targetHealth = hit.GetComponentInParent<IDamageable>();
             if (targetHealth == null) continue;
 
             targetHealth.TakeDamage(damageAmount);
-            Heal(biteHealAmount);
+            if (targetHealth is EnemyHealth) Heal(biteHealAmount);
             if (biteEffectPrefab != null)
             {
                 GameObject vfx = Instantiate(biteEffectPrefab, hit.transform.position, Quaternion.identity);
@@ -914,12 +914,12 @@ public class PlayerController : MonoBehaviour
     private void LandCometDive()
     {
         Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, cometRadius, ~0);
-        HashSet<EnemyHealth> damaged = new HashSet<EnemyHealth>();
+        HashSet<IDamageable> damaged = new HashSet<IDamageable>();
         foreach (Collider2D hit in hits)
         {
-            EnemyHealth eHealth = hit.GetComponentInParent<EnemyHealth>();
-            if (eHealth != null && damaged.Add(eHealth))
-                eHealth.TakeDamage(cometDamage);
+            IDamageable target = hit.GetComponentInParent<IDamageable>();
+            if (target != null && damaged.Add(target))
+                target.TakeDamage(cometDamage);
         }
 
         if (cometImpactEffect != null)
@@ -1005,13 +1005,13 @@ public class PlayerController : MonoBehaviour
         float jumpDir = isGravityReversed ? -1f : 1f;
         rb.AddForce(Vector2.up * staggerJumpForce * jumpDir, ForceMode2D.Impulse);
 
-        Collider2D[] enemies = Physics2D.OverlapCircleAll(transform.position, staggerRadius, enemyLayer);
+        Collider2D[] enemies = Physics2D.OverlapCircleAll(transform.position, staggerRadius, ~0);
         foreach (Collider2D enemy in enemies)
         {
-            EnemyHealth eHealth = enemy.GetComponent<EnemyHealth>();
-            if (eHealth != null)
+            IDamageable target = enemy.GetComponentInParent<IDamageable>();
+            if (target != null)
             {
-                eHealth.TakeDamage(staggerDamage);
+                target.TakeDamage(staggerDamage);
             }
         }
 
