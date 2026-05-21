@@ -37,9 +37,10 @@ public class CameraFollow : MonoBehaviour
             pos.y = Mathf.Clamp(pos.y, b.min.y + halfH, b.max.y - halfH);
         }
 
-        // Shake offset applied after clamping so zone edges don't suppress the shake
+        // Shake and peek offsets applied after clamping so zone edges don't suppress them
         Vector3 shakeOffset = CameraShake.instance != null ? (Vector3)CameraShake.instance.shakeOffset : Vector3.zero;
-        transform.position = pos + shakeOffset;
+        Vector3 peekOffset = CameraPeek.instance != null ? (Vector3)CameraPeek.instance.peekOffset : Vector3.zero;
+        transform.position = pos + shakeOffset + peekOffset;
     }
 
     private void UpdateActiveZone()

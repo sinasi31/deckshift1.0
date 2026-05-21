@@ -3674,6 +3674,7 @@ GameObject:
   - component: {fileID: 519420030}
   - component: {fileID: 519420033}
   - component: {fileID: 519420035}
+  - component: {fileID: 519420036}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -3826,6 +3827,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   target: {fileID: 5274940026035738714}
   offset: {x: 0, y: 0}
+--- !u!114 &519420036
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 519420028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa14f4e81b467824fbbd79d045afe1ad, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  peekDistance: 4
+  lerpDuration: 0.2
+  peekKey: 306
 --- !u!1 &520049766
 GameObject:
   m_ObjectHideFlags: 0
@@ -14686,6 +14702,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8334719470568814973, guid: 418762c5259557645bc3ca542f249d74, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8822436801064664186}
+    - targetCorrespondingSourceObject: {fileID: 8334719470568814973, guid: 418762c5259557645bc3ca542f249d74, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8822436801064664193}
   m_SourcePrefab: {fileID: 100100000, guid: 418762c5259557645bc3ca542f249d74, type: 3}
 --- !u!1001 &1254299156264031134
 PrefabInstance:
@@ -15022,6 +15041,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4dfa0209f709f3e44b9c2782eb5a8083, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &8822436801064664193
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1049478982}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c73f718c8a1590e4f8c6d6fcada87b30, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxHealth: 100
+  isInvincible: 0
+  hurtSound: {fileID: 8300000, guid: 4bcb86928d613044aacc4a9458bd99f8, type: 3}
+  deathSound: {fileID: 8300000, guid: 3e3343bf51da7cd4d835c7154b887582, type: 3}
+  deathVolume: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
