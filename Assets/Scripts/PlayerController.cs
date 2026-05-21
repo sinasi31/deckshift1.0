@@ -1,6 +1,5 @@
 ﻿using System.Collections;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 using Unity.Cinemachine;
 
@@ -10,6 +9,7 @@ public class PlayerController : MonoBehaviour
     private Animator animator;
     internal Camera mainCamera;
     private CardActionExecutor cardActionExecutor;
+    private PlayerHealth playerHealth;
 
     [Header("Visual Settings")]
     public GameObject visualModel; // YENİ: Hiyerarşideki PF Skeleton objesini buraya sürükleyeceğiz!
@@ -36,7 +36,7 @@ public class PlayerController : MonoBehaviour
     private bool isPhasing = false;
     private float verticalInput;
     private Vector3 originalScale;
-    private Vector3 currentRoomEntryPoint;
+    internal Vector3 currentRoomEntryPoint;
 
     private float _headBounceCooldown;
 
@@ -45,7 +45,6 @@ public class PlayerController : MonoBehaviour
     public event System.Action<int> OnGoldChanged;
 
     [Header("Audio Settings")]
-    public AudioClip hurtSound;
     public AudioSource audioSource;
     public AudioClip dashSound;
     public AudioClip fireballCastSound;
@@ -57,8 +56,6 @@ public class PlayerController : MonoBehaviour
     public AudioClip glassVailSound;
     public AudioClip jumpSound;
     public AudioClip leapSound;
-    public AudioClip deathSound;
-    public float deathVolume = 1f;
     public AudioClip spendSound;
     public AudioClip warningSoundClip;
     public float soundVolume = 1f;
@@ -102,13 +99,14 @@ public class PlayerController : MonoBehaviour
     private float moveInput;
 
     [Header("Health Settings")]
-    public float maxHealth = 100f;
-    private float currentHealth;
-    public bool isInvincible = false;
-    public float CurrentHealth { get { return currentHealth; } }
-    public float MaxHealth { get { return maxHealth; } }
-
-    private bool isDead = false;
+    public float CurrentHealth => playerHealth.CurrentHealth;
+    public float MaxHealth => playerHealth.MaxHealth;
+    public bool IsDead => playerHealth.IsDead;
+    public bool isInvincible
+    {
+        get => playerHealth.isInvincible;
+        set => playerHealth.isInvincible = value;
+    }
 
     [Header("Jump Settings")]
     public float defaultJumpForce = 10f;
@@ -184,6 +182,7 @@ public class PlayerController : MonoBehaviour
         mainCamera = Camera.main;
         cardActionExecutor = GetComponent<CardActionExecutor>();
         capsuleCollider = GetComponent<CapsuleCollider2D>();
+        playerHealth = GetComponent<PlayerHealth>();
 
         // Cache SkinnedMeshRenderer for gravity-reversal warning flash
         playerSkinnedRenderer = GetComponentInChildren<SkinnedMeshRenderer>(true);
@@ -204,9 +203,15 @@ public class PlayerController : MonoBehaviour
     void Start()
     {
         originalScale = transform.localScale;
-        currentHealth = maxHealth;
         currentShift = maxShift;
         ChangeState(PlayerState.Idle);
+
+        playerHealth.OnDamaged += (dmg) =>
+        {
+            tookDamageThisRoom = true;
+            RelicManager.instance?.OnPlayerTakeDamage();
+            CameraShake.instance?.Shake(0.2f, 0.3f);
+        };
 
         if (visualModel != null)
         {
@@ -227,7 +232,7 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        if (isDead) return;
+        if (playerHealth.IsDead) return;
 
         bool wasGrounded = isGrounded;
         isGrounded = IsGroundedCheck();
@@ -492,92 +497,15 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    internal IEnumerator DashIFrames(float duration)
-    {
-        isInvincible = true;
-        yield return new WaitForSeconds(duration);
-        isInvincible = false;
-    }
+    internal IEnumerator DashIFrames(float duration) => playerHealth.GrantInvincibility(duration);
 
-    public void ApplyKnockback(Vector2 knockbackForce)
-    {
-        StartCoroutine(KnockbackRoutine(knockbackForce));
-    }
+    public void ApplyKnockback(Vector2 knockbackForce) => playerHealth.ApplyKnockback(knockbackForce);
 
-    private IEnumerator KnockbackRoutine(Vector2 knockbackForce)
-    {
-        if (currentState == PlayerState.CometDiving) EndCometDive();
-        ChangeState(PlayerState.KnockedBack);
-        rb.linearVelocity = Vector2.zero;
-        rb.AddForce(knockbackForce, ForceMode2D.Impulse);
-        yield return new WaitForSeconds(0.2f);
-        if (currentState == PlayerState.KnockedBack)
-            ChangeState(PlayerState.Jumping);
-    }
-
-    public void TakeDamage(float damage)
-    {
-        if (isInvincible || isDead) { return; }
-        if (RelicManager.instance != null)
-        {
-            RelicManager.instance.OnPlayerTakeDamage();
-        }
-
-        if (CameraShake.instance != null)
-            CameraShake.instance.Shake(0.2f, 0.3f);
-
-        tookDamageThisRoom = true;
-        currentHealth = Mathf.Max(currentHealth - damage, 0f);
-
-        if (hurtSound != null && audioSource != null)
-        {
-            audioSource.PlayOneShot(hurtSound);
-        }
-
-        // GÜNCELLENDİ: Yeni paket hasar yeme animasyonu tetikleyicisi
-        if (animator != null) animator.SetTrigger("InjuredFront");
-
-        Debug.Log($"Hasar Alındı! Kalan Can: {currentHealth}");
-
-        if (currentHealth <= 0)
-        {
-            Die();
-        }
-    }
+    public void TakeDamage(float damage) => playerHealth.TakeDamage(damage);
 
     public void OnNewRoomEnter()
     {
         tookDamageThisRoom = false;
-    }
-
-    private void Die()
-    {
-        if (isDead) return;
-        isDead = true;
-        if (currentState == PlayerState.CometDiving) EndCometDive();
-
-        Debug.Log("💀 Oyuncu Öldü! Ses Çalınıyor...");
-
-        if (deathSound != null)
-        {
-            if (Camera.main != null)
-                AudioSource.PlayClipAtPoint(deathSound, Camera.main.transform.position, deathVolume);
-            else
-                AudioSource.PlayClipAtPoint(deathSound, transform.position, deathVolume);
-        }
-
-        // GÜNCELLENDİ: Yeni paket ölüm animasyonu tetikleyicisi
-        if (animator != null) animator.SetBool("IsDead", true);
-
-        if (rb != null) rb.simulated = false;
-
-        StartCoroutine(WaitAndReload());
-    }
-
-    private IEnumerator WaitAndReload()
-    {
-        yield return new WaitForSeconds(1.5f);
-        SceneManager.LoadScene("GameOverScene");
     }
 
     public bool IsGroundedCheck()
@@ -637,7 +565,7 @@ public class PlayerController : MonoBehaviour
     {
         if (other.CompareTag("DeathZone"))
         {
-            FallAndRespawn();
+            playerHealth.FallAndRespawn();
             return;
         }
 
@@ -659,13 +587,6 @@ public class PlayerController : MonoBehaviour
                     TriggerHeadBounce(eHealth);
             }
         }
-    }
-
-    private void FallAndRespawn()
-    {
-        if (currentState == PlayerState.CometDiving) EndCometDive();
-        rb.linearVelocity = Vector2.zero;
-        transform.position = currentRoomEntryPoint;
     }
 
     private void PerformFireball(float damageFromCard)
@@ -796,10 +717,7 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    public void Heal(float amount)
-    {
-        currentHealth = Mathf.Min(currentHealth + amount, maxHealth);
-    }
+    public void Heal(float amount) => playerHealth.Heal(amount);
 
     internal void PerformGlassWail(float stunDuration)
     {
@@ -988,7 +906,7 @@ public class PlayerController : MonoBehaviour
         if (CameraShake.instance != null) CameraShake.instance.Shake(0.1f, 0.2f);
     }
 
-    private void EndCometDive()
+    internal void EndCometDive()
     {
         if (diveTrail != null) diveTrail.emitting = false;
     }
@@ -1019,7 +937,7 @@ public class PlayerController : MonoBehaviour
             audioSource.PlayOneShot(adrenalineSound);
         }
 
-        float healthPercentage = currentHealth / maxHealth;
+        float healthPercentage = playerHealth.HealthPercent;
 
         if (CameraShake.instance != null) CameraShake.instance.Shake(0.1f, 0.5f);
 
@@ -1102,7 +1020,7 @@ public class PlayerController : MonoBehaviour
         if (staggerCount >= maxStaggerUses)
         {
             Debug.Log("KALBİN DAYANAMADI! ÖLÜYORSUN...");
-            Die();
+            playerHealth.Kill();
         }
     }
 

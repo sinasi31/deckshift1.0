@@ -109,10 +109,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxHealth: 30
   canBeHeadBounced: 1
-  healthBarPrefab: {fileID: 0}
-  headBarOffset: {x: 0, y: 1}
+  healthBarPrefab: {fileID: 5647382910293847562, guid: 7a3f9b4c1d8e2f6b5c3d7e9f4a1b2c3d, type: 3}
+  headBarOffset: {x: 0, y: 2.2}
   stunSpriteRenderers:
   - {fileID: 0}
   stunSkinnedRenderers:
   - {fileID: 4620261557865731894}
-  damagePopupPrefab: {fileID: 0}
+  damagePopupPrefab: {fileID: 2036397937272019125, guid: c4cd6b8e18cb9d141b1b0f9fa894bc1f, type: 3}

@@ -157,7 +157,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0.063402, y: 0.016487, z: 0.0017108}
-  m_LocalScale: {x: 0.5357581, y: 0.75001997, z: 0.79241747}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1873765427535981035}
@@ -221,7 +221,6 @@ MonoBehaviour:
   maxAirJumps: 0
   platformPrefab: {fileID: 2884497646027804218, guid: 0c30a27df86ca3d4485ef29c36533548, type: 3}
   currentGold: 40
-  hurtSound: {fileID: 8300000, guid: 4bcb86928d613044aacc4a9458bd99f8, type: 3}
   audioSource: {fileID: 7872518250570301061}
   dashSound: {fileID: 8300000, guid: 1f3da61f1655f6e4488574b4e351c8ce, type: 3}
   fireballCastSound: {fileID: 8300000, guid: 2edea64602e6220499330f4c32d7ee4a, type: 3}
@@ -233,8 +232,6 @@ MonoBehaviour:
   glassVailSound: {fileID: 8300000, guid: 0335a30fbf68921448cf9922e6b028cb, type: 3}
   jumpSound: {fileID: 8300000, guid: 4f25667166ce44040bd09867cd3a4042, type: 3}
   leapSound: {fileID: 8300000, guid: 4f25667166ce44040bd09867cd3a4042, type: 3}
-  deathSound: {fileID: 8300000, guid: 3e3343bf51da7cd4d835c7154b887582, type: 3}
-  deathVolume: 1
   spendSound: {fileID: 8300000, guid: 70cad06b332b69049ad572f5628c41c5, type: 3}
   warningSoundClip: {fileID: 0}
   soundVolume: 1
@@ -254,8 +251,6 @@ MonoBehaviour:
   wallSlideSpeed: 2
   wallJumpForce: {x: 10, y: 15}
   moveSpeed: 3
-  maxHealth: 100
-  isInvincible: 0
   defaultJumpForce: 10
   maxShift: 20
   currentShift: 1
@@ -270,6 +265,7 @@ MonoBehaviour:
   fireballPrefab: {fileID: 6847861146471343392, guid: c410de68076b28846bb5e156129b8267, type: 3}
   firePoint: {fileID: 7525573285496672760}
   wailRange: 10
+  fireballCastDelay: 0.12
   biteRange: 1.5
   biteHealAmount: 10
   enemyLayer:

@@ -222,12 +222,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxHealth: 20
   canBeHeadBounced: 1
-  healthBarPrefab: {fileID: 0}
+  healthBarPrefab: {fileID: 5647382910293847562, guid: 7a3f9b4c1d8e2f6b5c3d7e9f4a1b2c3d, type: 3}
   headBarOffset: {x: 0, y: 1}
   stunSpriteRenderers: []
   stunSkinnedRenderers:
   - {fileID: 6805959683191456920}
-  damagePopupPrefab: {fileID: 0}
+  damagePopupPrefab: {fileID: 2036397937272019125, guid: c4cd6b8e18cb9d141b1b0f9fa894bc1f, type: 3}
 --- !u!137 &6805959683191456920 stripped
 SkinnedMeshRenderer:
   m_CorrespondingSourceObject: {fileID: 543120381953721521, guid: 3e6bb0f0ee2942a41bf22c35f24c0c21, type: 3}

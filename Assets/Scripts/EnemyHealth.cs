@@ -83,12 +83,6 @@ public class EnemyHealth : MonoBehaviour
 
     public void TakeDamage(float damage, Transform damageSource = null)
     {
-        currentHealth -= damage;
-        if (HitStop.instance != null) HitStop.instance.Stop(0.15f);
-        Debug.Log($"{gameObject.name} hasar aldı! Kalan Can: {currentHealth}");
-
-        StartCoroutine(FlashRoutine());
-
         ShieldEnemy shield = GetComponent<ShieldEnemy>();
         if (shield != null && damageSource != null)
         {
@@ -98,6 +92,12 @@ public class EnemyHealth : MonoBehaviour
                 return;
             }
         }
+
+        currentHealth -= damage;
+        if (HitStop.instance != null) HitStop.instance.Stop(0.15f);
+        Debug.Log($"{gameObject.name} hasar aldı! Kalan Can: {currentHealth}");
+
+        StartCoroutine(FlashRoutine());
 
         if (damagePopupPrefab != null)
         {
