@@ -1,7 +1,7 @@
 using UnityEngine;
 using System.Collections;
 
-public class EnemyHealth : MonoBehaviour
+public class EnemyHealth : MonoBehaviour, IDamageable
 {
     [Header("Can Ayarları")]
     public float maxHealth = 30f;
@@ -81,23 +81,20 @@ public class EnemyHealth : MonoBehaviour
         }
     }
 
-    public void TakeDamage(float damage, Transform damageSource = null)
+    public void TakeDamage(float damage)
     {
+        ShieldEnemy shield = GetComponent<ShieldEnemy>();
+        if (shield != null && shield.IsBlocking())
+        {
+            Debug.Log("BLOKLANDI!");
+            return;
+        }
+
         currentHealth -= damage;
         if (HitStop.instance != null) HitStop.instance.Stop(0.15f);
         Debug.Log($"{gameObject.name} hasar aldı! Kalan Can: {currentHealth}");
 
         StartCoroutine(FlashRoutine());
-
-        ShieldEnemy shield = GetComponent<ShieldEnemy>();
-        if (shield != null && damageSource != null)
-        {
-            if (shield.IsBlocking(damageSource.position))
-            {
-                Debug.Log("BLOKLANDI! (Metal Sesi Çal)");
-                return;
-            }
-        }
 
         if (damagePopupPrefab != null)
         {

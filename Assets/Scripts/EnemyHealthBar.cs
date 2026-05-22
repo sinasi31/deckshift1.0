@@ -24,8 +24,22 @@ public class EnemyHealthBar : MonoBehaviour
     private bool isDamaged = false;
     private float currentHP, maxHP;
 
+    private static Sprite cachedWhiteSprite;
+
+    private static Sprite GetWhiteSprite()
+    {
+        if (cachedWhiteSprite == null)
+        {
+            Texture2D tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            tex.SetPixel(0, 0, Color.white);
+            tex.Apply();
+            cachedWhiteSprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 100f);
+        }
+        return cachedWhiteSprite;
+    }
+
     const float CANVAS_SCALE = 0.01f;
-    const float BAR_HEIGHT_PX = 16f;
+    const float BAR_HEIGHT_PX = 24f;
     const float DELAYED_SPEED = 2f;
     const float FADE_DELAY = 3f;
     const float FADE_SPEED = 2f;
@@ -83,6 +97,15 @@ public class EnemyHealthBar : MonoBehaviour
         {
             canvas.sortingLayerID = enemySR.sortingLayerID;
             canvas.sortingOrder = enemySR.sortingOrder + 10;
+        }
+        else
+        {
+            SkinnedMeshRenderer enemySMR = enemy.GetComponentInChildren<SkinnedMeshRenderer>();
+            if (enemySMR != null)
+            {
+                canvas.sortingLayerID = enemySMR.sortingLayerID;
+                canvas.sortingOrder = enemySMR.sortingOrder + 10;
+            }
         }
 
         if (followTarget != null)
@@ -181,6 +204,7 @@ public class EnemyHealthBar : MonoBehaviour
         GameObject go = MakeChild(name, parent);
         Image img = go.AddComponent<Image>();
         img.color = color;
+        img.sprite = GetWhiteSprite();
         return img;
     }
 

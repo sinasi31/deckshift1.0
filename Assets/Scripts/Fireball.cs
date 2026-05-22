@@ -31,7 +31,7 @@ public class Fireball : MonoBehaviour
 
         if (other.GetComponent<Portal>() != null) return;
 
-        EnemyHealth targetHealth = other.GetComponent<EnemyHealth>();
+        IDamageable targetHealth = other.GetComponentInParent<IDamageable>();
 
         if (targetHealth != null)
         {

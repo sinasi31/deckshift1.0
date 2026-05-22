@@ -2,9 +2,9 @@ using UnityEngine;
 
 public class Projectile : MonoBehaviour
 {
-    public float speed = 10f; 
-    public float lifeTime = 3f; 
-    public float damage = 10f;  
+    public float speed = 10f;
+    public float lifeTime = 3f;
+    public float damage = 10f;
     private Rigidbody2D rb;
 
     private void Awake()
@@ -23,12 +23,11 @@ public class Projectile : MonoBehaviour
         float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
         transform.rotation = Quaternion.Euler(0, 0, angle);
     }
+
     void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.isTrigger)
-        {
-            return;
-        }
+        if (other.isTrigger) return;
+
         PlayerController player = other.GetComponent<PlayerController>();
         if (player != null)
         {
@@ -36,9 +35,10 @@ public class Projectile : MonoBehaviour
             Destroy(gameObject); // Mermiyi yok et
             return;
         }
-        if (other.GetComponent<EnemyHealth>() == null)
-        {
-            Destroy(gameObject); // Duvara çarptý, yok et
-        }
+
+        IDamageable target = other.GetComponentInParent<IDamageable>();
+        if (target is EnemyHealth) return; // friendly fire â€” pass through
+        if (target != null) target.TakeDamage(damage);
+        Destroy(gameObject);
     }
 }

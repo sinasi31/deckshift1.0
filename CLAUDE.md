@@ -474,6 +474,23 @@ Many systems check via `enemyLayer` mask, which misses Default-layer enemies. Th
 
 **Known gap:** the velocity sign check (`rb.linearVelocity.y < -0.1f`) doesn't account for gravity reversal. Will silently fail during reversed-gravity head-bounce attempts. Low priority — gravity reversal duration is short and head-bouncing during it is an edge case.
 
+### Enemy Healthbars (EnemyHealthBar.cs + EnemyHealthBar.prefab)
+
+Wired and working across all six enemy types (AeroBat, MeleeEnemy, RangedEnemy, ShieldEnemy, Turret, PatrolEnemy).
+
+**Architecture:** `EnemyHealth` instantiates `healthBarPrefab` (assigned per-enemy in Inspector) in `Start()`, calls `Initialize(transform, headBarOffset, computedWidth)`. The bar parents itself to nothing (free in world space), follows the enemy via its own `LateUpdate`, and is destroyed in `Die()` before the enemy GameObject. Width is computed from `Collider2D.bounds.size.x * 1.2`. `EnemyHealth.headBarOffset` is the per-enemy Y offset; tune in Inspector if the bar sits in the middle of the model instead of above its head.
+
+**The prefab itself is intentionally near-empty:** `Assets/Prefabs/UI/EnemyHealthBar.prefab` has only a `RectTransform` + the `EnemyHealthBar` MonoBehaviour. `BuildCanvas()` in Awake constructs the Canvas, CanvasGroup, border Image, FillImmediate (dark red, snaps), FillDelayed (orange, lerps), and HealthText (TMP) procedurally. WorldSpace canvas at `CANVAS_SCALE = 0.01f`.
+
+**Two pitfalls already hit and fixed — do not regress:**
+
+1. **`UnityEngine.Resources.GetBuiltinResource<Sprite>("UI/Skin/UISprite.psd")` does NOT work at runtime.** Returns null with logged errors. The current solution: `EnemyHealthBar` builds a 1×1 white sprite procedurally in a static `GetWhiteSprite()` helper (cached in `cachedWhiteSprite`), assigned to every Image's `sprite` field in `MakeChildImage`. **Required for `fillAmount` to render** — Filled-mode Images with no sprite silently ignore fillAmount and just render as flat colored rectangles.
+2. **Sorting fallback for SkinnedMeshRenderer enemies.** `Initialize` first checks for SpriteRenderer (for any future sprite-based enemies), then falls back to SkinnedMeshRenderer for Cainos-based rigs. Without this fallback, AeroBat/MeleeEnemy/RangedEnemy/etc. would stay at default `sortingOrder = 100` regardless of their actual rendering layer.
+
+**Settings integration:** `EnemyHealthBar` subscribes to `SettingsMenu.OnShowNumbersChanged` and reads `PlayerPrefs.GetInt("ShowEnemyNumbers", 1)` on start. Only the text label toggles; bar visuals always render.
+
+**Shield-block damage leak (REAL BUG, not yet fixed):** In `EnemyHealth.TakeDamage`, `currentHealth -= damage` runs BEFORE the shield-block check, then the shield check returns early. Blocked hits silently deduct health but skip the popup and bar update — so the ShieldEnemy doesn't actually shield from damage, only from feedback. Move the deduction to AFTER the shield check when this is touched next. Trivial fix, scope-isolated to one method.
+
 ---
 
 ## Audio System
@@ -618,6 +635,7 @@ The current relic system follows Slay-the-Spire conventions: strictly additive, 
 
 ### Bugs (deferred)
 
+- **Shield-block damage leak:** In `EnemyHealth.TakeDamage`, `currentHealth -= damage` runs BEFORE the `ShieldEnemy.IsBlocking` check. The check returns early but the HP has already been deducted. So blocked hits silently lose HP — the shield only blocks the popup and the bar update, not the actual damage. Fix: move the deduction to AFTER the shield check. Trivial.
 - **Card effect conflict class of bug** — playing multiple state-modifying cards in close succession breaks player state permanently. Reachable in hub, mostly gated by Shift cost in normal play. Will be resolved as part of the CardActionExecutor refactor; do not patch individual cards.
 - **Phase card wall-stuck:** if Phase ends while player is inside a wall, player gets stuck. Plan: prevent Phase expiration inside collider.
 - **Fall damage zeroing into floor:** at high fall speeds player clips into ground. Plan: **remove fall damage entirely.**
@@ -627,6 +645,27 @@ The current relic system follows Slay-the-Spire conventions: strictly additive, 
 - **Duplicate ExitDoor possible in some room prefabs:** defensive guards now in place but the scene-side duplicate (if any) hasn't been cleaned up.
 - **AnimationEventReceiver may re-enable on prefab reimport.** Has been disabled twice. If OnFootstep NullRefs reappear in the console, check that the component on the visualModel's Animator child is unchecked.
 - **Gravity reversal warning flash is invisible** — relies on SkinnedMeshRenderer that no longer exists on the new sprite-based rig. Audio cue still fires. Fix: add a SpriteRenderer flash path.
+
+### CardTemplate prefab rebuild (BLOCKED on art)
+
+The `CardTemplate` prefab has fundamental scale corruption: root scale is non-uniform (0.119, 0.568, 0.92) and ShiftCostContainer compensates with inverse scale (7.40, 1.55, 0.96). On-screen layout works only because the scales partially cancel; any position/spacing change looks broken because the cancellation is non-uniform.
+
+**Measurements taken from a 1024×1536 sample card art** (deckshift_card_03):
+- Shift slot painted centers: PNG pixels (411, 138), (511, 138), (610, 138) — 99px horizontal spacing.
+- Charge slot painted center: PNG pixels (245, 150) — slightly lower and left.
+- Honest Point Spacing in a 120×180 card rect: ~11.72 units (current Inspector value is 20, also wrong).
+
+**Plan:** rebuild from scratch with all scales at (1, 1, 1), Width 120 / Height 180, all positioning via RectTransform Width/Height/Position only. **Blocked: user is hiring an artist for new card art. Not all current cards are the same exact size. Rebuilding now means rebuilding again once consistent art is back.** Hold until then.
+
+### Resolved this session (Enemy Healthbars)
+
+(Kept for short-term reference; can be deleted once stale.)
+- ✅ EnemyHealthBar.prefab created at `Assets/Prefabs/UI/EnemyHealthBar.prefab` (root + script only — Canvas built procedurally in Awake).
+- ✅ Wired and assigned via Inspector to all six enemy prefabs (AeroBat, MeleeEnemy, RangedEnemy, ShieldEnemy, Turret, PatrolEnemy). Per-enemy `headBarOffset` tuned by user.
+- ✅ Fixed silent fill-amount bug — `EnemyHealthBar` now uses a procedurally-built 1×1 white sprite (cached static helper) so Image.fillAmount works. The earlier attempt using `Resources.GetBuiltinResource<Sprite>("UI/Skin/UISprite.psd")` failed at runtime with "Failed to find" errors and has been replaced.
+- ✅ Added SkinnedMeshRenderer fallback to sorting layer detection in `Initialize` (Cainos rigs have no SpriteRenderer to inherit sortingLayer from).
+- ✅ Bumped `BAR_HEIGHT_PX` from 16 to 24 for better readability.
+- ✅ Removed two diagnostic `Debug.Log` calls used during the fill-amount bug hunt.
 
 ### Content (TODO)
 

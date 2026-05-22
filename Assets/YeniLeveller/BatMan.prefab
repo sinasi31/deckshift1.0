@@ -69,6 +69,14 @@ PrefabInstance:
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5946757459841159558, guid: 4d7507a06ac2dc847b8d0d893c01eaa5, type: 3}
+      propertyPath: healthBarPrefab
+      value: 
+      objectReference: {fileID: 5647382910293847562, guid: 7a3f9b4c1d8e2f6b5c3d7e9f4a1b2c3d, type: 3}
+    - target: {fileID: 5946757459841159558, guid: 4d7507a06ac2dc847b8d0d893c01eaa5, type: 3}
+      propertyPath: damagePopupPrefab
+      value: 
+      objectReference: {fileID: 2036397937272019125, guid: c4cd6b8e18cb9d141b1b0f9fa894bc1f, type: 3}
+    - target: {fileID: 5946757459841159558, guid: 4d7507a06ac2dc847b8d0d893c01eaa5, type: 3}
       propertyPath: stunSpriteRenderers.Array.size
       value: 1
       objectReference: {fileID: 0}

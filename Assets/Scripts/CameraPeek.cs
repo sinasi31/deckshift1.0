@@ -1,104 +1,51 @@
-﻿using UnityEngine;
-using Unity.Cinemachine; // Cinemachine kütüphanesi şart
+using UnityEngine;
 
 public class CameraPeek : MonoBehaviour
 {
-    [Header("Peek Ayarları")]
-    public KeyCode peekKey = KeyCode.LeftControl; // Hangi tuşla bakılacak?
-    public float peekSpeed = 20f;                 // Kamera ne kadar hızlı kaysın?
-    public float maxPeekDistance = 15f;           // Oyuncudan en fazla ne kadar uzağa bakabilsin?
+    public static CameraPeek instance;
 
-    private CinemachineCamera vCam;
-    private CinemachineConfiner2D confiner;
-    private Transform originalTarget;
-    private GameObject peekTargetObj;
-    private PlayerController player;
+    [Header("Peek Settings")]
+    [SerializeField] float maxOffset = 3f;
+    [SerializeField] float lerpDuration = 0.3f;
+    [SerializeField] KeyCode peekKey = KeyCode.LeftControl;
 
-    void Start()
+    public Vector2 peekOffset { get; private set; }
+
+    private Camera cam;
+    private PlayerHealth playerHealth;
+
+    void Awake()
     {
-        player = GetComponent<PlayerController>();
-        vCam = FindFirstObjectByType<CinemachineCamera>();
-
-        peekTargetObj = new GameObject("CameraPeekTarget");
-        peekTargetObj.transform.position = transform.position;
-
-        if (vCam != null)
-        {
-            originalTarget = vCam.Follow;
-            confiner = vCam.GetComponent<CinemachineConfiner2D>(); // --- YENİ EKLENDİ ---
-        }
+        instance = this;
+        cam = Camera.main;
     }
 
     void Update()
     {
-        if (vCam == null || player == null) return;
+        if (playerHealth == null && GameManager.instance != null && GameManager.instance.player != null)
+            playerHealth = GameManager.instance.player.GetComponent<PlayerHealth>();
 
-        // 1. Oyuncu havada süzülürken hile yapamasın diye, sadece yere basıyorken açsın
-        bool isGrounded = Physics2D.OverlapCircle(player.groundCheck.position, player.groundCheckRadius, player.groundLayer);
+        bool inputBlocked =
+            (GameManager.instance != null && GameManager.instance.currentState == GameState.Paused) ||
+            (HandUIDrawer.instance != null && HandUIDrawer.instance.isLocked) ||
+            (playerHealth != null && playerHealth.IsDead);
 
-        if (Input.GetKeyDown(peekKey) && isGrounded)
+        Vector2 target = Vector2.zero;
+
+        if (!inputBlocked && Input.GetKey(peekKey))
         {
-            StartPeek();
-        }
-        else if (Input.GetKeyUp(peekKey) || (player.isPeeking && !isGrounded))
-        {
-            // Tuşu bırakırsa VEYA haritaya bakarken altındaki platform çökerse hemen kamerayı geri ver
-            StopPeek();
-        }
-
-        if (player.isPeeking)
-        {
-            HandlePeekMovement();
-        }
-    }
-
-    void StartPeek()
-    {
-        player.isPeeking = true;
-        peekTargetObj.transform.position = transform.position; // Görünmez hedefi oyuncunun yanına çek
-        vCam.Follow = peekTargetObj.transform;                 // Kameraya "Artık bunu takip et" de
-    }
-
-    void StopPeek()
-    {
-        if (!player.isPeeking) return;
-
-        player.isPeeking = false;
-        vCam.Follow = originalTarget; // Kamerayı tekrar oyuncuya bağla
-    }
-
-    void HandlePeekMovement()
-    {
-        float horizontal = Input.GetAxisRaw("Horizontal");
-        float vertical = Input.GetAxisRaw("Vertical");
-
-        Vector3 moveDir = new Vector3(horizontal, vertical, 0).normalized;
-        peekTargetObj.transform.position += moveDir * peekSpeed * Time.deltaTime;
-
-        // 1. OYUNCUDAN UZAKLAŞMA SINIRI (Mevcut sınırımız)
-        float distanceToPlayer = Vector2.Distance(transform.position, peekTargetObj.transform.position);
-        if (distanceToPlayer > maxPeekDistance)
-        {
-            Vector3 limitDir = (peekTargetObj.transform.position - transform.position).normalized;
-            peekTargetObj.transform.position = transform.position + limitDir * maxPeekDistance;
+            Vector2 screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+            Vector2 mousePos = Input.mousePosition;
+            Vector2 norm = new Vector2(
+                (mousePos.x - screenCenter.x) / screenCenter.x,
+                (mousePos.y - screenCenter.y) / screenCenter.y
+            );
+            norm.x = Mathf.Clamp(norm.x, -1f, 1f);
+            norm.y = Mathf.Clamp(norm.y, -1f, 1f);
+            target = norm * maxOffset;
         }
 
-        // --- 2. YENİ: KAMERADAN KOPMA SINIRI (Duvar Çözümü) ---
-        // Eğer kamera duvara çarparsa, hedef noktanın ekranın dışına doğru yürümesini engelle.
-        Vector2 cameraPos = new Vector2(vCam.transform.position.x, vCam.transform.position.y);
-        Vector2 targetPos = new Vector2(peekTargetObj.transform.position.x, peekTargetObj.transform.position.y);
-
-        float distanceToCamera = Vector2.Distance(cameraPos, targetPos);
-
-        // Hedef kameranın merkezinden 1 birimden fazla uzaklaşamaz
-        float maxDistanceFromCamera = 1.0f;
-
-        if (distanceToCamera > maxDistanceFromCamera)
-        {
-            Vector2 limitDir = (targetPos - cameraPos).normalized;
-            Vector2 clampedPos = cameraPos + limitDir * maxDistanceFromCamera;
-            peekTargetObj.transform.position = new Vector3(clampedPos.x, clampedPos.y, peekTargetObj.transform.position.z);
-        }
-        // -------------------------------------------------------
+        float t = 1f - Mathf.Exp(-Time.unscaledDeltaTime / (lerpDuration / 3f));
+        peekOffset = Vector2.Lerp(peekOffset, target, t);
     }
 }

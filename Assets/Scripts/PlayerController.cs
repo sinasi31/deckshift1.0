@@ -1,6 +1,5 @@
 ﻿using System.Collections;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 using Unity.Cinemachine;
 
@@ -10,6 +9,7 @@ public class PlayerController : MonoBehaviour
     private Animator animator;
     internal Camera mainCamera;
     private CardActionExecutor cardActionExecutor;
+    private PlayerHealth playerHealth;
 
     [Header("Visual Settings")]
     public GameObject visualModel; // YENİ: Hiyerarşideki PF Skeleton objesini buraya sürükleyeceğiz!
@@ -36,10 +36,7 @@ public class PlayerController : MonoBehaviour
     private bool isPhasing = false;
     private float verticalInput;
     private Vector3 originalScale;
-    private Vector3 currentRoomEntryPoint;
-
-    [Header("Fall Settings")]
-    public float fallDamage = 20f;
+    internal Vector3 currentRoomEntryPoint;
 
     private float _headBounceCooldown;
 
@@ -48,7 +45,6 @@ public class PlayerController : MonoBehaviour
     public event System.Action<int> OnGoldChanged;
 
     [Header("Audio Settings")]
-    public AudioClip hurtSound;
     public AudioSource audioSource;
     public AudioClip dashSound;
     public AudioClip fireballCastSound;
@@ -60,8 +56,6 @@ public class PlayerController : MonoBehaviour
     public AudioClip glassVailSound;
     public AudioClip jumpSound;
     public AudioClip leapSound;
-    public AudioClip deathSound;
-    public float deathVolume = 1f;
     public AudioClip spendSound;
     public AudioClip warningSoundClip;
     public float soundVolume = 1f;
@@ -105,13 +99,14 @@ public class PlayerController : MonoBehaviour
     private float moveInput;
 
     [Header("Health Settings")]
-    public float maxHealth = 100f;
-    private float currentHealth;
-    public bool isInvincible = false;
-    public float CurrentHealth { get { return currentHealth; } }
-    public float MaxHealth { get { return maxHealth; } }
-
-    private bool isDead = false;
+    public float CurrentHealth => playerHealth.CurrentHealth;
+    public float MaxHealth => playerHealth.MaxHealth;
+    public bool IsDead => playerHealth.IsDead;
+    public bool isInvincible
+    {
+        get => playerHealth.isInvincible;
+        set => playerHealth.isInvincible = value;
+    }
 
     [Header("Jump Settings")]
     public float defaultJumpForce = 10f;
@@ -140,6 +135,7 @@ public class PlayerController : MonoBehaviour
     public GameObject fireballPrefab;
     public Transform firePoint;
     public float wailRange = 10f;
+    [SerializeField] internal float fireballCastDelay = 0.12f;
     public float biteRange = 1.5f;
     public float biteHealAmount = 10f;
     public LayerMask enemyLayer;
@@ -157,7 +153,7 @@ public class PlayerController : MonoBehaviour
     public GameObject staggerEffect;
 
     // Gravity reversal state
-    private bool isGravityReversed = false;
+    internal bool isGravityReversed = false;
     private float originalGravityScale;
     private Coroutine gravityReversalCoroutine;
     private float visualRotationZ = 0f;
@@ -174,12 +170,19 @@ public class PlayerController : MonoBehaviour
     private bool playerRendererHasColor;
     private Color playerRendererOriginalColor;
 
+    [Header("Phase Visual")]
+    [SerializeField] internal SkinnedMeshRenderer[] phaseVisuals;
+    private Coroutine phaseVisualCoroutine;
+    private CapsuleCollider2D capsuleCollider;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponentInChildren<Animator>();
         mainCamera = Camera.main;
         cardActionExecutor = GetComponent<CardActionExecutor>();
+        capsuleCollider = GetComponent<CapsuleCollider2D>();
+        playerHealth = GetComponent<PlayerHealth>();
 
         // Cache SkinnedMeshRenderer for gravity-reversal warning flash
         playerSkinnedRenderer = GetComponentInChildren<SkinnedMeshRenderer>(true);
@@ -200,9 +203,25 @@ public class PlayerController : MonoBehaviour
     void Start()
     {
         originalScale = transform.localScale;
-        currentHealth = maxHealth;
         currentShift = maxShift;
         ChangeState(PlayerState.Idle);
+
+        playerHealth.OnDamaged += (dmg) =>
+        {
+            tookDamageThisRoom = true;
+            RelicManager.instance?.OnPlayerTakeDamage();
+            CameraShake.instance?.Shake(0.2f, 0.3f);
+        };
+
+        if (visualModel != null)
+        {
+            var aer = visualModel.GetComponentInChildren<Cainos.CustomizablePixelCharacter.AnimationEventReceiver>(true);
+            if (aer != null && aer.enabled)
+            {
+                aer.enabled = false;
+                Debug.Log("[PlayerController] AnimationEventReceiver was enabled on startup, force-disabling.");
+            }
+        }
     }
 
     void Update()
@@ -213,7 +232,7 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        if (isDead) return;
+        if (playerHealth.IsDead) return;
 
         bool wasGrounded = isGrounded;
         isGrounded = IsGroundedCheck();
@@ -478,92 +497,15 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    internal IEnumerator DashIFrames(float duration)
-    {
-        isInvincible = true;
-        yield return new WaitForSeconds(duration);
-        isInvincible = false;
-    }
+    internal IEnumerator DashIFrames(float duration) => playerHealth.GrantInvincibility(duration);
 
-    public void ApplyKnockback(Vector2 knockbackForce)
-    {
-        StartCoroutine(KnockbackRoutine(knockbackForce));
-    }
+    public void ApplyKnockback(Vector2 knockbackForce) => playerHealth.ApplyKnockback(knockbackForce);
 
-    private IEnumerator KnockbackRoutine(Vector2 knockbackForce)
-    {
-        if (currentState == PlayerState.CometDiving) EndCometDive();
-        ChangeState(PlayerState.KnockedBack);
-        rb.linearVelocity = Vector2.zero;
-        rb.AddForce(knockbackForce, ForceMode2D.Impulse);
-        yield return new WaitForSeconds(0.2f);
-        if (currentState == PlayerState.KnockedBack)
-            ChangeState(PlayerState.Jumping);
-    }
-
-    public void TakeDamage(float damage)
-    {
-        if (isInvincible || isDead) { return; }
-        if (RelicManager.instance != null)
-        {
-            RelicManager.instance.OnPlayerTakeDamage();
-        }
-
-        if (CameraShake.instance != null)
-            CameraShake.instance.Shake(0.2f, 0.3f);
-
-        tookDamageThisRoom = true;
-        currentHealth = Mathf.Max(currentHealth - damage, 0f);
-
-        if (hurtSound != null && audioSource != null)
-        {
-            audioSource.PlayOneShot(hurtSound);
-        }
-
-        // GÜNCELLENDİ: Yeni paket hasar yeme animasyonu tetikleyicisi
-        if (animator != null) animator.SetTrigger("InjuredFront");
-
-        Debug.Log($"Hasar Alındı! Kalan Can: {currentHealth}");
-
-        if (currentHealth <= 0)
-        {
-            Die();
-        }
-    }
+    public void TakeDamage(float damage) => playerHealth.TakeDamage(damage);
 
     public void OnNewRoomEnter()
     {
         tookDamageThisRoom = false;
-    }
-
-    private void Die()
-    {
-        if (isDead) return;
-        isDead = true;
-        if (currentState == PlayerState.CometDiving) EndCometDive();
-
-        Debug.Log("💀 Oyuncu Öldü! Ses Çalınıyor...");
-
-        if (deathSound != null)
-        {
-            if (Camera.main != null)
-                AudioSource.PlayClipAtPoint(deathSound, Camera.main.transform.position, deathVolume);
-            else
-                AudioSource.PlayClipAtPoint(deathSound, transform.position, deathVolume);
-        }
-
-        // GÜNCELLENDİ: Yeni paket ölüm animasyonu tetikleyicisi
-        if (animator != null) animator.SetBool("IsDead", true);
-
-        if (rb != null) rb.simulated = false;
-
-        StartCoroutine(WaitAndReload());
-    }
-
-    private IEnumerator WaitAndReload()
-    {
-        yield return new WaitForSeconds(1.5f);
-        SceneManager.LoadScene("GameOverScene");
     }
 
     public bool IsGroundedCheck()
@@ -623,36 +565,27 @@ public class PlayerController : MonoBehaviour
     {
         if (other.CompareTag("DeathZone"))
         {
-            FallAndRespawn();
+            playerHealth.FallAndRespawn();
             return;
         }
 
         if (currentState == PlayerState.CometDiving) return;
 
-        if (rb.linearVelocity.y < -0.1f)
+        bool fallingDown = isGravityReversed ? rb.linearVelocity.y > 0.1f : rb.linearVelocity.y < -0.1f;
+        if (fallingDown)
         {
             if (RelicManager.instance == null || !RelicManager.instance.HasRelic("PogoBoots")) return;
             EnemyHealth eHealth = other.GetComponentInParent<EnemyHealth>();
             if (eHealth != null)
             {
                 float enemyTopY = other.bounds.center.y + other.bounds.extents.y * 0.5f;
+                float enemyBottomY = other.bounds.center.y - other.bounds.extents.y * 0.5f;
                 Debug.Log($"[HeadBounce Trigger] {other.gameObject.name}, playerY: {transform.position.y:F2}, enemyTopY: {enemyTopY:F2}, velocity.y: {rb.linearVelocity.y:F2}");
 
-                if (transform.position.y > enemyTopY)
+                bool positionOk = isGravityReversed ? transform.position.y < enemyBottomY : transform.position.y > enemyTopY;
+                if (positionOk)
                     TriggerHeadBounce(eHealth);
             }
-        }
-    }
-
-    private void FallAndRespawn()
-    {
-        if (currentState == PlayerState.CometDiving) EndCometDive();
-        if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
-            TakeDamage(fallDamage);
-        if (currentHealth > 0)
-        {
-            rb.linearVelocity = Vector2.zero;
-            transform.position = currentRoomEntryPoint;
         }
     }
 
@@ -674,27 +607,17 @@ public class PlayerController : MonoBehaviour
 
     internal IEnumerator FireballCastRoutine(float damageFromCard)
     {
-        // Clip: "Pixel Character - Attack Cast", 30 frames at 30fps = 1.0s total.
-        // OnAttackCast animation event fires at t=0.361s (frame ~10.8) — the exact frame
-        // Cainos designed for projectile release, and sits at ~36% of the clip.
-        float spawnDelay = 0.36f;
-
-        // After spawning, hold IsAttacking true briefly so the animation finishes
-        // its follow-through before the layer returns to idle. The Cast state exits
-        // on its own ExitTime at ~0.8s, so this only prevents re-triggering.
-        float clearAttackingDelay = 0.15f;
-
         if (animator != null)
         {
             animator.SetInteger("AttackAction", 14);
             animator.SetBool("IsAttacking", true);
         }
 
-        yield return new WaitForSeconds(spawnDelay);
+        yield return new WaitForSeconds(fireballCastDelay);
 
         PerformFireball(damageFromCard);
 
-        yield return new WaitForSeconds(clearAttackingDelay);
+        yield return new WaitForSeconds(0.39f);
 
         if (animator != null)
             animator.SetBool("IsAttacking", false);
@@ -780,11 +703,11 @@ public class PlayerController : MonoBehaviour
         Collider2D[] hits = Physics2D.OverlapCircleAll(firePoint.position, biteRange, ~0);
         foreach (Collider2D hit in hits)
         {
-            EnemyHealth targetHealth = hit.GetComponentInParent<EnemyHealth>();
+            IDamageable targetHealth = hit.GetComponentInParent<IDamageable>();
             if (targetHealth == null) continue;
 
             targetHealth.TakeDamage(damageAmount);
-            Heal(biteHealAmount);
+            if (targetHealth is EnemyHealth) Heal(biteHealAmount);
             if (biteEffectPrefab != null)
             {
                 GameObject vfx = Instantiate(biteEffectPrefab, hit.transform.position, Quaternion.identity);
@@ -794,10 +717,7 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    public void Heal(float amount)
-    {
-        currentHealth = Mathf.Min(currentHealth + amount, maxHealth);
-    }
+    public void Heal(float amount) => playerHealth.Heal(amount);
 
     internal void PerformGlassWail(float stunDuration)
     {
@@ -835,26 +755,89 @@ public class PlayerController : MonoBehaviour
         rb.linearVelocity = Vector2.zero;
 
         int playerLayer = LayerMask.NameToLayer("Player");
-        int groundLayer = LayerMask.NameToLayer("Ground");
-        int enemyLayer = LayerMask.NameToLayer("Enemy");
+        int groundLayerIndex = LayerMask.NameToLayer("Ground");
+        int enemyLayerIndex = LayerMask.NameToLayer("Enemy");
 
-        Physics2D.IgnoreLayerCollision(playerLayer, groundLayer, true);
-        Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, true);
+        Physics2D.IgnoreLayerCollision(playerLayer, groundLayerIndex, true);
+        Physics2D.IgnoreLayerCollision(playerLayer, enemyLayerIndex, true);
 
-        // GÜNCELLENDİ: SkinnedMeshRenderer'larda direkt materyal rengi değiştirmek shader'a bağlı olduğu için 
-        // şimdilik alfa değişimi kodunu yorum satırı yaptık. Gerekirse ileride çözeriz.
-        // if (spriteRenderer != null) ... 
+        // Pass duration + 1.5f so the pulse covers the maximum possible extension time.
+        // PhaseRoutine always stops it explicitly; the extra headroom just prevents a
+        // static mid-pulse tint if wall-stuck extension runs to the full 1s cap.
+        phaseVisualCoroutine = StartCoroutine(PhaseVisualRoutine(duration + 1.5f));
 
         yield return new WaitForSeconds(duration);
 
-        Physics2D.IgnoreLayerCollision(playerLayer, groundLayer, false);
-        Physics2D.IgnoreLayerCollision(playerLayer, enemyLayer, false);
+        float extensionTime = 0f;
+        while (IsCollidingWithGround() && extensionTime < 1f)
+        {
+            yield return new WaitForSeconds(0.1f);
+            extensionTime += 0.1f;
+        }
+        if (IsCollidingWithGround())
+        {
+            float ejectDir = isGravityReversed ? -1f : 1f;
+            transform.position += new Vector3(0, 0.5f * ejectDir, 0);
+        }
+
+        if (phaseVisualCoroutine != null) { StopCoroutine(phaseVisualCoroutine); phaseVisualCoroutine = null; }
+        RestorePhaseVisuals();
+
+        Physics2D.IgnoreLayerCollision(playerLayer, groundLayerIndex, false);
+        Physics2D.IgnoreLayerCollision(playerLayer, enemyLayerIndex, false);
 
         rb.gravityScale = originalGravity;
 
-        // if (spriteRenderer != null) ...
-
         isPhasing = false;
+    }
+
+    private IEnumerator PhaseVisualRoutine(float duration)
+    {
+        if (phaseVisuals == null || phaseVisuals.Length == 0) yield break;
+
+        MaterialPropertyBlock block = new MaterialPropertyBlock();
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            float pulse = (Mathf.Sin(Time.time * Mathf.PI * 4f) + 1f) * 0.5f;
+            block.SetFloat("_Alpha", Mathf.Lerp(0.3f, 0.6f, pulse));
+            for (int i = 0; i < phaseVisuals.Length; i++)
+            {
+                if (phaseVisuals[i] == null) continue;
+                phaseVisuals[i].SetPropertyBlock(block);
+            }
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        // Safety net: restore if PhaseRoutine doesn't stop this coroutine first.
+        block.SetFloat("_Alpha", 1f);
+        for (int i = 0; i < phaseVisuals.Length; i++)
+        {
+            if (phaseVisuals[i] == null) continue;
+            phaseVisuals[i].SetPropertyBlock(block);
+        }
+    }
+
+    private void RestorePhaseVisuals()
+    {
+        if (phaseVisuals == null) return;
+        MaterialPropertyBlock block = new MaterialPropertyBlock();
+        block.SetFloat("_Alpha", 1f);
+        for (int i = 0; i < phaseVisuals.Length; i++)
+        {
+            if (phaseVisuals[i] == null) continue;
+            phaseVisuals[i].SetPropertyBlock(block);
+        }
+    }
+
+    private bool IsCollidingWithGround()
+    {
+        if (capsuleCollider == null) return false;
+        Bounds b = capsuleCollider.bounds;
+        // 0.9f shrink avoids a false positive from the player barely touching the floor normally
+        return Physics2D.OverlapBox(b.center, b.size * 0.9f, 0f, groundLayer);
     }
 
     public void IncreaseMaxShift(int amount)
@@ -903,7 +886,8 @@ public class PlayerController : MonoBehaviour
             ContactPoint2D contact = collision.GetContact(0);
             Debug.Log($"[HeadBounce] Collision: {collision.gameObject.name}, normal.y: {contact.normal.y:F2}, velocity.y: {rb.linearVelocity.y:F2}, canBounce: {eHealth.canBeHeadBounced}");
 
-            if (contact.normal.y > 0.7f)
+            bool normalFromBelow = isGravityReversed ? contact.normal.y < -0.7f : contact.normal.y > 0.7f;
+            if (normalFromBelow)
                 TriggerHeadBounce(eHealth);
         }
     }
@@ -916,12 +900,13 @@ public class PlayerController : MonoBehaviour
         _headBounceCooldown = Time.time + 0.3f;
         eHealth.TakeDamage(8f);
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0f);
-        rb.AddForce(Vector2.up * defaultJumpForce * 0.7f, ForceMode2D.Impulse);
+        float bounceDir = isGravityReversed ? -1f : 1f;
+        rb.AddForce(Vector2.up * defaultJumpForce * 0.7f * bounceDir, ForceMode2D.Impulse);
         AddShift(1);
         if (CameraShake.instance != null) CameraShake.instance.Shake(0.1f, 0.2f);
     }
 
-    private void EndCometDive()
+    internal void EndCometDive()
     {
         if (diveTrail != null) diveTrail.emitting = false;
     }
@@ -929,12 +914,12 @@ public class PlayerController : MonoBehaviour
     private void LandCometDive()
     {
         Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, cometRadius, ~0);
-        HashSet<EnemyHealth> damaged = new HashSet<EnemyHealth>();
+        HashSet<IDamageable> damaged = new HashSet<IDamageable>();
         foreach (Collider2D hit in hits)
         {
-            EnemyHealth eHealth = hit.GetComponentInParent<EnemyHealth>();
-            if (eHealth != null && damaged.Add(eHealth))
-                eHealth.TakeDamage(cometDamage);
+            IDamageable target = hit.GetComponentInParent<IDamageable>();
+            if (target != null && damaged.Add(target))
+                target.TakeDamage(cometDamage);
         }
 
         if (cometImpactEffect != null)
@@ -952,7 +937,7 @@ public class PlayerController : MonoBehaviour
             audioSource.PlayOneShot(adrenalineSound);
         }
 
-        float healthPercentage = currentHealth / maxHealth;
+        float healthPercentage = playerHealth.HealthPercent;
 
         if (CameraShake.instance != null) CameraShake.instance.Shake(0.1f, 0.5f);
 
@@ -1017,15 +1002,16 @@ public class PlayerController : MonoBehaviour
         Debug.Log($"STAGGER KULLANILDI! ({staggerCount}/{maxStaggerUses})");
 
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
-        rb.AddForce(Vector2.up * staggerJumpForce, ForceMode2D.Impulse);
+        float jumpDir = isGravityReversed ? -1f : 1f;
+        rb.AddForce(Vector2.up * staggerJumpForce * jumpDir, ForceMode2D.Impulse);
 
-        Collider2D[] enemies = Physics2D.OverlapCircleAll(transform.position, staggerRadius, enemyLayer);
+        Collider2D[] enemies = Physics2D.OverlapCircleAll(transform.position, staggerRadius, ~0);
         foreach (Collider2D enemy in enemies)
         {
-            EnemyHealth eHealth = enemy.GetComponent<EnemyHealth>();
-            if (eHealth != null)
+            IDamageable target = enemy.GetComponentInParent<IDamageable>();
+            if (target != null)
             {
-                eHealth.TakeDamage(staggerDamage);
+                target.TakeDamage(staggerDamage);
             }
         }
 
@@ -1034,7 +1020,7 @@ public class PlayerController : MonoBehaviour
         if (staggerCount >= maxStaggerUses)
         {
             Debug.Log("KALBİN DAYANAMADI! ÖLÜYORSUN...");
-            Die();
+            playerHealth.Kill();
         }
     }
 
