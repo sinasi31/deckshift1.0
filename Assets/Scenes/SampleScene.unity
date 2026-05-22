@@ -8700,12 +8700,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerTransform: {fileID: 5274940026035738714}
   roomPrefabs:
-  - {fileID: 1843502735663899364, guid: fe0a360a69bc6e143b2cc2ca9e83d6c9, type: 3}
-  - {fileID: 8878139818867148303, guid: 2f45d8bf04375b342b4043a32c04a4dc, type: 3}
-  - {fileID: 3910532149720474984, guid: 99e8840405500d245a733bec7c1e5889, type: 3}
-  - {fileID: 635766636009674316, guid: 3625746d16e0e464ba85e470691faa0f, type: 3}
-  - {fileID: 7937581221952600193, guid: f1643df793b7def498d57f12d13c6efe, type: 3}
-  - {fileID: 5945455368163326805, guid: a6fc938686ab0ff4da8952eb9a83bda8, type: 3}
+  - {fileID: 4422550194592066788, guid: 9300916977ca99d4aa54b59e1ebaf609, type: 3}
 --- !u!4 &1361928416
 Transform:
   m_ObjectHideFlags: 0
