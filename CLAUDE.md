@@ -10,9 +10,9 @@ This file is loaded automatically into Claude Code at the start of every session
 
 **Core concept:** "Movement is a Resource." Jumping consumes **Shift**, a non-regenerating resource per-room. Most other actions (attacks, special movement, utility) are delivered via cards. Cards have **charges**; when charges deplete the card moves to the exhaust pile and must be recovered via scrap.
 
-**Current state:** Act 1 (Oxidation District) prototype. ~5 hand-crafted levels, ~10 cards in the game (after deleting 4 unused: `DashBackward`, `WallCling`, `DrawCards`, `GainJumpCharges` — see "Card System" for the surviving 12). Two acts (Vapor Stratum, Final Forge) planned but not started. Target: 45-50 minute run length, 60+ cards total at content-complete.
+**Current state:** Act 1 (Oxidation District) prototype. ~5 hand-crafted levels, ~10 cards in the game. Two acts (Vapor Stratum, Final Forge) planned but not started. Target: 45-50 minute run length, 60+ cards total at content-complete.
 
-The player character was swapped from a SkinnedMeshRenderer-based rig (`PF Skeleton - Mage`) to the Cainos `PF Pixel Character - Mage M` pack. The wizard identity is now the canonical character. The skeleton remains in the Player prefab disabled, intended for future use as an enemy. **Note despite the "Pixel Character" name, the Cainos pack uses SkinnedMeshRenderers, not SpriteRenderers** — see Common Pitfalls.
+The player character was recently swapped from a SkinnedMeshRenderer-based rig (`PF Skeleton - Mage`) to a sprite-based one (`PF Pixel Character - Mage M`) from the Cainos Customizable Pixel Character pack. The wizard identity is now the canonical character. The skeleton remains in the Player prefab disabled, intended for future use as an enemy.
 
 **Active scene:** `Assets/Scenes/SampleScene.unity` (build index 2). Other scene files exist (`GameScene`, `MasterLevel`, `Hub`) but are inactive/legacy. When debugging "is this in the scene?" issues, always check SampleScene first.
 
@@ -48,45 +48,31 @@ These are absolute. Do not suggest alternatives without explicit user approval.
 
 6. **Asset pack imports require extreme care.** The Cainos Customizable Pixel Character pack ships as a "complete project" that wants to overwrite `ProjectSettings/`. Always uncheck `ProjectSettings/` in the import dialog and uncheck any duplicate packs you already have. See "Common Pitfalls" for the full story.
 
-7. **`CardActionType` enum values must have explicit integer assignments.** Every value is pinned (`Jump = 0`, `Dash = 1`, etc.). Deleted values are left as comments documenting their retired slot. **Never reuse a retired slot for a new action.** Reason: CardData assets serialize `actionType` as the integer, not the name. Renumbering re-binds every existing asset to the wrong action silently. New CardActionType values must be added at the end (16, 17, etc.). This rule was learned the hard way — the entire card system broke once because deletion shifted indices.
-
-8. **For per-renderer runtime property changes, use `MaterialPropertyBlock`, not `renderer.material.color`.** Writing to `.material` clones the material every frame (breaks batching, leaks). MaterialPropertyBlock is the proper Unity pattern: one allocation, `SetFloat`/`SetColor`, then `renderer.SetPropertyBlock(block)`. The Cainos `PixelCharacter.Alpha` setter is the reference implementation.
-
 ---
 
 ## Player System
 
 ### PlayerController.cs
 
-This is a large script (~1,200 lines). It currently handles movement, jumping, gravity reversal, VFX spawning, audio, health, gold, shift, knockback, portal mid-card state, cannon enter/exit, death, and respawn. Card dispatch has been extracted (see Card System below) but most action helper methods still live here.
+This is a large script (~1,200 lines). It currently handles movement, jumping, card action execution, gravity reversal, VFX spawning, audio, health, gold, shift, knockback, portal state, cannon enter/exit, death, and respawn.
 
-**Known issue:** It is a God Object. Card dispatch was extracted to `CardActionExecutor`, but most action logic remains in `PlayerController` as helper methods (`TryPlacePortal`, `PerformVampiricBite`, `FireballCastRoutine`, etc.) that the CardAction classes delegate into. Three further extractions are queued in deferred work: **PlayerHealth** (HP/damage/death/knockback), **PortalController** (firstPortalInstance + TryPlacePortal), **GravityController** (full ReverseGravity routine + visualFlipYOffset). These will reduce coupling significantly.
+**Known issue:** It is a God Object and is scheduled for refactor. The `ExecuteAction()` method (~100 lines, switch over `CardActionType`) will be extracted to a separate `CardActionExecutor` component. **This is the TOP architectural priority right now.** With 60+ cards planned, this needs to happen before content scales further. **When adding new cards, add them to the existing switch, but be aware this is temporary.** See "Card Effect Conflict Class of Bug" below for one of the reasons the refactor matters.
 
 ### Player Prefab Specifics
 
 - **Active visual model:** `PF Pixel Character - Mage M` at `Assets/Cainos/Customizable Pixel Character/Prefab/Character Preset/PF Pixel Character - Mage M.prefab`. This is a child of the Player root and is assigned to `PlayerController.visualModel`.
-- **Disabled fallback:** `PF Skeleton - Mage` is still parented under Player but disabled. Kept as backup and for future reuse as an enemy.
+- **Disabled fallback:** `PF Skeleton - Mage` is still parented under Player but disabled (checkbox off). Kept as backup and for future reuse as an enemy.
 - **Physics collider:** `CapsuleCollider2D` on the Player root with **Offset (0.122, 0.871) and Size (0.5075, 1.6848)**. Direction: Vertical. These values were honest-refactored from pre-fix design-intent values that had been compounding with a non-(1,1,1) root scale for 9 months. A `BoxCollider2D` was previously present but disabled and has been removed. Do not re-add it.
 - **Rigidbody2D:** Dynamic. Gravity scale flips sign during gravity reversal — do NOT modify `Physics2D.gravity` globally.
-- **Player root Transform:** Position (0, 0, 0), Rotation (0, 0, 0), **Scale (1, 1, 1)**. Hard rule. To change character size, scale `visualModel`.
+- **Player root Transform:** Position (0, 0, 0), Rotation (0, 0, 0), **Scale (1, 1, 1)**. This is now a hard rule again — the prior non-(1,1,1) scale was an accidental drift that compounded into a real bug. Do not modify the root scale to adjust character size; scale `visualModel` instead.
 
 ### Visual Model Internals (PF Pixel Character - Mage M)
 
-- The visualModel itself is scaled to **(0.8, 0.8, 0.8)** to fit the collider.
-- **Important: the Cainos "Pixel Character" pack uses SkinnedMeshRenderer, not SpriteRenderer**, despite the pixel-art aesthetic. The rig is a 3D FBX with one SkinnedMeshRenderer per body part (body, eye, hair, hat, cloth, pants, shoes, shoesFront, back, expression, eyeBase — for Mage M).
+- The visualModel itself is scaled to **(0.8, 0.8, 0.8)** to fit the collider. If the character ever needs to appear larger or smaller, change this value, not the root.
 - The prefab has its own root-level scripts (`PixelCharacter`, `PixelCharacterController`, `PixelCharacterInputMouseAndKeyboard`, plus its own Rigidbody2D and BoxCollider2D). When the visualModel was integrated, the controller scripts and physics components were removed; only the `PixelCharacter` (customization) script remains. Do not re-add the removed components.
 - The Animator component lives on the child GameObject named `Animator`, found via `GetComponentInChildren<Animator>()`. There is only one Animator in the hierarchy.
 - The Animator Controller is `Assets/Cainos/Customizable Pixel Character/Animation/AC Character.controller`.
-- **`Cainos.CustomizablePixelCharacter.AnimationEventReceiver` component on the Animator GameObject must remain DISABLED.** It throws NullReferenceExceptions on the built-in footstep animation events. Re-enabling it floods the console with errors during the cast animation. Has been disabled twice — watch for re-enabling on prefab reimport.
-
-### Cainos Shader Properties
-
-The shaders used by the Cainos character (`ASE Pixel Character Body.shader`, `ASE Pixel Character Alpha Cut.shader`) expose:
-- `_MainTex` — Texture (always)
-- `_Alpha` — Float, 0=invisible (dithered), 1=opaque (always)
-- `_SkinMaskTex`, `_SkinTint` — Body shader only
-
-**`_Color` does not exist on these shaders.** `renderer.material.color = X` or `material.SetColor("_Color", ...)` does nothing visible — the shader doesn't read it. Use `_Alpha` for fades, `_SkinTint` for body recoloring. Wrote a feature that doesn't appear in play? Check that the property name matches what the shader actually exposes.
+- **`Cainos.CustomizablePixelCharacter.AnimationEventReceiver` component on the Animator GameObject must remain DISABLED.** It throws NullReferenceExceptions on the built-in footstep animation events (the pack expects a footstep audio system that we don't use). Re-enabling it floods the console with errors during the cast animation.
 
 ### Animator Parameter Map
 
@@ -108,172 +94,134 @@ PlayerController writes to these parameters on the Animator:
 
 The Cainos Animator Controller has a "Cast" animation at `AttackAction == 14`, playing on both the "Attack Action - Arm" and "Attack Action - Body" layers simultaneously. The clip is 1.0 seconds long and self-exits at ~80% via unconditional ExitTime.
 
-`PlayerController.FireballCastRoutine`:
+`PlayerController.FireballCastRoutine` (~line 800-826):
 1. Sets `IsAttacking = true` and `AttackAction = 14`.
-2. Waits **0.36 seconds** — the `OnAttackCast` event timestamp authored by Cainos. This delay was originally chosen for designer-authored sync but **the user has flagged that 0.36s of input-to-action lag feels bad and wants instant-spawn**; this is on the deferred work list.
+2. Waits **0.36 seconds** — this is the `OnAttackCast` animation event timestamp authored by Cainos themselves, the designer's intended projectile release frame.
 3. Calls `PerformFireball(value)` to spawn the projectile.
 4. Waits an additional 0.15 seconds, then sets `IsAttacking = false`.
 
+The animation will self-exit even if the bool isn't released, but releasing it explicitly prevents an Empty→Cast re-trigger loop.
+
+**Cainos's own attack system (idle, unused):** The pack prefab has a `CharacterBehaviour` script on its root with an `attackAction` field (set to 14 in Mage M preset) and UnityEvent callbacks `onAttackCast`, `onAttackStart`, `onAttackEnd`. These exist but are not currently wired. If perfect frame-accurate cast spawn timing becomes a priority, hooking into `onAttackCast` via an Animation Event is the right path — but not today.
+
 ### Ground / Wall / Ceiling Detection
 
-The player has check Transforms parented to the player root (NOT to visualModel):
+The player has check Transforms parented to the player root (NOT to visualModel). Post-refactor honest values:
 
-- **`groundCheck`** at local (0, 0.015, 0). Normal grounded detection.
-- **`wallCheck`** at local (0, -0.00975, 0). Horizontal collision.
-- **`ceilingCheck`** at local (0, 1.725, 0). Used when `isGravityReversed` is true.
-- **`firepoint`** at local Position (0.499, 1.263, 0).
+- **`groundCheck`** at local (0, 0.015, 0). Used for normal grounded detection via `Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer)`.
+- **`wallCheck`** at local (0, -0.00975, 0). For horizontal collision detection.
+- **`ceilingCheck`** at local (0, 1.725, 0) — added during gravity reversal work. Used when `isGravityReversed` is true.
+- **`firepoint`** at local Position (0.499, 1.263, 0), Scale (1, 1, 1). Fireball/bite origin point.
 
-`IsGroundedCheck()` switches probe based on `isGravityReversed`.
+`IsGroundedCheck()` switches probe based on `isGravityReversed`. The original implementation used a mirror-math formula (`2 * pivot - groundCheck.position`) but that was fragile (only 0.16 units of overlap margin); the dedicated `ceilingCheck` Transform replaced it.
 
-`groundLayer` mask is `2057` = layers 0 (Default), 3 (level geometry), 11. **Enemies are mixed: AeroBat and MeleeEnemy are on the Default layer; RangedEnemy is on the Enemy layer.** This inconsistency is load-bearing — see Enemy System.
+`groundLayer` mask is `2057` = layers 0 (Default), 3 (level geometry), 11. Level geometry pieces are on layer 3. Enemies are mixed: **AeroBat and MeleeEnemy are on the Default layer; RangedEnemy is on the Enemy layer.** This inconsistency is a known issue but currently load-bearing.
 
 ### Gravity Reversal System
 
-Triggered by the "Floor is Lava" card (`CardActionType.ReverseGravity`). Lasts 5 seconds with audio warning at t=4.5s before expiration.
+Triggered by the "Floor is Lava" card (`CardActionType.ReverseGravity`). Lasts 5 seconds with a 0.5s warning flash + audio cue before expiration.
 
 Key fields on PlayerController:
-- `isGravityReversed` — **`internal`** (not private — read by `JumpAction` and others). Runtime flag checked by grounded detection, facing, jump direction, head-bounce direction, etc.
+- `isGravityReversed` — runtime flag
 - `originalGravityScale` — cached at effect start, restored at end
 - `gravityReversalCoroutine` — reference for stop-and-restart on re-play
-- `visualFlipYOffset` — serialized field, current value **1.6875**.
+- **`visualFlipYOffset`** — serialized field, current value **1.6875** (tuned in Inspector after the scale refactor). Translates visualModel up so the 180° rotation pivots around the collider center instead of the feet.
 - `originalVisualLocalPos`, `originalVisualScaleX` — cached for restoration
 - `warningSoundClip` — AudioClip Inspector field, played at t=4.5s
 
-**Cards/systems that respect gravity reversal:** `JumpAction`, `PerformJump` (space bar), `PerformStagger`, head-bounce (all three checks: velocity sign, contact normal, position Y), Phase wall-stuck eject direction. All flip via `isGravityReversed ? -1f : 1f`. When adding new vertical-direction mechanics, follow this pattern.
+`GravityReversalRoutine()` handles the full timeline. `LerpVisualTransform` uses a tracked Z-angle float (never reads back from `localEulerAngles`, which Unity normalizes unpredictably).
 
-**Known gap:** the 0.5s warning flash is implemented against `SkinnedMeshRenderer.material.SetColor("_Color", ...)` — but Cainos shaders don't expose `_Color` (see Cainos Shader Properties above). The flash silently no-ops. Audio still plays. Fixing this requires rewriting against `_Alpha` or `_SkinTint` via MaterialPropertyBlock. Low priority but noted.
+The 0.5s **warning flash** is implemented against `SkinnedMeshRenderer` via `material.SetColor("_Color", ...)`. The new visualModel uses SpriteRenderers, so `GetComponentInChildren<SkinnedMeshRenderer>()` returns null and the flash silently no-ops. **The expiration audio cue still plays**, so the warning is still audible — just not visible. Fixing this would require a SpriteRenderer flash path; not done yet, low priority.
 
 ### Facing System
 
-`transform.localScale` of the player root is ALWAYS `(1, 1, 1)`. Never modify it for facing.
+**Critical:** `transform.localScale` of the player root is ALWAYS `(1, 1, 1)`. Never modify it directly for facing.
 
-Use `isFacingRight` (`internal`). `ApplyVisualFacing()` writes to `visualModel.localScale.x`:
+Use the `isFacingRight` private bool instead. The `ApplyVisualFacing()` method writes to `visualModel.localScale.x` with this formula:
 
 ```
 sign = (isFacingRight ? 1 : -1) * (isGravityReversed ? -1 : 1)
 visualModel.localScale.x = originalVisualScaleX * sign
 ```
 
-**Every system that needs world-space facing direction must read `isFacingRight`**, never `transform.localScale.x`.
+The gravity reversal factor compensates for the 180° Z rotation inverting the visual X axis.
+
+**Every system that needs world-space facing direction (dash, wall jump, wall check raycast, fireball, etc.) must read `isFacingRight`**, never `transform.localScale.x`.
 
 ---
 
 ## Card System
 
-### Architecture
+### Data Architecture
 
-Card dispatch was extracted from a switch in `PlayerController.ExecuteAction` into a polymorphic system. Components:
-
-- **`CardAction`** (abstract base, `Assets/Scripts/CardActions/CardAction.cs`) — every card action inherits this.
-- **One concrete subclass per action** in `Assets/Scripts/CardActions/Actions/` (12 currently — see list below).
-- **`CardActionExecutor`** (MonoBehaviour on Player) — owns a `Dictionary<CardActionType, CardAction>`, dispatches `TryExecute(type, value)` calls.
-- **`ConflictFlags`** (flags enum) — each action declares which shared player state it touches (`GravityScale`, `TimeScale`, `MoveSpeed`, `LayerCollisionMatrix`, `VisualTransform`, `PlayerVelocity`, `Invincibility`, `AnimatorAttackState`). Used by the executor's running-effects registry.
-
-The executor does NOT block conflicts; both colliding effects coexist. The flag system exists so future logic can react to overlap without preventing combos (which are the point of a deckbuilder). **Caveat: Phase, Adrenaline, and ReverseGravity currently start their coroutines inside PlayerController helpers, not the CardAction.** Their flags are declared honestly but they don't fully participate in `runningEffects` tracking. Restructuring those three helpers to return IEnumerator is deferred work — it's the real fix for the Phase/ReverseGravity gravity-corruption bug class.
-
-### CardActionType Enum (Pinned Integer Values)
-
-```
-Jump = 0,
-Dash = 1,
-// 2 (DashBackward) intentionally retired — never reuse
-// 3 (WallCling) intentionally retired
-// 4 (DrawCards) intentionally retired
-// 5 (GainJumpCharges) intentionally retired
-PlatformCreate = 6,
-Fireball = 7,
-Portal = 8,
-VampiricBite = 9,
-GlassWail = 10,
-Phase = 11,
-CometDive = 12,
-Adrenaline = 13,
-Stagger = 14,
-ReverseGravity = 15,
-```
-
-**Never reuse the retired slots.** CardData assets serialize the integer; reusing a slot silently re-binds orphaned save data or scene references. New actions go at 16, 17, etc.
+- **`CardData`** (ScriptableObject) — card templates. Created as assets via Unity menu.
+- **`RuntimeCard`** — instance, tracks `currentUses`, `isInfinite`, etc.
+- **`CardActionType`** (enum in `GameEnums.cs`) — dispatch identifier.
 
 ### Adding a New Card
 
-1. Add a new value to `CardActionType` enum at the next unused integer (currently 16). Do not renumber existing values.
-2. Create a new class in `Assets/Scripts/CardActions/Actions/<Name>Action.cs` inheriting `CardAction`. Implement `ActionType`, `ModifiedState`, and `Execute` (instant) or `ExecuteCoroutine` (timed).
-3. Register the action in `CardActionExecutor.cs` (dictionary registration list).
-4. Create a `CardData` asset in Unity. Set `actionType`, `maxUses`, `shiftCost`, sprite.
-5. Add the card to relevant reward pools / starter deck as needed.
-
-### Action Class Conventions
-
-- Action classes call back into PlayerController helpers (e.g., `player.PerformVampiricBite()`). Helpers are kept on PlayerController for now; future refactors will extract them per-component.
-- Where actions need to read/write PlayerController fields, those fields are `internal`, not `public`. Don't weaken to `public`.
-- Direction-dependent actions (Jump, Stagger, etc.) MUST consult `player.isGravityReversed` to compute their direction. World-space `Vector2.up` constants without flipping is a bug.
-
-### Data
-
-- **`CardData`** (ScriptableObject) — card templates.
-- **`RuntimeCard`** — instance, tracks `currentUses`, `isInfinite`.
+1. Add a new value to `CardActionType` enum if no existing action covers it.
+2. Add a case to the switch in `PlayerController.ExecuteAction()` (until the planned refactor extracts this).
+3. Create a `CardData` asset in Unity (right-click in Project view → Create → Card Data).
+4. Set the asset's `actionType`, `maxUses`, `shiftCost`, sprite, etc. in the Inspector.
+5. Add the card to the relevant reward pools / starter deck as needed.
 
 ### Deck Structure
 
-`DeckManager` maintains four piles: `drawPile`, `hand`, `discardPile`, `exhaustPile`. **Recall** (R key) is the player's manual refresh — costs Shift, redraws the hand, cost increases each use within a level.
+`DeckManager` maintains four piles: `drawPile`, `hand`, `discardPile`, `exhaustPile`. **Recall** (R key) is the player's manual refresh action — costs Shift, redraws the hand, cost increases each use within a level.
 
 ### Stagger Mechanic
 
 When Shift is 0 AND no playable cards exist, a Stagger card is auto-added to the hand. Three Stagger plays in one run = death.
 
-### Dash (Current Design)
+### Card Effect Conflict Class of Bug (KNOWN)
 
-The Dash card is **impulse-based**, not velocity-based. `DashAction.Execute` applies a single `AddForce` impulse in the facing direction (`dashImpulse` field, default 18), starts a brief invincibility coroutine (`dashIFrameDuration`, default 0.15s), spawns VFX, plays audio. Critically, **Dash does NOT touch `rb.gravityScale`** — the previous coroutine implementation captured and restored gravity, which corrupted state when ReverseGravity expired mid-dash. The impulse model composes correctly with every other mechanic. The dash-then-jump combo is intentional and feels good.
+Discovered when hub mode allowed free card spamming: playing multiple state-modifying cards in close succession (e.g., Floor is Lava + Adrenaline + Phase) can leave the player in a permanently broken state (flying, frozen gravity, etc.). Each card's effect captures "original" state at start and restores it at end, but **none of them know about each other**. Card A captures the current state (already modified by still-active Card B), then later restores to that mid-effect snapshot — corrupting baseline.
 
-### Comet Dive (Current Design)
+**This is one of the strongest reasons for the CardActionExecutor refactor.** A proper extractor will let each action declare what state it modifies and check for conflicts. Patching individual cards is wasted work that the refactor would supersede.
 
-Dead Cells-style ground slam. Airborne-only (card fails silently if grounded). On play, vertical velocity becomes `-cometSpeed`, horizontal velocity is preserved (momentum carries). On ground collision, AOE damage in `cometRadius` (using all-layers OverlapCircleAll + `GetComponentInParent<EnemyHealth>` + HashSet dedup). Spawns `cometImpactEffect`, camera shakes, trail cleans up via `EndCometDive()`. Trail cleanup also fires on death, knockback, and fall-respawn — every dive-ending path.
-
-### Card Effect Conflict Class of Bug (Partial Resolution)
-
-Originally: playing multiple state-modifying cards in close succession (Phase + ReverseGravity + Adrenaline) could permanently corrupt player state because each card's "capture original, restore on exit" pattern was unaware of the others.
-
-**Current status:** the CardActionExecutor + ConflictFlags scaffolding is in place. Most actions are tracked correctly. Three actions (Phase, Adrenaline, ReverseGravity) still manage coroutines inside PlayerController helpers and don't fully populate `runningEffects` — their declared flags exist but aren't actively tracked. **The Phase/ReverseGravity gravity-capture interaction can still corrupt gravity scale** if both expire in a specific order. Reachable in hub; mostly gated by Shift cost in normal play. **Fix is in deferred work:** restructure the three helpers to return IEnumerator so the executor can manage their lifecycle and detect conflicts.
+**In normal play, Shift cost gates spamming heavily enough that this is rarely reachable.** It is fully reachable in the hub. For now: known issue, do not patch individual cards.
 
 ---
 
 ## Hub Mode (Sandbox)
 
-The hub is a sandbox room where the player tests cards, jumps freely, and experiments without consequence. The hub prefab is at `Assets/LevelEfeS/hub.prefab`. **It is currently the always-first room in every run.**
+The hub is a sandbox room where the player tests cards, jumps freely, and experiments without consequence. The hub prefab is at `Assets/LevelEfeS/hub.prefab`. **It is currently the always-first room in every run** (see "First-Room Logic" under Level System).
 
 ### HubMarker Component
 
-`Assets/Scripts/HubMarker.cs` is a marker MonoBehaviour signaling "this is a hub." `LevelManager.IsCurrentRoomHub()` is the single source of truth.
+`Assets/Scripts/HubMarker.cs` is a marker MonoBehaviour with no fields or methods — its presence on a room prefab's root signals "this is a hub" to the rest of the codebase. Currently attached to the hub prefab's root.
+
+`LevelManager.IsCurrentRoomHub()` returns true if the currently spawned room has a HubMarker. This is the single source of truth.
 
 ### Umbrella Rule: No Consumption In Hub
 
-The hub gates every player-resource consumption call. **No resource is consumed and no permanent state changes** while the player is in a hub.
+The hub gates every player-resource consumption call. The umbrella principle: **no resource is consumed and no permanent state changes** while the player is in a hub.
 
 Specifically gated:
 - Shift consumption from jumping (`PerformJump`)
 - Shift consumption from playing cards (`DeckManager.PlayCard` → `player.SpendShift(cost)`)
 - Shift consumption from portal second-placement (`TryPlacePortal`)
 - Card charge decrement (`playedCard.currentUses--`)
-- Card exhaust routing
+- Card exhaust routing (cards play but don't go to exhaust pile when depleted)
 - Recall shift cost (`TryRecall` → `SpendShift`)
 - Recall cost escalation (`currentRecallCost++`)
 - Stagger card injection (`CheckForStaggerCondition`)
+- Fall damage (`FallAndRespawn` → `TakeDamage(fallDamage)`)
 
-(Fall damage was removed entirely from the game and is no longer in this list.)
+All guards use the pattern: `if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub()) { ... do the consumption ... }`.
 
-Pattern: `if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub()) { ... do the consumption ... }`.
-
-**When adding new player-resource consumption code,** ask "should this be free in a sandbox?" — almost always yes.
+**When adding new player-resource consumption code,** check whether it should also be gated by `IsCurrentRoomHub()`. The pattern is: at every consumption site, ask "should this be free in a sandbox?" — almost always yes.
 
 ### What Hub Does NOT Hide
 
-UI is intentionally unchanged in hub. Only the underlying mechanics are gated.
+UI is intentionally unchanged in hub. The shift counter, card hand, recall button — all visible and operate normally. Only the underlying mechanics are gated. This is so the hub can act as a tutorial space where the player sees the UI react.
 
 ---
 
 ## Manager Layer
 
-13+ singleton managers. Architectural smell but load-bearing.
+There are 13+ singleton managers. This is a known architectural smell flagged in audit but currently load-bearing. Do not propose merging or restructuring without explicit user approval.
 
 ### List of Managers
 
@@ -285,16 +233,16 @@ UI is intentionally unchanged in hub. Only the underlying mechanics are gated.
 - **SkillManager**, **SkillRewardManager** — skill tree / skill selection
 - **QuestSystem** — quest tracking, board UI, accept/progress/complete events
 - **ShopManager** — in-game shop UI and purchases
-- **SlotMachineManager** / **SlotMachineUI** — gambling system (planned replacement: Dice Broker)
+- **SlotMachineManager** / **SlotMachineUI** — gambling system (planned to be replaced with Dice Broker — see deferred work)
 - **AchievementManager** — achievement tracking
 - **MenuManager** / **PauseMenu** / **MainMenuController** — menu systems
 - **EffectManager** — VFX spawning helper
 - **MusicManager** — background music
-- **CameraShake**, **HitStop** — game-feel singletons
+- **CameraShake**, **HitStop** — game-feel singletons (camera shake + freeze frames)
 
 ### Pause Counter System
 
-`GameManager` has a centralized pause counter:
+`GameManager` has a centralized pause counter that any UI/menu system uses instead of writing `Time.timeScale` directly.
 
 ```csharp
 GameManager.instance.RequestPause();   // increments depth, sets timeScale=0 if depth becomes 1
@@ -303,65 +251,119 @@ GameManager.instance.ReleasePause();   // decrements depth, sets timeScale=1 if 
 
 **Use this for any new UI that should pause the game.** Do not write `Time.timeScale = 0` directly in new code.
 
-Exceptions: `HitStop.Stop()`, `PlayerController.AdrenalineSlowMoRoutine`, `PauseMenu.LoadMenu()`.
+Exceptions that intentionally bypass the counter:
+- `HitStop.Stop()` — sets timeScale=0 briefly for hit freezes. Not a "pause" semantically.
+- `PlayerController.AdrenalineSlowMoRoutine` — slow motion at timeScale=0.4f. Not a pause.
+- `PauseMenu.LoadMenu()` — hard reset before scene transition.
 
 ### Known Manager Issues
 
 - **Cyclic dependencies:** PlayerController → DeckManager → PlayerController. Don't add more cycles.
 - **Most managers lack `DontDestroyOnLoad`**, intentional for single-scene operation.
-- **QuestSystem has `DontDestroyOnLoad`** — inconsistent. Flagged for review.
-- **`GameManager.instance.player` is accessed from many UI scripts** with inconsistent null guarding.
+- **QuestSystem has `DontDestroyOnLoad`** — inconsistent with other managers. Flagged for review.
+- **`GameManager.instance.player` is accessed from many UI scripts** with inconsistent null guarding. Add null guards when touching these sites.
 
 ---
 
 ## Quest System
 
-Functional: data model, accept/progress/complete events, board UI, live tracker HUD all working.
+The quest system is **functional**: data model, accept/progress/complete events, board UI, and live tracker HUD all working as of the most recent session.
 
 ### Data
 
-- **`QuestData`** (ScriptableObject) — `questName`, `description`, `type` (QuestType enum), `targetAmount`, `rewardText`, `rewardType` (RewardType enum), `rewardAmount`.
-- **`QuestType` enum:** `GoldAccumulate`, `KillEnemy`, `AirKill`, `NoDamageRoom`, `UseCardCount`. Only `KillEnemy` and `AirKill` fire events (from `EnemyHealth.Die()`). Others are defined but unwired.
-- **`RewardType` enum:** `Gold`, `ShiftCharge`, `Heal`. All wired in `QuestSystem.GiveReward`.
-- **Three quest assets exist** at `Assets/Quests/`. `New Quest 1` (NoDamageRoom) won't progress until the type is wired.
+- **`QuestData`** (ScriptableObject) — quest templates. Fields: `questName`, `description`, `type` (QuestType enum), `targetAmount`, `rewardText`, `rewardType` (RewardType enum), `rewardAmount`.
+- **`QuestType` enum:** `GoldAccumulate`, `KillEnemy`, `AirKill`, `NoDamageRoom`, `UseCardCount`. **Of these, only `KillEnemy` and `AirKill` currently fire events** (from `EnemyHealth.Die()`). The others are defined but unwired.
+- **`RewardType` enum:** `Gold`, `ShiftCharge`, `Heal`. All three are wired in `QuestSystem.GiveReward`.
+- **Three quest assets currently exist** at `Assets/Quests/`:
+  - `New Quest 1` — "Invincible" — NoDamageRoom (1) → 300 Gold. **Objective type not wired, won't progress yet.**
+  - `New Quest 2` — "Hit a Clip" — AirKill (3) → +10 Shift. Fully functional.
+  - `New Quest 3` — "Bounty Hunter" — KillEnemy (3) → 100 Gold. Fully functional.
 
 ### QuestSystem Singleton
 
-In SampleScene. `ToggleBoard`, `GenerateQuests` (always picks first 3, no randomization yet), `AcceptQuest`, `ReportEvent`, `CheckCompletion`, `GiveReward` (immediate, not deferred to level-end).
+Located on a `QuestSystem` GameObject in SampleScene. Holds:
+- `allQuests` — list of QuestData assets the board can pull from (currently the 3 above).
+- `activeQuests` — `List<ActiveQuest>` (inner serializable class). Each `ActiveQuest` has `data` (QuestData), `currentAmount` (int), `isCompleted` (bool).
+- Serialized fields: `overlayPanel` (GameObject), `container` (Transform), `paperPrefab` (GameObject).
 
-### Events
+Key methods:
+- `ToggleBoard()` / `CloseBoard()` — opens/closes the QuestBoardOverlay UI; uses `RequestPause`/`ReleasePause`.
+- `GenerateQuests()` — spawns up to 3 QuestPaper prefabs into the container. **Currently always picks the first 3 in `allQuests` — no randomization.**
+- `AcceptQuest(QuestData)` — adds to `activeQuests` (deduplicates by data reference), fires `OnQuestAccepted`.
+- `ReportEvent(QuestType, int)` — iterates activeQuests, increments `currentAmount` on matching quests, fires `OnQuestProgress`, then calls `CheckCompletion`.
+- `CheckCompletion(ActiveQuest)` — if `currentAmount >= targetAmount`, sets `isCompleted = true`, fires `OnQuestCompleted`, calls `GiveReward`.
+- `GiveReward(QuestData)` — delivers reward immediately. **Not deferred to level-end yet** (on the deferred list).
+
+### Events (for HUDs and other listeners)
 
 ```csharp
-public event System.Action<ActiveQuest> OnQuestAccepted;
-public event System.Action<ActiveQuest> OnQuestProgress;
-public event System.Action<ActiveQuest> OnQuestCompleted;
+public event System.Action<ActiveQuest> OnQuestAccepted;   // fired after successful add (not on duplicate-accept)
+public event System.Action<ActiveQuest> OnQuestProgress;   // fired after currentAmount++, before CheckCompletion
+public event System.Action<ActiveQuest> OnQuestCompleted;  // fired after isCompleted=true, before GiveReward
 ```
+
+### Quest Board UI
+
+Lives under `Canvas` as `QuestBoardOverlay` → `Panel` → (`QuestContainer`, `LeaveButton`). The board uses a hand-painted background sprite with three painted parchment slots and three painted ACCEPT buttons; the spawned `QuestItemTemplate` prefabs (one per quest) sit inside those painted slots with transparent backgrounds, and the invisible Accept buttons inside each QuestPaper are sized to overlay the painted ACCEPT graphics. The Leave button is also an invisible button over a painted graphic.
+
+The QuestBoard in `Assets/LevelEfeS/hub.prefab` has a `SimpleInteract` component on it (implements `IInteractable`) that calls `QuestSystem.ToggleBoard()` on player interact (press E within `interactionRange`). The board's Layer must be in PlayerController's `interactableLayer` mask. Currently the mask is set to "Interactable" only, and the QuestBoard is on Layer 12. **Verify in Inspector that Layer 12 corresponds to Interactable, or that interactableLayer includes both.**
 
 ### Live Tracker HUD (QuestTrackerHUD)
 
-`Assets/Scripts/QuestTrackerHUD.cs`. Two TMP children named exactly `Title` and `Progress` (case-sensitive — typos make rows blank).
+`Assets/Scripts/QuestTrackerHUD.cs`, attached to a `QuestTracker` GameObject under `Canvas/GameplayHUD/`, top-right of screen. Subscribes to the three QuestSystem events. Maintains a `Dictionary<ActiveQuest, GameObject>` mapping quests to their instantiated row GameObjects.
+
+- Row prefab: `Assets/Prefabs/QuestRowPrefab.prefab`. Two TMP children named exactly `Title` and `Progress` (case-sensitive).
+- On accept: instantiate row, set Title to quest name, set Progress to "0/X".
+- On progress: update the row's Progress text to "current/target".
+- On complete: destroy the row.
+
+Because the tracker is parented under GameplayHUD, it inherits the auto-hide behavior when Shop / SlotMachine / QuestBoard open.
+
+### Known Quest Pitfall (Resolved)
+
+`QuestPaper.OnAccept` previously crashed at line 32 trying to assign text to a TextMeshProUGUI child that didn't exist on the Accept button (the button was stripped of its text label during UI styling). The crash happened BEFORE `QuestSystem.AcceptQuest` was called, so the quest never actually got added and the event never fired. Fixed by null-guarding the GetComponentInChildren result. If you ever see a quest accept silently fail again, check the error trace for `QuestPaper.OnAccept` first.
 
 ---
 
 ## Relic System
 
-Currently SOTS-style additive: unlimited relics, no slots. **Slated for major redesign — see "Future: Slot-Constrained Relic Redesign" in deferred work.** Don't invest heavily in relic UX or content; it'll be reworked.
+Currently a Slay-the-Spire-style additive system: every relic is a passive bonus, the player can own unlimited relics, no slot constraints. **This is slated for a major redesign — see "Future: Slot-Constrained Relic Redesign" in the deferred work section.** Do not invest heavily in new relic content or relic UX features until the redesign happens; that work will likely be reworked.
 
 ### RelicManager
 
-Singleton. `OwnedRelics` accessor, `OnRelicAdded` event. Grant paths: `ShopItemUI`, `SlotMachineUI`, `DebugTools.cs` F1.
+Singleton. Holds:
+- `ownedRelics` — private list of owned `RelicData`.
+- Public `OwnedRelics` — `IReadOnlyList<RelicData>` accessor.
+- Public event `OnRelicAdded` — `System.Action<RelicData>`, fired after a successful add (not on duplicate-add).
 
-No starting-relic infrastructure exists yet.
+Grant paths (only two are accessible in normal play):
+- `ShopItemUI` — buying a shop item with a relic reference.
+- `SlotMachineUI` — slot machine payout.
+- `DebugTools.cs` F1 key — debug only.
 
-### RelicData
+**No starting-relic infrastructure exists yet.** Every run begins with zero relics. Adding a starting relic system (e.g., a wizard who begins with a Fireball relic) is on the deferred list.
 
-`relicID`, `relicName`, `description`, `relicArt`, `rarity`.
+### RelicData ScriptableObject
 
-Wired relics: VampireTooth (heal on kill), Kinetic (+2 Shift on kill), SpikedCarapac (reflect on damage), Pogo Boots (head-bounce), LavaBoots (hazard immunity). Placeholders: "Oops! All 7's", Helly.
+Fields: `relicID` (string, used for `HasRelic` polling), `relicName`, `description`, `relicArt` (Sprite, used by the HUD), `rarity` (enum).
+
+Current relic assets at `Assets/Relics/`:
+- `VampireTooth` — kills heal 5 HP. Wired in `RelicManager.OnEnemyKilled`.
+- `Kinetic` — kills grant +2 Shift. Wired.
+- `SpikedCarapac` — taking damage reflects 20 to nearby enemies. Wired.
+- `Pogo Boots` — head-bounce on enemies. Wired in `PlayerController` (see Enemy System).
+- `LavaBoots` — protects from hazard zones. Wired in `HazardZone.cs`.
+- `New Relic 1` ("Oops! All 7's", Legendary) — no behavior, placeholder.
+- `Helly` (Common) — no behavior, placeholder/junk.
 
 ### Relic HUD (RelicHUD.cs)
 
-Middle-left vertical column. 48×48 icons. No tooltip, no activation flash — deferred polish.
+`Assets/Scripts/RelicHUD.cs`, attached to a `RelicHUD` GameObject under `Canvas/GameplayHUD/`, anchored middle-left, vertical column.
+
+- Subscribes to `RelicManager.OnRelicAdded` in `Start()`.
+- Also iterates existing `RelicManager.instance.OwnedRelics` at Start so it populates on late wake-up.
+- Each new relic instantiates `RelicIconPrefab.prefab` as a child, setting the `Image` component's sprite to the relic's `relicArt`.
+- 48×48 icon size. No tooltip, no activation flash — both deferred as future polish.
 
 ---
 
@@ -369,19 +371,28 @@ Middle-left vertical column. 48×48 icons. No tooltip, no activation flash — d
 
 ### Canvas Hierarchy
 
-- **`GameplayHUD`** — gold, health, shift counter, recall button, deck/discard/exhaust pile buttons, hand drawer, RelicHUD, QuestTracker. Toggle `SetActive(false)` for full-screen UI.
-- **`QuestBoardOverlay`** — quest board panel.
-- Menu panels (PauseMenu, ShopUI, etc.) as direct children of Canvas.
+SampleScene's main Canvas contains:
+- **`GameplayHUD`** — contains all in-game HUD elements (gold, health, shift counter, recall button, deck/discard/exhaust pile buttons, hand drawer trigger zone, **RelicHUD**, **QuestTracker**). Toggle with `SetActive(false)` to hide HUD during full-screen UI.
+- **`QuestBoardOverlay`** — quest board panel (full-screen).
+- Various menu panels (PauseMenu, ShopUI, SlotMachineUI, RewardScreen, etc.) as direct children of Canvas.
 
-**When adding new full-screen UI**, hide GameplayHUD with a reference and SetActive.
+**When adding new full-screen UI panels**, hide GameplayHUD when they open by adding a `[SerializeField] GameObject gameplayHUD;` reference and toggling SetActive. ShopManager, SlotMachineUI, and QuestSystem already follow this pattern.
 
 ### Never Scale UI Containers — Resize Them
 
-Change Width and Height in the RectTransform, not Scale. Scaling cascades to children and breaks Layout Groups.
+When a UI element needs to be bigger or smaller, **change Width and Height in the RectTransform, not Scale.** Scaling a UI container cascades to children and fights with Layout Groups, producing wildly incorrect sizes (twice during the last session we hit this — once with the RelicHUD container scaled 5.44× on Y, once nearly happened with the QuestBoardOverlay). The honest fix is always Width/Height, sometimes anchor/pivot. Leave Scale at (1, 1, 1) on UI elements.
 
 ### HandUIDrawer
 
-Auto-slides up on hover. The `Image` has `raycastTarget = true` for hover detection. **When opening any full-screen UI panel, call `HandUIDrawer.instance.SetLocked(true)`** and `SetLocked(false)` when closing.
+The hand drawer at the bottom of the screen auto-slides up on hover and down when idle.
+
+**Critical raycast behavior:** The drawer's `Image` component has `raycastTarget` enabled to detect hover (`IPointerEnterHandler`). This means it absorbs clicks in its rect. The `SetLocked(bool)` method:
+
+- Sets `isLocked` (stops slide animation)
+- Sets `isHovered = false`
+- **Toggles `raycastTarget` on the Image component** so the drawer stops absorbing clicks when locked.
+
+**When opening any full-screen UI panel, call `HandUIDrawer.instance.SetLocked(true)`** and `SetLocked(false)` when closing. ShopManager, SlotMachineUI, and DeckViewUI already do this.
 
 ---
 
@@ -389,19 +400,28 @@ Auto-slides up on hover. The `Image` has `raycastTarget = true` for hover detect
 
 ### CameraFollow.cs (custom)
 
-Replaces Cinemachine. Each level prefab has a `LevelBounds` child with `BoxCollider2D` zones. Zone transitions use hysteresis, no lerp.
+Replaces Cinemachine for the main follow camera. Each level prefab contains a `LevelBounds` child GameObject with `BoxCollider2D` zone children. `LevelManager.SetZones()` passes these to `CameraFollow` on spawn.
 
-**Naming case-sensitive:** child must be exactly `LevelBounds`.
+- Camera clamps to the zone the player is currently in.
+- Zone transitions use hysteresis (zone doesn't change until player leaves current zone).
+- No lerp on zone transition — direct follow (lerp was tried, caused jitter).
+
+**Naming is case-sensitive:** the child must be named exactly `LevelBounds`. Earlier code looked for `CameraBounds` and silently failed.
 
 ### CameraShake.cs
 
-Uses `shakeOffset` Vector2 added by `CameraFollow.LateUpdate`. `unscaledDeltaTime` so it plays during HitStop. `CameraShake.instance.Shake(duration, intensity)`. Null-guard `instance`.
+Rewritten to work without Cinemachine. Uses a `shakeOffset` Vector2 that `CameraFollow.LateUpdate` adds to the final clamped position (so shake can briefly push past zone bounds, which feels correct).
 
-**Must be present and enabled** on the Main Camera. If missing, every Shake call silently no-ops.
+- Uses `unscaledDeltaTime` so shake still plays during HitStop freezes.
+- Call sites: `CameraShake.instance.Shake(duration, intensity)`. Always null-guard `instance`.
+
+**The CameraShake component must be present in the active scene** (on the Main Camera) and **enabled**. If it's missing or disabled, every Shake call silently no-ops. This caused a 9-month "no shake anywhere" bug that wasn't discovered until the audit.
 
 ### CameraPeek.cs (BROKEN)
 
-Currently does not work. Left Ctrl bind dead. Cinemachine-dependent. Slated for rebuild as `CameraFollow` offset.
+**Currently does not work.** Default bind is Left Ctrl; pressing it produces no effect. Still depends on Cinemachine, which is no longer present in the scene. Slated for **full rebuild**, likely as an offset on `CameraFollow` (similar to how CameraShake works). Don't touch unless explicitly tasked.
+
+Related: a missing-script warning for `CameraBoundsController` appears in the console at scene load — this is part of the same Cinemachine-era cleanup that's pending. Cosmetic; doesn't affect gameplay.
 
 ---
 
@@ -409,11 +429,22 @@ Currently does not work. Left Ctrl bind dead. Cinemachine-dependent. Slated for 
 
 ### Room Pool
 
-`LevelManager.roomPrefabs`. Element 0 is the hub by convention.
+`LevelManager.roomPrefabs` holds the pool of room prefabs that can be spawned. Element 0 is the hub by convention.
 
 ### First-Room Logic
 
-Bool `hasSpawnedFirstRoom`. First call: force index 0 (hub), mark spawned. Subsequent calls: strip index 0 from pool every call. Net effect: hub is first room every run, never spawns again.
+`LevelManager` has a private bool `hasSpawnedFirstRoom` that defaults to false. On first call to the room-pick block:
+- Forces `selectedRoomIndex = 0` (the hub).
+- Sets `hasSpawnedFirstRoom = true`.
+- Removes index 0 from the available pool immediately.
+
+On all subsequent calls:
+- Strips index 0 from the available pool every call (no-op if not present; covers cases where pool refill re-adds it).
+- If the strip empties the pool, refill and strip again.
+- Pick from whatever remains with a normal `Random.Range(0, count)`.
+- Falls back to index 0 only if `roomPrefabs` has a single entry (the only physical possibility).
+
+Net effect: **the hub is the first room of every run and never spawns again during the same run.** If/when proper scene flow gets built (player starts in hub from main menu and returns after death), this logic should be reviewed.
 
 ---
 
@@ -421,44 +452,52 @@ Bool `hasSpawnedFirstRoom`. First call: force index 0 (hub), mark spawned. Subse
 
 ### Pattern
 
-- **`EnemyHealth`** base script — damage, flash, death, drops, stun. `Die()` calls `RelicManager.OnEnemyKilled()`, `QuestSystem.ReportEvent(QuestType.KillEnemy, 1)`, optionally `AirKill`. **No C# event for death.**
-- **AeroBat (BatMan)** — Cainos visual + custom `AeroBatAI`. Raycast LOS aimed at player chest. State: Idle → Preparing → Diving → Returning.
-- **MeleeEnemy, RangedEnemy** — SkinnedMeshRenderer-based skeleton rigs.
-- **ShieldEnemy, Turret (Taret), PatrolEnemy** — additional types.
+- **`EnemyHealth`** base script — handles damage, flash, death, drops. **Currently the only callsite that reports KillEnemy/AirKill to QuestSystem.** `Die()` calls `RelicManager.OnEnemyKilled()`, `QuestSystem.ReportEvent(QuestType.KillEnemy, 1)`, and (if airborne) `QuestSystem.ReportEvent(QuestType.AirKill, 1)`. **No C# event for death** — death consequences are direct calls inside `Die()`. If you need to react to enemy death from a new system, add a call inside `Die()`; don't try to subscribe to a non-existent event.
+- **AeroBat (BatMan)** — uses Cainos pack visual + custom `AeroBatAI`. Parent has Kinematic Rigidbody2D + Polygon trigger collider. Raycast LOS aimed at player chest (+0.5 Y), shortened by 0.3 to avoid hitting tile at player's feet. State machine: Idle → Preparing → Diving → Returning.
+- **MeleeEnemy**, **RangedEnemy** — based on Cainos pack patterns.
 
-### Stun System
+**`TakeDamage(float damage, Transform damageSource = null)` does not currently track damage source.** Spike or hazard kills would credit the player's kill counter the same as direct kills. Minor concern; flag if it becomes design-relevant.
 
-Glass Wail and any future stun source go through `EnemyHealth.Stun(float duration)`. Pattern:
+### Layer Convention Mismatch (Known Issue)
 
-- `EnemyHealth.IsStunned` is a `public bool { get; private set; }` property.
-- `Stun(duration)` cancels any running stun, sets `IsStunned = true`, starts `StunRoutine(duration)` which clears the flag after the wait.
-- **Every AI script polls the flag.** Pattern at the top of Update/FixedUpdate: `if (health != null && health.IsStunned) return;`. Coroutines that yield can either skip-then-continue (like Turret's FireRoutine) or abort cleanly to Idle on detection (like AeroBat's PrepareAttackRoutine).
-- Visual feedback uses dual arrays on EnemyHealth: `SpriteRenderer[] stunSpriteRenderers` and `SkinnedMeshRenderer[] stunSkinnedRenderers`. Both get tinted blue on stun, restored on exit. Arrays handle Cainos multi-body-part rigs and mixed renderer types in one pattern. **Note: the current implementation uses `.material.color` writes, which is wasteful — should be rewritten to MaterialPropertyBlock when next touched.**
-- AI scripts with stun guards wired: AeroBatAI, MeleeEnemyAI, RangedEnemyAI, PatrolEnemy, Turret, ShieldEnemy.
+- **AeroBat, MeleeEnemy:** on the **Default** layer (0).
+- **RangedEnemy:** on the **Enemy** layer.
 
-When adding a new enemy: implement EnemyHealth, add the stun-guard one-liner in your AI's Update, wire the appropriate renderer array in Inspector. That's it.
-
-### Layer Convention Mismatch (Known)
-
-- **AeroBat, MeleeEnemy:** on **Default** layer (0).
-- **RangedEnemy:** on **Enemy** layer.
-
-**Workaround:** use `GetComponentInParent<EnemyHealth>()` for hit detection instead of layer masks. The Vampiric Bite, Comet Dive, and head-bounce systems all use this pattern.
+Many systems check via `enemyLayer` mask, which misses Default-layer enemies. The workaround in PlayerController is to use `GetComponentInParent<EnemyHealth>()` instead of relying on layer masks for head-bounce detection. **Be aware of this when adding new enemies — pick a layer and stick with it, or use the EnemyHealth-component approach.**
 
 ### Head Bounce (Pogo Boots Relic)
 
 - 8 damage, `defaultJumpForce * 0.7f` upward force, 0.1s camera shake, 0.3s cooldown.
 - Gated behind `RelicManager.HasRelic("PogoBoots")`.
-- Uses both `OnCollisionEnter2D` and `OnTriggerEnter2D` (AeroBat has trigger; others solid).
-- **Fully respects gravity reversal:** velocity sign check, contact normal check, position Y check, and bounce direction all flip via `isGravityReversed`. (Was previously partially broken; now correct.)
+- Uses both `OnCollisionEnter2D` and `OnTriggerEnter2D` (AeroBat has trigger collider, others have solid).
+- Contact normal check: `contact.normal.y > 0.7`.
+
+**Known gap:** the velocity sign check (`rb.linearVelocity.y < -0.1f`) doesn't account for gravity reversal. Will silently fail during reversed-gravity head-bounce attempts. Low priority — gravity reversal duration is short and head-bouncing during it is an edge case.
+
+### Enemy Healthbars (EnemyHealthBar.cs + EnemyHealthBar.prefab)
+
+Wired and working across all six enemy types (AeroBat, MeleeEnemy, RangedEnemy, ShieldEnemy, Turret, PatrolEnemy).
+
+**Architecture:** `EnemyHealth` instantiates `healthBarPrefab` (assigned per-enemy in Inspector) in `Start()`, calls `Initialize(transform, headBarOffset, computedWidth)`. The bar parents itself to nothing (free in world space), follows the enemy via its own `LateUpdate`, and is destroyed in `Die()` before the enemy GameObject. Width is computed from `Collider2D.bounds.size.x * 1.2`. `EnemyHealth.headBarOffset` is the per-enemy Y offset; tune in Inspector if the bar sits in the middle of the model instead of above its head.
+
+**The prefab itself is intentionally near-empty:** `Assets/Prefabs/UI/EnemyHealthBar.prefab` has only a `RectTransform` + the `EnemyHealthBar` MonoBehaviour. `BuildCanvas()` in Awake constructs the Canvas, CanvasGroup, border Image, FillImmediate (dark red, snaps), FillDelayed (orange, lerps), and HealthText (TMP) procedurally. WorldSpace canvas at `CANVAS_SCALE = 0.01f`.
+
+**Two pitfalls already hit and fixed — do not regress:**
+
+1. **`UnityEngine.Resources.GetBuiltinResource<Sprite>("UI/Skin/UISprite.psd")` does NOT work at runtime.** Returns null with logged errors. The current solution: `EnemyHealthBar` builds a 1×1 white sprite procedurally in a static `GetWhiteSprite()` helper (cached in `cachedWhiteSprite`), assigned to every Image's `sprite` field in `MakeChildImage`. **Required for `fillAmount` to render** — Filled-mode Images with no sprite silently ignore fillAmount and just render as flat colored rectangles.
+2. **Sorting fallback for SkinnedMeshRenderer enemies.** `Initialize` first checks for SpriteRenderer (for any future sprite-based enemies), then falls back to SkinnedMeshRenderer for Cainos-based rigs. Without this fallback, AeroBat/MeleeEnemy/RangedEnemy/etc. would stay at default `sortingOrder = 100` regardless of their actual rendering layer.
+
+**Settings integration:** `EnemyHealthBar` subscribes to `SettingsMenu.OnShowNumbersChanged` and reads `PlayerPrefs.GetInt("ShowEnemyNumbers", 1)` on start. Only the text label toggles; bar visuals always render.
+
+**Shield-block damage leak (REAL BUG, not yet fixed):** In `EnemyHealth.TakeDamage`, `currentHealth -= damage` runs BEFORE the shield-block check, then the shield check returns early. Blocked hits silently deduct health but skip the popup and bar update — so the ShieldEnemy doesn't actually shield from damage, only from feedback. Move the deduction to AFTER the shield check when this is touched next. Trivial fix, scope-isolated to one method.
 
 ---
 
 ## Audio System
 
-Currently minimal. `MusicManager` handles BGM. SFX via `AudioSource.PlayOneShot()`. No central SFX manager.
+Currently minimal. `MusicManager` handles background music. Individual scripts play SFX via `AudioSource.PlayOneShot()` or `AudioSource.PlayClipAtPoint()`. No central SFX manager.
 
-When adding audio: `[SerializeField] AudioClip` field, play with null guard.
+When adding audio cues for new cards/effects, follow the existing pattern: expose a `[SerializeField] AudioClip` field and play it with a null guard.
 
 ---
 
@@ -466,83 +505,54 @@ When adding audio: `[SerializeField] AudioClip` field, play with null guard.
 
 ### "Importing an asset pack can overwrite ProjectSettings and break everything"
 
-Cainos packs ship as "complete projects" with `ProjectSettings/` overrides. **Always click "None" on the Step-2 overrides screen.** Always uncheck duplicate packs in Step-1. Accepting overrides destroys URP config, tags, physics, input bindings.
+The Cainos Customizable Pixel Character pack is distributed as a "complete project." Its first import dialog warns about overwriting project settings; the second dialog ("Step 2 of 2: Import Settings Overrides") lists 15+ ProjectSettings files marked **Override**. Accepting these overwrites your URP renderer config (shaders go pink), tags (custom tags vanish), physics (gravity/layer matrix changes), and input bindings.
 
-### "Cainos shaders use _Alpha and _SkinTint, NOT _Color"
-
-This bit us writing the Phase visual effect. `renderer.material.color =` calls `SetColor("_Color", ...)` which the Cainos shaders ignore — they expose `_Alpha` (float) for fades and `_SkinTint` (Color, body shader only) for body recoloring. If a renderer effect "doesn't appear," check the shader source first. Read the `Properties { }` block of the .shader file.
-
-### "Cainos 'Pixel Character' is SkinnedMeshRenderer, not SpriteRenderer"
-
-The pixel aesthetic implies 2D sprites. The Cainos pack is actually a 3D FBX rig with one SkinnedMeshRenderer per body part. Code that assumes SpriteRenderer (like the old gravity reversal warning flash) silently no-ops. Mixed-renderer features should use parallel arrays (`SpriteRenderer[] foo; SkinnedMeshRenderer[] bar;`) like the stun system does.
-
-### "Use MaterialPropertyBlock, not .material.color, for per-frame renderer writes"
-
-Writing to `renderer.material` clones the material every frame. Breaks batching, leaks memory. The correct pattern:
-
-```csharp
-MaterialPropertyBlock block = new MaterialPropertyBlock();
-block.SetFloat("_Alpha", 0.5f);
-renderer.SetPropertyBlock(block);
-```
-
-Cainos's own `PixelCharacter.Alpha` setter is the reference implementation.
-
-### "Enum integer pinning is required for serialized enum fields"
-
-`CardActionType` values MUST have explicit `= N` assignments. ScriptableObject assets (CardData) serialize the integer. Deleting an enum entry shifts every later value down, silently re-binding every existing asset to a different action. Discovered after a bulk deletion broke every card except Dash.
-
-Apply this convention to any future enum whose values appear in serialized assets.
+**Always click "None" on the Step-2 overrides screen.** Always uncheck duplicate Cainos packs you already have in the Step-1 file tree (overwriting shared files in `Common/` can break other Cainos packs too). The pack itself is fine to import once these are excluded.
 
 ### "The system exists in code but doesn't work"
 
-Check whether the component is **actually in the scene and enabled** before assuming code is broken. CameraShake was disabled for 9 months. HitStop was missing from scenes. QuestSystem was missing entirely after a scene reorganization. **Verify scene presence first.**
+Check whether the component is **actually in the scene and enabled**. Multiple times during development, scripts were perfect but the GameObject was missing or the component was disabled. Examples:
+- CameraShake was in the scene but disabled for 9 months.
+- HitStop was missing from some scenes entirely.
+- QuestSystem was missing from SampleScene after the old hub scene was deleted — the script existed and was complete, the manager just wasn't instantiated anywhere.
 
-Same lesson applies to required Inspector wiring: a feature that depends on a serialized array won't work if the array is empty. Check the Inspector before debugging the code.
+When a system "doesn't seem to work," verify scene presence and enabled state BEFORE assuming the code is wrong.
 
 ### "Idempotent operations hide bugs"
 
-`Time.timeScale = 0` is idempotent — calling it twice does the same as once. This hid the ExitDoor double-fire bug for months. The pause counter makes redundant calls visible.
+Setting `Time.timeScale = 0` is idempotent — calling it twice does the same as once. This hid the ExitDoor double-fire bug for months. Now that the pause counter is in place, redundant calls become visible (pauseDepth goes to 2). **If you find redundant-but-harmless calls, audit whether they should be redundant.**
 
 ### "Reading back transform.localEulerAngles is unreliable"
 
-Unity normalizes Euler angles unpredictably. For rotation tracking, store the angle in a float and write via `Quaternion.Euler(0, 0, currentZ)`. Never read back from `localEulerAngles`.
+Unity normalizes Euler angles and may return unexpected combinations after 180° rotations. **For rotation tracking, store the angle in a float field and write it via `Quaternion.Euler(0, 0, currentZ)`.** Never read back from `localEulerAngles`.
 
 ### "Camera.main is slow and can be null"
 
-Tag-based lookup every call. Cache in Awake. Null-guard.
+`Camera.main` does a tag-based lookup every call. **Cache it in Awake.** Add null guards at call sites.
 
 ### "Visual flip ≠ Physics flip"
 
-When rotating a sprite 180° around Z for gravity reversal, the collider does NOT rotate. Translate the visual instead (`visualFlipYOffset`).
+When rotating a sprite 180° around Z to simulate gravity reversal, the collider does NOT rotate. The capsule remains upright. Don't try to rotate the collider — translate the visual instead (this is what `visualFlipYOffset` does).
 
 ### "Cinemachine values don't translate to direct camera offsets"
 
-Magnitudes differ. Retune when porting away from Cinemachine.
+A Cinemachine `AmplitudeGain` of 0.15 looks very different from a direct `transform.position` offset of 0.15 world units. When porting away from Cinemachine, expect to retune all magnitudes.
 
 ### "Animator parameter type errors are silent until used"
 
-The `AC Character.controller` YAML uses `m_Type` integers: 1=Float, 3=Int, 4=Bool, 9=Trigger. Read the .controller YAML directly when in doubt; don't guess.
+`AC Character.controller` lists `AttackAction` as `m_Type: 3` in YAML, which is **Int**, not Float. The mapping is: 1=Float, 3=Int, 4=Bool, 9=Trigger. When in doubt about an Animator parameter type, read the .controller YAML directly rather than guessing from the parameter's appearance in the Animator window.
 
 ### "First diagnostics can be wrong; always verify"
 
-Claude Code's first diagnostic on a complex script can be wrong. For animator parameter types, the YAML m_Type integer is the source of truth.
+During the character swap session, Claude Code's first diagnostic incorrectly described `AttackAction` as a Float. The error only surfaced at runtime as a type mismatch. **For Animator parameter types specifically, the YAML `m_Type` integer is the source of truth.**
 
-### "Transform.Find is case-sensitive and silent"
+### "Transform.Find is strict and silent"
 
-A typo, trailing space, or capitalization mismatch returns null and the calling code skips silently. When tracker rows / popups / instantiated UI elements appear blank, check child naming inside the prefab first.
+The QuestTrackerHUD looks for children named exactly `Title` and `Progress` (case-sensitive). A typo, trailing space, or different capitalization causes Transform.Find to return null, and the defensive code skips text assignment silently. When a tracker, popup, or instantiated UI element appears blank, the first thing to check is child naming inside the prefab.
 
 ### "GetComponentInChildren can return null"
 
-Always null-guard before dereferencing. The QuestPaper.OnAccept silent-fail bug was a missing TMP child causing the entire AcceptQuest flow to never run.
-
-### "The object picker (+) only lists project assets, not scene/prefab GameObjects"
-
-When wiring a serialized GameObject/Component reference, drag from the Hierarchy. The Inspector's `+` picker won't show GameObjects inside the open prefab.
-
-### "Different rig types need different renderer references"
-
-SpriteRenderer and SkinnedMeshRenderer are different component types. A serialized `SpriteRenderer` field can't hold a SkinnedMeshRenderer reference (and vice versa). When a project has mixed enemy types, features that tint/fade them need parallel arrays.
+`acceptButton.GetComponentInChildren<TextMeshProUGUI>().text = "ACCEPTED"` crashes if the button has no TMP descendant. This caused a silent quest-acceptance failure: the exception fired BEFORE the actual AcceptQuest logic ran, so the system looked like "nothing happened on click." Always null-guard before dereferencing GetComponentInChildren results.
 
 ---
 
@@ -550,127 +560,135 @@ SpriteRenderer and SkinnedMeshRenderer are different component types. A serializ
 
 ### Two-Claude Collaboration
 
-The user consults a separate Claude instance for design and prompt drafting, then sends prompts to Claude Code for execution. When the user references "what Claude said," that's the conversational instance.
+The user often consults a separate Claude instance (the conversational one in claude.ai) for design discussion and prompt drafting, then sends prompts to Claude Code for execution. When the user references "what Claude said" or "the other Claude," that's the source. Defer to user intent when their explanation differs from a previous prompt.
 
 ### Confirmation Patterns
 
 - Default to small, targeted changes. Refactors require explicit approval.
-- When scope changes mid-task ("while I'm in there..."), STOP and confirm.
-- For multi-file changes, show the file list before editing.
-- Diagnostic-only prompts must be respected — never make changes when asked to diagnose.
-- **Commit between meaningful steps.** A working state is worth checkpointing. Saved us multiple times already.
+- When a plan changes scope mid-task ("while I'm in there..."), STOP and confirm with the user.
+- For multi-file changes, show the affected file list before making edits.
+- Diagnostic-only prompts ("don't fix yet, report") must be respected — never make changes when asked to diagnose only.
+- **Commit between meaningful steps.** A working state is worth checkpointing even if more work remains. The discipline of "commit per logical change" has saved the project from cascading errors multiple times.
 
 ### Language
 
 - New code comments: **English**.
 - Older code comments: often Turkish — leave alone unless misleading.
+- User communicates in English now (was Turkish in earlier sessions).
 
 ### Don't Save Before Discarding
 
-If discarding uncommitted Unity changes, close Unity with "Don't Save" first.
+If the user is about to discard uncommitted Unity changes via GitHub Desktop, **Unity should be closed first with "Don't Save"** on the unsaved-changes prompt. Saving the broken state right before throwing it away is pointless and can interfere with the discard.
 
 ---
 
 ## Known Issues / Deferred Work
 
-### Architecture (planned)
+### Architecture (planned, highest priority)
 
-- **PlayerHealth extraction** — pull HP, damage, death, knockback, invincibility, fall-respawn into its own component. Highest-leverage refactor after the CardActionExecutor pass.
-- **PortalController extraction** — `firstPortalInstance` mid-card state currently lives on PlayerController; should be its own component with proper cleanup on room/death.
-- **GravityController extraction** — full ReverseGravity routine, `visualFlipYOffset` machinery, the gravity-reversal warning flash (currently broken).
-- **CardActionExecutor conflict-tracking completion** — Phase, Adrenaline, and ReverseGravity helpers need restructuring to return IEnumerator so the executor can track them in `runningEffects`. This is the real fix for the Phase/ReverseGravity gravity-corruption bug.
-- **CameraPeek rebuild** — currently broken (Left Ctrl dead). Rebuild as `CameraFollow` offset, like CameraShake.
+- **PlayerController.ExecuteAction() extraction** — extract the card-action switch into a dedicated `CardActionExecutor` component. **TOP architectural priority.** Also resolves the card-effect-conflict class of bug (multiple effects modifying shared state without coordination). Scheduled as the next major work item.
+- **CameraPeek rebuild** — currently broken (Left Ctrl does nothing). Rebuild without Cinemachine, likely as a temporary offset on `CameraFollow` matching the CameraShake pattern.
 - **Manager dependency graph** — undocumented. Long-term docs task.
-- **QuestSystem DontDestroyOnLoad inconsistency** — pending scene-flow design decision.
-
-### Developer Experience (planned)
-
-- **In-game debug console** — text input overlay with commands like `give relic X`, `spawn enemy Y`, `set shift 99`, `play card Z`, `toggle gravity`. Grown-up version of DebugTools.cs hotkeys. Pays off recursively for every test session.
-- **Runtime tuning panel** — in-game dropdown listing cards, sliders for their tunable fields (damage, duration, cost, radius), apply button. Cuts the prompt → wait → review → test cycle for number tweaks. Lower priority than the debug console; really pays off once card design pace picks up.
+- **QuestSystem DontDestroyOnLoad inconsistency** — should be removed or all other managers should adopt the same convention. Pending scene-flow design decision.
 
 ### Future: Slot-Constrained Relic Redesign (MAJOR DESIGN DIRECTION)
 
-The current relic system (SOTS-style additive, unlimited) is slated to be replaced with a Balatro-style slot-constrained system.
+The current relic system follows Slay-the-Spire conventions: strictly additive, free accumulation, every relic is a small passive bonus. **This is slated to be replaced with a Balatro-style slot-constrained system.**
 
-**Design intent:** fixed slots (~5), sell to make room, bigger interactive effects, real acquisition decisions. Extends "Movement is a Resource" to relics.
+**Design intent:**
+- Fixed number of relic slots (probably 5 to start, may tune).
+- To acquire a new relic when slots are full, the player must **sell** one of their current relics.
+- Each acquisition becomes a real decision (synergy, swap-out math, what to give up).
+- Existing relics will likely be rebalanced or redesigned — current SOTS-style relics (small passive bonuses) won't shine in a slot-constrained system; bigger, more interactive effects will.
 
-**Scope when undertaken (multi-session):**
-- New data model (slots, sell prices)
-- Rework of RelicManager and RelicHUD into a slot manager UI
-- Rebalance or redesign of existing relics
-- 15-25 new relics
-- Economy tuning
-- Possibly new acquisition events (shop vs. pack vs. voucher)
+**Why this fits the game's DNA:** Deckshift's core philosophy is "Movement is a Resource" — resources matter. A slot-constrained relic system extends that principle to relics: they become a curated resource pool the player manages, not a pile that grows passively.
 
-**Until then: don't invest heavily in relic UX or new SOTS-style relics.** Small fixes fine; large investments not.
+**Scope when undertaken (multi-session work):**
+- New data model (slots, sell prices, possibly slot states like "negative")
+- Rework of RelicManager and RelicHUD into a slot manager UI (display, sell button, drag/swap)
+- Rebalance or redesign of the 5 currently-functional relics
+- 15-25 new relics to make slot decisions meaningful
+- Economy tuning (sell refund %, relic offer frequency vs. 45-50 min run length)
+- Possibly new relic-acquisition events (shop vs. pack vs. voucher distinction)
+
+**Until the redesign happens: do not invest heavily in relic UX features (tooltips, activation flashes, etc.) or in adding many new SOTS-style relics.** That work will likely be reworked. Small fixes and one-off relic additions are fine; large investments are not.
 
 **Approach when starting:** paper design first, code second.
 
-### Quest System Expansion
+### Quest System Expansion (deferred)
 
-- Wire `NoDamageRoom`, `GoldAccumulate`, `UseCardCount` quest types.
-- Add card-reward type.
-- **Rich Man's Dagger card** — damage based on player gold. Needs design pass.
-- Defer reward delivery to level-end (hook: `RewardManager.SelectCard` before `SpawnNextRoom`).
-- Randomize `GenerateQuests()`.
-- Enforce 3-quest cap on `AcceptQuest`.
-- Visual feedback on quest accept.
-- Wire QuestBoard's `SimpleInteract.prompt` field for the "press E" hint.
+- Wire `NoDamageRoom` quest type — needs an event fired from PlayerController's damage path that resets a per-room "no damage" flag; on level end, if flag is true, fire `ReportEvent(QuestType.NoDamageRoom, 1)`.
+- Wire `GoldAccumulate` and `UseCardCount` quest types similarly.
+- Add card-reward type. Currently only Gold/Heal/ShiftCharge are supported.
+- **Rich Man's Dagger card** — a card that deals damage based on current player gold. Was discussed as a quest reward. Needs design pass: damage formula, balance against scaling gold pools, mid-fight gold loss interaction.
+- Defer reward delivery to **level-end** instead of firing immediately on quest completion. Hook point identified: `RewardManager.SelectCard()` just before `SpawnNextRoom()`.
+- Add randomization to `GenerateQuests()` — currently always shows the first 3 in `allQuests`. As content grows, this becomes a real problem.
+- Enforce the 3-quest cap on `AcceptQuest`. Currently you can accept more than 3.
+- Visual feedback on quest accept (button flash, "ACCEPTED" overlay, hide accepted quests from board).
+- Wire the "press E" prompt GameObject on the QuestBoard's `SimpleInteract.prompt` field (currently null — no hover hint appears).
 
-### Scene Flow
+### Scene Flow (deferred)
 
-- Player starts in hub from main menu, transitions to runs, returns after death.
-- Currently hacked: hub is `LevelManager.roomPrefabs[0]` and first-room logic forces it.
-- When implemented: review every manager for `DontDestroyOnLoad` needs.
-
-### Card Polish (deferred from this session)
-
-- **Fireball instant-spawn** — user wants the projectile spawned the moment the card is played, not 0.36s in. Need to either fire-and-forget the animation (keep the 0.36s delay only for visual sync, but spawn immediately) or rework the animation timing. Feel call.
-- **Enemy healthbars** — UI elements above enemies showing current/max HP. User flagged this mid-session; needs design for show-always vs. show-on-damage with fade. Worldspace canvas per enemy.
+- Player should start in hub from main menu, transition to run levels, and return to hub after death/run completion.
+- Currently a hack: hub is `LevelManager.roomPrefabs[0]` and first-room logic forces it. Works for testing/demo but isn't proper scene flow.
+- When implemented: review every manager for `DontDestroyOnLoad` needs. Most currently lack it; that becomes a real concern with scene transitions.
 
 ### Bugs (deferred)
 
-- **Card effect conflict (residual):** Phase, Adrenaline, ReverseGravity helpers don't fully participate in `runningEffects` tracking. Phase/ReverseGravity gravity-corruption interaction is still reachable. See "CardActionExecutor conflict-tracking completion" in Architecture.
+- **Shield-block damage leak:** In `EnemyHealth.TakeDamage`, `currentHealth -= damage` runs BEFORE the `ShieldEnemy.IsBlocking` check. The check returns early but the HP has already been deducted. So blocked hits silently lose HP — the shield only blocks the popup and the bar update, not the actual damage. Fix: move the deduction to AFTER the shield check. Trivial.
+- **Card effect conflict class of bug** — playing multiple state-modifying cards in close succession breaks player state permanently. Reachable in hub, mostly gated by Shift cost in normal play. Will be resolved as part of the CardActionExecutor refactor; do not patch individual cards.
+- **Phase card wall-stuck:** if Phase ends while player is inside a wall, player gets stuck. Plan: prevent Phase expiration inside collider.
+- **Fall damage zeroing into floor:** at high fall speeds player clips into ground. Plan: **remove fall damage entirely.**
 - **Spike knockback always sends right-up:** ignores incoming angle. Plan: velocity reflection.
-- **Duplicate ExitDoor possible in some room prefabs:** defensive guards in place; scene-side duplicate may need cleanup.
-- **AnimationEventReceiver may re-enable on prefab reimport.** Disabled twice already.
-- **Gravity reversal warning flash is invisible** — relies on SkinnedMeshRenderer + `_Color` that don't apply to current rig. Audio still fires. Rewrite via `_Alpha` MaterialPropertyBlock when touching GravityController.
-- **Stun visual tinting uses `.material.color` writes** — wasteful, clones materials. Rewrite to MaterialPropertyBlock when next touched.
+- **Comet Dive identity loss:** does the same thing as head-bounce relic. Plan: redesign.
+- **Head bounce + gravity reversal:** velocity sign check doesn't account for reversed gravity. Low priority.
+- **Duplicate ExitDoor possible in some room prefabs:** defensive guards now in place but the scene-side duplicate (if any) hasn't been cleaned up.
+- **AnimationEventReceiver may re-enable on prefab reimport.** Has been disabled twice. If OnFootstep NullRefs reappear in the console, check that the component on the visualModel's Animator child is unchecked.
+- **Gravity reversal warning flash is invisible** — relies on SkinnedMeshRenderer that no longer exists on the new sprite-based rig. Audio cue still fires. Fix: add a SpriteRenderer flash path.
 
-### Resolved this session
+### CardTemplate prefab rebuild (BLOCKED on art)
+
+The `CardTemplate` prefab has fundamental scale corruption: root scale is non-uniform (0.119, 0.568, 0.92) and ShiftCostContainer compensates with inverse scale (7.40, 1.55, 0.96). On-screen layout works only because the scales partially cancel; any position/spacing change looks broken because the cancellation is non-uniform.
+
+**Measurements taken from a 1024×1536 sample card art** (deckshift_card_03):
+- Shift slot painted centers: PNG pixels (411, 138), (511, 138), (610, 138) — 99px horizontal spacing.
+- Charge slot painted center: PNG pixels (245, 150) — slightly lower and left.
+- Honest Point Spacing in a 120×180 card rect: ~11.72 units (current Inspector value is 20, also wrong).
+
+**Plan:** rebuild from scratch with all scales at (1, 1, 1), Width 120 / Height 180, all positioning via RectTransform Width/Height/Position only. **Blocked: user is hiring an artist for new card art. Not all current cards are the same exact size. Rebuilding now means rebuilding again once consistent art is back.** Hold until then.
+
+### Resolved this session (Enemy Healthbars)
 
 (Kept for short-term reference; can be deleted once stale.)
-- ✅ Phase wall-stuck bug (auto-extends + safety eject)
-- ✅ Fall damage removal
-- ✅ Comet Dive redesign (area damage, momentum preserved)
-- ✅ Head-bounce gravity reversal blindness (all 3 checks fixed)
-- ✅ Jump card / Stagger gravity reversal blindness
-- ✅ Vampiric Bite layer mismatch
-- ✅ Comet Dive trail leak on miss
-- ✅ Portal HUD cost display mismatch
-- ✅ Glass Wail stun (full system rewrite: IsStunned property + dual renderer arrays)
-- ✅ Turret + ShieldEnemy stun guards
-- ✅ Phase visibility feedback (alpha pulse via MaterialPropertyBlock + `_Alpha`)
-- ✅ CardActionExecutor scaffolding (16 → 12 actions, polymorphic dispatch)
-- ✅ Four-card deletion + Dash impulse rewrite + enum integer pinning
+- ✅ EnemyHealthBar.prefab created at `Assets/Prefabs/UI/EnemyHealthBar.prefab` (root + script only — Canvas built procedurally in Awake).
+- ✅ Wired and assigned via Inspector to all six enemy prefabs (AeroBat, MeleeEnemy, RangedEnemy, ShieldEnemy, Turret, PatrolEnemy). Per-enemy `headBarOffset` tuned by user.
+- ✅ Fixed silent fill-amount bug — `EnemyHealthBar` now uses a procedurally-built 1×1 white sprite (cached static helper) so Image.fillAmount works. The earlier attempt using `Resources.GetBuiltinResource<Sprite>("UI/Skin/UISprite.psd")` failed at runtime with "Failed to find" errors and has been replaced.
+- ✅ Added SkinnedMeshRenderer fallback to sorting layer detection in `Initialize` (Cainos rigs have no SpriteRenderer to inherit sortingLayer from).
+- ✅ Bumped `BAR_HEIGHT_PX` from 16 to 24 for better readability.
+- ✅ Removed two diagnostic `Debug.Log` calls used during the fill-amount bug hunt.
 
 ### Content (TODO)
 
-- Scale to 60+ cards (currently 12).
+- Scale to 60+ cards (currently ~10).
 - Glass archetype: cards exist in theory, not implemented.
 - Expand Vampiric archetype.
 - Three-act structure: Act 1 prototype exists; Acts 2-3 not started.
-- Boss encounters per act.
-- Chunk-based level system.
-- Starting relic system + Fireball relic for wizard identity. Deferred when broader relic redesign was prioritized.
+- Boss encounters per act (3 bosses per act, randomly selected from pool).
+- Chunk-based level system (currently hand-crafted levels).
+- **Starting relic system** + **Fireball relic** for the wizard identity (auto-fires fireball every 10s). Deferred when the broader relic redesign was prioritized — may be revisited as a small early demo polish.
 
 ### Replace SlotMachine with "Dice Broker"
 
-Character-driven gambling NPC. Same gameplay outcome (random relic). Implementation: roll first, then play animation ending on correct face. Sprite-sheet 6-12 tumble frames.
+A character-driven gambling NPC replacing the current slot machine. Same gameplay outcome (random relic from a dice roll) but rethemed:
+- A grimy character (sprite needed) who shakes a dice cup
+- Reuses RewardManager's relic-grant flow
+- Implementation note: **roll the result in code first, then play an animation that ends on the correct face**. Don't depend on physics simulation.
+- Dice animation: sprite-sheet of 6-12 tumble frames ending on each face (cheaper and more readable than physics dice).
+- Voice/banter potential — give the broker personality.
 
 ### Documentation Tasks
 
-- Eventually: proper GDD. Worth doing once relic system, act structure, and card list are locked.
+- Eventually: a proper GDD (Game Design Document). Currently the design is fluid enough that a GDD would be obsolete fast. Worth doing once: the relic system is finalized, the act structure is locked, the card list is more complete.
 
 ---
 
@@ -679,11 +697,10 @@ Character-driven gambling NPC. Same gameplay outcome (random relic). Implementat
 - Active scene: `Assets/Scenes/SampleScene.unity`
 - Player prefab: `Assets/Prefabs/Player.prefab`
 - Scripts: `Assets/Scripts/` (75+ files, flat structure)
-- Card actions: `Assets/Scripts/CardActions/Actions/`
 - Level prefabs: `Assets/LevelSinasi/*.prefab` and `Assets/LevelEfeS/*.prefab` (hub)
 - Quest assets: `Assets/Quests/`
 - Relic assets: `Assets/Relics/`
-- Card assets: `Assets/Cards/`
+- Card asset directory: (project-specific, check user's setup)
 - Hub prefab: `Assets/LevelEfeS/hub.prefab`
 - Customizable Pixel Character pack: `Assets/Cainos/Customizable Pixel Character/`
 
@@ -691,10 +708,9 @@ Character-driven gambling NPC. Same gameplay outcome (random relic). Implementat
 
 ## When in Doubt
 
-- Ask the user for clarification before sweeping changes.
-- Verify scene presence and Inspector wiring before assuming code is broken.
+- Ask the user for clarification before making sweeping changes.
+- Verify scene presence of components before assuming code is broken.
 - Read related scripts before refactoring shared systems.
 - For visual/UI work, confirm the canvas hierarchy and parenting before moving GameObjects.
-- For Animator parameter types, read the `.controller` YAML directly.
-- For shader property writes, read the `.shader` file's Properties block — don't assume `_Color` exists.
-- The user wants quality over speed. "Make this one of the greats" — push back gently on quick-fix patterns when a slightly larger correct fix is appropriate.
+- For Animator parameter types, read the `.controller` YAML directly (m_Type integer).
+- The user wants quality over speed. "Make this one of the greats" is the stated goal — push back gently on quick-fix patterns when a slightly larger correct fix is appropriate.
