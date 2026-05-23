@@ -22,6 +22,8 @@ public class EnemyHealth : MonoBehaviour, IDamageable
 
     private float currentHealth;
 
+    public event System.Action OnDamaged;
+
     // Polled by AI scripts — they return early while this is true.
     public bool IsStunned { get; private set; }
 
@@ -91,6 +93,7 @@ public class EnemyHealth : MonoBehaviour, IDamageable
         }
 
         currentHealth -= damage;
+        OnDamaged?.Invoke();
         if (HitStop.instance != null) HitStop.instance.Stop(0.15f);
         Debug.Log($"{gameObject.name} hasar aldı! Kalan Can: {currentHealth}");
 
