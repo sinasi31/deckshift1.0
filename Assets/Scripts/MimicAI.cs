@@ -20,6 +20,11 @@ public class MimicAI : MonoBehaviour
     [SerializeField] private float damageDelay = 0.3f;
     [SerializeField] private float knockbackPower = 5f;
 
+    [Header("Edge Detection")]
+    [SerializeField] private LayerMask groundLayer;
+    [SerializeField] private float edgeCheckOffsetX = 0.5f;
+    [SerializeField] private float edgeCheckDepth = 1f;
+
     private MimicState state = MimicState.Hidden;
     private float lastAttackTime;
 
@@ -130,7 +135,9 @@ public class MimicAI : MonoBehaviour
             }
             else
             {
-                controller.inputMove.x = player.position.x > transform.position.x ? 1f : -1f;
+                float dir = player.position.x > transform.position.x ? 1f : -1f;
+                if (!IsEdgeAhead(dir))
+                    controller.inputMove.x = dir;
             }
         }
     }
@@ -172,6 +179,12 @@ public class MimicAI : MonoBehaviour
                 playerController.ApplyKnockback(knockbackDir * knockbackPower);
             }
         }
+    }
+
+    private bool IsEdgeAhead(float dirX)
+    {
+        Vector2 checkPos = (Vector2)transform.position + new Vector2(dirX * edgeCheckOffsetX, -0.1f);
+        return Physics2D.Raycast(checkPos, Vector2.down, edgeCheckDepth, groundLayer).collider == null;
     }
 
     private void OnDrawGizmosSelected()
