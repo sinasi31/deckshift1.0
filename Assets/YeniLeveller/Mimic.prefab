@@ -233,11 +233,11 @@ GameObject:
   - component: {fileID: 7305450490666195495}
   - component: {fileID: 6494963442867382333}
   - component: {fileID: 2139218215722888081}
-  - component: {fileID: 6498399520749333335}
   - component: {fileID: 4595278796731476082}
   - component: {fileID: 3318117684256201585}
   - component: {fileID: 4031357309696474985}
   - component: {fileID: 8895334991605959623}
+  - component: {fileID: 3949997331226332973}
   m_Layer: 0
   m_Name: Mimic
   m_TagString: Untagged
@@ -317,25 +317,6 @@ MonoBehaviour:
   inputMoveModifier: 0
   inputJump: 0
   inputAttack: 0
---- !u!114 &6498399520749333335
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3963212800144201329}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0ea27e719cb9953468a7396155220ea7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  upKey: 119
-  downKey: 115
-  leftKey: 97
-  rightKey: 100
-  jumpKey: 32
-  moveModifierKey: 304
-  attackKey: 323
 --- !u!50 &4595278796731476082
 Rigidbody2D:
   serializedVersion: 5
@@ -370,7 +351,7 @@ BoxCollider2D:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3963212800144201329}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 3
   m_Density: 1
   m_Material: {fileID: 6200000, guid: 07dabb9f2913bd946952990cde61d21d, type: 2}
@@ -429,6 +410,11 @@ MonoBehaviour:
   attackDamage: 15
   damageDelay: 0.3
   knockbackPower: 5
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 8
+  edgeCheckOffsetX: 0.5
+  edgeCheckDepth: 1
 --- !u!114 &8895334991605959623
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -448,7 +434,44 @@ MonoBehaviour:
   stunSpriteRenderers: []
   stunSkinnedRenderers:
   - {fileID: 7418360019075749340}
-  damagePopupPrefab: {fileID: 0}
+  damagePopupPrefab: {fileID: 2036397937272019125, guid: c4cd6b8e18cb9d141b1b0f9fa894bc1f, type: 3}
+--- !u!70 &3949997331226332973
+CapsuleCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3963212800144201329}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 0
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: -0.004508257, y: 0.50342846}
+  m_Size: {x: 0.8937259, y: 0.9909835}
+  m_Direction: 0
 --- !u!1 &4107794032168774166
 GameObject:
   m_ObjectHideFlags: 0

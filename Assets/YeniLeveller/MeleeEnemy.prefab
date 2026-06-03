@@ -48,6 +48,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2377005024943048759, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 5164379758955276693, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
       propertyPath: m_Enabled
       value: 0
@@ -66,6 +70,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 6418267430543814824, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7970200218222573164}
+    - targetCorrespondingSourceObject: {fileID: 6418267430543814824, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3441777526412479726}
   m_SourcePrefab: {fileID: 100100000, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
 --- !u!137 &4620261557865731894 stripped
 SkinnedMeshRenderer:
@@ -95,6 +102,11 @@ MonoBehaviour:
   damage: 15
   damageDelay: 0.5
   knockbackPower: 5
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 8
+  edgeCheckOffsetX: 0.5
+  edgeCheckDepth: 1
 --- !u!114 &7970200218222573164
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -116,3 +128,40 @@ MonoBehaviour:
   stunSkinnedRenderers:
   - {fileID: 4620261557865731894}
   damagePopupPrefab: {fileID: 2036397937272019125, guid: c4cd6b8e18cb9d141b1b0f9fa894bc1f, type: 3}
+--- !u!70 &3441777526412479726
+CapsuleCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4838929585779216848}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 0
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0.1307869, y: 1.0390711}
+  m_Size: {x: 0.63912964, y: 2.1208992}
+  m_Direction: 0
