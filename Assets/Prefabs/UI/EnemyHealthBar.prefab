@@ -46,6 +46,6 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d910210ff562333478ea698b2929dca8, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  healthFont: {fileID: 0}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  healthFont: {fileID: 11400000, guid: 3ac13a9add857c243977de8d60555863, type: 2}

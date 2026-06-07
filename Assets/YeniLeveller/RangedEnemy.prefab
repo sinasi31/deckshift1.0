@@ -176,6 +176,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 9033723767455251144, guid: 3e6bb0f0ee2942a41bf22c35f24c0c21, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -186,6 +190,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 337962001318085207, guid: 3e6bb0f0ee2942a41bf22c35f24c0c21, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1626646847183605829}
+    - targetCorrespondingSourceObject: {fileID: 337962001318085207, guid: 3e6bb0f0ee2942a41bf22c35f24c0c21, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8852787592231567395}
   m_SourcePrefab: {fileID: 100100000, guid: 3e6bb0f0ee2942a41bf22c35f24c0c21, type: 3}
 --- !u!1 &6722330528948978302 stripped
 GameObject:
@@ -228,6 +235,43 @@ MonoBehaviour:
   stunSkinnedRenderers:
   - {fileID: 6805959683191456920}
   damagePopupPrefab: {fileID: 2036397937272019125, guid: c4cd6b8e18cb9d141b1b0f9fa894bc1f, type: 3}
+--- !u!70 &8852787592231567395
+CapsuleCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6722330528948978302}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 0
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0.10217476, y: 1.0849428}
+  m_Size: {x: 0.7043495, y: 2.1791115}
+  m_Direction: 0
 --- !u!137 &6805959683191456920 stripped
 SkinnedMeshRenderer:
   m_CorrespondingSourceObject: {fileID: 543120381953721521, guid: 3e6bb0f0ee2942a41bf22c35f24c0c21, type: 3}
