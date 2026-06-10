@@ -1,9 +1,17 @@
 fileFormatVersion: 2
 guid: 5da750f36e60e0949ba7085b5e1788ce
+AssetOrigin:
+  serializedVersion: 1
+  productId: 237109
+  packageName: Pixel Art Platformer - Dungeon
+  packageVersion: 1.1.6
+  assetPath: Assets/Cainos/Pixel Art Platformer - Dungeon/Texture/TX Tileset - Dungeon
+    Ground Extra.png
+  uploadId: 849070
 TextureImporter:
   internalIDToNameTable: []
   externalObjects: {}
-  serializedVersion: 12
+  serializedVersion: 13
   mipmaps:
     mipMapMode: 0
     enableMipMap: 0
@@ -20,11 +28,12 @@ TextureImporter:
     externalNormalMap: 0
     heightScale: 0.25
     normalMapFilter: 0
+    flipGreenChannel: 0
   isReadable: 0
   streamingMipmaps: 0
   streamingMipmapsPriority: 0
   vTOnly: 0
-  ignoreMasterTextureLimit: 0
+  ignoreMipmapLimit: 0
   grayScaleToAlpha: 0
   generateCubemap: 6
   cubemapConvolution: 0
@@ -63,9 +72,10 @@ TextureImporter:
   textureFormatSet: 0
   ignorePngGamma: 0
   applyGammaDecoding: 0
+  swizzle: 50462976
   cookieLightType: 1
   platformSettings:
-  - serializedVersion: 3
+  - serializedVersion: 4
     buildTarget: DefaultTexturePlatform
     maxTextureSize: 2048
     resizeAlgorithm: 0
@@ -75,9 +85,10 @@ TextureImporter:
     crunchedCompression: 0
     allowsAlphaSplitting: 0
     overridden: 0
+    ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
-  - serializedVersion: 3
+  - serializedVersion: 4
     buildTarget: Standalone
     maxTextureSize: 2048
     resizeAlgorithm: 0
@@ -87,9 +98,10 @@ TextureImporter:
     crunchedCompression: 0
     allowsAlphaSplitting: 0
     overridden: 0
+    ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
-  - serializedVersion: 3
+  - serializedVersion: 4
     buildTarget: Server
     maxTextureSize: 2048
     resizeAlgorithm: 0
@@ -99,9 +111,10 @@ TextureImporter:
     crunchedCompression: 0
     allowsAlphaSplitting: 0
     overridden: 0
+    ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
-  - serializedVersion: 3
+  - serializedVersion: 4
     buildTarget: Android
     maxTextureSize: 2048
     resizeAlgorithm: 0
@@ -111,9 +124,10 @@ TextureImporter:
     crunchedCompression: 0
     allowsAlphaSplitting: 0
     overridden: 0
+    ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
-  - serializedVersion: 3
+  - serializedVersion: 4
     buildTarget: WebGL
     maxTextureSize: 2048
     resizeAlgorithm: 0
@@ -123,6 +137,7 @@ TextureImporter:
     crunchedCompression: 0
     allowsAlphaSplitting: 0
     overridden: 0
+    ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
@@ -139,6 +154,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -160,6 +176,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -181,6 +198,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -202,6 +220,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -223,6 +242,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -244,6 +264,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -265,6 +286,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -286,6 +308,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -307,6 +330,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -328,6 +352,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -349,6 +374,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -16, y: 16}
@@ -375,6 +401,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -396,6 +423,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -16, y: 16}
@@ -422,6 +450,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -443,6 +472,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -464,6 +494,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -485,6 +516,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -506,6 +538,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -16, y: 16}
@@ -532,6 +565,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -553,6 +587,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -574,6 +609,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -13, y: -15}
@@ -600,6 +636,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -621,6 +658,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -642,6 +680,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -14, y: -16}
@@ -668,6 +707,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -689,6 +729,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -710,6 +751,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -731,6 +773,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -752,6 +795,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -773,6 +817,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -794,6 +839,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -815,6 +861,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -836,6 +883,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -857,6 +905,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -878,6 +927,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -899,6 +949,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -920,6 +971,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -941,6 +993,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -962,6 +1015,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -983,6 +1037,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1004,6 +1059,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1025,6 +1081,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1046,6 +1103,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -16, y: 16}
@@ -1072,6 +1130,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1093,6 +1152,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -16, y: 16}
@@ -1119,6 +1179,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1140,6 +1201,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1161,6 +1223,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1182,6 +1245,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1203,6 +1267,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1224,6 +1289,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1245,6 +1311,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1266,6 +1333,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1287,6 +1355,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1308,6 +1377,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1329,6 +1399,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1350,6 +1421,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1371,6 +1443,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1392,6 +1465,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1413,6 +1487,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1434,6 +1509,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1455,6 +1531,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1476,6 +1553,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1497,6 +1575,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1518,6 +1597,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -16, y: 16}
@@ -1544,6 +1624,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1565,6 +1646,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1586,6 +1668,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -15, y: 16}
@@ -1616,6 +1699,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1637,6 +1721,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1658,6 +1743,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -9, y: 16}
@@ -1685,6 +1771,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1706,6 +1793,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1727,6 +1815,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1748,6 +1837,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -13, y: -15}
@@ -1774,6 +1864,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1795,6 +1886,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -15, y: 16}
@@ -1825,6 +1917,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1846,6 +1939,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1867,6 +1961,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1888,6 +1983,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1909,6 +2005,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1930,6 +2027,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1951,6 +2049,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1972,6 +2071,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -1993,6 +2093,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2014,6 +2115,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2035,6 +2137,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2056,6 +2159,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2077,6 +2181,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2098,6 +2203,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2119,6 +2225,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2140,6 +2247,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2161,6 +2269,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2182,6 +2291,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2203,6 +2313,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2224,6 +2335,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2245,6 +2357,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2266,6 +2379,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2287,6 +2401,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2308,6 +2423,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2329,6 +2445,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2350,6 +2467,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2371,6 +2489,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2392,6 +2511,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2413,6 +2533,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2434,6 +2555,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -16, y: 16}
@@ -2460,6 +2582,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2481,6 +2604,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -15, y: 16}
@@ -2509,6 +2633,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2530,6 +2655,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2551,6 +2677,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2572,6 +2699,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -15, y: 16}
@@ -2600,6 +2728,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2621,6 +2750,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: 8, y: 16}
@@ -2650,6 +2780,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2671,6 +2802,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -14, y: 16}
@@ -2697,6 +2829,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2718,6 +2851,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -16, y: 16}
@@ -2747,6 +2881,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2768,6 +2903,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2789,6 +2925,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2810,6 +2947,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2831,6 +2969,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2852,6 +2991,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2873,6 +3013,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2894,6 +3035,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2915,6 +3057,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2936,6 +3079,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2957,6 +3101,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2978,6 +3123,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -2999,6 +3145,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3020,6 +3167,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3041,6 +3189,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3062,6 +3211,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3083,6 +3233,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3104,6 +3255,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3125,6 +3277,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3146,6 +3299,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3167,6 +3321,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3188,6 +3343,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3209,6 +3365,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3230,6 +3387,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3251,6 +3409,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3272,6 +3431,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3293,6 +3453,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -16, y: 8}
@@ -3322,6 +3483,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -16, y: -16}
@@ -3347,6 +3509,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3368,6 +3531,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: 14, y: -10}
@@ -3393,6 +3557,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: 4, y: 0}
@@ -3422,6 +3587,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3443,6 +3609,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3464,6 +3631,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3485,6 +3653,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3506,6 +3675,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -16, y: 16}
@@ -3537,6 +3707,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3558,6 +3729,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -4, y: 16}
@@ -3588,6 +3760,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3609,6 +3782,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3630,6 +3804,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3651,6 +3826,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3672,6 +3848,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3693,6 +3870,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3714,6 +3892,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3735,6 +3914,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3756,6 +3936,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3777,6 +3958,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3798,6 +3980,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3819,6 +4002,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3840,6 +4024,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3861,6 +4046,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -16, y: 16}
@@ -3889,6 +4075,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3910,6 +4097,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: 1, y: 16}
@@ -3938,6 +4126,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3959,6 +4148,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -3980,6 +4170,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4001,6 +4192,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4022,6 +4214,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4043,6 +4236,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4064,6 +4258,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4085,6 +4280,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4106,6 +4302,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4127,6 +4324,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4148,6 +4346,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4169,6 +4368,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4190,6 +4390,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4211,6 +4412,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -16, y: 16}
@@ -4239,6 +4441,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4260,6 +4463,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: 1, y: 16}
@@ -4288,6 +4492,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4309,6 +4514,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4330,6 +4536,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4351,6 +4558,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4372,6 +4580,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: -16, y: 8}
@@ -4401,6 +4610,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: 14, y: -16}
@@ -4430,6 +4640,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape:
       - - {x: 4, y: 0}
@@ -4459,6 +4670,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4480,6 +4692,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4501,6 +4714,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4522,6 +4736,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4543,6 +4758,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4564,6 +4780,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4585,6 +4802,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4606,6 +4824,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4627,6 +4846,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4648,6 +4868,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4669,6 +4890,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4690,6 +4912,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4711,6 +4934,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4732,6 +4956,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4753,6 +4978,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4774,6 +5000,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4795,6 +5022,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4816,6 +5044,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4837,6 +5066,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4858,6 +5088,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4879,6 +5110,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4900,6 +5132,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4921,6 +5154,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4942,6 +5176,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4963,6 +5198,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -4984,6 +5220,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5005,6 +5242,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5026,6 +5264,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5047,6 +5286,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5068,6 +5308,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5089,6 +5330,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5110,6 +5352,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5131,6 +5374,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5152,6 +5396,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5173,6 +5418,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5194,6 +5440,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5215,6 +5462,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5236,6 +5484,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5257,6 +5506,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5278,6 +5528,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5299,6 +5550,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5320,6 +5572,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5341,6 +5594,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5362,6 +5616,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5383,6 +5638,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5404,6 +5660,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5425,6 +5682,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5446,6 +5704,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5467,6 +5726,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5488,6 +5748,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5509,6 +5770,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5530,6 +5792,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5551,6 +5814,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5572,6 +5836,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5593,6 +5858,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5614,6 +5880,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5635,6 +5902,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5656,6 +5924,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5677,6 +5946,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5698,6 +5968,7 @@ TextureImporter:
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
@@ -5709,6 +5980,7 @@ TextureImporter:
       edges: []
       weights: []
     outline: []
+    customData: 
     physicsShape: []
     bones: []
     spriteID: 5e97eb03825dee720800000000000000
@@ -5718,274 +5990,267 @@ TextureImporter:
     edges: []
     weights: []
     secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
     nameFileIdTable:
-      TX Tileset - Dungeon Ground Extra_250: -1888895816
-      TX Tileset - Dungeon Ground Extra_68: 973251982
-      TX Tileset - Dungeon Ground Extra_219: -941552959
-      TX Tileset - Dungeon Ground Extra_14: 1014604881
-      TX Tileset - Dungeon Ground Extra_239: 1648191231
-      TX Tileset - Dungeon Ground Extra_115: -131379972
-      TX Tileset - Dungeon Ground Extra_113: -480415316
-      TX Tileset - Dungeon Ground Extra_247: 1782000233
-      TX Tileset - Dungeon Ground Extra_193: -1246598472
-      TX Tileset - Dungeon Ground Extra_77: -490035172
-      TX Tileset - Dungeon Ground Extra_223: -693384992
-      TX Tileset - Dungeon Ground Extra_96: 873520594
-      TX Tileset - Dungeon Ground Extra_140: -605800995
-      TX Tileset - Dungeon Ground Extra_72: 1566430304
-      TX Tileset - Dungeon Ground Extra_110: 997171624
-      TX Tileset - Dungeon Ground Extra_128: -373117438
-      TX Tileset - Dungeon Ground Extra_218: -516555394
-      TX Tileset - Dungeon Ground Extra_125: 1612146895
-      TX Tileset - Dungeon Ground Extra_155: -654673629
-      TX Tileset - Dungeon Ground Extra_228: 494643432
-      TX Tileset - Dungeon Ground Extra_36: -1087220403
       TX Tileset - Dungeon Ground Extra_0: -2082347729
-      TX Tileset - Dungeon Ground Extra_58: -904971554
-      TX Tileset - Dungeon Ground Extra_152: -1578166609
-      TX Tileset - Dungeon Ground Extra_9: -379100792
-      TX Tileset - Dungeon Ground Extra_175: 89276483
-      TX Tileset - Dungeon Ground Extra_226: -536867670
-      TX Tileset - Dungeon Ground Extra_248: 913025920
-      TX Tileset - Dungeon Ground Extra_21: 1824458280
-      TX Tileset - Dungeon Ground Extra_63: 2084907029
-      TX Tileset - Dungeon Ground Extra_242: 146930702
-      TX Tileset - Dungeon Ground Extra_169: -675938021
-      TX Tileset - Dungeon Ground Extra_69: -52839591
-      TX Tileset - Dungeon Ground Extra_232: -1108332565
-      TX Tileset - Dungeon Ground Extra_70: -1157997347
-      TX Tileset - Dungeon Ground Extra_197: -1512898699
-      TX Tileset - Dungeon Ground Extra_202: -2096646265
-      TX Tileset - Dungeon Ground Extra_107: 338431607
-      TX Tileset - Dungeon Ground Extra_243: 311233259
-      TX Tileset - Dungeon Ground Extra_123: 1980111576
-      TX Tileset - Dungeon Ground Extra_90: -879741706
-      TX Tileset - Dungeon Ground Extra_22: -1079868522
-      TX Tileset - Dungeon Ground Extra_13: -1401003291
-      TX Tileset - Dungeon Ground Extra_131: 69065072
-      TX Tileset - Dungeon Ground Extra_148: -929947361
-      TX Tileset - Dungeon Ground Extra_203: -830954234
-      TX Tileset - Dungeon Ground Extra_254: 1727932538
-      TX Tileset - Dungeon Ground Extra_136: 503256401
-      TX Tileset - Dungeon Ground Extra_236: 1194973097
-      TX Tileset - Dungeon Ground Extra_233: -2113701912
-      TX Tileset - Dungeon Ground Extra_238: -1404322948
-      TX Tileset - Dungeon Ground Extra_101: 1629935191
-      TX Tileset - Dungeon Ground Extra_225: -370206064
-      TX Tileset - Dungeon Ground Extra_253: 587183930
-      TX Tileset - Dungeon Ground Extra_222: 2053814183
-      TX Tileset - Dungeon Ground Extra_215: 1117944758
-      TX Tileset - Dungeon Ground Extra_73: 764265028
-      TX Tileset - Dungeon Ground Extra_255: 260157622
-      TX Tileset - Dungeon Ground Extra_221: 1060874308
-      TX Tileset - Dungeon Ground Extra_62: -1752409780
-      TX Tileset - Dungeon Ground Extra_224: 605799587
-      TX Tileset - Dungeon Ground Extra_249: 445642665
-      TX Tileset - Dungeon Ground Extra_95: 1857859586
-      TX Tileset - Dungeon Ground Extra_194: -379940982
-      TX Tileset - Dungeon Ground Extra_92: 1372675032
-      TX Tileset - Dungeon Ground Extra_151: 380766834
-      TX Tileset - Dungeon Ground Extra_78: -1746756179
-      TX Tileset - Dungeon Ground Extra_51: -2098586274
-      TX Tileset - Dungeon Ground Extra_34: -871401815
-      TX Tileset - Dungeon Ground Extra_168: 374238424
-      TX Tileset - Dungeon Ground Extra_23: -895090159
-      TX Tileset - Dungeon Ground Extra_81: 353225422
-      TX Tileset - Dungeon Ground Extra_178: 1668212545
-      TX Tileset - Dungeon Ground Extra_109: -1598361
-      TX Tileset - Dungeon Ground Extra_43: 1665088854
-      TX Tileset - Dungeon Ground Extra_66: 1841726211
-      TX Tileset - Dungeon Ground Extra_156: -1090249382
-      TX Tileset - Dungeon Ground Extra_111: 1636419594
-      TX Tileset - Dungeon Ground Extra_216: 1592516862
-      TX Tileset - Dungeon Ground Extra_133: -2034612119
-      TX Tileset - Dungeon Ground Extra_138: 1919575019
-      TX Tileset - Dungeon Ground Extra_50: 1531598624
-      TX Tileset - Dungeon Ground Extra_188: -445734585
-      TX Tileset - Dungeon Ground Extra_83: -1173094512
-      TX Tileset - Dungeon Ground Extra_246: 1908330760
-      TX Tileset - Dungeon Ground Extra_201: -1814929984
-      TX Tileset - Dungeon Ground Extra_132: 1284704061
-      TX Tileset - Dungeon Ground Extra_60: 967071149
-      TX Tileset - Dungeon Ground Extra_49: 435047628
-      TX Tileset - Dungeon Ground Extra_207: -389726952
-      TX Tileset - Dungeon Ground Extra_204: 201373558
-      TX Tileset - Dungeon Ground Extra_183: -1409044328
-      TX Tileset - Dungeon Ground Extra_27: -675444251
-      TX Tileset - Dungeon Ground Extra_7: -1078822245
-      TX Tileset - Dungeon Ground Extra_42: -1792574068
-      TX Tileset - Dungeon Ground Extra_191: -1327292367
-      TX Tileset - Dungeon Ground Extra_99: 65715163
-      TX Tileset - Dungeon Ground Extra_172: 1400807848
-      TX Tileset - Dungeon Ground Extra_205: 1642532798
-      TX Tileset - Dungeon Ground Extra_108: -2004568230
-      TX Tileset - Dungeon Ground Extra_206: -1630259704
-      TX Tileset - Dungeon Ground Extra_28: -1747413190
-      TX Tileset - Dungeon Ground Extra_26: 596813260
-      TX Tileset - Dungeon Ground Extra_220: 305964686
-      TX Tileset - Dungeon Ground Extra_57: -1164845387
-      TX Tileset - Dungeon Ground Extra_230: 748138125
-      TX Tileset - Dungeon Ground Extra_71: -2141412091
-      TX Tileset - Dungeon Ground Extra_106: 46099730
-      TX Tileset - Dungeon Ground Extra_192: -1737331578
-      TX Tileset - Dungeon Ground Extra_44: -375352115
-      TX Tileset - Dungeon Ground Extra_127: 1385507651
-      TX Tileset - Dungeon Ground Extra_177: 1870972201
       TX Tileset - Dungeon Ground Extra_1: 1770663931
-      TX Tileset - Dungeon Ground Extra_144: -1635409508
-      TX Tileset - Dungeon Ground Extra_142: 603622233
-      TX Tileset - Dungeon Ground Extra_153: -1619841598
-      TX Tileset - Dungeon Ground Extra_19: -82347812
-      TX Tileset - Dungeon Ground Extra_163: 206489017
-      TX Tileset - Dungeon Ground Extra_30: 372900593
-      TX Tileset - Dungeon Ground Extra_40: -1887612523
-      TX Tileset - Dungeon Ground Extra_61: 1049866906
-      TX Tileset - Dungeon Ground Extra_160: 1333605735
-      TX Tileset - Dungeon Ground Extra_240: -1669673734
-      TX Tileset - Dungeon Ground Extra_12: 849361051
-      TX Tileset - Dungeon Ground Extra_88: 939699111
-      TX Tileset - Dungeon Ground Extra_149: -1062937034
-      TX Tileset - Dungeon Ground Extra_11: 1438126348
-      TX Tileset - Dungeon Ground Extra_211: -1580397441
-      TX Tileset - Dungeon Ground Extra_196: 1071243859
-      TX Tileset - Dungeon Ground Extra_117: -1279838605
-      TX Tileset - Dungeon Ground Extra_124: 311665024
-      TX Tileset - Dungeon Ground Extra_195: -1741952620
-      TX Tileset - Dungeon Ground Extra_213: -1256737498
-      TX Tileset - Dungeon Ground Extra_82: -2011245000
-      TX Tileset - Dungeon Ground Extra_129: 359429572
-      TX Tileset - Dungeon Ground Extra_84: 116367926
-      TX Tileset - Dungeon Ground Extra_56: 858682175
-      TX Tileset - Dungeon Ground Extra_171: -1833309988
-      TX Tileset - Dungeon Ground Extra_134: 896148277
-      TX Tileset - Dungeon Ground Extra_165: -2119997466
-      TX Tileset - Dungeon Ground Extra_64: -1399490332
-      TX Tileset - Dungeon Ground Extra_15: -1179173706
-      TX Tileset - Dungeon Ground Extra_105: -1910235268
-      TX Tileset - Dungeon Ground Extra_112: 1391831997
-      TX Tileset - Dungeon Ground Extra_18: 1384345084
-      TX Tileset - Dungeon Ground Extra_85: 527390372
-      TX Tileset - Dungeon Ground Extra_116: 1304548039
-      TX Tileset - Dungeon Ground Extra_29: -147347063
-      TX Tileset - Dungeon Ground Extra_79: -1764612580
-      TX Tileset - Dungeon Ground Extra_103: 839653424
-      TX Tileset - Dungeon Ground Extra_198: -1040571274
-      TX Tileset - Dungeon Ground Extra_3: 217023654
-      TX Tileset - Dungeon Ground Extra_35: 1134680097
-      TX Tileset - Dungeon Ground Extra_167: 1840414155
-      TX Tileset - Dungeon Ground Extra_180: -448165189
-      TX Tileset - Dungeon Ground Extra_141: 5308835
-      TX Tileset - Dungeon Ground Extra_16: 210023222
-      TX Tileset - Dungeon Ground Extra_55: -854929303
-      TX Tileset - Dungeon Ground Extra_94: 272618249
-      TX Tileset - Dungeon Ground Extra_164: -697895834
-      TX Tileset - Dungeon Ground Extra_119: 793642503
       TX Tileset - Dungeon Ground Extra_10: -180098127
-      TX Tileset - Dungeon Ground Extra_146: -1184667394
-      TX Tileset - Dungeon Ground Extra_237: -274733152
-      TX Tileset - Dungeon Ground Extra_118: -1427005916
-      TX Tileset - Dungeon Ground Extra_212: 1492201792
-      TX Tileset - Dungeon Ground Extra_87: -1976429280
-      TX Tileset - Dungeon Ground Extra_190: 2108974642
-      TX Tileset - Dungeon Ground Extra_252: -1250516141
-      TX Tileset - Dungeon Ground Extra_48: 1570308081
-      TX Tileset - Dungeon Ground Extra_24: 656914209
-      TX Tileset - Dungeon Ground Extra_147: 1252331366
-      TX Tileset - Dungeon Ground Extra_166: -1543544309
-      TX Tileset - Dungeon Ground Extra_150: -1905310818
-      TX Tileset - Dungeon Ground Extra_53: 1835966368
-      TX Tileset - Dungeon Ground Extra_126: 52421342
-      TX Tileset - Dungeon Ground Extra_137: 1816870919
-      TX Tileset - Dungeon Ground Extra_182: -609588019
-      TX Tileset - Dungeon Ground Extra_39: -1740263253
-      TX Tileset - Dungeon Ground Extra_185: -1611421874
-      TX Tileset - Dungeon Ground Extra_122: -22807502
-      TX Tileset - Dungeon Ground Extra_229: 2102586652
-      TX Tileset - Dungeon Ground Extra_97: 1116059886
-      TX Tileset - Dungeon Ground Extra_135: 1951880461
-      TX Tileset - Dungeon Ground Extra_184: -1875539044
-      TX Tileset - Dungeon Ground Extra_244: 1885997539
-      TX Tileset - Dungeon Ground Extra_174: -1359703533
-      TX Tileset - Dungeon Ground Extra_20: 1726452119
-      TX Tileset - Dungeon Ground Extra_162: 533084012
-      TX Tileset - Dungeon Ground Extra_86: -881500821
-      TX Tileset - Dungeon Ground Extra_121: 260450700
-      TX Tileset - Dungeon Ground Extra_209: 2121538854
-      TX Tileset - Dungeon Ground Extra_199: -926199083
-      TX Tileset - Dungeon Ground Extra_143: -2082475193
-      TX Tileset - Dungeon Ground Extra_5: 323505984
-      TX Tileset - Dungeon Ground Extra_91: -1627443325
-      TX Tileset - Dungeon Ground Extra_173: 716885797
-      TX Tileset - Dungeon Ground Extra_186: -702168923
-      TX Tileset - Dungeon Ground Extra_234: -309688182
-      TX Tileset - Dungeon Ground Extra_158: -2123803820
-      TX Tileset - Dungeon Ground Extra_176: -198984284
-      TX Tileset - Dungeon Ground Extra_214: 1926411134
-      TX Tileset - Dungeon Ground Extra_37: 1987236825
-      TX Tileset - Dungeon Ground Extra_159: -1273112236
-      TX Tileset - Dungeon Ground Extra_25: 323762366
-      TX Tileset - Dungeon Ground Extra_157: -1617875158
-      TX Tileset - Dungeon Ground Extra_41: 1365373394
-      TX Tileset - Dungeon Ground Extra_89: -338227424
-      TX Tileset - Dungeon Ground Extra_245: -715280770
-      TX Tileset - Dungeon Ground Extra_187: 2110087331
-      TX Tileset - Dungeon Ground Extra_80: 1930034823
-      TX Tileset - Dungeon Ground Extra_54: -1293283038
-      TX Tileset - Dungeon Ground Extra_32: -2084181243
-      TX Tileset - Dungeon Ground Extra_130: -2079211424
-      TX Tileset - Dungeon Ground Extra_33: -1950641268
-      TX Tileset - Dungeon Ground Extra_59: -1334672180
-      TX Tileset - Dungeon Ground Extra_45: -2110561419
-      TX Tileset - Dungeon Ground Extra_75: -2058824542
-      TX Tileset - Dungeon Ground Extra_98: -1571281482
-      TX Tileset - Dungeon Ground Extra_227: 2063959835
-      TX Tileset - Dungeon Ground Extra_65: -1357117353
-      TX Tileset - Dungeon Ground Extra_154: -770803028
-      TX Tileset - Dungeon Ground Extra_251: -205265654
-      TX Tileset - Dungeon Ground Extra_8: -1972177467
-      TX Tileset - Dungeon Ground Extra_46: -1762235955
-      TX Tileset - Dungeon Ground Extra_231: 18924151
-      TX Tileset - Dungeon Ground Extra_179: 1958060076
-      TX Tileset - Dungeon Ground Extra_120: -1971109780
-      TX Tileset - Dungeon Ground Extra_31: -98658752
       TX Tileset - Dungeon Ground Extra_100: 1540497202
-      TX Tileset - Dungeon Ground Extra_189: 864602076
-      TX Tileset - Dungeon Ground Extra_217: 1273650369
-      TX Tileset - Dungeon Ground Extra_17: -125464678
+      TX Tileset - Dungeon Ground Extra_101: 1629935191
       TX Tileset - Dungeon Ground Extra_102: 1519406936
-      TX Tileset - Dungeon Ground Extra_200: 104852471
-      TX Tileset - Dungeon Ground Extra_161: 1585053728
-      TX Tileset - Dungeon Ground Extra_4: 1414447616
-      TX Tileset - Dungeon Ground Extra_241: 571397283
-      TX Tileset - Dungeon Ground Extra_76: 969168495
-      TX Tileset - Dungeon Ground Extra_170: -1194917009
-      TX Tileset - Dungeon Ground Extra_52: -1676318507
-      TX Tileset - Dungeon Ground Extra_67: 2091173724
-      TX Tileset - Dungeon Ground Extra_38: 1550388568
-      TX Tileset - Dungeon Ground Extra_47: 1995429200
-      TX Tileset - Dungeon Ground Extra_145: 717251399
-      TX Tileset - Dungeon Ground Extra_2: -148469598
-      TX Tileset - Dungeon Ground Extra_6: 251577540
-      TX Tileset - Dungeon Ground Extra_181: -1096773881
-      TX Tileset - Dungeon Ground Extra_93: -1011426151
-      TX Tileset - Dungeon Ground Extra_210: -1658243159
-      TX Tileset - Dungeon Ground Extra_114: -1325858149
-      TX Tileset - Dungeon Ground Extra_235: -2140647605
-      TX Tileset - Dungeon Ground Extra_139: -1101109841
-      TX Tileset - Dungeon Ground Extra_208: 1345756150
+      TX Tileset - Dungeon Ground Extra_103: 839653424
       TX Tileset - Dungeon Ground Extra_104: -1841308390
+      TX Tileset - Dungeon Ground Extra_105: -1910235268
+      TX Tileset - Dungeon Ground Extra_106: 46099730
+      TX Tileset - Dungeon Ground Extra_107: 338431607
+      TX Tileset - Dungeon Ground Extra_108: -2004568230
+      TX Tileset - Dungeon Ground Extra_109: -1598361
+      TX Tileset - Dungeon Ground Extra_11: 1438126348
+      TX Tileset - Dungeon Ground Extra_110: 997171624
+      TX Tileset - Dungeon Ground Extra_111: 1636419594
+      TX Tileset - Dungeon Ground Extra_112: 1391831997
+      TX Tileset - Dungeon Ground Extra_113: -480415316
+      TX Tileset - Dungeon Ground Extra_114: -1325858149
+      TX Tileset - Dungeon Ground Extra_115: -131379972
+      TX Tileset - Dungeon Ground Extra_116: 1304548039
+      TX Tileset - Dungeon Ground Extra_117: -1279838605
+      TX Tileset - Dungeon Ground Extra_118: -1427005916
+      TX Tileset - Dungeon Ground Extra_119: 793642503
+      TX Tileset - Dungeon Ground Extra_12: 849361051
+      TX Tileset - Dungeon Ground Extra_120: -1971109780
+      TX Tileset - Dungeon Ground Extra_121: 260450700
+      TX Tileset - Dungeon Ground Extra_122: -22807502
+      TX Tileset - Dungeon Ground Extra_123: 1980111576
+      TX Tileset - Dungeon Ground Extra_124: 311665024
+      TX Tileset - Dungeon Ground Extra_125: 1612146895
+      TX Tileset - Dungeon Ground Extra_126: 52421342
+      TX Tileset - Dungeon Ground Extra_127: 1385507651
+      TX Tileset - Dungeon Ground Extra_128: -373117438
+      TX Tileset - Dungeon Ground Extra_129: 359429572
+      TX Tileset - Dungeon Ground Extra_13: -1401003291
+      TX Tileset - Dungeon Ground Extra_130: -2079211424
+      TX Tileset - Dungeon Ground Extra_131: 69065072
+      TX Tileset - Dungeon Ground Extra_132: 1284704061
+      TX Tileset - Dungeon Ground Extra_133: -2034612119
+      TX Tileset - Dungeon Ground Extra_134: 896148277
+      TX Tileset - Dungeon Ground Extra_135: 1951880461
+      TX Tileset - Dungeon Ground Extra_136: 503256401
+      TX Tileset - Dungeon Ground Extra_137: 1816870919
+      TX Tileset - Dungeon Ground Extra_138: 1919575019
+      TX Tileset - Dungeon Ground Extra_139: -1101109841
+      TX Tileset - Dungeon Ground Extra_14: 1014604881
+      TX Tileset - Dungeon Ground Extra_140: -605800995
+      TX Tileset - Dungeon Ground Extra_141: 5308835
+      TX Tileset - Dungeon Ground Extra_142: 603622233
+      TX Tileset - Dungeon Ground Extra_143: -2082475193
+      TX Tileset - Dungeon Ground Extra_144: -1635409508
+      TX Tileset - Dungeon Ground Extra_145: 717251399
+      TX Tileset - Dungeon Ground Extra_146: -1184667394
+      TX Tileset - Dungeon Ground Extra_147: 1252331366
+      TX Tileset - Dungeon Ground Extra_148: -929947361
+      TX Tileset - Dungeon Ground Extra_149: -1062937034
+      TX Tileset - Dungeon Ground Extra_15: -1179173706
+      TX Tileset - Dungeon Ground Extra_150: -1905310818
+      TX Tileset - Dungeon Ground Extra_151: 380766834
+      TX Tileset - Dungeon Ground Extra_152: -1578166609
+      TX Tileset - Dungeon Ground Extra_153: -1619841598
+      TX Tileset - Dungeon Ground Extra_154: -770803028
+      TX Tileset - Dungeon Ground Extra_155: -654673629
+      TX Tileset - Dungeon Ground Extra_156: -1090249382
+      TX Tileset - Dungeon Ground Extra_157: -1617875158
+      TX Tileset - Dungeon Ground Extra_158: -2123803820
+      TX Tileset - Dungeon Ground Extra_159: -1273112236
+      TX Tileset - Dungeon Ground Extra_16: 210023222
+      TX Tileset - Dungeon Ground Extra_160: 1333605735
+      TX Tileset - Dungeon Ground Extra_161: 1585053728
+      TX Tileset - Dungeon Ground Extra_162: 533084012
+      TX Tileset - Dungeon Ground Extra_163: 206489017
+      TX Tileset - Dungeon Ground Extra_164: -697895834
+      TX Tileset - Dungeon Ground Extra_165: -2119997466
+      TX Tileset - Dungeon Ground Extra_166: -1543544309
+      TX Tileset - Dungeon Ground Extra_167: 1840414155
+      TX Tileset - Dungeon Ground Extra_168: 374238424
+      TX Tileset - Dungeon Ground Extra_169: -675938021
+      TX Tileset - Dungeon Ground Extra_17: -125464678
+      TX Tileset - Dungeon Ground Extra_170: -1194917009
+      TX Tileset - Dungeon Ground Extra_171: -1833309988
+      TX Tileset - Dungeon Ground Extra_172: 1400807848
+      TX Tileset - Dungeon Ground Extra_173: 716885797
+      TX Tileset - Dungeon Ground Extra_174: -1359703533
+      TX Tileset - Dungeon Ground Extra_175: 89276483
+      TX Tileset - Dungeon Ground Extra_176: -198984284
+      TX Tileset - Dungeon Ground Extra_177: 1870972201
+      TX Tileset - Dungeon Ground Extra_178: 1668212545
+      TX Tileset - Dungeon Ground Extra_179: 1958060076
+      TX Tileset - Dungeon Ground Extra_18: 1384345084
+      TX Tileset - Dungeon Ground Extra_180: -448165189
+      TX Tileset - Dungeon Ground Extra_181: -1096773881
+      TX Tileset - Dungeon Ground Extra_182: -609588019
+      TX Tileset - Dungeon Ground Extra_183: -1409044328
+      TX Tileset - Dungeon Ground Extra_184: -1875539044
+      TX Tileset - Dungeon Ground Extra_185: -1611421874
+      TX Tileset - Dungeon Ground Extra_186: -702168923
+      TX Tileset - Dungeon Ground Extra_187: 2110087331
+      TX Tileset - Dungeon Ground Extra_188: -445734585
+      TX Tileset - Dungeon Ground Extra_189: 864602076
+      TX Tileset - Dungeon Ground Extra_19: -82347812
+      TX Tileset - Dungeon Ground Extra_190: 2108974642
+      TX Tileset - Dungeon Ground Extra_191: -1327292367
+      TX Tileset - Dungeon Ground Extra_192: -1737331578
+      TX Tileset - Dungeon Ground Extra_193: -1246598472
+      TX Tileset - Dungeon Ground Extra_194: -379940982
+      TX Tileset - Dungeon Ground Extra_195: -1741952620
+      TX Tileset - Dungeon Ground Extra_196: 1071243859
+      TX Tileset - Dungeon Ground Extra_197: -1512898699
+      TX Tileset - Dungeon Ground Extra_198: -1040571274
+      TX Tileset - Dungeon Ground Extra_199: -926199083
+      TX Tileset - Dungeon Ground Extra_2: -148469598
+      TX Tileset - Dungeon Ground Extra_20: 1726452119
+      TX Tileset - Dungeon Ground Extra_200: 104852471
+      TX Tileset - Dungeon Ground Extra_201: -1814929984
+      TX Tileset - Dungeon Ground Extra_202: -2096646265
+      TX Tileset - Dungeon Ground Extra_203: -830954234
+      TX Tileset - Dungeon Ground Extra_204: 201373558
+      TX Tileset - Dungeon Ground Extra_205: 1642532798
+      TX Tileset - Dungeon Ground Extra_206: -1630259704
+      TX Tileset - Dungeon Ground Extra_207: -389726952
+      TX Tileset - Dungeon Ground Extra_208: 1345756150
+      TX Tileset - Dungeon Ground Extra_209: 2121538854
+      TX Tileset - Dungeon Ground Extra_21: 1824458280
+      TX Tileset - Dungeon Ground Extra_210: -1658243159
+      TX Tileset - Dungeon Ground Extra_211: -1580397441
+      TX Tileset - Dungeon Ground Extra_212: 1492201792
+      TX Tileset - Dungeon Ground Extra_213: -1256737498
+      TX Tileset - Dungeon Ground Extra_214: 1926411134
+      TX Tileset - Dungeon Ground Extra_215: 1117944758
+      TX Tileset - Dungeon Ground Extra_216: 1592516862
+      TX Tileset - Dungeon Ground Extra_217: 1273650369
+      TX Tileset - Dungeon Ground Extra_218: -516555394
+      TX Tileset - Dungeon Ground Extra_219: -941552959
+      TX Tileset - Dungeon Ground Extra_22: -1079868522
+      TX Tileset - Dungeon Ground Extra_220: 305964686
+      TX Tileset - Dungeon Ground Extra_221: 1060874308
+      TX Tileset - Dungeon Ground Extra_222: 2053814183
+      TX Tileset - Dungeon Ground Extra_223: -693384992
+      TX Tileset - Dungeon Ground Extra_224: 605799587
+      TX Tileset - Dungeon Ground Extra_225: -370206064
+      TX Tileset - Dungeon Ground Extra_226: -536867670
+      TX Tileset - Dungeon Ground Extra_227: 2063959835
+      TX Tileset - Dungeon Ground Extra_228: 494643432
+      TX Tileset - Dungeon Ground Extra_229: 2102586652
+      TX Tileset - Dungeon Ground Extra_23: -895090159
+      TX Tileset - Dungeon Ground Extra_230: 748138125
+      TX Tileset - Dungeon Ground Extra_231: 18924151
+      TX Tileset - Dungeon Ground Extra_232: -1108332565
+      TX Tileset - Dungeon Ground Extra_233: -2113701912
+      TX Tileset - Dungeon Ground Extra_234: -309688182
+      TX Tileset - Dungeon Ground Extra_235: -2140647605
+      TX Tileset - Dungeon Ground Extra_236: 1194973097
+      TX Tileset - Dungeon Ground Extra_237: -274733152
+      TX Tileset - Dungeon Ground Extra_238: -1404322948
+      TX Tileset - Dungeon Ground Extra_239: 1648191231
+      TX Tileset - Dungeon Ground Extra_24: 656914209
+      TX Tileset - Dungeon Ground Extra_240: -1669673734
+      TX Tileset - Dungeon Ground Extra_241: 571397283
+      TX Tileset - Dungeon Ground Extra_242: 146930702
+      TX Tileset - Dungeon Ground Extra_243: 311233259
+      TX Tileset - Dungeon Ground Extra_244: 1885997539
+      TX Tileset - Dungeon Ground Extra_245: -715280770
+      TX Tileset - Dungeon Ground Extra_246: 1908330760
+      TX Tileset - Dungeon Ground Extra_247: 1782000233
+      TX Tileset - Dungeon Ground Extra_248: 913025920
+      TX Tileset - Dungeon Ground Extra_249: 445642665
+      TX Tileset - Dungeon Ground Extra_25: 323762366
+      TX Tileset - Dungeon Ground Extra_250: -1888895816
+      TX Tileset - Dungeon Ground Extra_251: -205265654
+      TX Tileset - Dungeon Ground Extra_252: -1250516141
+      TX Tileset - Dungeon Ground Extra_253: 587183930
+      TX Tileset - Dungeon Ground Extra_254: 1727932538
+      TX Tileset - Dungeon Ground Extra_255: 260157622
+      TX Tileset - Dungeon Ground Extra_26: 596813260
+      TX Tileset - Dungeon Ground Extra_27: -675444251
+      TX Tileset - Dungeon Ground Extra_28: -1747413190
+      TX Tileset - Dungeon Ground Extra_29: -147347063
+      TX Tileset - Dungeon Ground Extra_3: 217023654
+      TX Tileset - Dungeon Ground Extra_30: 372900593
+      TX Tileset - Dungeon Ground Extra_31: -98658752
+      TX Tileset - Dungeon Ground Extra_32: -2084181243
+      TX Tileset - Dungeon Ground Extra_33: -1950641268
+      TX Tileset - Dungeon Ground Extra_34: -871401815
+      TX Tileset - Dungeon Ground Extra_35: 1134680097
+      TX Tileset - Dungeon Ground Extra_36: -1087220403
+      TX Tileset - Dungeon Ground Extra_37: 1987236825
+      TX Tileset - Dungeon Ground Extra_38: 1550388568
+      TX Tileset - Dungeon Ground Extra_39: -1740263253
+      TX Tileset - Dungeon Ground Extra_4: 1414447616
+      TX Tileset - Dungeon Ground Extra_40: -1887612523
+      TX Tileset - Dungeon Ground Extra_41: 1365373394
+      TX Tileset - Dungeon Ground Extra_42: -1792574068
+      TX Tileset - Dungeon Ground Extra_43: 1665088854
+      TX Tileset - Dungeon Ground Extra_44: -375352115
+      TX Tileset - Dungeon Ground Extra_45: -2110561419
+      TX Tileset - Dungeon Ground Extra_46: -1762235955
+      TX Tileset - Dungeon Ground Extra_47: 1995429200
+      TX Tileset - Dungeon Ground Extra_48: 1570308081
+      TX Tileset - Dungeon Ground Extra_49: 435047628
+      TX Tileset - Dungeon Ground Extra_5: 323505984
+      TX Tileset - Dungeon Ground Extra_50: 1531598624
+      TX Tileset - Dungeon Ground Extra_51: -2098586274
+      TX Tileset - Dungeon Ground Extra_52: -1676318507
+      TX Tileset - Dungeon Ground Extra_53: 1835966368
+      TX Tileset - Dungeon Ground Extra_54: -1293283038
+      TX Tileset - Dungeon Ground Extra_55: -854929303
+      TX Tileset - Dungeon Ground Extra_56: 858682175
+      TX Tileset - Dungeon Ground Extra_57: -1164845387
+      TX Tileset - Dungeon Ground Extra_58: -904971554
+      TX Tileset - Dungeon Ground Extra_59: -1334672180
+      TX Tileset - Dungeon Ground Extra_6: 251577540
+      TX Tileset - Dungeon Ground Extra_60: 967071149
+      TX Tileset - Dungeon Ground Extra_61: 1049866906
+      TX Tileset - Dungeon Ground Extra_62: -1752409780
+      TX Tileset - Dungeon Ground Extra_63: 2084907029
+      TX Tileset - Dungeon Ground Extra_64: -1399490332
+      TX Tileset - Dungeon Ground Extra_65: -1357117353
+      TX Tileset - Dungeon Ground Extra_66: 1841726211
+      TX Tileset - Dungeon Ground Extra_67: 2091173724
+      TX Tileset - Dungeon Ground Extra_68: 973251982
+      TX Tileset - Dungeon Ground Extra_69: -52839591
+      TX Tileset - Dungeon Ground Extra_7: -1078822245
+      TX Tileset - Dungeon Ground Extra_70: -1157997347
+      TX Tileset - Dungeon Ground Extra_71: -2141412091
+      TX Tileset - Dungeon Ground Extra_72: 1566430304
+      TX Tileset - Dungeon Ground Extra_73: 764265028
       TX Tileset - Dungeon Ground Extra_74: -853242805
-  spritePackingTag: 
+      TX Tileset - Dungeon Ground Extra_75: -2058824542
+      TX Tileset - Dungeon Ground Extra_76: 969168495
+      TX Tileset - Dungeon Ground Extra_77: -490035172
+      TX Tileset - Dungeon Ground Extra_78: -1746756179
+      TX Tileset - Dungeon Ground Extra_79: -1764612580
+      TX Tileset - Dungeon Ground Extra_8: -1972177467
+      TX Tileset - Dungeon Ground Extra_80: 1930034823
+      TX Tileset - Dungeon Ground Extra_81: 353225422
+      TX Tileset - Dungeon Ground Extra_82: -2011245000
+      TX Tileset - Dungeon Ground Extra_83: -1173094512
+      TX Tileset - Dungeon Ground Extra_84: 116367926
+      TX Tileset - Dungeon Ground Extra_85: 527390372
+      TX Tileset - Dungeon Ground Extra_86: -881500821
+      TX Tileset - Dungeon Ground Extra_87: -1976429280
+      TX Tileset - Dungeon Ground Extra_88: 939699111
+      TX Tileset - Dungeon Ground Extra_89: -338227424
+      TX Tileset - Dungeon Ground Extra_9: -379100792
+      TX Tileset - Dungeon Ground Extra_90: -879741706
+      TX Tileset - Dungeon Ground Extra_91: -1627443325
+      TX Tileset - Dungeon Ground Extra_92: 1372675032
+      TX Tileset - Dungeon Ground Extra_93: -1011426151
+      TX Tileset - Dungeon Ground Extra_94: 272618249
+      TX Tileset - Dungeon Ground Extra_95: 1857859586
+      TX Tileset - Dungeon Ground Extra_96: 873520594
+      TX Tileset - Dungeon Ground Extra_97: 1116059886
+      TX Tileset - Dungeon Ground Extra_98: -1571281482
+      TX Tileset - Dungeon Ground Extra_99: 65715163
+  mipmapLimitGroupName: 
   pSDRemoveMatte: 0
-  pSDShowRemoveMatteOption: 0
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 237109
-  packageName: Pixel Art Platformer - Dungeon
-  packageVersion: 1.1.6
-  assetPath: Assets/Cainos/Pixel Art Platformer - Dungeon/Texture/TX Tileset - Dungeon
-    Ground Extra.png
-  uploadId: 849070

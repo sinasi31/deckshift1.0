@@ -14546,6 +14546,10 @@ PrefabInstance:
       value: 500
       objectReference: {fileID: 0}
     - target: {fileID: 1641162466347240171, guid: 418762c5259557645bc3ca542f249d74, type: 3}
+      propertyPath: warningSoundClip
+      value: 
+      objectReference: {fileID: 8300000, guid: 70cad06b332b69049ad572f5628c41c5, type: 3}
+    - target: {fileID: 1641162466347240171, guid: 418762c5259557645bc3ca542f249d74, type: 3}
       propertyPath: visualFlipYOffset
       value: 1.6875
       objectReference: {fileID: 0}
