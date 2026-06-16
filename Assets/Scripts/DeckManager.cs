@@ -106,13 +106,17 @@ public class DeckManager : MonoBehaviour
         if (player.GetCurrentShift() < cost) return;
         if (!playedCard.isInfinite && playedCard.currentUses <= 0) return;
 
-        if (data.actionType != CardActionType.Portal)
+        bool success = player.ExecuteAction(data.actionType, data.actionValue, out bool keepInHand);
+
+        // Shift is deducted only when the action actually executed — Blocked plays
+        // (conflict refusal) and Failed plays (e.g. Comet Dive while grounded) cost
+        // nothing. The affordability check above still gates execution up front.
+        // Portal stays exempt: TryPlacePortal spends its own cost on second placement.
+        if (success && data.actionType != CardActionType.Portal)
         {
             if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
                 player.SpendShift(cost);
         }
-
-        bool success = player.ExecuteAction(data.actionType, data.actionValue, out bool keepInHand);
 
         if (success && !keepInHand)
         {

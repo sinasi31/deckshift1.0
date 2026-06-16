@@ -73,6 +73,13 @@ public class PlayerHealth : MonoBehaviour
         if (isDead) return;
         isDead = true;
 
+        // Adrenaline slow-mo scales Time.timeScale/fixedDeltaTime and restores them in a
+        // coroutine that dies with the scene load below — so a death during slow-mo would
+        // leave the whole game at 40% speed forever. Reset defensively on every death;
+        // outside Adrenaline these are already 1 / 0.02 (audit_report.md Critical #3).
+        Time.timeScale = 1f;
+        Time.fixedDeltaTime = 0.02f;
+
         if (playerController.currentState == PlayerState.CometDiving)
             playerController.EndCometDive();
 

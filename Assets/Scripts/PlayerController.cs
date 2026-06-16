@@ -213,6 +213,11 @@ public class PlayerController : MonoBehaviour
             CameraShake.instance?.Shake(0.2f, 0.3f);
         };
 
+        // Phase toggles the global layer-collision matrix, which survives scene loads.
+        // Dying mid-Phase kills PhaseRoutine before its cleanup runs, so the death
+        // path must restore the matrix itself (audit_report.md Critical #2).
+        playerHealth.OnDied += RestorePhaseLayerCollisions;
+
         if (visualModel != null)
         {
             var aer = visualModel.GetComponentInChildren<Cainos.CustomizablePixelCharacter.AnimationEventReceiver>(true);
@@ -322,11 +327,6 @@ public class PlayerController : MonoBehaviour
         if (Input.GetMouseButtonDown(1))
         {
             DeckManager.instance.DeselectCard();
-        }
-
-        if (Input.GetKeyDown(KeyCode.R))
-        {
-            DeckManager.instance.ReloadHand();
         }
     }
 
@@ -473,9 +473,14 @@ public class PlayerController : MonoBehaviour
         ApplyVisualFacing();
     }
 
+    // Detailed outcome of the most recent card play (Success / Failed / Blocked).
+    // DeckManager only needs the bool; UI feedback for Blocked reads this later.
+    public CardExecuteResult LastExecuteResult { get; private set; } = CardExecuteResult.Success;
+
     public bool ExecuteAction(CardActionType type, float value, out bool keepCardInHand)
     {
-        return cardActionExecutor.TryExecute(type, value, out keepCardInHand);
+        LastExecuteResult = cardActionExecutor.TryExecute(type, value, out keepCardInHand);
+        return LastExecuteResult == CardExecuteResult.Success;
     }
 
     private void PerformJump(float jumpForce)
@@ -737,16 +742,7 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    internal void PerformPhase(float duration)
-    {
-        if (audioSource != null && phaseSound != null)
-        {
-            audioSource.PlayOneShot(phaseSound);
-        }
-        StartCoroutine(PhaseRoutine(duration));
-    }
-
-    private IEnumerator PhaseRoutine(float duration)
+    internal IEnumerator PhaseRoutine(float duration)
     {
         isPhasing = true;
 
@@ -840,6 +836,16 @@ public class PlayerController : MonoBehaviour
         return Physics2D.OverlapBox(b.center, b.size * 0.9f, 0f, groundLayer);
     }
 
+    // Re-enables the layer pairs PhaseRoutine ignores. Runs unconditionally on death:
+    // ignoring is only ever set by Phase, and clearing an already-clear pair is a no-op,
+    // so this is safe whether or not a Phase was active when the player died.
+    private void RestorePhaseLayerCollisions()
+    {
+        int playerLayer = LayerMask.NameToLayer("Player");
+        Physics2D.IgnoreLayerCollision(playerLayer, LayerMask.NameToLayer("Ground"), false);
+        Physics2D.IgnoreLayerCollision(playerLayer, LayerMask.NameToLayer("Enemy"), false);
+    }
+
     public void IncreaseMaxShift(int amount)
     {
         maxShift += amount;
@@ -860,9 +866,19 @@ public class PlayerController : MonoBehaviour
         transform.SetParent(cannonTransform);
     }
 
+    // Mirrors the dive's PlayerVelocity flag: true from StartCometDive until the first
+    // EndCometDive. Needed because the fall-respawn path can call EndCometDive twice
+    // for one dive (once at respawn, once when the still-diving state lands at spawn).
+    private bool cometDiveWindowActive;
+
     internal void StartCometDive()
     {
         ChangeState(PlayerState.CometDiving);
+        cometDiveWindowActive = true;
+        // Manual flag: the dive holds PlayerVelocity until it lands (or is interrupted)
+        // — an open-ended window the executor can't see via ManagedCoroutine.
+        // ConflictFlags has no player-state flag, so PlayerVelocity is the whole claim.
+        cardActionExecutor?.SetManualFlag(ConflictFlags.PlayerVelocity, true);
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, -cometSpeed);
         if (diveTrail != null) diveTrail.emitting = true;
         if (audioSource != null && cometDiveSound != null)
@@ -906,8 +922,16 @@ public class PlayerController : MonoBehaviour
         if (CameraShake.instance != null) CameraShake.instance.Shake(0.1f, 0.2f);
     }
 
+    // Single choke point for ending the dive window — every exit path (LandCometDive,
+    // knockback, death, fall-respawn) calls this. The guard clears the flag exactly
+    // once per dive even when a path calls EndCometDive twice (fall-respawn does).
     internal void EndCometDive()
     {
+        if (cometDiveWindowActive)
+        {
+            cometDiveWindowActive = false;
+            cardActionExecutor?.SetManualFlag(ConflictFlags.PlayerVelocity, false);
+        }
         if (diveTrail != null) diveTrail.emitting = false;
     }
 
@@ -954,17 +978,20 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator AdrenalineSlowMoRoutine()
     {
+        cardActionExecutor?.SetManualFlag(ConflictFlags.TimeScale | ConflictFlags.MoveSpeed, true);
         Time.timeScale = slowMotionFactor;
         Time.fixedDeltaTime = 0.02f * Time.timeScale;
 
         yield return new WaitForSecondsRealtime(adrenalineDuration);
 
+        cardActionExecutor?.SetManualFlag(ConflictFlags.TimeScale | ConflictFlags.MoveSpeed, false);
         Time.timeScale = 1f;
         Time.fixedDeltaTime = 0.02f;
     }
 
     private IEnumerator AdrenalineSpeedBoostRoutine()
     {
+        cardActionExecutor?.SetManualFlag(ConflictFlags.TimeScale | ConflictFlags.MoveSpeed, true);
         isAdrenalineActive = true;
 
         // GÜNCELLENDİ: SkinnedMesh rengi şimdilik değiştirilmiyor
@@ -975,6 +1002,7 @@ public class PlayerController : MonoBehaviour
 
         yield return new WaitForSeconds(adrenalineDuration);
 
+        cardActionExecutor?.SetManualFlag(ConflictFlags.TimeScale | ConflictFlags.MoveSpeed, false);
         moveSpeed = originalSpeed;
 
         // if (spriteRenderer != null) spriteRenderer.color = Color.white;
@@ -1044,14 +1072,26 @@ public class PlayerController : MonoBehaviour
 
     internal void StartGravityReversal()
     {
-        // Stop any existing effect so re-plays refresh the timer instead of stacking
+        // Stop any existing effect so re-plays refresh the timer instead of stacking.
+        // Flags are cleared BEFORE StopCoroutine: stopping skips the old routine's
+        // tail (its normal clear point), and the new routine re-sets them
+        // synchronously inside StartCoroutine below — so there is never a window
+        // with flags set but no live routine, and the clear can't stomp the new set.
         if (gravityReversalCoroutine != null)
+        {
+            cardActionExecutor?.SetManualFlag(ConflictFlags.GravityScale | ConflictFlags.VisualTransform, false);
             StopCoroutine(gravityReversalCoroutine);
+        }
         gravityReversalCoroutine = StartCoroutine(GravityReversalRoutine());
     }
 
     private IEnumerator GravityReversalRoutine()
     {
+        // Manual-flag pattern (same as Adrenaline): flags live exactly as long as this
+        // routine. This line runs synchronously inside StartCoroutine, so on a replay
+        // the clear in StartGravityReversal and this re-set happen in one call stack.
+        cardActionExecutor?.SetManualFlag(ConflictFlags.GravityScale | ConflictFlags.VisualTransform, true);
+
         bool wasAlreadyReversed = isGravityReversed;
 
         if (!wasAlreadyReversed)
@@ -1067,7 +1107,11 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            // Re-play while already reversed: gravity and visual already set, just restart timer
+            // Re-play while already reversed: gravity and visual already set, just restart timer.
+            // UNREACHABLE since Block enforcement (CardActionExecutor.TryExecute): a
+            // ReverseGravity play while the effect is active is refused upstream because its
+            // GravityScale|VisualTransform flags overlap activeFlags. Kept deliberately in
+            // case the policy later changes to allow same-card timer refresh.
             yield return new WaitForSeconds(4.5f);
         }
 
@@ -1082,6 +1126,9 @@ public class PlayerController : MonoBehaviour
         ApplyVisualFacing();
         yield return StartCoroutine(LerpVisualTransform(180f, 0f, originalVisualLocalPos.y + visualFlipYOffset, originalVisualLocalPos.y, 0.15f));
 
+        // Cleared only after the visual lerp-back so VisualTransform stays honest
+        // for the full effect, mirroring the set at the top of this routine.
+        cardActionExecutor?.SetManualFlag(ConflictFlags.GravityScale | ConflictFlags.VisualTransform, false);
         gravityReversalCoroutine = null;
     }
 

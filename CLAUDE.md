@@ -36,11 +36,11 @@ The user works with a **separate conversational Claude instance** (claude.ai) fo
 
 These are absolute. Do not suggest alternatives without explicit user approval.
 
-1. **No Cinemachine currently in use.** It was removed early due to confiner issues with multi-shape rooms. The custom system is in `CameraFollow.cs` plus per-level `LevelBounds` zones. The policy is "currently removed, can be revisited if a clean approach is found" — not absolute prohibition. The surviving Cinemachine reference is in `CameraPeek.cs`, which is currently broken and slated for rebuild.
+1. **No Cinemachine currently in use.** It was removed early due to confiner issues with multi-shape rooms. The custom system is in `CameraFollow.cs` plus per-level `LevelBounds` zones. The policy is "currently removed, can be revisited if a clean approach is found" — not absolute prohibition. `CameraPeek.cs` has since been rebuilt without Cinemachine and works (see Camera System); the Cinemachine package itself is still installed and two dead `using Unity.Cinemachine;` directives remain (`PlayerController.cs`, `LevelManager.cs`) — cleanup pending.
 
 2. **Manager-singleton pattern.** All major systems are singleton MonoBehaviour managers (GameManager, DeckManager, LevelManager, etc.). This pattern has known issues (cyclic dependencies, flat global state) but is the architecture. Do not propose dependency injection, ECS, or other paradigms.
 
-3. **Game runs in a single scene currently.** Most managers do not have `DontDestroyOnLoad`. **Exception: QuestSystem currently has `DontDestroyOnLoad` set, which is inconsistent with the rest of the codebase — flagged for review.** If scene transitions are added later, this must be revisited. Do not add `DontDestroyOnLoad` to existing managers without discussing the implications.
+3. **Game runs in a single scene currently.** Most managers do not have `DontDestroyOnLoad`. **QuestSystem's `DontDestroyOnLoad` was REMOVED (2026-06-10): quests are per-run by design and reset on death/restart; each scene uses its own QuestSystem instance, whose serialized UI references match that scene.** If quest meta-progression is ever wanted, persist it through the save system (PlayerPrefs, like AchievementManager) — do not re-add `DontDestroyOnLoad`. If scene transitions are added later, this must be revisited. Do not add `DontDestroyOnLoad` to existing managers without discussing the implications.
 
 4. **Comment language convention.** Older code has Turkish comments (Gemini-era). Going forward, **new comments should be in English** for clarity. Do not retranslate existing Turkish comments unless they're factually misleading.
 
@@ -56,7 +56,7 @@ These are absolute. Do not suggest alternatives without explicit user approval.
 
 This is a large script (~1,200 lines). It currently handles movement, jumping, card action execution, gravity reversal, VFX spawning, audio, health, gold, shift, knockback, portal state, cannon enter/exit, death, and respawn.
 
-**Known issue:** It is a God Object and is scheduled for refactor. The `ExecuteAction()` method (~100 lines, switch over `CardActionType`) will be extracted to a separate `CardActionExecutor` component. **This is the TOP architectural priority right now.** With 60+ cards planned, this needs to happen before content scales further. **When adding new cards, add them to the existing switch, but be aware this is temporary.** See "Card Effect Conflict Class of Bug" below for one of the reasons the refactor matters.
+**Refactor status: the `CardActionExecutor` extraction is DONE.** `ExecuteAction()` is now a one-line delegate to `CardActionExecutor.TryExecute()`. All card actions live in `Assets/Scripts/CardActions/Actions/` as `CardAction` subclasses, registered in a dictionary in `CardActionExecutor.Awake()`. There is no switch statement anymore — do not look for one. The conflict-flag half of the system is only partially built; see "Card Effect Conflict Class of Bug" below for the audited current state.
 
 ### Player Prefab Specifics
 
@@ -161,7 +161,7 @@ The gravity reversal factor compensates for the 180° Z rotation inverting the v
 ### Adding a New Card
 
 1. Add a new value to `CardActionType` enum if no existing action covers it.
-2. Add a case to the switch in `PlayerController.ExecuteAction()` (until the planned refactor extracts this).
+2. Create a `CardAction` subclass in `Assets/Scripts/CardActions/Actions/` and register it in the dictionary in `CardActionExecutor.Awake()`. Declare an honest `ModifiedState` (ConflictFlags) for any state the action touches.
 3. Create a `CardData` asset in Unity (right-click in Project view → Create → Card Data).
 4. Set the asset's `actionType`, `maxUses`, `shiftCost`, sprite, etc. in the Inspector.
 5. Add the card to the relevant reward pools / starter deck as needed.
@@ -178,9 +178,18 @@ When Shift is 0 AND no playable cards exist, a Stagger card is auto-added to the
 
 Discovered when hub mode allowed free card spamming: playing multiple state-modifying cards in close succession (e.g., Floor is Lava + Adrenaline + Phase) can leave the player in a permanently broken state (flying, frozen gravity, etc.). Each card's effect captures "original" state at start and restores it at end, but **none of them know about each other**. Card A captures the current state (already modified by still-active Card B), then later restores to that mid-effect snapshot — corrupting baseline.
 
-**This is one of the strongest reasons for the CardActionExecutor refactor.** A proper extractor will let each action declare what state it modifies and check for conflicts. Patching individual cards is wasted work that the refactor would supersede.
+**Current state (audited 2026-06-10):** the CardActionExecutor extraction is done and the conflict-flag system is half built. Each `CardAction` declares a `ModifiedState` (`ConflictFlags`), and the executor tracks flags in `activeFlags` while coroutine-based actions run — **but `TryExecute` never checks the flags. Blocking/enforcement is NOT implemented; overlapping effects still run concurrently, so this bug class is still live.**
 
-**In normal play, Shift cost gates spamming heavily enough that this is rarely reachable.** It is fully reachable in the hub. For now: known issue, do not patch individual cards.
+Per-effect conversion status:
+- **Dash** ✅ converted — managed coroutine; flags `PlayerVelocity | Invincibility` held live, cleared in `finally`.
+- **Phase** ✅ converted — managed coroutine; flags `GravityScale | LayerCollisionMatrix | PlayerVelocity`.
+- **Adrenaline** ✅ converted (manual-flag pattern) — `UseAdrenaline`'s sub-coroutines call `SetManualFlag(TimeScale | MoveSpeed, …)` at start/end. Caveats: both flags are set regardless of which branch runs, and `SetManualFlag` is not refcounted (overlapping plays clear flags early).
+- **Fireball** ✅ converted — managed coroutine; `AnimatorAttackState`.
+- **ReverseGravity** ⚠️ NOT converted — it declares `GravityScale | VisualTransform`, but those flags are **dead**: `IsCoroutine = false` and the executor only registers flags for coroutine actions, and `StartGravityReversal`/`GravityReversalRoutine` never call `SetManualFlag`. While Floor is Lava is active, `ActiveFlags` shows nothing.
+
+Remaining work: (1) register ReverseGravity's flags via `SetManualFlag` with a restart-safe lifecycle (`StartGravityReversal` stops and restarts the coroutine without cleanup, so flags must not double-clear or leak); (2) implement enforcement in `TryExecute` — block or queue when `ModifiedState & ActiveFlags != 0`. Until enforcement exists, the flags are bookkeeping only.
+
+**In normal play, Shift cost gates spamming heavily enough that this is rarely reachable.** It is fully reachable in the hub. For now: known issue, do not patch individual cards — the enforcement work supersedes per-card patches.
 
 ---
 
@@ -207,7 +216,7 @@ Specifically gated:
 - Recall shift cost (`TryRecall` → `SpendShift`)
 - Recall cost escalation (`currentRecallCost++`)
 - Stagger card injection (`CheckForStaggerCondition`)
-- Fall damage (`FallAndRespawn` → `TakeDamage(fallDamage)`)
+- ~~Fall damage~~ — no longer applicable: fall damage has been removed from the game entirely (`FallAndRespawn` only teleports; see Resolved bugs)
 
 All guards use the pattern: `if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub()) { ... do the consumption ... }`.
 
@@ -260,7 +269,7 @@ Exceptions that intentionally bypass the counter:
 
 - **Cyclic dependencies:** PlayerController → DeckManager → PlayerController. Don't add more cycles.
 - **Most managers lack `DontDestroyOnLoad`**, intentional for single-scene operation.
-- **QuestSystem has `DontDestroyOnLoad`** — inconsistent with other managers. Flagged for review.
+- **QuestSystem is now scene-local too** — its `DontDestroyOnLoad` was removed 2026-06-10 (quests are per-run by design; the survivor's dead UI references broke the quest board after the first death).
 - **`GameManager.instance.player` is accessed from many UI scripts** with inconsistent null guarding. Add null guards when touching these sites.
 
 ---
@@ -417,9 +426,9 @@ Rewritten to work without Cinemachine. Uses a `shakeOffset` Vector2 that `Camera
 
 **The CameraShake component must be present in the active scene** (on the Main Camera) and **enabled**. If it's missing or disabled, every Shake call silently no-ops. This caused a 9-month "no shake anywhere" bug that wasn't discovered until the audit.
 
-### CameraPeek.cs (BROKEN)
+### CameraPeek.cs (REBUILT — working, verified by code audit 2026-06-10)
 
-**Currently does not work.** Default bind is Left Ctrl; pressing it produces no effect. Still depends on Cinemachine, which is no longer present in the scene. Slated for **full rebuild**, likely as an offset on `CameraFollow` (similar to how CameraShake works). Don't touch unless explicitly tasked.
+Rebuilt without Cinemachine, along the planned CameraShake-style design: holding Left Ctrl computes a mouse-direction `peekOffset` (clamped to `maxOffset`, smoothed with unscaled time) that `CameraFollow.LateUpdate` adds after zone clamping. Input is blocked while paused, while the hand drawer is locked, or when the player is dead. If peek "doesn't seem to work," verify scene presence and enabled state of the component first (per Common Pitfalls) — the code is fine. Note: the rebuilt CameraPeek does NOT set `PlayerController.isPeeking`; that flag is dead code.
 
 Related: a missing-script warning for `CameraBoundsController` appears in the console at scene load — this is part of the same Cinemachine-era cleanup that's pending. Cosmetic; doesn't affect gameplay.
 
@@ -489,7 +498,7 @@ Wired and working across all six enemy types (AeroBat, MeleeEnemy, RangedEnemy, 
 
 **Settings integration:** `EnemyHealthBar` subscribes to `SettingsMenu.OnShowNumbersChanged` and reads `PlayerPrefs.GetInt("ShowEnemyNumbers", 1)` on start. Only the text label toggles; bar visuals always render.
 
-**Shield-block damage leak (REAL BUG, not yet fixed):** In `EnemyHealth.TakeDamage`, `currentHealth -= damage` runs BEFORE the shield-block check, then the shield check returns early. Blocked hits silently deduct health but skip the popup and bar update — so the ShieldEnemy doesn't actually shield from damage, only from feedback. Move the deduction to AFTER the shield check when this is touched next. Trivial fix, scope-isolated to one method.
+**Shield-block damage leak (RESOLVED — verified by code audit 2026-06-10):** `EnemyHealth.TakeDamage` now runs the `shield.IsBlocking()` check and returns BEFORE deducting health. Blocked hits no longer lose HP. Do not re-fix.
 
 ---
 
@@ -586,10 +595,10 @@ If the user is about to discard uncommitted Unity changes via GitHub Desktop, **
 
 ### Architecture (planned, highest priority)
 
-- **PlayerController.ExecuteAction() extraction** — extract the card-action switch into a dedicated `CardActionExecutor` component. **TOP architectural priority.** Also resolves the card-effect-conflict class of bug (multiple effects modifying shared state without coordination). Scheduled as the next major work item.
-- **CameraPeek rebuild** — currently broken (Left Ctrl does nothing). Rebuild without Cinemachine, likely as a temporary offset on `CameraFollow` matching the CameraShake pattern.
+- **CardActionExecutor conflict-flag enforcement** — the ExecuteAction() extraction itself is **DONE** (see Player System). What remains: register ReverseGravity's flags via `SetManualFlag` and make `TryExecute` actually check `ActiveFlags` before running an overlapping effect (currently flags are tracked but never checked). This is the step that resolves the card-effect-conflict bug class.
+- ~~CameraPeek rebuild~~ — **done**; rebuilt without Cinemachine (see Camera System).
 - **Manager dependency graph** — undocumented. Long-term docs task.
-- **QuestSystem DontDestroyOnLoad inconsistency** — should be removed or all other managers should adopt the same convention. Pending scene-flow design decision.
+- ~~QuestSystem DontDestroyOnLoad inconsistency~~ — **resolved 2026-06-10**: removed; QuestSystem is scene-local like every other manager, and quests are per-run by design. Quest meta-progression, if ever wanted, should go through the save system (PlayerPrefs, like AchievementManager), not DontDestroyOnLoad.
 
 ### Future: Slot-Constrained Relic Redesign (MAJOR DESIGN DIRECTION)
 
@@ -635,16 +644,22 @@ The current relic system follows Slay-the-Spire conventions: strictly additive, 
 
 ### Bugs (deferred)
 
-- **Shield-block damage leak:** In `EnemyHealth.TakeDamage`, `currentHealth -= damage` runs BEFORE the `ShieldEnemy.IsBlocking` check. The check returns early but the HP has already been deducted. So blocked hits silently lose HP — the shield only blocks the popup and the bar update, not the actual damage. Fix: move the deduction to AFTER the shield check. Trivial.
-- **Card effect conflict class of bug** — playing multiple state-modifying cards in close succession breaks player state permanently. Reachable in hub, mostly gated by Shift cost in normal play. Will be resolved as part of the CardActionExecutor refactor; do not patch individual cards.
+- **Card effect conflict class of bug** — playing multiple state-modifying cards in close succession breaks player state permanently. Reachable in hub, mostly gated by Shift cost in normal play. The CardActionExecutor extraction is done; what resolves this bug class is the remaining **conflict-flag enforcement** work (flags are tracked but `TryExecute` never checks them — see Card System). Do not patch individual cards.
 - **Phase card wall-stuck:** if Phase ends while player is inside a wall, player gets stuck. Plan: prevent Phase expiration inside collider.
-- **Fall damage zeroing into floor:** at high fall speeds player clips into ground. Plan: **remove fall damage entirely.**
-- **Spike knockback always sends right-up:** ignores incoming angle. Plan: velocity reflection.
 - **Comet Dive identity loss:** does the same thing as head-bounce relic. Plan: redesign.
 - **Head bounce + gravity reversal:** velocity sign check doesn't account for reversed gravity. Low priority.
 - **Duplicate ExitDoor possible in some room prefabs:** defensive guards now in place but the scene-side duplicate (if any) hasn't been cleaned up.
 - **AnimationEventReceiver may re-enable on prefab reimport.** Has been disabled twice. If OnFootstep NullRefs reappear in the console, check that the component on the visualModel's Animator child is unchecked.
 - **Gravity reversal warning flash is invisible** — relies on SkinnedMeshRenderer that no longer exists on the new sprite-based rig. Audio cue still fires. Fix: add a SpriteRenderer flash path.
+
+### Resolved bugs (verified by code audit 2026-06-10 — do NOT re-fix)
+
+These were previously listed as open in this file; the audit (`audit_report.md`) confirmed they are already fixed in code:
+
+- ✅ **Shield-block damage leak** — `EnemyHealth.TakeDamage` checks the shield BEFORE deducting health; blocked hits no longer lose HP.
+- ✅ **Spike knockback always sends right-up** — `Spike.cs` now reflects incoming velocity off `transform.up` with a minimum-force floor (correct for floor, wall, and ceiling spikes).
+- ✅ **Fall damage** — removed entirely; `FallAndRespawn` teleports to the room entry point and fires `OnFallRespawn`, no damage is applied.
+- ✅ **CameraPeek** — fully rebuilt without Cinemachine as a `peekOffset` consumed by `CameraFollow.LateUpdate` (see Camera System).
 
 ### CardTemplate prefab rebuild (BLOCKED on art)
 

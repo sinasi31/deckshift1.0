@@ -84,12 +84,20 @@ public class ShopManager : MonoBehaviour
         }
     }
 
+    // Frame on which the shop consumed the Escape press. PauseMenu checks this so a
+    // single ESC can't both close the shop and open the pause menu (audit High 1.6).
+    public static int escapeConsumedFrame = -1;
+
     private void Update()
     {
         if (shopPanel.activeSelf)
         {
             UpdateGoldUI();
-            if (Input.GetKeyDown(KeyCode.Escape)) CloseShop();
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                escapeConsumedFrame = Time.frameCount;
+                CloseShop();
+            }
         }
     }
 
