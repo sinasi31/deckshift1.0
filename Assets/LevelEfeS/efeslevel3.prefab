@@ -7123,16 +7123,40 @@ PrefabInstance:
     m_TransformParent: {fileID: 6885198164910193475}
     m_Modifications:
     - target: {fileID: 536071244870314531, guid: 4c6f7f680d35ecb45bd66603fd0f3516, type: 3}
+      propertyPath: startState
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 536071244870314531, guid: 4c6f7f680d35ecb45bd66603fd0f3516, type: 3}
       propertyPath: lengthRange.x
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 536071244870314531, guid: 4c6f7f680d35ecb45bd66603fd0f3516, type: 3}
       propertyPath: lengthRange.y
-      value: 6
+      value: 6.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 796464613234584105, guid: 4c6f7f680d35ecb45bd66603fd0f3516, type: 3}
+      propertyPath: m_Layer
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 796464614501576273, guid: 4c6f7f680d35ecb45bd66603fd0f3516, type: 3}
+      propertyPath: m_Layer
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 796464614684625379, guid: 4c6f7f680d35ecb45bd66603fd0f3516, type: 3}
+      propertyPath: m_Layer
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 796464614721710445, guid: 4c6f7f680d35ecb45bd66603fd0f3516, type: 3}
+      propertyPath: m_Layer
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 796464614996848182, guid: 4c6f7f680d35ecb45bd66603fd0f3516, type: 3}
       propertyPath: m_Name
       value: PF Village Props - Elevator
+      objectReference: {fileID: 0}
+    - target: {fileID: 796464614996848182, guid: 4c6f7f680d35ecb45bd66603fd0f3516, type: 3}
+      propertyPath: m_Layer
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 796464614996848183, guid: 4c6f7f680d35ecb45bd66603fd0f3516, type: 3}
       propertyPath: m_LocalPosition.x
@@ -7173,6 +7197,10 @@ PrefabInstance:
     - target: {fileID: 796464614996848183, guid: 4c6f7f680d35ecb45bd66603fd0f3516, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 796464615045801945, guid: 4c6f7f680d35ecb45bd66603fd0f3516, type: 3}
+      propertyPath: m_Layer
+      value: 3
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
