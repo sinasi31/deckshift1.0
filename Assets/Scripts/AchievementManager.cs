@@ -53,12 +53,12 @@ public class AchievementManager : MonoBehaviour
         Challenge challengeToComplete = allChallenges.Find(c => c.challengeID == challengeID);
         if (challengeToComplete != null && !challengeToComplete.isCompleted)
         {
-            // --- DÜZELTÝLEN SATIR BURASI ---
+            // --- Dï¿½ZELTï¿½LEN SATIR BURASI ---
             // 'aciklama' -> 'description'
             // 'kartAdi' -> 'cardName'
             Debug.Log("CHALLENGE COMPLETE: " + challengeToComplete.description +
                       ". Reward: " + challengeToComplete.unlockableCard.cardName + " unlocked!");
-            // --- BÝTÝÞ ---
+            // --- Bï¿½Tï¿½ï¿½ ---
 
             challengeToComplete.isCompleted = true;
             SaveChallenges();
@@ -82,6 +82,8 @@ public class AchievementManager : MonoBehaviour
         }
     }
 
+#if UNITY_EDITOR
+    // Editor-only: a stray F12 in a build must never wipe the player's save.
     private void Update()
     {
         // F12 to reset save data (for testing)
@@ -92,4 +94,5 @@ public class AchievementManager : MonoBehaviour
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
     }
+#endif
 }

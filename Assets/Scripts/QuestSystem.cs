@@ -20,10 +20,15 @@ public class QuestSystem : MonoBehaviour
 
     private void Awake()
     {
+        // Scene-local on purpose: quests are per-run by design and reset on
+        // death/restart. DontDestroyOnLoad was removed because the survivor kept
+        // dead references to the old scene's UI (overlayPanel/container), breaking
+        // the quest board after the first death. If quest meta-progression is ever
+        // wanted, persist it via the save system (PlayerPrefs, like
+        // AchievementManager) — do not re-add DontDestroyOnLoad.
         if (instance == null)
         {
             instance = this;
-            DontDestroyOnLoad(gameObject); 
         }
         else
         {

@@ -4,7 +4,9 @@ using UnityEngine;
 public class JumpAction : CardAction
 {
     public override CardActionType ActionType => CardActionType.Jump;
-    public override ConflictFlags ModifiedState => ConflictFlags.PlayerVelocity;
+    // No declared flags: the impulse is a one-frame write with nothing to restore.
+    // Declaring PlayerVelocity would wrongly Block jumps during dives/dash i-frames —
+    // basic mobility must never be refused by the conflict system.
 
     public override bool Execute(PlayerController player, float value, out bool keepCardInHand)
     {

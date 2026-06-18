@@ -5,7 +5,9 @@ public class FireballAction : CardAction
 {
     public override CardActionType ActionType => CardActionType.Fireball;
     public override bool IsCoroutine => true;
-    public override ConflictFlags ModifiedState => ConflictFlags.AnimatorAttackState;
+    // No declared flags (design decision): declaring AnimatorAttackState would Block
+    // rapid-fire casts for ~0.5s each. Overlapping casts only risk a cosmetic
+    // animation cut — attacks must never be refused by the conflict system.
 
     public override IEnumerator ExecuteCoroutine(PlayerController player, float value)
     {

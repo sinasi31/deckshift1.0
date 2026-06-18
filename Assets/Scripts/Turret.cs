@@ -12,10 +12,11 @@ public class Turret : MonoBehaviour
     private Transform playerTransform;
     private EnemyHealth health;
 
-    void Start()
+    // Reference lookups live in Awake so they exist before OnEnable's coroutine runs.
+    // The firing loop is owned exclusively by OnEnable/OnDisable — starting it here too
+    // ran two overlapping loops (double fire rate), per audit_report.md High 1.5.
+    void Awake()
     {
-        // BURADA ESK�DEN CAN KODLARI VARDI, ARTIK YOK.
-
         health = GetComponent<EnemyHealth>();
 
         GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
@@ -23,8 +24,6 @@ public class Turret : MonoBehaviour
         {
             playerTransform = playerObject.transform;
         }
-
-        StartCoroutine(FireRoutine());
     }
 
     private IEnumerator FireRoutine()
