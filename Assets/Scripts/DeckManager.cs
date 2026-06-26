@@ -7,6 +7,7 @@ public class DeckManager : MonoBehaviour
 {
     public static DeckManager instance;
     public static event Action<bool> OnHandChanged;
+    public static event Action<int> OnCardPlayed;
     public bool isNextCardFree = false;
     [Header("Recall Settings")]
     public int baseRecallCost = 1; // Başlangıç maliyeti
@@ -120,6 +121,8 @@ public class DeckManager : MonoBehaviour
 
         if (success && !keepInHand)
         {
+            OnCardPlayed?.Invoke(index);
+            player.FlashCardPlay();
 
             hand.RemoveAt(index);
             selectedIndex = -1;

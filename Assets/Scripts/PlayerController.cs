@@ -122,6 +122,8 @@ public class PlayerController : MonoBehaviour
     public float cometDamage = 40f;
     public float cometRadius = 3f;
     public GameObject cometImpactEffect;
+    public GameObject cometShockwaveEffect;
+    [Range(0.005f, 0.1f)] public float cometVfxScale = 0.055f;
 
     [Header("Adrenaline Card Settings")]
     public float adrenalineDuration = 3f;
@@ -891,7 +893,7 @@ public class PlayerController : MonoBehaviour
         {
             bool isGround = (groundLayer.value & (1 << collision.gameObject.layer)) > 0;
             if (isGround)
-                LandCometDive();
+                LandCometDive(collision.GetContact(0).point);
             return;
         }
 
@@ -935,7 +937,7 @@ public class PlayerController : MonoBehaviour
         if (diveTrail != null) diveTrail.emitting = false;
     }
 
-    private void LandCometDive()
+    private void LandCometDive(Vector2 contactPoint)
     {
         Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, cometRadius, ~0);
         HashSet<IDamageable> damaged = new HashSet<IDamageable>();
@@ -946,12 +948,60 @@ public class PlayerController : MonoBehaviour
                 target.TakeDamage(cometDamage);
         }
 
+        // Offset up by half the canvas height so the bottom of the VFX sits on the surface
+        // rather than the center, which would put half the explosion inside the ground.
+        float halfCanvasWorld = 32f * cometVfxScale;
+        Vector3 vfxPos = new Vector3(contactPoint.x, contactPoint.y + halfCanvasWorld, 0f);
+
         if (cometImpactEffect != null)
-            Instantiate(cometImpactEffect, transform.position, Quaternion.identity);
+            SpawnUIVFX(cometImpactEffect, vfxPos, cometVfxScale, 0.75f);
+        if (cometShockwaveEffect != null)
+            SpawnUIVFX(cometShockwaveEffect, vfxPos, cometVfxScale, 0.75f);
         if (CameraShake.instance != null) CameraShake.instance.Shake(0.15f, 0.5f);
 
         EndCometDive();
         ChangeState(PlayerState.Idle);
+    }
+
+    public void FlashCardPlay()
+    {
+        StartCoroutine(CardPlayFlashRoutine());
+    }
+
+    private IEnumerator CardPlayFlashRoutine()
+    {
+        SpriteRenderer[] renderers = visualModel != null
+            ? visualModel.GetComponentsInChildren<SpriteRenderer>()
+            : GetComponentsInChildren<SpriteRenderer>();
+
+        Color flashColor = new Color(1f, 0.85f, 0.2f); // gold
+        Color[] original = new Color[renderers.Length];
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            original[i] = renderers[i].color;
+            renderers[i].color = flashColor;
+        }
+
+        yield return new WaitForSecondsRealtime(0.08f);
+
+        for (int i = 0; i < renderers.Length; i++)
+            if (renderers[i] != null) renderers[i].color = original[i];
+    }
+
+    void SpawnUIVFX(GameObject vfxPrefab, Vector3 worldPos, float scale, float destroyAfter)
+    {
+        GameObject canvasGO = new GameObject("VFX_Canvas");
+
+        UnityEngine.Canvas canvas = canvasGO.AddComponent<UnityEngine.Canvas>();
+        canvas.renderMode = UnityEngine.RenderMode.WorldSpace;
+        canvas.sortingOrder = 10;
+
+        canvasGO.GetComponent<RectTransform>().sizeDelta = new Vector2(64f, 64f);
+        canvasGO.transform.position = worldPos;
+        canvasGO.transform.localScale = Vector3.one * scale;
+
+        Instantiate(vfxPrefab, canvasGO.transform);
+        Destroy(canvasGO, destroyAfter);
     }
 
     internal void UseAdrenaline(float value)
