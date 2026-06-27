@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections;
+using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using UnityEngine.EventSystems;
@@ -20,6 +21,12 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     public GameObject descriptionPanel;
     public TextMeshProUGUI descriptionText;
     public float selectionLiftAmount = 50f;
+
+    [Header("Hover Art Fade")]
+    [SerializeField] private float hoverFadeTargetAlpha = 0.12f;
+    [SerializeField] private float hoverFadeDuration = 0.15f;
+
+    private Coroutine artFadeCoroutine;
 
     private RuntimeCard myCard;
     private int myIndex;
@@ -135,10 +142,48 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
             descriptionPanel.SetActive(true);
             descriptionPanel.transform.SetAsLastSibling();
         }
+        StartArtFade(hoverFadeTargetAlpha);
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
         if (descriptionPanel != null) descriptionPanel.SetActive(false);
+        StartArtFade(1f);
+    }
+
+    // Cleanly (re)starts the artwork alpha fade so rapid enter/exit can't leave it stuck.
+    private void StartArtFade(float targetAlpha)
+    {
+        if (cardArtImage == null) return;
+        if (artFadeCoroutine != null) StopCoroutine(artFadeCoroutine);
+        artFadeCoroutine = StartCoroutine(FadeArtAlpha(targetAlpha));
+    }
+
+    private IEnumerator FadeArtAlpha(float targetAlpha)
+    {
+        Color c = cardArtImage.color;
+        float startAlpha = c.a;
+
+        if (hoverFadeDuration <= 0f)
+        {
+            c.a = targetAlpha;
+            cardArtImage.color = c;
+            artFadeCoroutine = null;
+            yield break;
+        }
+
+        float elapsed = 0f;
+        while (elapsed < hoverFadeDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / hoverFadeDuration);
+            c.a = Mathf.Lerp(startAlpha, targetAlpha, t);
+            cardArtImage.color = c;
+            yield return null;
+        }
+
+        c.a = targetAlpha;
+        cardArtImage.color = c;
+        artFadeCoroutine = null;
     }
 }
