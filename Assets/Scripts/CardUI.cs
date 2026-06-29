@@ -13,6 +13,7 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     public TextMeshProUGUI usesText;
     public Transform shiftCostContainer;
     public GameObject shiftPointPrefab;
+    public TextMeshProUGUI costText; // Maliyet sayısı (büyük sol-üst daire)
 
     [Header("Hizalama Ayarları")]
     public float pointSpacing = 20f; // Noktalar arası boşluk (Bunu Inspector'dan değiştirebilirsin)
@@ -71,33 +72,9 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
             }
         }
 
-        // --- YENİ HİZALAMA SİSTEMİ ---
-        if (shiftCostContainer != null && shiftPointPrefab != null)
-        {
-            // Önce eskileri temizle
-            foreach (Transform child in shiftCostContainer) Destroy(child.gameObject);
-
-            int cost = card.cardData.shiftCost;
-
-            // Eğer maliyet 0 ise hiçbir şey yapma
-            if (cost > 0)
-            {
-                // Toplam genişliği hesapla (Nokta sayısı - 1 * Boşluk)
-                float totalWidth = (cost - 1) * pointSpacing;
-
-                // Başlangıç noktası (Merkezden sola doğru yarım genişlik kadar git)
-                float startX = -totalWidth / 2f;
-
-                for (int i = 0; i < cost; i++)
-                {
-                    GameObject p = Instantiate(shiftPointPrefab, shiftCostContainer);
-                    RectTransform rt = p.GetComponent<RectTransform>();
-
-                    // Pozisyonu ayarla: Başlangıç + (Sıra * Boşluk)
-                    rt.anchoredPosition = new Vector2(startX + (i * pointSpacing), 0f);
-                }
-            }
-        }
+        // --- MALİYET: tek sayı (büyük sol-üst daire) ---
+        // Eski nokta (dot) sistemi kaldırıldı; maliyet artık costText'te sayı olarak gösteriliyor.
+        if (costText != null) costText.text = card.cardData.shiftCost.ToString();
         // -----------------------------
 
         UpdateSelectionVisual();
