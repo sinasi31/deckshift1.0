@@ -7,8 +7,9 @@ using Cainos.PixelArtMonster_Dungeon;
 // (both call TakeDamage) and Glass Wail stuns it for free (EnemyHealth.IsStunned).
 //
 // Implemented: pursue, Acid Cleave (melee), Charge (run-across dash), Leap Slam (+ green acid
-// shockwave), Lob (acid blob → lingering puddle; the slime-throw variant will reuse the same arc).
-// Still to come: phase transitions, slime-spit enemy, the full acid system (flank pools → P3 rise).
+// shockwave), Lob (acid blob → lingering puddle on the floor, or a Slime add lobbed onto a camped
+// platform — same arc, different payload).
+// Still to come: phase transitions, the full acid system (flank pools → P3 rise), boss death/reward.
 [RequireComponent(typeof(EnemyHealth))]
 public class MossKnightBoss : MonoBehaviour
 {
@@ -69,9 +70,11 @@ public class MossKnightBoss : MonoBehaviour
     [Tooltip("Green acid shockwave spawned on landing (assign AcidShockwaveVFX).")]
     public GameObject slamShockwaveEffect;
 
-    [Header("Lob (Acid Blob)")]
-    [Tooltip("Acid blob projectile thrown onto the player/platform (assign AcidBlobProjectile).")]
+    [Header("Lob (Acid Blob / Slime)")]
+    [Tooltip("Carrier projectile arced onto the player/platform (assign AcidBlobProjectile).")]
     public GameObject lobProjectile;
+    [Tooltip("Slime add lobbed up when the player camps a platform (assign SlimeEnemy). Empty = acid only.")]
+    public GameObject slimeEnemy;
     [Tooltip("On the floor, only lob when the player is at least this far.")]
     public float lobMinRange = 6f;
     [Tooltip("Never lob past this range (the throw can't reach).")]
@@ -87,6 +90,12 @@ public class MossKnightBoss : MonoBehaviour
     public float lobTravelTime = 0.9f;
     [Tooltip("Player counts as 'camped on a platform' (priority lob target) when this far above the boss.")]
     public float lobAboveThreshold = 2f;
+
+    [Header("Boss Health Bar")]
+    [Tooltip("Big screen bar shown for this boss (assign BossHealthBar). Empty = no boss bar.")]
+    public GameObject bossHealthBarPrefab;
+    [Tooltip("Name shown on the boss bar.")]
+    public string bossName = "The Moss Knight";
 
     [Header("Edge Detection")]
     [Tooltip("Stop at ledges. Requires Ground Layer to be set, or it is ignored.")]
@@ -131,6 +140,14 @@ public class MossKnightBoss : MonoBehaviour
 
         if (controller == null)
             Debug.LogWarning("MossKnightBoss: no MonsterController found — add this to the Moss Knight (Cainos) prefab.");
+
+        // Spawn the dedicated boss health bar and bind it to our EnemyHealth.
+        if (bossHealthBarPrefab != null && health != null)
+        {
+            GameObject barGO = Instantiate(bossHealthBarPrefab);
+            BossHealthBar bar = barGO.GetComponent<BossHealthBar>();
+            if (bar != null) bar.Initialize(health, bossName);
+        }
     }
 
     void Update()
@@ -159,14 +176,14 @@ public class MossKnightBoss : MonoBehaviour
 
         if (canCleave)
             StartCoroutine(CleaveRoutine());
-        else if (canLob && playerAbove)            // contest platforms first — rain acid on the perch
-            StartCoroutine(LobRoutine());
+        else if (canLob && playerAbove)            // contest platforms first — lob a slime up onto the perch
+            StartCoroutine(LobRoutine(true));
         else if (canCharge)
             StartCoroutine(ChargeRoutine());
         else if (canLeap)
             StartCoroutine(LeapSlamRoutine());
-        else if (canLob)                            // otherwise a ranged floor poke while leap/charge cool
-            StartCoroutine(LobRoutine());
+        else if (canLob)                            // otherwise an acid poke while leap/charge cool
+            StartCoroutine(LobRoutine(false));
         else
             Pursue(dist);
     }
@@ -359,11 +376,12 @@ public class MossKnightBoss : MonoBehaviour
         // TODO (acid system): spread a temporary acid pool at the landing point.
     }
 
-    // --- Lob (Acid Blob) ---
-    // Reuses the single Attack anim as a throw gesture and arcs an acid blob onto the player's
-    // spot (the platform they are camping, or the floor). The blob bursts into a lingering acid
-    // puddle — see AcidBlobProjectile. This is what keeps the platforms from being a free refuge.
-    private IEnumerator LobRoutine()
+    // --- Lob (Acid Blob / Slime) ---
+    // Reuses the single Attack anim as a throw gesture and arcs a payload onto the player's spot.
+    // When the player is camped above (on a platform), it lobs a Slime add up to contest the perch;
+    // otherwise it lobs an acid blob that bursts into a lingering puddle (see AcidBlobProjectile).
+    // Either way, the platforms stop being a free refuge.
+    private IEnumerator LobRoutine(bool aimHigh)
     {
         isActing = true;
         lobReadyTime = Time.time + lobCooldown;
@@ -380,11 +398,19 @@ public class MossKnightBoss : MonoBehaviour
 
         if (lobProjectile != null && player != null)
         {
+            // Lob a slime onto a camped platform; otherwise an acid blob.
+            bool throwSlime = aimHigh && slimeEnemy != null;
+
             Vector2 origin = (Vector2)transform.position + Vector2.up * 1.2f;   // from the hands
             Vector2 landing = player.position;                                  // where they are now (dodgeable)
             GameObject blob = Instantiate(lobProjectile, origin, Quaternion.identity);
             AcidBlobProjectile proj = blob.GetComponent<AcidBlobProjectile>();
-            if (proj != null) proj.Launch(origin, landing, lobArcHeight, lobTravelTime);
+            if (proj != null)
+            {
+                proj.createPuddle = !throwSlime;
+                proj.landPayload = throwSlime ? slimeEnemy : null;
+                proj.Launch(origin, landing, lobArcHeight, lobTravelTime);
+            }
         }
 
         yield return new WaitForSeconds(lobRecover);

@@ -24,6 +24,12 @@ public class AcidBlobProjectile : MonoBehaviour
     [Tooltip("Half-width of the acid puddle in world units.")]
     public float patchRadius = 1.2f;
 
+    [Header("Payload (optional)")]
+    [Tooltip("If set, spawned at the landing point instead of/with the puddle (e.g. a Slime add). Set by the thrower.")]
+    public GameObject landPayload;
+    [Tooltip("Leave a lingering acid puddle on landing. Turned off for slime throws.")]
+    public bool createPuddle = true;
+
     private Vector2 start;
     private Vector2 target;
     private float arcHeight;
@@ -78,31 +84,41 @@ public class AcidBlobProjectile : MonoBehaviour
     {
         landed = true;
         transform.rotation = Quaternion.identity;
-        transform.localScale = Vector3.one;   // reset so the child puddle scales cleanly
+        transform.localScale = Vector3.one;   // reset so a child puddle scales cleanly
+        blobSr.enabled = false;               // hide the flying orb
 
         if (splashEffect != null)
             Instantiate(splashEffect, transform.position, Quaternion.identity);
 
-        // Build the lingering puddle as a child. Reuses HazardZone (LavaBoots protects, like all acid).
+        // Optional payload (e.g. a lobbed Slime add) drops in at the landing point.
+        if (landPayload != null)
+            Instantiate(landPayload, transform.position + Vector3.up * 0.3f, Quaternion.identity);
+
+        if (!createPuddle)
+        {
+            Destroy(gameObject);   // nothing lingers (slime throw) — clean up the carrier
+            return;
+        }
+
+        // Build the lingering acid puddle as a child. Reuses HazardZone (LavaBoots protects, like all acid).
         GameObject patch = new GameObject("AcidPatch");
         patch.transform.SetParent(transform, false);
-        patch.transform.localScale = new Vector3(patchRadius * 2f, patchRadius, 1f);
+        patch.transform.localScale = Vector3.one * (patchRadius * 2f);
 
         SpriteRenderer ps = patch.AddComponent<SpriteRenderer>();
-        ps.sprite = GetCircleSprite();
-        ps.color = new Color(blobColor.r, blobColor.g, blobColor.b, 0.55f);
+        ps.sprite = GetPuddleSprite();
+        ps.color = new Color(blobColor.r, blobColor.g, blobColor.b, 0.85f);
         ps.sortingLayerName = "Default";
         ps.sortingOrder = 9;
 
         BoxCollider2D col = patch.AddComponent<BoxCollider2D>();
         col.isTrigger = true;
-        col.size = new Vector2(1f, 0.6f);   // local units, scaled by the puddle's localScale above
+        col.size = new Vector2(0.85f, 0.32f);   // local units, scaled by the puddle's localScale above
 
         HazardZone hz = patch.AddComponent<HazardZone>();
         hz.damagePerSecond = patchDamagePerSecond;
         hz.requiredRelicID = "LavaBoots";
 
-        blobSr.enabled = false;   // hide the orb; the GameObject lives on to host the puddle
         StartCoroutine(PuddleLife(ps));
     }
 
@@ -110,14 +126,14 @@ public class AcidBlobProjectile : MonoBehaviour
     {
         float t = 0f;
         float fadeStart = Mathf.Max(0f, patchDuration - 0.8f);
-        Color baseCol = ps.color;
+        Color rgb = ps.color;
+        float baseA = rgb.a;
         while (t < patchDuration)
         {
+            float a = baseA * (0.88f + 0.12f * Mathf.Sin(t * 5f));   // gentle liquid shimmer
             if (t > fadeStart && patchDuration > fadeStart)
-            {
-                float fade = 1f - (t - fadeStart) / (patchDuration - fadeStart);
-                ps.color = new Color(baseCol.r, baseCol.g, baseCol.b, baseCol.a * Mathf.Clamp01(fade));
-            }
+                a *= Mathf.Clamp01(1f - (t - fadeStart) / (patchDuration - fadeStart));
+            ps.color = new Color(rgb.r, rgb.g, rgb.b, a);
             t += Time.deltaTime;
             yield return null;
         }
@@ -144,5 +160,62 @@ public class AcidBlobProjectile : MonoBehaviour
         tex.Apply();
         circleSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
         return circleSprite;
+    }
+
+    // The settled acid pool: a wide, wavy-edged puddle with a dark rim, a brighter interior and a
+    // few bubble highlights. Tinted via SpriteRenderer.color. 1 sprite, cached and reused.
+    private static Sprite puddleSprite;
+    private static Sprite GetPuddleSprite()
+    {
+        if (puddleSprite != null) return puddleSprite;
+
+        int size = 64;
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        float cx = size / 2f, cy = size / 2f;
+        float rx = 30f, ry = 15f;   // a wide, flat pool
+
+        // Bubble highlights, in normalized ellipse coords (-1..1) + radius.
+        float[,] bubbles = {
+            { -0.35f,  0.10f, 0.18f },
+            {  0.28f, -0.18f, 0.14f },
+            {  0.52f,  0.22f, 0.10f },
+            { -0.02f, -0.28f, 0.10f },
+            {  0.12f,  0.30f, 0.08f },
+        };
+
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float nx = (x + 0.5f - cx) / rx;
+                float ny = (y + 0.5f - cy) / ry;
+                float d = Mathf.Sqrt(nx * nx + ny * ny);
+                float ang = Mathf.Atan2(ny, nx);
+                float edge = 1f + 0.07f * Mathf.Sin(ang * 7f) + 0.05f * Mathf.Sin(ang * 3f + 1.3f);
+
+                if (d > edge) { tex.SetPixel(x, y, Color.clear); continue; }
+
+                float rim = edge - 0.22f;
+                float shade = d > rim ? 0.5f : 0.95f;   // dark rim, bright interior
+                float alpha = d > rim ? 0.95f : 0.82f;
+
+                for (int b = 0; b < bubbles.GetLength(0); b++)
+                {
+                    float dx = nx - bubbles[b, 0];
+                    float dy = ny - bubbles[b, 1];
+                    float bd = Mathf.Sqrt(dx * dx + dy * dy);
+                    if (bd < bubbles[b, 2])
+                    {
+                        float tb = bd / bubbles[b, 2];
+                        shade = tb > 0.62f ? 0.4f : 1f;   // dark outline ring, bright center
+                        alpha = 0.95f;
+                    }
+                }
+
+                tex.SetPixel(x, y, new Color(shade, shade, shade, alpha));
+            }
+        tex.Apply();
+        puddleSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+        return puddleSprite;
     }
 }

@@ -22,6 +22,9 @@ public class EnemyHealth : MonoBehaviour, IDamageable
 
     private float currentHealth;
 
+    // Read-only accessor so external HUDs (e.g. the boss health bar) can poll current HP.
+    public float CurrentHealth => currentHealth;
+
     public event System.Action OnDamaged;
 
     // Polled by AI scripts — they return early while this is true.

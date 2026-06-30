@@ -47,15 +47,15 @@ So the boss must be **baitable**: it approaches/chases the player predictably en
 
 Net effect: **floor** (melee, charge, rising acid) and **platforms** (slimes, acid lobs) are both hostile — constant repositioning between two bad options *is* the Shift tax.
 
-## 5. Phases
+## 5. Phases — CUT (decision 2026-07-01)
 
-- **P1 — "Duelist" (100–66%):** Acid Cleave + occasional Leap Slam. Static acid pools only. No slimes. Teaches spacing, slam-dodge, and the crusher bait.
-- **P2 — "Bloom" (66–33%):** adds **Charge** and the **Lob** (slimes + acid blobs hurled **up onto the platforms**). Slams spread acid wider.
-- **P3 — "Verdant Meltdown" (33–0%):** **acid level rises** (live on platforms); faster slams + charge; steady slime pressure. A survival/DPS race juggling Shift + adds + crusher timing.
+**No phase system.** This is a first-act boss most players reach under-geared, so it's deliberately kept simple/readable: all attacks are available from the start, no HP-gated escalation, no rising-acid climax. The full moveset (Cleave / Charge / Leap Slam / Lob[acid|slime]) just runs by range + cooldown the whole fight. The 3-phase plan below is kept only as a historical record in case a harder remix is ever wanted.
+
+- ~~**P1 "Duelist"**~~ / ~~**P2 "Bloom"**~~ / ~~**P3 "Verdant Meltdown"**~~ — shelved.
 
 ## 6. Starting numbers (all to tune)
 
-- **Boss HP:** ~600 (so the crusher's 80-dmg hits are a strong assist, ~2–4 landed over the fight, with cards/attacks doing the rest). Target fight length ~90–120s.
+- **Boss HP:** **~300** (revised down 2026-07-01 — players reach this boss under-geared; the crusher's 80-dmg hits are then a big assist, with cards/attacks doing the rest). Fair, non-punishing damage. Was ~600 in the original phased plan.
 - **Contact/Cleave dmg:** ~15; **Leap Slam:** ~20 + acid; **Charge:** ~18.
 - **Acid pool dmg:** reuse HazardZone's current value.
 - **Slimes:** spawn 1–2 at a time in P2, up to 3 concurrent in P3; low HP (~30), small contact dmg.
@@ -78,7 +78,7 @@ Net effect: **floor** (melee, charge, rising acid) and **platforms** (slimes, ac
 - **Boss acid-immunity:** when the acid hazard is built, it must skip the boss (flag/tag the boss so `HazardZone` ignores it). The boss also passes through the player physically (already done — ignores solid collision so a charge doesn't bulldoze the player).
 - Slimes: `EnemyHealth` + a simple chase AI (reuse `MeleeEnemy` pattern). Spawned by the **Lob** attack, which arcs them onto a platform; the acid-blob variant shares the lob and splashes a temp acid patch.
 - Acid rise (P3): move/scale the `PF Pixel Water - Acid` surface up, or enable stacked HazardZones. Flank pools in P1–P2; floods inward in P3.
-- Boss healthbar: dedicated boss bar (bigger than the standard enemy bar) — UI task.
+- Boss healthbar: ✔ done. `BossHealthBar.cs` + `Assets/Prefabs/UI/BossHealthBar.prefab` — big screen-anchored bar (top-center) with the boss name + a delayed "damage chunk" drain, built procedurally like EnemyHealthBar. Spawned by the boss in Start (assign to `MossKnightBoss.bossHealthBarPrefab`); polls `EnemyHealth.CurrentHealth`; removes itself when the boss dies. Clear the boss's `EnemyHealth.healthBarPrefab` slot so the small floating bar doesn't also show.
 - Telegraphs: procedural markers/flashes (reuse our VFX approach).
 
 ## 9. Arena layout (BossRoom.prefab — ~58 wide × 23 tall, 1 tile ≈ 1 unit)
@@ -116,7 +116,7 @@ Current state: tilemap geometry + the Crusher (PressHead/Chain/ChainAnchor) + a 
 
 1. ✔ `BossController` greybox: Moss Knight with EnemyHealth + healthbar, pursues player, **Acid Cleave**. Cards + crusher damage it.
 2. ✔ **Charge** (run-across dash, passes through player) and **Leap Slam** (parabolic leap → green acid shockwave + AoE).
-3. ✔ **Lob — acid-blob variant**: `AcidBlobProjectile.cs` (+ prefab) arcs onto the player/platform and bursts into a lingering acid puddle (reuses `HazardZone`, so LavaBoots protects). Boss prioritizes lobbing when the player is camped **above** him (platform), pokes at floor-range otherwise. **Slime-throw variant still TODO** — it reuses this exact arc once the Green Slime enemy exists.
-4. Phase transitions + **slime** summoning (build the slime enemy; the lob already carries it).
+3. ✔ **Lob**: `AcidBlobProjectile.cs` (+ prefab) is an arcing carrier. On the floor it bursts into a lingering acid puddle (reuses `HazardZone`, so LavaBoots protects); when the player is camped **above** (platform), it carries a **Slime add** (`SlimeEnemy.prefab` in `Assets/YeniLeveller/`, already wired with SlimeAI + EnemyHealth) and drops it onto the perch instead. Boss prioritizes the slime-lob when the player is above, acid-pokes at floor-range otherwise.
+4. Phase transitions (gate Charge/Lob/slime by HP, ramp cadence) + boss death anim + RewardManager hook.
 5. **Acid system**: static flank pools → P3 rising tide (the slam + lob puddles foreshadow it).
 6. Arena/layout tuning, boss healthbar UI, reward, balance pass.
