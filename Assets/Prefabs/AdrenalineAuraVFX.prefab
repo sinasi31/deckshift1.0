@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &3283776623164260811
+--- !u!1 &7401582936470158293
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,22 +8,22 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 3283776623164260812}
-  - component: {fileID: 3283776623164260813}
+  - component: {fileID: 7401582936470158294}
+  - component: {fileID: 7401582936470158295}
   m_Layer: 0
-  m_Name: BiteVFX
+  m_Name: AdrenalineAuraVFX
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &3283776623164260812
+--- !u!4 &7401582936470158294
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3283776623164260811}
+  m_GameObject: {fileID: 7401582936470158293}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -32,32 +32,28 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &3283776623164260813
+--- !u!114 &7401582936470158295
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3283776623164260811}
+  m_GameObject: {fileID: 7401582936470158293}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 38fa93cc40d448d4198289e57df83dad, type: 3}
+  m_Script: {fileID: 11500000, guid: e5b8d2f10c6a4937b8e1d4c7a2f9b063, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  mouthScale: 1.05
-  baseSortingOrder: 20
-  fangColor: {r: 0.85, g: 0.08, b: 0.1, a: 1}
-  fangCount: 5
-  openOffset: 1.3
-  closeOffset: 0.42
-  biteDuration: 0.1
-  holdTime: 0.12
-  retractTime: 0.18
-  glowColor: {r: 0.9, g: 0.05, b: 0.1, a: 0.8}
-  glowSize: 2.6
-  bloodDrops: 8
-  bloodColor: {r: 0.7, g: 0, b: 0.05, a: 1}
-  bloodFallSpeed: 4
-  bloodSpread: 0.5
-  bloodSize: 0.16
-  bloodLifetime: 0.55
+  duration: 3
+  sparksPerSecond: 36
+  spawnRadius: 0.5
+  spawnYOffset: -0.4
+  riseSpeed: 5
+  riseSpeedVariance: 1.5
+  horizontalDrift: 0.5
+  sparkLifetime: 0.5
+  color: {r: 1, g: 0.75, b: 0.2, a: 0.9}
+  sparkSize: 0.12
+  sparkSizeVariance: 0.05
+  sortingLayer: Default
+  sortingOrder: 9

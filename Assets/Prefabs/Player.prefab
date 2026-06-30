@@ -25,7 +25,7 @@ Transform:
   m_GameObject: {fileID: 3644981727623042767}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 2.3, z: 0}
+  m_LocalPosition: {x: 0, y: 1.725, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -56,7 +56,7 @@ Transform:
   m_GameObject: {fileID: 3828055576969383411}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.02, z: 0}
+  m_LocalPosition: {x: 0, y: 0.015, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -87,7 +87,7 @@ Transform:
   m_GameObject: {fileID: 5046179867843327484}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.013, z: 0}
+  m_LocalPosition: {x: 0, y: -0.00975, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -118,8 +118,8 @@ Transform:
   m_GameObject: {fileID: 8107516281811307619}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.931, y: 1.684, z: -0.029971}
-  m_LocalScale: {x: 0.92018855, y: 1.8151367, z: 0.5790286}
+  m_LocalPosition: {x: 0.499, y: 1.263, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 7752269728812986763}
@@ -140,6 +140,8 @@ GameObject:
   - component: {fileID: 5524391224463896992}
   - component: {fileID: 7872518250570301061}
   - component: {fileID: 7895736338733408254}
+  - component: {fileID: 5062495975001351823}
+  - component: {fileID: 3837754565138129228}
   m_Layer: 7
   m_Name: Player
   m_TagString: Player
@@ -193,7 +195,7 @@ Rigidbody2D:
     m_Bits: 0
   m_Interpolate: 0
   m_SleepingMode: 1
-  m_CollisionDetection: 0
+  m_CollisionDetection: 1
   m_Constraints: 4
 --- !u!114 &1641162466347240171
 MonoBehaviour:
@@ -220,7 +222,12 @@ MonoBehaviour:
     m_Bits: 2056
   maxAirJumps: 0
   platformPrefab: {fileID: 2884497646027804218, guid: 0c30a27df86ca3d4485ef29c36533548, type: 3}
-  currentGold: 40
+  swimSpeed: 5
+  swimExitJumpForce: 9
+  swimSurfaceOffset: 1.2
+  swimSettleStrength: 8
+  swimExitDuration: 0.35
+  currentGold: 500
   audioSource: {fileID: 7872518250570301061}
   dashSound: {fileID: 8300000, guid: 1f3da61f1655f6e4488574b4e351c8ce, type: 3}
   fireballCastSound: {fileID: 8300000, guid: 2edea64602e6220499330f4c32d7ee4a, type: 3}
@@ -233,7 +240,7 @@ MonoBehaviour:
   jumpSound: {fileID: 8300000, guid: 4f25667166ce44040bd09867cd3a4042, type: 3}
   leapSound: {fileID: 8300000, guid: 4f25667166ce44040bd09867cd3a4042, type: 3}
   spendSound: {fileID: 8300000, guid: 70cad06b332b69049ad572f5628c41c5, type: 3}
-  warningSoundClip: {fileID: 0}
+  warningSoundClip: {fileID: 8300000, guid: 70cad06b332b69049ad572f5628c41c5, type: 3}
   soundVolume: 1
   biteEffectPrefab: {fileID: 3283776623164260811, guid: 793631f470e29814da8521d7548720a4, type: 3}
   leapEffectPrefab: {fileID: 4494037052561318430, guid: 1da5ff91634c74043845a8b98d0d41a1, type: 3}
@@ -250,14 +257,16 @@ MonoBehaviour:
   wallCheckDistance: 0.5
   wallSlideSpeed: 2
   wallJumpForce: {x: 10, y: 15}
-  moveSpeed: 3
+  moveSpeed: 5
   defaultJumpForce: 10
-  maxShift: 20
+  maxShift: 40
   currentShift: 1
   cometSpeed: 25
   cometDamage: 40
   cometRadius: 5
-  cometImpactEffect: {fileID: 7676874937706828914, guid: 6a0b8832fb3a14a4caa7833f014e25fd, type: 3}
+  cometImpactEffect: {fileID: 1148100095273426946, guid: 11fac573aa7824f4ab01e53fe6b2e880, type: 3}
+  cometShockwaveEffect: {fileID: 3610639634387760082, guid: 02caf5a9f88e25a46b92c7b33debfce1, type: 3}
+  cometVfxScale: 0.0299
   adrenalineDuration: 2.5
   slowMotionFactor: 0.4
   speedBoostMultiplier: 4
@@ -271,17 +280,18 @@ MonoBehaviour:
   enemyLayer:
     serializedVersion: 2
     m_Bits: 2048
+  glassWailEffect: {fileID: 4801726395048172630, guid: e1d4b8a26f3c40579ab1c2d3e4f5a6b7, type: 3}
   interactionRange: 2
   interactableLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 4096
   staggerCount: 0
   maxStaggerUses: 3
   staggerJumpForce: 5
   staggerDamage: 5
   staggerRadius: 2
   staggerEffect: {fileID: 0}
-  visualFlipYOffset: 2.25
+  visualFlipYOffset: 1.6875
   phaseVisuals:
   - {fileID: 9072995722623145862}
   - {fileID: 9072995722623145958}
@@ -340,8 +350,8 @@ CapsuleCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0.2285792, y: 1.161078}
-  m_Size: {x: 1.085281, y: 2.282375}
+  m_Offset: {x: -0.005312443, y: 0.84233874}
+  m_Size: {x: 0.5074955, y: 1.6848084}
   m_Direction: 0
 --- !u!96 &5524391224463896992
 TrailRenderer:
@@ -568,9 +578,38 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fa14f4e81b467824fbbd79d045afe1ad, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  maxOffset: 3
+  lerpDuration: 0.3
   peekKey: 306
-  peekSpeed: 20
-  maxPeekDistance: 15
+--- !u!114 &5062495975001351823
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8334719470568814973}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4dfa0209f709f3e44b9c2782eb5a8083, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &3837754565138129228
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8334719470568814973}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c73f718c8a1590e4f8c6d6fcada87b30, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxHealth: 100
+  isInvincible: 0
+  hurtSound: {fileID: 8300000, guid: 4bcb86928d613044aacc4a9458bd99f8, type: 3}
+  deathSound: {fileID: 8300000, guid: 3e3343bf51da7cd4d835c7154b887582, type: 3}
+  deathVolume: 1
 --- !u!1001 &259556885127125483
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -598,6 +637,18 @@ PrefabInstance:
     - target: {fileID: 3316761313665263895, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
       propertyPath: m_Layer
       value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 5230306948048977582, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 5230306948048977582, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 5230306948048977582, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.8
       objectReference: {fileID: 0}
     - target: {fileID: 5230306948048977582, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
       propertyPath: m_LocalPosition.x
@@ -820,6 +871,7 @@ PrefabInstance:
     - {fileID: 7015482586559747009, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
     - {fileID: 3016187934527726210, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
     - {fileID: 726649114791577718, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
+    - {fileID: 6370598690341371159, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
