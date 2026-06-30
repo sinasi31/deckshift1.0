@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardName: Create Platform
   description: Spawns a small platform at your cursor's location for 5 seconds
-  cardArt: {fileID: 9100342094264933583, guid: 4d4b03b86f23d62449dbe0899538a9b7, type: 3}
+  cardArt: {fileID: 6454027854207398463, guid: 425454d0d9c74d04b81f19b4e45bfe40, type: 3}
   actionType: 6
   actionValue: 0
   singleUse: 0

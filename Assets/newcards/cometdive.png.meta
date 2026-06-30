@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 940fc68f8ce05ec4c89e1005b403c5f9
+guid: 82da3f8f21bd06c41842722cd5bef0ac
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -634340166622653614
-    second: ChatGPT Image Jun 30, 2026, 12_52_16 PM_0
+      213: -6264566646456649978
+    second: cometdive_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -37,7 +37,7 @@ TextureImporter:
   maxTextureSize: 2048
   textureSettings:
     serializedVersion: 2
-    filterMode: 0
+    filterMode: 1
     aniso: 1
     mipBias: 0
     wrapU: 1
@@ -75,7 +75,7 @@ TextureImporter:
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 0
+    textureCompression: 1
     compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
@@ -100,7 +100,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: ChatGPT Image Jun 30, 2026, 12_52_16 PM_0
+      name: cometdive_0
       rect:
         serializedVersion: 2
         x: 0
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 253d1b5bafe5237f0800000000000000
-      internalID: -634340166622653614
+      spriteID: 607f03e73d9cf09a0800000000000000
+      internalID: -6264566646456649978
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      ChatGPT Image Jun 30, 2026, 12_52_16 PM_0: -634340166622653614
+      cometdive_0: -6264566646456649978
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
