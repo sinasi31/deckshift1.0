@@ -35,6 +35,23 @@ public class PlayerController : MonoBehaviour
     public GameObject platformPrefab;
     private bool isPhasing = false;
     private float verticalInput;
+
+    [Header("Swim Settings")]
+    [Tooltip("Horizontal/vertical move speed while swimming. Lower than moveSpeed to simulate water resistance.")]
+    public float swimSpeed = 5f;
+    [Tooltip("Upward impulse applied when pressing Jump while swimming, used to break the surface and leap out.")]
+    public float swimExitJumpForce = 9f;
+    [Tooltip("How far BELOW the surface the player settles when NOT actively swimming up/down, so they sit in the water instead of bobbing on top. Hold Up to swim above this and out of the water.")]
+    public float swimSurfaceOffset = 1.2f;
+    [Tooltip("How quickly the player sinks to the idle rest depth when not pressing up/down. Higher = snappier settle.")]
+    [SerializeField] private float swimSettleStrength = 8f;
+    [Tooltip("Seconds the upward swim-jump pop is preserved, to help breach the surface and leave the water.")]
+    [SerializeField] private float swimExitDuration = 0.35f;
+    private bool isSwimming = false;
+    private float swimCachedGravityScale;
+    private int swimZoneCount = 0; // refcount so overlapping swim zones don't exit early
+    private SwimZone currentSwimZone;
+    private float swimExitTimer;
     private Vector3 originalScale;
     internal Vector3 currentRoomEntryPoint;
 
@@ -276,6 +293,17 @@ public class PlayerController : MonoBehaviour
             moveInput = Input.GetAxisRaw("Horizontal");
             verticalInput = Input.GetAxisRaw("Vertical");
         }
+        else if (isSwimming)
+        {
+            // Free 8-directional swim. Jump kicks upward to break the surface.
+            moveInput = Input.GetAxisRaw("Horizontal");
+            verticalInput = Input.GetAxisRaw("Vertical");
+
+            if (Input.GetButtonDown("Jump")) PerformSwimJump();
+
+            if (moveInput > 0 && !isFacingRight) Flip();
+            else if (moveInput < 0 && isFacingRight) Flip();
+        }
         else
         {
             if (Input.GetButtonDown("Jump"))
@@ -295,20 +323,31 @@ public class PlayerController : MonoBehaviour
         // gravitySign flips fall/low-jump-cut direction when gravity is reversed.
         // Fall check: velocity dot gravitySign < 0 means moving against gravity (falling).
         // Low-jump cut: velocity dot gravitySign > 0 means rising; multiplied force sign follows.
-        float gravitySign = isGravityReversed ? -1f : 1f;
-        if (rb.linearVelocity.y * gravitySign < 0)
+        // Skip Better Jump while swimming: it manually applies Physics2D.gravity
+        // regardless of gravityScale, which would pull the swimmer down.
+        if (!isSwimming)
         {
-            rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (fallMultiplier - 1) * Time.deltaTime * gravitySign;
-        }
-        else if (rb.linearVelocity.y * gravitySign > 0 && !Input.GetKey(KeyCode.Space))
-        {
-            rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (lowJumpMultiplier - 1) * Time.deltaTime * gravitySign;
+            float gravitySign = isGravityReversed ? -1f : 1f;
+            if (rb.linearVelocity.y * gravitySign < 0)
+            {
+                rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (fallMultiplier - 1) * Time.deltaTime * gravitySign;
+            }
+            else if (rb.linearVelocity.y * gravitySign > 0 && !Input.GetKey(KeyCode.Space))
+            {
+                rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (lowJumpMultiplier - 1) * Time.deltaTime * gravitySign;
+            }
         }
 
-        if (!isPhasing)
+        // Swimming handles its own facing above and must not let ground-based
+        // transitions (e.g. touching the water floor) knock it out of Swimming.
+        if (!isPhasing && !isSwimming)
         {
             HandleStateTransitions();
             UpdateAnimations();
+        }
+        else if (isSwimming)
+        {
+            UpdateSwimAnimations();
         }
     }
 
@@ -372,6 +411,18 @@ public class PlayerController : MonoBehaviour
         animator.SetBool("IsGrounded", isGrounded);
     }
 
+    // Feeds the Cainos swim blend tree so it picks the forward / backward / up / down
+    // swim clip based on actual movement. IsInWater (set in EnterWater) gates entry.
+    private void UpdateSwimAnimations()
+    {
+        if (animator == null) return;
+
+        animator.SetFloat("MoveBlendX", Mathf.Abs(moveInput) > 0.1f ? 1f : 0f);
+        // VelocityX is signed by facing so "forward" stays positive regardless of direction.
+        animator.SetFloat("VelocityX", rb.linearVelocity.x * (isFacingRight ? 1f : -1f));
+        animator.SetFloat("VelocityY", rb.linearVelocity.y);
+    }
+
     private void HandleJumpInput()
     {
         if (currentState == PlayerState.WallSliding)
@@ -411,6 +462,37 @@ public class PlayerController : MonoBehaviour
         if (isPhasing)
         {
             rb.linearVelocity = new Vector2(moveInput * moveSpeed, verticalInput * moveSpeed);
+        }
+        else if (isSwimming && currentState != PlayerState.Dashing && currentState != PlayerState.KnockedBack && currentState != PlayerState.CometDiving)
+        {
+            // Direct velocity control with water resistance. Overwriting velocity each
+            // step keeps swimming responsive even if gravityScale gets changed elsewhere.
+            float vx = moveInput * swimSpeed;
+            float vy;
+
+            if (swimExitTimer > 0f)
+            {
+                // Swim-jump pop in progress: preserve the upward velocity to breach and exit.
+                swimExitTimer -= Time.fixedDeltaTime;
+                vy = rb.linearVelocity.y;
+            }
+            else if (Mathf.Abs(verticalInput) > 0.01f)
+            {
+                // Actively swimming up or down. Holding Up carries the player to the
+                // surface and out of the water — this is the normal way to exit.
+                vy = verticalInput * swimSpeed;
+            }
+            else
+            {
+                // Idle: settle DOWN to a rest depth below the surface so the player sits
+                // in the water instead of floating on top. Never pushes up, so it can't trap.
+                float restY = (currentSwimZone != null ? currentSwimZone.SurfaceY : transform.position.y) - swimSurfaceOffset;
+                vy = transform.position.y > restY
+                    ? Mathf.Max(-swimSpeed, (restY - transform.position.y) * swimSettleStrength)
+                    : 0f;
+            }
+
+            rb.linearVelocity = new Vector2(vx, vy);
         }
         else if (currentState == PlayerState.WallSliding)
         {
@@ -473,6 +555,49 @@ public class PlayerController : MonoBehaviour
     {
         isFacingRight = !isFacingRight;
         ApplyVisualFacing();
+    }
+
+    // === SWIMMING ===
+    // Called by SwimZone when the player enters/exits swimmable water (Clear/Normal).
+    // Hazard waters (Acid/Lava/Poison) use HazardZone and never call these.
+    // Swimming is free (no Shift cost) and uses gravity-off, 8-directional control.
+    public void EnterWater(SwimZone zone)
+    {
+        swimZoneCount++;
+        if (isSwimming || playerHealth.IsDead || currentState == PlayerState.InCannon) return;
+
+        isSwimming = true;
+        currentSwimZone = zone;
+        swimExitTimer = 0f;
+        swimCachedGravityScale = rb.gravityScale; // restore exactly on exit (handles gravity reversal)
+        rb.gravityScale = 0f;
+        ChangeState(PlayerState.Swimming);
+
+        // Drives the Cainos "Swim" state machine in AC Character.controller.
+        if (animator != null) animator.SetBool("IsInWater", true);
+    }
+
+    public void ExitWater(SwimZone zone)
+    {
+        swimZoneCount = Mathf.Max(0, swimZoneCount - 1);
+        if (!isSwimming || swimZoneCount > 0) return; // still inside another overlapping zone
+
+        isSwimming = false;
+        currentSwimZone = null;
+        swimExitTimer = 0f;
+        rb.gravityScale = swimCachedGravityScale;
+        if (currentState == PlayerState.Swimming) ChangeState(PlayerState.Jumping);
+
+        if (animator != null) animator.SetBool("IsInWater", false);
+    }
+
+    // Upward kick to break the surface and leap out of water. Free, no Shift cost.
+    // Starts a brief window where the surface clamp is bypassed so the player can exit.
+    private void PerformSwimJump()
+    {
+        swimExitTimer = swimExitDuration;
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, swimExitJumpForce);
+        if (audioSource != null && jumpSound != null) audioSource.PlayOneShot(jumpSound, soundVolume);
     }
 
     // Detailed outcome of the most recent card play (Success / Failed / Blocked).

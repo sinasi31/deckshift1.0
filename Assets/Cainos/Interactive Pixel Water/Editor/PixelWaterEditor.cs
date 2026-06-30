@@ -15,6 +15,85 @@ namespace Cainos.InteractivePixelWater
             water = (PixelWater)target;
 
             Undo.undoRedoPerformed += OnUndoRedo;
+
+            //set tooltips
+            SetTooltip("Size", "Controlling the width (X) and maximum height (Y) of the water area. Modifying this regenerates the mesh.");
+            SetTooltip("Fill", "A float (0 to 1) representing the vertical fill percentage. 1.0 is full height defined by Size.y, while lower values lower the water surface level.");
+            SetTooltip("interactionLayerMask", "Defines which layers contain non-trigger colliders that can physically interact with the water (create waves, splashes, etc.).");
+            SetTooltip("interactionTriggerLayerMask", "Defines which layers contain trigger colliders that can interact with the water.");
+
+            SetTooltip("waterColorEnabled", "Toggles the water color. When off the water itself will be transparent.");
+            SetTooltip("waterColorShallow", "The color gradient from the water surface (shallow) to the bottom (deep). The color is blended using alpha blend.");
+            SetTooltip("waterColorDeep", "The color gradient from the water surface (shallow) to the bottom (deep). The color is blended using alpha blend.");
+
+            SetTooltip("underwaterTintEnabled", "Toggles the tint applied to the content behind the water.");
+            SetTooltip("underwaterTintShallow", "The color tint applied to content behind the water, grading from surface (shallow) to bottom (deep). The color is blended using multiply.");
+            SetTooltip("underwaterTintDeep", "The color tint applied to content behind the water, grading from surface (shallow) to bottom (deep). The color is blended using multiply.");
+
+            SetTooltip("surfaceEnabled", "Toggles the rendering of the surface line at the top of the water. The surface line is divided into upper and lower part.");
+            SetTooltip("surfaceColorUpper", "Color of the upper part of the surface line.");
+            SetTooltip("surfaceColorLower", "Color of the lower part of the surface line.");
+            SetTooltip("surfaceThicknessUpper", "Controls how thick the upper surface line is rendered.");
+            SetTooltip("surfaceThicknessLower", "Controls how thick the lower surface line is rendered.");
+            SetTooltip("surfaceDistortionMul", "Multiplier for the distortion effect of the surface line.");
+
+            SetTooltip("distortionEnabled", "Toggles the refraction/distortion effect of the behind water content.");
+            SetTooltip("distortionSpeed", "Controls the animation speed of the effect.");
+            SetTooltip("distortionScale", "Controls the texture scale of the effect.");
+            SetTooltip("distortionStrength", "Controls the intensity of the effect.");
+
+            SetTooltip("blurEnabled", "Toggles the blur effect for the behind water content.");
+            SetTooltip("blurAmountShallow", "The blur effect intensity, grading from surface (shallow) to bottom (deep).");
+            SetTooltip("blurAmountDeep", "The blur effect intensity, grading from surface (shallow) to bottom (deep).");
+
+            SetTooltip("lightShaftEnabled", "Toggles the effect of light beams shining down into the water.");
+            SetTooltip("lightShaftColor", "The color and transparency of the light beams. The color is blended using add mode.");
+            SetTooltip("lightShaftScale", "Controls the size of the light rays.");
+            SetTooltip("lightShaftPower", "The power applied to the alpha of the light rays.");
+            SetTooltip("lightShaftTilt", "Controls the angle of the light rays.");
+            SetTooltip("lightShaftDepth", "Controls the fade-depth of the light rays.");
+            SetTooltip("lightShaftSpeed", "Controls the animation speed of the light rays.");
+
+            SetTooltip("waveEnabled", "Toggles the physics-based spring simulation for surface waves.");
+            SetTooltip("waveInfluenceMul", "Multiplier for how much an object's velocity (X and Y) impacts the water surface to create waves.");
+            SetTooltip("waveInfluenceDecayDepth", "The depth at which an object no longer creates surface waves (objects deep underwater won't disturb the surface).");
+            SetTooltip("waveTension", "Controls the stiffness of the wave. Higher values make the water surface snap back to rest position faster.");
+            SetTooltip("waveDamping", "Controls friction of the wave. Higher values make waves settle and stop oscillating faster. Avoid setting it to near zero.");
+            SetTooltip("waveSpread", "Controls how fast a wave ripple travels to neighboring vertices.");
+            SetTooltip("waveSpreadIteration", "The quality/smoothness of the wave propagation calculation (higher is more accurate but more expensive).");
+            SetTooltip("waveSpeedMul", "Global speed multiplier for the wave physics simulation.");
+            SetTooltip("waveVelocityLimit", "Clamps the maximum speed of the wave.");
+            SetTooltip("waveLimit", "Clamps the maximum amplitude of the wave.");
+
+            SetTooltip("ambientWaveEnabled", "Toggles the constant background waves.");
+            SetTooltip("ambientWaveMul", "Global intensity multiplier for the ambient wave.");
+            SetTooltip("ambientWaveSpeed", "Parameters that allow layering up to 4 different wave noises (x, y, z, w) for complex, non-repeating surface wave motion.");
+            SetTooltip("ambientWaveFrequency", "Parameters that allow layering up to 4 different wave noises (x, y, z, w) for complex, non-repeating surface wave motion.");
+            SetTooltip("ambientWaveAmplitude", "Parameters that allow layering up to 4 different wave noises (x, y, z, w) for complex, non-repeating surface wave motion.");
+
+            SetTooltip("bubbleEnabled", "Toggles bubble effect generation.");
+            SetTooltip("bubbleDurationMul", "Multiplier for bubble emit duration.");
+            SetTooltip("bubbleAmountMul", "Multiplier for bubble emit amount.");
+            SetTooltip("bubbleColorOutline", "The outline color of the generated bubble.");
+            SetTooltip("bubbleColorFill", "The fill color of the generated bubble.");
+            SetTooltip("bubblePrefab", "The prefab instantiated to create bubbles. (must contain PixelWaterBubble script).");
+
+            SetTooltip("splashEnabled", "Toggles splash effect generation.");
+            SetTooltip("splashOnEnter", "Whether to generate splash when objects enter the water.");
+            SetTooltip("splashOnExit", "Whether to generate splash when objects exit the water.");
+            SetTooltip("splashColorLight", "The color of the lighter part of the splash.");
+            SetTooltip("splashColorDark", "The color of the darker part of the splash.");
+            SetTooltip("splashColorOutline", "The outline color of the splash.");
+            SetTooltip("splashConfigs", "A list of SplashConfig objects defining different splash types based on object size.");
+
+            SetTooltip("surfaceParticleEnabled", "Toggles continuous particles on the water surface.");
+            SetTooltip("surfaceParticleConfigs", "A list of ParticleConfig objects defining particle systems used as the surface particle.");
+            SetTooltip("inWaterParticleEnabled", "Toggles continuous particles inside the water volume.");
+            SetTooltip("inWaterParticleConfigs", "A list of ParticleConfig objects defining particle systems used as the surface particle.");
+
+            SetTooltip("dragEnabled", "Toggles the custom drag force.");
+            SetTooltip("dragLinear", "How much linear velocity is slowed down.");
+            SetTooltip("dragAngular", "How much rotation (angular velocity) is slowed down.");
         }
 
 
@@ -50,7 +129,7 @@ namespace Cainos.InteractivePixelWater
 
             //bottom left handle
             EditorGUI.BeginChangeCheck();
-            var fmh_53_66_639114543040926768 = Quaternion.identity; Vector3 newBL = Handles.FreeMoveHandle(handlePos[0], handleSize, snap, Handles.CubeHandleCap);
+            var fmh_132_66_639184265665839560 = Quaternion.identity; Vector3 newBL = Handles.FreeMoveHandle(handlePos[0], handleSize, snap, Handles.CubeHandleCap);
             if (EditorGUI.EndChangeCheck())
             {
                 Undo.RecordObject(water, "Resize Water");
@@ -62,7 +141,7 @@ namespace Cainos.InteractivePixelWater
 
             //bottom right handle
             EditorGUI.BeginChangeCheck();
-            var fmh_65_66_639114543040942479 = Quaternion.identity; Vector3 newBR = Handles.FreeMoveHandle(handlePos[1], handleSize, snap, Handles.CubeHandleCap);
+            var fmh_144_66_639184265665859059 = Quaternion.identity; Vector3 newBR = Handles.FreeMoveHandle(handlePos[1], handleSize, snap, Handles.CubeHandleCap);
             if (EditorGUI.EndChangeCheck())
             {
                 Undo.RecordObject(water, "Resize Water");
@@ -74,7 +153,7 @@ namespace Cainos.InteractivePixelWater
 
             //top left handle
             EditorGUI.BeginChangeCheck();
-            var fmh_77_66_639114543040945114 = Quaternion.identity; Vector3 newTL = Handles.FreeMoveHandle(handlePos[2], handleSize, snap, Handles.CubeHandleCap);
+            var fmh_156_66_639184265665863703 = Quaternion.identity; Vector3 newTL = Handles.FreeMoveHandle(handlePos[2], handleSize, snap, Handles.CubeHandleCap);
             if (EditorGUI.EndChangeCheck())
             {
                 Undo.RecordObject(water, "Resize Water");
@@ -86,7 +165,7 @@ namespace Cainos.InteractivePixelWater
 
             //top right
             EditorGUI.BeginChangeCheck();
-            var fmh_89_66_639114543040946499 = Quaternion.identity; Vector3 newTR = Handles.FreeMoveHandle(handlePos[3], handleSize, snap, Handles.CubeHandleCap);
+            var fmh_168_66_639184265665866535 = Quaternion.identity; Vector3 newTR = Handles.FreeMoveHandle(handlePos[3], handleSize, snap, Handles.CubeHandleCap);
             if (EditorGUI.EndChangeCheck())
             {
                 Undo.RecordObject(water, "Resize Water");

@@ -9,6 +9,7 @@ public enum PlayerState
     WallSliding,
     InCannon,
     CometDiving,
+    Swimming,
 }
 
 public enum CardActionType
