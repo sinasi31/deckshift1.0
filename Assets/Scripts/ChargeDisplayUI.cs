@@ -3,19 +3,19 @@ using TMPro;
 
 public class ChargeDisplayUI : MonoBehaviour
 {
-    // 1. Bu referansýn Inspector'da atanmýþ olmasý gerekiyor
+    // 1. Bu referansï¿½n Inspector'da atanmï¿½ï¿½ olmasï¿½ gerekiyor
     public PlayerController playerController;
 
-    // 2. Bu referansýn da Inspector'da atanmýþ olmasý gerekiyor
-    public TextMeshProUGUI shiftTextElement; // Adýný daha anlaþýlýr yaptým
+    // 2. Bu referansï¿½n da Inspector'da atanmï¿½ï¿½ olmasï¿½ gerekiyor
+    public TextMeshProUGUI shiftTextElement; // Adï¿½nï¿½ daha anlaï¿½ï¿½lï¿½r yaptï¿½m
 
     void Update()
     {
         if (playerController != null && shiftTextElement != null)
         {
-            // 3. 'GetCurrentShift()' fonksiyonunu çaðýrýyoruz
+            // 3. 'GetCurrentShift()' fonksiyonunu ï¿½aï¿½ï¿½rï¿½yoruz
             int charges = playerController.GetCurrentShift();
-            shiftTextElement.text = $"Shift: {charges}"; // Metni 'Shift' olarak güncelledim
+            shiftTextElement.text = $"SHIFT: {charges}"; // Display label; cost logic unchanged
         }
     }
 }

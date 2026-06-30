@@ -43,7 +43,7 @@ public class RecallUI : MonoBehaviour
     {
         if (costText != null)
         {
-            costText.text = newCost.ToString() + " Shift";
+            costText.text = newCost.ToString();
 
             // Opsiyonel: Maliyet arttıkça rengi kırmızıya dönsün
             if (newCost > 3) costText.color = Color.red;
