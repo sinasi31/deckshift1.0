@@ -146,6 +146,7 @@ public class PlayerController : MonoBehaviour
     public float adrenalineDuration = 3f;
     public float slowMotionFactor = 0.4f;
     public float speedBoostMultiplier = 1.5f;
+    public GameObject adrenalineAuraEffect;   // looping energy aura (AdrenalineAuraVFX), played for the buff duration
 
     public PlayerState currentState;
     internal bool isGrounded;
@@ -158,6 +159,7 @@ public class PlayerController : MonoBehaviour
     public float biteRange = 1.5f;
     public float biteHealAmount = 10f;
     public LayerMask enemyLayer;
+    public GameObject glassWailEffect;   // Glass Wail shockwave VFX (world-space ShockwaveVFX prefab; size set on the prefab)
 
     [Header("Interaction Settings")]
     public float interactionRange = 2f;
@@ -183,11 +185,8 @@ public class PlayerController : MonoBehaviour
     [Header("Gravity Reversal")]
     // Tune in Play mode: feet should just touch the ceiling when flipped
     [SerializeField] private float visualFlipYOffset = 2.0f;
-
-    // Cached renderer for warning flash (same approach as EnemyHealth)
-    private SkinnedMeshRenderer playerSkinnedRenderer;
-    private bool playerRendererHasColor;
-    private Color playerRendererOriginalColor;
+    public GameObject gravityAuraEffect;        // looping anti-gravity aura prefab (GravityAuraVFX), played for the reversal duration
+    private GameObject gravityAuraInstance;
 
     [Header("Phase Visual")]
     [SerializeField] internal SkinnedMeshRenderer[] phaseVisuals;
@@ -202,15 +201,6 @@ public class PlayerController : MonoBehaviour
         cardActionExecutor = GetComponent<CardActionExecutor>();
         capsuleCollider = GetComponent<CapsuleCollider2D>();
         playerHealth = GetComponent<PlayerHealth>();
-
-        // Cache SkinnedMeshRenderer for gravity-reversal warning flash
-        playerSkinnedRenderer = GetComponentInChildren<SkinnedMeshRenderer>(true);
-        if (playerSkinnedRenderer != null)
-        {
-            playerRendererHasColor = playerSkinnedRenderer.material.HasProperty("_Color");
-            if (playerRendererHasColor)
-                playerRendererOriginalColor = playerSkinnedRenderer.material.color;
-        }
 
         if (visualModel != null)
         {
@@ -841,10 +831,11 @@ public class PlayerController : MonoBehaviour
             targetHealth.TakeDamage(damageAmount);
             if (targetHealth is EnemyHealth) Heal(biteHealAmount);
             if (biteEffectPrefab != null)
-            {
-                GameObject vfx = Instantiate(biteEffectPrefab, hit.transform.position, Quaternion.identity);
-                Destroy(vfx, 1.0f);
-            }
+                Instantiate(biteEffectPrefab, hit.transform.position, Quaternion.identity);  // BiteVFX self-destroys
+
+            if (CameraShake.instance != null)
+                CameraShake.instance.Shake(0.08f, 0.25f);   // chomp impact
+
             return; // one bite, one target
         }
     }
@@ -862,6 +853,11 @@ public class PlayerController : MonoBehaviour
 
         if (CameraShake.instance != null)
             CameraShake.instance.Shake(0.5f, 0.5f);
+
+        // Wail origin: a shockwave ripples out from the player so the screen-wide stun reads visually.
+        // World-space prefab (self-destroys), so spawn it directly rather than via the UI-canvas helper.
+        if (glassWailEffect != null)
+            Instantiate(glassWailEffect, transform.position, Quaternion.identity);
 
         foreach (EnemyHealth enemy in allEnemies)
         {
@@ -1140,6 +1136,16 @@ public class PlayerController : MonoBehaviour
 
         if (CameraShake.instance != null) CameraShake.instance.Shake(0.1f, 0.5f);
 
+        // Energy aura for the whole buff (both branches last adrenalineDuration). Parent to the
+        // player root (identity rotation) so sparks rise in world space; it self-destroys.
+        if (adrenalineAuraEffect != null)
+        {
+            GameObject aura = Instantiate(adrenalineAuraEffect, transform);
+            aura.transform.localPosition = Vector3.zero;
+            AdrenalineAuraVFX auraVfx = aura.GetComponent<AdrenalineAuraVFX>();
+            if (auraVfx != null) auraVfx.duration = adrenalineDuration;
+        }
+
         if (healthPercentage > 0.5f)
         {
             StartCoroutine(AdrenalineSlowMoRoutine());
@@ -1256,6 +1262,7 @@ public class PlayerController : MonoBehaviour
         {
             cardActionExecutor?.SetManualFlag(ConflictFlags.GravityScale | ConflictFlags.VisualTransform, false);
             StopCoroutine(gravityReversalCoroutine);
+            DestroyGravityAura();   // stopping the routine skips its normal cleanup; clear the aura too
         }
         gravityReversalCoroutine = StartCoroutine(GravityReversalRoutine());
     }
@@ -1276,6 +1283,15 @@ public class PlayerController : MonoBehaviour
             ApplyVisualFacing();
             originalGravityScale = rb.gravityScale;
             rb.gravityScale = -originalGravityScale;
+
+            // Anti-gravity aura: parent to the player root (identity rotation) so motes
+            // rise in world space rather than inheriting the visual's 180 deg flip.
+            if (gravityAuraEffect != null)
+            {
+                gravityAuraInstance = Instantiate(gravityAuraEffect, transform);
+                gravityAuraInstance.transform.localPosition = Vector3.zero;
+            }
+
             yield return StartCoroutine(LerpVisualTransform(0f, 180f, originalVisualLocalPos.y, originalVisualLocalPos.y + visualFlipYOffset, 0.15f));
             // Wait until 0.5s before the 5s mark (5.0 - 0.5 - 0.15 initial rotation = 4.35s)
             yield return new WaitForSeconds(4.35f);
@@ -1301,10 +1317,21 @@ public class PlayerController : MonoBehaviour
         ApplyVisualFacing();
         yield return StartCoroutine(LerpVisualTransform(180f, 0f, originalVisualLocalPos.y + visualFlipYOffset, originalVisualLocalPos.y, 0.15f));
 
+        DestroyGravityAura();
+
         // Cleared only after the visual lerp-back so VisualTransform stays honest
         // for the full effect, mirroring the set at the top of this routine.
         cardActionExecutor?.SetManualFlag(ConflictFlags.GravityScale | ConflictFlags.VisualTransform, false);
         gravityReversalCoroutine = null;
+    }
+
+    private void DestroyGravityAura()
+    {
+        if (gravityAuraInstance != null)
+        {
+            Destroy(gravityAuraInstance);
+            gravityAuraInstance = null;
+        }
     }
 
     private IEnumerator LerpVisualTransform(float fromZ, float toZ, float fromY, float toY, float duration)
@@ -1330,19 +1357,38 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator WarningFlashRoutine()
     {
+        // Flash the sprite rig (the SkinnedMeshRenderer path was dead after the rig swap).
+        // Capture each sprite's own color so the restore is honest even if they differ.
+        SpriteRenderer[] sprites = visualModel != null
+            ? visualModel.GetComponentsInChildren<SpriteRenderer>(true)
+            : new SpriteRenderer[0];
+        Color[] originals = new Color[sprites.Length];
+        for (int i = 0; i < sprites.Length; i++)
+            originals[i] = sprites[i].color;
+
+        Color warnColor = new Color(1f, 0.3f, 0.3f);   // red danger tint
+
         // 3 rapid on/off cycles ≈ 0.5s total
-        for (int i = 0; i < 3; i++)
+        for (int c = 0; c < 3; c++)
         {
-            SetPlayerFlashColor(Color.white);
+            SetSpriteColors(sprites, warnColor, null);
             yield return new WaitForSeconds(0.083f);
-            SetPlayerFlashColor(playerRendererOriginalColor);
+            SetSpriteColors(sprites, default, originals);
             yield return new WaitForSeconds(0.083f);
         }
+
+        // Guarantee restoration regardless of where the loop ended.
+        SetSpriteColors(sprites, default, originals);
     }
 
-    private void SetPlayerFlashColor(Color color)
+    // Tint all sprites to a single color, or restore each to its captured original
+    // when 'restore' is supplied.
+    private void SetSpriteColors(SpriteRenderer[] sprites, Color flat, Color[] restore)
     {
-        if (playerSkinnedRenderer != null && playerRendererHasColor)
-            playerSkinnedRenderer.material.SetColor("_Color", color);
+        for (int i = 0; i < sprites.Length; i++)
+        {
+            if (sprites[i] == null) continue;
+            sprites[i].color = restore != null ? restore[i] : flat;
+        }
     }
 }
