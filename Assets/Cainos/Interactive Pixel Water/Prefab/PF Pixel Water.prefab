@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 1866009694136763870}
   - component: {fileID: 9021447951967945863}
   - component: {fileID: 3063698515212308602}
+  - component: {fileID: 4786090398209908283}
   m_Layer: 4
   m_Name: PF Pixel Water
   m_TagString: Untagged
@@ -28,13 +29,13 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1866009694136763843}
+  serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 11.709694, y: -1.339735, z: -1}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1866009694136763840
 MonoBehaviour:
@@ -100,8 +101,7 @@ MonoBehaviour:
   bubbleAmountMul: 1
   bubbleColorOutline: {r: 0.9, g: 1, b: 1, a: 0.4}
   bubbleColorFill: {r: 0.24, g: 0.54, b: 0.38, a: 0.27}
-  bubblePrefab: {fileID: 1354388899100067157, guid: ba918cd723b452b4c80cc3c7dcbaea8c,
-    type: 3}
+  bubblePrefab: {fileID: 1354388899100067157, guid: ba918cd723b452b4c80cc3c7dcbaea8c, type: 3}
   splashEnabled: 1
   splashOnEnter: 1
   splashOnExit: 1
@@ -112,23 +112,19 @@ MonoBehaviour:
   - sizeRange: {x: 0, y: 0.2}
     minSpeed: 0.5
     minDepth: 0
-    splashPrefab: {fileID: 5800786323235578726, guid: e03b07e211ce1664faafa53bf1b64cb9,
-      type: 3}
+    splashPrefab: {fileID: 5800786323235578726, guid: e03b07e211ce1664faafa53bf1b64cb9, type: 3}
   - sizeRange: {x: 0.2, y: 0.4}
     minSpeed: 1.5
     minDepth: 0.1
-    splashPrefab: {fileID: 5800786323235578726, guid: 71e85c26489236d4899df3b6a181e804,
-      type: 3}
+    splashPrefab: {fileID: 5800786323235578726, guid: 71e85c26489236d4899df3b6a181e804, type: 3}
   - sizeRange: {x: 0.4, y: 1.2}
     minSpeed: 1.5
     minDepth: 0.12
-    splashPrefab: {fileID: 5800786323235578726, guid: ade0a54f6cb471945a03674b1e63ab06,
-      type: 3}
+    splashPrefab: {fileID: 5800786323235578726, guid: ade0a54f6cb471945a03674b1e63ab06, type: 3}
   - sizeRange: {x: 1.2, y: 100}
     minSpeed: 2
     minDepth: 0.2
-    splashPrefab: {fileID: 5800786323235578726, guid: ebdd47cc02199d6419e9dfd31e9ee9e6,
-      type: 3}
+    splashPrefab: {fileID: 5800786323235578726, guid: ebdd47cc02199d6419e9dfd31e9ee9e6, type: 3}
   surfaceParticleEnabled: 0
   surfaceParticleConfigs: []
   inWaterParticleEnabled: 0
@@ -158,6 +154,9 @@ MeshRenderer:
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 2
   m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -202,7 +201,7 @@ BuoyancyEffector2D:
   m_UseColliderMask: 1
   m_ColliderMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 2147483647
   m_SurfaceLevel: 1.702745
   m_Density: 20
   m_LinearDrag: 0
@@ -218,11 +217,32 @@ BoxCollider2D:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1866009694136763843}
   m_Enabled: 1
+  serializedVersion: 3
   m_Density: 1
   m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
   m_IsTrigger: 1
   m_UsedByEffector: 1
-  m_UsedByComposite: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0.8513725}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
@@ -233,6 +253,17 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  serializedVersion: 2
   m_Size: {x: 20.957535, y: 1.702745}
   m_EdgeRadius: 0
+--- !u!114 &4786090398209908283
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1866009694136763843}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e10c6917d2d8ce0468bf8e53cd3e4b51, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
