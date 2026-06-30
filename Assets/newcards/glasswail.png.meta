@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 07ae3920dc8a32d40a735d5f4985f87e
+guid: d8b48ba556ef0c24ab4bfa1fbd51c3d0
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -4715177265856822388
-    second: glass_wail_0
+      213: -8024131544370953100
+    second: glasswail_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: glass_wail_0
+      name: glasswail_0
       rect:
         serializedVersion: 2
-        x: 3
-        y: 2
-        width: 595
-        height: 895
+        x: 0
+        y: 0
+        width: 1024
+        height: 1536
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: c834b9f3243509eb0800000000000000
-      internalID: -4715177265856822388
+      spriteID: 47443c2cfde84a090800000000000000
+      internalID: -8024131544370953100
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      glass_wail_0: -4715177265856822388
+      glasswail_0: -8024131544370953100
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
