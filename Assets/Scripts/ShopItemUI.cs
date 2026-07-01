@@ -112,7 +112,7 @@ public class ShopItemUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
             if (buySound != null)
             {
                 // Sesi kameranın olduğu pozisyonda çalıyoruz ki her yerden duyulsun
-                AudioSource.PlayClipAtPoint(buySound, Camera.main.transform.position, soundVolume);
+                SfxManager.PlayAtPoint(buySound, Camera.main.transform.position, soundVolume);
             }
             // -----------------------------
 

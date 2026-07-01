@@ -4,7 +4,8 @@ using UnityEngine.UI;
 public class SettingsMenu : MonoBehaviour
 {
     [Header("UI Elemanları")]
-    public Slider volumeSlider;
+    public Slider volumeSlider;        // Master volume (AudioListener) — affects music + SFX together
+    public Slider sfxSlider;           // Sound-effects volume (SfxManager), independent of music
     public Toggle showEnemyNumbersToggle;
     public GameObject settingsPanel;
 
@@ -19,6 +20,13 @@ public class SettingsMenu : MonoBehaviour
             volumeSlider.onValueChanged.AddListener(SetVolume);
         }
 
+        if (sfxSlider != null)
+        {
+            // Show the saved SFX volume (SfxManager loads it from PlayerPrefs on boot).
+            sfxSlider.value = SfxManager.Volume;
+            sfxSlider.onValueChanged.AddListener(SetSfxVolume);
+        }
+
         if (showEnemyNumbersToggle != null)
         {
             bool showNumbers = PlayerPrefs.GetInt("ShowEnemyNumbers", 1) == 1;
@@ -30,6 +38,12 @@ public class SettingsMenu : MonoBehaviour
     public void SetVolume(float volume)
     {
         AudioListener.volume = volume;
+    }
+
+    // Sets + persists the global SFX volume (all sound effects, independent of music).
+    public void SetSfxVolume(float volume)
+    {
+        if (SfxManager.instance != null) SfxManager.instance.SetVolume(volume);
     }
 
     public void SetShowEnemyNumbers(bool show)

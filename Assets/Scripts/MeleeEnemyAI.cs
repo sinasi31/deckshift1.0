@@ -19,6 +19,12 @@ public class MeleeEnemyAI : MonoBehaviour
     public float edgeCheckOffsetX = 0.5f;
     public float edgeCheckDepth = 1f;
 
+    [Header("Ses")]
+    // Played at the start of each swing. PlayClipAtPoint keeps it working even if
+    // the enemy is destroyed mid-swing (no AudioSource component required).
+    [SerializeField] private AudioClip attackSound;
+    [SerializeField, Range(0f, 1f)] private float attackVolume = 1f;
+
     private MonsterController controller;
     private EnemyHealth health;
     private Transform player;
@@ -57,6 +63,9 @@ public class MeleeEnemyAI : MonoBehaviour
                 {
                     controller.inputAttack = true;
                     lastAttackTime = Time.time;
+
+                    // Play the swing sound at the moment the attack starts.
+                    SfxManager.PlayAtPoint(attackSound, transform.position, attackVolume);
 
                     // YENİ: Kılıcı kaldırdığı an hasar hesaplama sürecini başlat
                     StartCoroutine(DealDamageRoutine());

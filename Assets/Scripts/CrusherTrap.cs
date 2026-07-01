@@ -97,7 +97,7 @@ public class CrusherTrap : MonoBehaviour
         ApplyImpactDamage();
 
         if (CameraShake.instance != null) CameraShake.instance.Shake(shakeDuration, shakeIntensity);
-        if (slamSound != null) AudioSource.PlayClipAtPoint(slamSound, pressHead.position);
+        SfxManager.PlayAtPoint(slamSound, pressHead.position);
 
         yield return new WaitForSeconds(holdTime);
 

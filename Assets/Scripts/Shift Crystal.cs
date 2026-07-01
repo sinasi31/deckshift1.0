@@ -6,6 +6,12 @@ public class ShiftCrystal : MonoBehaviour
     public int shiftAmount = 1;
     public bool destroyOnCollect = true;
 
+    [Header("Ses")]
+    // Played when the player collects the crystal. Uses PlayClipAtPoint because
+    // the object is destroyed on collect, so a local AudioSource would be cut off.
+    [SerializeField] private AudioClip collectSound;
+    [SerializeField, Range(0f, 1f)] private float collectVolume = 1f;
+
     private void OnTriggerEnter2D(Collider2D other)
     {
         // SADECE OYUNCU DOKUNURSA ALINSIN
@@ -14,8 +20,8 @@ public class ShiftCrystal : MonoBehaviour
             CollectCrystal();
         }
 
-        // NOT: Buradaki "else if (other.GetComponent<Fireball>..." kýsmýný sildik.
-        // Artýk Fireball buna deðince hiçbir þey olmamýþ gibi yoluna devam edecek.
+        // NOT: Buradaki "else if (other.GetComponent<Fireball>..." kï¿½smï¿½nï¿½ sildik.
+        // Artï¿½k Fireball buna deï¿½ince hiï¿½bir ï¿½ey olmamï¿½ï¿½ gibi yoluna devam edecek.
     }
 
     private void CollectCrystal()
@@ -23,10 +29,11 @@ public class ShiftCrystal : MonoBehaviour
         if (GameManager.instance != null && GameManager.instance.player != null)
         {
             GameManager.instance.player.AddShift(shiftAmount);
-            Debug.Log("Shift Kristali alýndý!");
+            Debug.Log("Shift Kristali alï¿½ndï¿½!");
         }
 
-        // Ses efekti vs. buraya
+        // Play the pickup sound at the crystal's position (survives object destroy).
+        SfxManager.PlayAtPoint(collectSound, transform.position, collectVolume);
 
         if (destroyOnCollect)
         {

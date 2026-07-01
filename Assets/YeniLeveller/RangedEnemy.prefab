@@ -215,6 +215,8 @@ MonoBehaviour:
   attackRange: 7
   fireRate: 2.5
   yTolerance: 1.5
+  shootSound: {fileID: 8300000, guid: b855762454f2d67468da655b38fe2019, type: 3}
+  shootVolume: 1
 --- !u!114 &1626646847183605829
 MonoBehaviour:
   m_ObjectHideFlags: 0

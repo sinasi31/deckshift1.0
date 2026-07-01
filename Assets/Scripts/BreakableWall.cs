@@ -97,8 +97,7 @@ public class BreakableWall : MonoBehaviour, IDamageable
         if (breakVFX != null)
             Instantiate(breakVFX, transform.position, Quaternion.identity);
 
-        if (breakSound != null)
-            AudioSource.PlayClipAtPoint(breakSound, transform.position);
+        SfxManager.PlayAtPoint(breakSound, transform.position);
 
         CameraShake.instance?.Shake(0.1f, 0.15f);
         Destroy(gameObject);

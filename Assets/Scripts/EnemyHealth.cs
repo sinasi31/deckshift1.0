@@ -28,6 +28,9 @@ public class EnemyHealth : MonoBehaviour, IDamageable
     public event System.Action OnDamaged;
     // Carries the hit's damage amount (e.g. so the boss can flinch on big hits). Fires after a landed hit.
     public event System.Action<float> OnDamagedAmount;
+    // Fired once when this enemy dies, right before the GameObject is destroyed
+    // (e.g. so the boss can hand music back to the level track).
+    public event System.Action OnDied;
 
     // Polled by AI scripts — they return early while this is true.
     public bool IsStunned { get; private set; }
@@ -160,6 +163,9 @@ public class EnemyHealth : MonoBehaviour, IDamageable
                 Debug.Log("OVERCLOCK AKTİF: Sonraki kart bedava!");
             }
         }
+
+        // Notify listeners (e.g. the boss) before the object is destroyed.
+        OnDied?.Invoke();
 
         Destroy(gameObject);
     }

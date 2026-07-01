@@ -5,39 +5,40 @@ public class MusicManager : MonoBehaviour
 {
     public static MusicManager instance;
 
-    [Header("Müzikler")]
+    [Header("Mï¿½zikler")]
     public AudioClip menuMusic;
     public AudioClip levelMusic;
+    public AudioClip bossMusic; // Boss savaÅŸÄ±nda Ã§alar (PlayBossMusic ile devreye girer)
 
     [Header("Ayarlar")]
     [Range(0f, 1f)] public float musicVolume = 0.5f;
-    public string menuSceneName = "MainMenu"; // Senin menü sahnennin adý neyse buraya yaz
+    public string menuSceneName = "MainMenu"; // Senin menï¿½ sahnennin adï¿½ neyse buraya yaz
 
     private AudioSource audioSource;
 
     private void Awake()
     {
-        // --- SINGLETON (TEKÝL) YAPI ---
-        // Bu objeden sadece 1 tane olsun, sahneler arasý yok olmasýn.
+        // --- SINGLETON (TEKï¿½L) YAPI ---
+        // Bu objeden sadece 1 tane olsun, sahneler arasï¿½ yok olmasï¿½n.
         if (instance == null)
         {
             instance = this;
-            DontDestroyOnLoad(gameObject); // Sahne deðiþince beni yok etme!
+            DontDestroyOnLoad(gameObject); // Sahne deï¿½iï¿½ince beni yok etme!
 
             audioSource = GetComponent<AudioSource>();
             if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
 
-            audioSource.loop = true; // Müzik döngüye girsin
+            audioSource.loop = true; // Mï¿½zik dï¿½ngï¿½ye girsin
         }
         else
         {
-            Destroy(gameObject); // Zaten bir tane var, ben fazlalýðým
+            Destroy(gameObject); // Zaten bir tane var, ben fazlalï¿½ï¿½ï¿½m
         }
     }
 
     private void OnEnable()
     {
-        // Sahne yüklendiðinde haberim olsun
+        // Sahne yï¿½klendiï¿½inde haberim olsun
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
@@ -48,7 +49,7 @@ public class MusicManager : MonoBehaviour
 
     private void Start()
     {
-        // Oyun ilk açýldýðýnda da kontrol et
+        // Oyun ilk aï¿½ï¿½ldï¿½ï¿½ï¿½nda da kontrol et
         PlayMusicForScene(SceneManager.GetActiveScene());
     }
 
@@ -61,23 +62,23 @@ public class MusicManager : MonoBehaviour
     {
         AudioClip musicToPlay = null;
 
-        // Sahne ismine göre hangi müziðin çalacaðýna karar ver
+        // Sahne ismine gï¿½re hangi mï¿½ziï¿½in ï¿½alacaï¿½ï¿½na karar ver
         if (scene.name == menuSceneName)
         {
             musicToPlay = menuMusic;
         }
         else
         {
-            // Menü deðilse oyun müziði çal (GameOver sahnesi hariç istersen buraya else if ekleyebilirsin)
+            // Menï¿½ deï¿½ilse oyun mï¿½ziï¿½i ï¿½al (GameOver sahnesi hariï¿½ istersen buraya else if ekleyebilirsin)
             musicToPlay = levelMusic;
         }
 
-        // --- KRÝTÝK NOKTA ---
-        // Eðer çalmasý gereken müzik zaten þu an çalýyorsa DOKUNMA.
-        // Böylece level resetlendiðinde müzik kesilmez.
+        // --- KRï¿½Tï¿½K NOKTA ---
+        // Eï¿½er ï¿½almasï¿½ gereken mï¿½zik zaten ï¿½u an ï¿½alï¿½yorsa DOKUNMA.
+        // Bï¿½ylece level resetlendiï¿½inde mï¿½zik kesilmez.
         if (audioSource.clip == musicToPlay) return;
 
-        // Yeni müziði çal
+        // Yeni mï¿½ziï¿½i ï¿½al
         if (musicToPlay != null)
         {
             audioSource.clip = musicToPlay;
@@ -86,10 +87,28 @@ public class MusicManager : MonoBehaviour
         }
     }
 
-    // Ses seviyesini dýþarýdan deðiþtirmek istersen (Ayarlar menüsü için)
+    // Ses seviyesini dï¿½ï¿½arï¿½dan deï¿½iï¿½tirmek istersen (Ayarlar menï¿½sï¿½ iï¿½in)
     public void SetVolume(float volume)
     {
         musicVolume = volume;
         if (audioSource != null) audioSource.volume = volume;
+    }
+
+    // Overrides the scene's default track with the boss theme until StopBossMusic() is called.
+    // Called from MossKnightBoss.Start() when the boss room loads.
+    public void PlayBossMusic()
+    {
+        if (bossMusic == null || audioSource == null) return;
+        if (audioSource.clip == bossMusic) return; // already playing, don't restart
+
+        audioSource.clip = bossMusic;
+        audioSource.volume = musicVolume;
+        audioSource.Play();
+    }
+
+    // Returns to the current scene's default music. Called when the boss dies.
+    public void StopBossMusic()
+    {
+        PlayMusicForScene(SceneManager.GetActiveScene());
     }
 }
