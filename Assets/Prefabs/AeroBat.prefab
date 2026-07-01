@@ -132,7 +132,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealth: 30
-  scriptsToDisable: []
+  healthBarPrefab: {fileID: 5647382910293847562, guid: 7a3f9b4c1d8e2f6b5c3d7e9f4a1b2c3d, type: 3}
+  headBarOffset: {x: 0, y: 1}
   damagePopupPrefab: {fileID: 0}
 --- !u!114 &4974319120112828237
 MonoBehaviour:

@@ -80,12 +80,26 @@ public class EnemyHealth : MonoBehaviour, IDamageable
             healthBar = barGO.GetComponent<EnemyHealthBar>();
             if (healthBar != null)
             {
-                Collider2D col = GetComponent<Collider2D>();
-                float barWidth = col != null ? col.bounds.size.x * 1.2f : 1f;
-                healthBar.Initialize(transform, headBarOffset, barWidth);
+                healthBar.Initialize(transform, headBarOffset, ComputeBarWidth());
                 healthBar.SetHealth(currentHealth, maxHealth);
             }
         }
+    }
+
+    // Width for the health bar. Prefer an ENABLED collider — a disabled one (e.g. the box on
+    // capsule-fixed enemies) reports a zero-size bounds, which produced a zero-width, invisible
+    // bar. Fall back to the visual renderer, then a sane floor so the bar is never sized to nothing.
+    private float ComputeBarWidth()
+    {
+        foreach (Collider2D c in GetComponents<Collider2D>())
+            if (c.enabled && c.bounds.size.x > 0.05f)
+                return Mathf.Max(0.6f, c.bounds.size.x * 1.2f);
+
+        Renderer r = GetComponentInChildren<Renderer>();
+        if (r != null && r.bounds.size.x > 0.05f)
+            return Mathf.Max(0.6f, r.bounds.size.x * 1.2f);
+
+        return 1f;
     }
 
     public void TakeDamage(float damage)

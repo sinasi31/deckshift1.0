@@ -23,6 +23,10 @@ public class AcidBlobProjectile : MonoBehaviour
     public float patchDamagePerSecond = 10f;
     [Tooltip("Half-width of the acid puddle in world units.")]
     public float patchRadius = 1.2f;
+    [Tooltip("Slow the player while they stand on the sticky goo puddle.")]
+    public bool patchSlows = true;
+    [Tooltip("Movement-speed multiplier while on the puddle. 1 = no slow, 0.5 = half speed.")]
+    [Range(0.05f, 1f)] public float patchSlowMultiplier = 0.5f;
 
     [Header("Sprites (optional — real art beats the procedural fallback)")]
     [Tooltip("In-flight blob sprite (e.g. Slime Gel). Procedural circle if empty.")]
@@ -120,6 +124,8 @@ public class AcidBlobProjectile : MonoBehaviour
         HazardZone hz = patch.AddComponent<HazardZone>();
         hz.damagePerSecond = patchDamagePerSecond;
         hz.requiredRelicID = "LavaBoots";
+        hz.appliesSlow = patchSlows;
+        hz.slowMultiplier = patchSlowMultiplier;
 
         StartCoroutine(PuddleLife(pieces));
     }

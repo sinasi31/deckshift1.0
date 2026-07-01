@@ -73,6 +73,7 @@ This is a large script (~1,200 lines). It currently handles movement, jumping, c
 - The Animator component lives on the child GameObject named `Animator`, found via `GetComponentInChildren<Animator>()`. There is only one Animator in the hierarchy.
 - The Animator Controller is `Assets/Cainos/Customizable Pixel Character/Animation/AC Character.controller`.
 - **`Cainos.CustomizablePixelCharacter.AnimationEventReceiver` component on the Animator GameObject must remain DISABLED.** It throws NullReferenceExceptions on the built-in footstep animation events (the pack expects a footstep audio system that we don't use). Re-enabling it floods the console with errors during the cast animation.
+- **`PlayerAnimEventSink` component (added 2026-07-01) must stay on that same Animator GameObject.** With the Cainos receiver disabled, the pack's ~20 animation events (`OnFootstep`, `OnAttackCast`, etc.) had no receiver, spamming `"'OnFootstep' has no receiver!"` every step. `Assets/Scripts/PlayerAnimEventSink.cs` is an inert sink with an empty method for every event name (including the pack's `OnLedgeClimbFinised` typo) so the events land harmlessly. Do NOT delete it or the spam returns. Footstep/attack SFX, if ever wanted, hook here.
 
 ### Animator Parameter Map
 
@@ -649,7 +650,7 @@ The current relic system follows Slay-the-Spire conventions: strictly additive, 
 - **Comet Dive identity loss:** does the same thing as head-bounce relic. Plan: redesign.
 - **Head bounce + gravity reversal:** velocity sign check doesn't account for reversed gravity. Low priority.
 - **Duplicate ExitDoor possible in some room prefabs:** defensive guards now in place but the scene-side duplicate (if any) hasn't been cleaned up.
-- **AnimationEventReceiver may re-enable on prefab reimport.** Has been disabled twice. If OnFootstep NullRefs reappear in the console, check that the component on the visualModel's Animator child is unchecked.
+- **AnimationEventReceiver may re-enable on prefab reimport.** Has been disabled twice. If OnFootstep NullRefs reappear in the console, check that the component on the visualModel's Animator child is unchecked. (Separately, the "'OnFootstep' has no receiver!" *warning* spam — the flip side of keeping the receiver disabled — is now absorbed by the `PlayerAnimEventSink` component on that same GameObject; see Visual Model Internals.)
 - **Gravity reversal warning flash is invisible** — relies on SkinnedMeshRenderer that no longer exists on the new sprite-based rig. Audio cue still fires. Fix: add a SpriteRenderer flash path.
 
 ### Resolved bugs (verified by code audit 2026-06-10 — do NOT re-fix)

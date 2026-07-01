@@ -115,6 +115,28 @@ public class PlayerController : MonoBehaviour
     public float moveSpeed = 8f;
     private float moveInput;
 
+    // --- Temporary movement slow (acid drag / sticky goo) ---
+    // Kept as a separate multiplier ON TOP of moveSpeed rather than mutating moveSpeed itself,
+    // so it composes cleanly with Adrenaline's speed boost (which mutates moveSpeed) instead of
+    // corrupting its save/restore snapshot. Refreshed each frame by hazard zones the player
+    // stands in, and auto-clears shortly after they leave.
+    private float slowFactor = 1f;       // 1 = normal, <1 = slowed
+    private float slowExpireTime = 0f;
+
+    /// <summary>
+    /// Applies a temporary movement slow. Called repeatedly by hazard zones while the player is
+    /// inside them; the strongest (lowest) active multiplier wins, and it fades <paramref name="duration"/>
+    /// seconds after the last call.
+    /// </summary>
+    public void ApplySlow(float multiplier, float duration)
+    {
+        multiplier = Mathf.Clamp(multiplier, 0.05f, 1f);
+        // If a slow is already active this frame, keep whichever is stronger.
+        if (Time.time < slowExpireTime) multiplier = Mathf.Min(multiplier, slowFactor);
+        slowFactor = multiplier;
+        slowExpireTime = Time.time + Mathf.Max(0.02f, duration);
+    }
+
     [Header("Health Settings")]
     public float CurrentHealth => playerHealth.CurrentHealth;
     public float MaxHealth => playerHealth.MaxHealth;
@@ -449,9 +471,12 @@ public class PlayerController : MonoBehaviour
 
     private void FixedUpdate()
     {
+        // Expire the acid/goo slow once the player has been out of the hazard long enough.
+        if (Time.time >= slowExpireTime) slowFactor = 1f;
+
         if (isPhasing)
         {
-            rb.linearVelocity = new Vector2(moveInput * moveSpeed, verticalInput * moveSpeed);
+            rb.linearVelocity = new Vector2(moveInput * moveSpeed * slowFactor, verticalInput * moveSpeed * slowFactor);
         }
         else if (isSwimming && currentState != PlayerState.Dashing && currentState != PlayerState.KnockedBack && currentState != PlayerState.CometDiving)
         {
@@ -492,13 +517,13 @@ public class PlayerController : MonoBehaviour
         {
             if (isGrounded)
             {
-                rb.linearVelocity = new Vector2(moveInput * moveSpeed, rb.linearVelocity.y);
+                rb.linearVelocity = new Vector2(moveInput * moveSpeed * slowFactor, rb.linearVelocity.y);
             }
             else
             {
                 // Havadayken yatay hızı koru, ama input ile biraz kontrol ver
                 float airControl = 0.7f;
-                float targetX = moveInput * moveSpeed;
+                float targetX = moveInput * moveSpeed * slowFactor;
                 float newX = Mathf.Lerp(rb.linearVelocity.x, targetX, airControl * Time.fixedDeltaTime * 5f);
                 rb.linearVelocity = new Vector2(newX, rb.linearVelocity.y);
             }
