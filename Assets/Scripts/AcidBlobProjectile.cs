@@ -24,6 +24,12 @@ public class AcidBlobProjectile : MonoBehaviour
     [Tooltip("Half-width of the acid puddle in world units.")]
     public float patchRadius = 1.2f;
 
+    [Header("Sprites (optional — real art beats the procedural fallback)")]
+    [Tooltip("In-flight blob sprite (e.g. Slime Gel). Procedural circle if empty.")]
+    public Sprite blobSprite;
+    [Tooltip("Puddle splat sprite (e.g. Slime Gel). Procedural pool if empty.")]
+    public Sprite puddleSprite;
+
     [Header("Payload (optional)")]
     [Tooltip("If set, spawned at the landing point instead of/with the puddle (e.g. a Slime add). Set by the thrower.")]
     public GameObject landPayload;
@@ -43,10 +49,11 @@ public class AcidBlobProjectile : MonoBehaviour
 
     void Awake()
     {
-        // Flying-blob visual (a small green orb).
+        // Flying-blob visual — a real gel sprite if provided, else a procedural orb.
         blobSr = gameObject.AddComponent<SpriteRenderer>();
-        blobSr.sprite = GetCircleSprite();
-        blobSr.color = blobColor;
+        bool hasSprite = blobSprite != null;
+        blobSr.sprite = hasSprite ? blobSprite : GetCircleSprite();
+        blobSr.color = hasSprite ? Color.white : blobColor;
         blobSr.sortingLayerName = "Default";
         blobSr.sortingOrder = 11;
         transform.localScale = Vector3.one * (blobRadius * 2f);
@@ -75,7 +82,7 @@ public class AcidBlobProjectile : MonoBehaviour
         float baseY = Mathf.Lerp(start.y, target.y, k);
         float lift = arcHeight * 4f * k * (1f - k);   // parabola: 0 at both ends, peak at the middle
         transform.position = new Vector3(x, baseY + lift, 0f);
-        transform.Rotate(0f, 0f, -360f * Time.deltaTime);   // a little tumble for life
+        transform.Rotate(0f, 0f, -150f * Time.deltaTime);   // a slow tumble for life
 
         if (u >= 1f) Land();
     }
@@ -103,37 +110,76 @@ public class AcidBlobProjectile : MonoBehaviour
         // Build the lingering acid puddle as a child. Reuses HazardZone (LavaBoots protects, like all acid).
         GameObject patch = new GameObject("AcidPatch");
         patch.transform.SetParent(transform, false);
-        patch.transform.localScale = Vector3.one * (patchRadius * 2f);
 
-        SpriteRenderer ps = patch.AddComponent<SpriteRenderer>();
-        ps.sprite = GetPuddleSprite();
-        ps.color = new Color(blobColor.r, blobColor.g, blobColor.b, 0.85f);
-        ps.sortingLayerName = "Default";
-        ps.sortingOrder = 9;
+        SpriteRenderer[] pieces = BuildSplat(patch.transform);
 
         BoxCollider2D col = patch.AddComponent<BoxCollider2D>();
         col.isTrigger = true;
-        col.size = new Vector2(0.85f, 0.32f);   // local units, scaled by the puddle's localScale above
+        col.size = new Vector2(patchRadius * 1.9f, patchRadius * 0.7f);
 
         HazardZone hz = patch.AddComponent<HazardZone>();
         hz.damagePerSecond = patchDamagePerSecond;
         hz.requiredRelicID = "LavaBoots";
 
-        StartCoroutine(PuddleLife(ps));
+        StartCoroutine(PuddleLife(pieces));
     }
 
-    private IEnumerator PuddleLife(SpriteRenderer ps)
+    // Builds the splat from real gel sprites (a few overlapping blobs) or a procedural pool fallback.
+    private SpriteRenderer[] BuildSplat(Transform parent)
+    {
+        if (puddleSprite != null)
+        {
+            Color main = new Color(blobColor.r * 0.85f, blobColor.g * 0.9f, blobColor.b * 0.7f, 0.95f);
+            Color accent = new Color(blobColor.r * 0.7f, blobColor.g * 0.8f, blobColor.b * 0.55f, 0.9f);
+            SpriteRenderer a = MakeSplatPiece(parent, puddleSprite, main,
+                new Vector3(0f, 0f, 0f), new Vector3(patchRadius * 2.2f, patchRadius * 1.1f, 1f), 9);
+            SpriteRenderer b = MakeSplatPiece(parent, puddleSprite, accent,
+                new Vector3(-patchRadius * 0.7f, -0.03f, 0f), new Vector3(patchRadius * 1.2f, patchRadius * 0.7f, 1f), 8);
+            SpriteRenderer c = MakeSplatPiece(parent, puddleSprite, accent,
+                new Vector3(patchRadius * 0.75f, 0.02f, 0f), new Vector3(patchRadius * 1.25f, patchRadius * 0.72f, 1f), 8);
+            return new[] { a, b, c };
+        }
+
+        SpriteRenderer ps = MakeSplatPiece(parent, GetPuddleSprite(),
+            new Color(blobColor.r, blobColor.g, blobColor.b, 0.85f),
+            Vector3.zero, new Vector3(patchRadius * 2f, patchRadius, 1f), 9);
+        return new[] { ps };
+    }
+
+    private static SpriteRenderer MakeSplatPiece(Transform parent, Sprite sprite, Color color,
+        Vector3 localPos, Vector3 localScale, int order)
+    {
+        GameObject go = new GameObject("Splat");
+        go.transform.SetParent(parent, false);
+        go.transform.localPosition = localPos;
+        go.transform.localScale = localScale;
+        SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite = sprite;
+        sr.color = color;
+        sr.sortingLayerName = "Default";
+        sr.sortingOrder = order;
+        return sr;
+    }
+
+    private IEnumerator PuddleLife(SpriteRenderer[] pieces)
     {
         float t = 0f;
         float fadeStart = Mathf.Max(0f, patchDuration - 0.8f);
-        Color rgb = ps.color;
-        float baseA = rgb.a;
+        Color[] baseCols = new Color[pieces.Length];
+        for (int i = 0; i < pieces.Length; i++)
+            if (pieces[i] != null) baseCols[i] = pieces[i].color;
+
         while (t < patchDuration)
         {
-            float a = baseA * (0.88f + 0.12f * Mathf.Sin(t * 5f));   // gentle liquid shimmer
-            if (t > fadeStart && patchDuration > fadeStart)
-                a *= Mathf.Clamp01(1f - (t - fadeStart) / (patchDuration - fadeStart));
-            ps.color = new Color(rgb.r, rgb.g, rgb.b, a);
+            float shimmer = 0.9f + 0.1f * Mathf.Sin(t * 5f);   // gentle liquid shimmer
+            float fade = (t > fadeStart && patchDuration > fadeStart)
+                ? Mathf.Clamp01(1f - (t - fadeStart) / (patchDuration - fadeStart)) : 1f;
+            for (int i = 0; i < pieces.Length; i++)
+            {
+                if (pieces[i] == null) continue;
+                Color b = baseCols[i];
+                pieces[i].color = new Color(b.r, b.g, b.b, b.a * shimmer * fade);
+            }
             t += Time.deltaTime;
             yield return null;
         }
@@ -164,10 +210,10 @@ public class AcidBlobProjectile : MonoBehaviour
 
     // The settled acid pool: a wide, wavy-edged puddle with a dark rim, a brighter interior and a
     // few bubble highlights. Tinted via SpriteRenderer.color. 1 sprite, cached and reused.
-    private static Sprite puddleSprite;
+    private static Sprite cachedPuddleSprite;
     private static Sprite GetPuddleSprite()
     {
-        if (puddleSprite != null) return puddleSprite;
+        if (cachedPuddleSprite != null) return cachedPuddleSprite;
 
         int size = 64;
         Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
@@ -215,7 +261,7 @@ public class AcidBlobProjectile : MonoBehaviour
                 tex.SetPixel(x, y, new Color(shade, shade, shade, alpha));
             }
         tex.Apply();
-        puddleSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
-        return puddleSprite;
+        cachedPuddleSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+        return cachedPuddleSprite;
     }
 }

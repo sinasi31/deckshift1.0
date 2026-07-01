@@ -200,13 +200,17 @@ PrefabInstance:
       propertyPath: m_Layer
       value: 11
       objectReference: {fileID: 0}
+    - target: {fileID: 5825798145663248550, guid: ebdad00539a4bc54c9683d7deb6d5c26, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6893558064518712221, guid: ebdad00539a4bc54c9683d7deb6d5c26, type: 3}
       propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7038916177618310106, guid: ebdad00539a4bc54c9683d7deb6d5c26, type: 3}
       propertyPath: m_Name
-      value: moss knight Variant
+      value: MossKnightBoss
       objectReference: {fileID: 0}
     - target: {fileID: 7038916177618310106, guid: ebdad00539a4bc54c9683d7deb6d5c26, type: 3}
       propertyPath: m_Layer
@@ -216,6 +220,9 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 7038916177618310106, guid: ebdad00539a4bc54c9683d7deb6d5c26, type: 3}
+      insertIndex: 5
+      addedObject: {fileID: -5791643467854309104}
     - targetCorrespondingSourceObject: {fileID: 7038916177618310106, guid: ebdad00539a4bc54c9683d7deb6d5c26, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2774266077842018916}
@@ -228,6 +235,43 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 7038916177618310106, guid: ebdad00539a4bc54c9683d7deb6d5c26, type: 3}
   m_PrefabInstance: {fileID: 7215006147314927398}
   m_PrefabAsset: {fileID: 0}
+--- !u!70 &-5791643467854309104
+CapsuleCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 400707278137185532}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 0
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: -0.1490419, y: 1.4391809}
+  m_Size: {x: 1.360822, y: 2.9095914}
+  m_Direction: 0
 --- !u!114 &2774266077842018916
 MonoBehaviour:
   m_ObjectHideFlags: 0

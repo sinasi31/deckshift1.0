@@ -26,6 +26,8 @@ public class EnemyHealth : MonoBehaviour, IDamageable
     public float CurrentHealth => currentHealth;
 
     public event System.Action OnDamaged;
+    // Carries the hit's damage amount (e.g. so the boss can flinch on big hits). Fires after a landed hit.
+    public event System.Action<float> OnDamagedAmount;
 
     // Polled by AI scripts — they return early while this is true.
     public bool IsStunned { get; private set; }
@@ -97,6 +99,7 @@ public class EnemyHealth : MonoBehaviour, IDamageable
 
         currentHealth -= damage;
         OnDamaged?.Invoke();
+        OnDamagedAmount?.Invoke(damage);
         if (HitStop.instance != null) HitStop.instance.Stop(0.15f);
         Debug.Log($"{gameObject.name} hasar aldı! Kalan Can: {currentHealth}");
 

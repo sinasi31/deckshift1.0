@@ -50,3 +50,5 @@ MonoBehaviour:
   patchDuration: 4
   patchDamagePerSecond: 10
   patchRadius: 1.2
+  blobSprite: {fileID: 21300000, guid: d1f94eb541d98c94c9e0a776707e9c7c, type: 3}
+  puddleSprite: {fileID: 21300000, guid: d1f94eb541d98c94c9e0a776707e9c7c, type: 3}

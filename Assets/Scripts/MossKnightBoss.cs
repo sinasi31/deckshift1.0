@@ -69,6 +69,12 @@ public class MossKnightBoss : MonoBehaviour
     public float leapRecover = 0.6f;
     [Tooltip("Green acid shockwave spawned on landing (assign AcidShockwaveVFX).")]
     public GameObject slamShockwaveEffect;
+    [Tooltip("Gravity multiplier during the leap — higher = snappier, less floaty.")]
+    public float leapGravityMul = 2.2f;
+    [Tooltip("Extra downward pull while descending — makes the slam land with weight.")]
+    public float leapFallMul = 1.4f;
+    [Tooltip("Gel sprite flung out on slam impact for splatter (assign Slime Gel). Optional.")]
+    public Sprite slamDebrisSprite;
 
     [Header("Lob (Acid Blob / Slime)")]
     [Tooltip("Carrier projectile arced onto the player/platform (assign AcidBlobProjectile).")]
@@ -96,6 +102,10 @@ public class MossKnightBoss : MonoBehaviour
     public GameObject bossHealthBarPrefab;
     [Tooltip("Name shown on the boss bar.")]
     public string bossName = "The Moss Knight";
+
+    [Header("Damage Reaction")]
+    [Tooltip("A single hit above this plays the boss's injured/flinch animation (e.g. the Crusher's 80).")]
+    public float hurtAnimThreshold = 50f;
 
     [Header("Edge Detection")]
     [Tooltip("Stop at ledges. Requires Ground Layer to be set, or it is ignored.")]
@@ -148,6 +158,33 @@ public class MossKnightBoss : MonoBehaviour
             BossHealthBar bar = barGO.GetComponent<BossHealthBar>();
             if (bar != null) bar.Initialize(health, bossName);
         }
+
+        // Flinch on big hits (Crusher, heavy cards).
+        if (health != null) health.OnDamagedAmount += OnDamaged;
+    }
+
+    void OnDestroy()
+    {
+        if (health != null) health.OnDamagedAmount -= OnDamaged;
+    }
+
+    // Plays the injured/flinch animation when a single hit is heavy enough. Front vs back is chosen
+    // from where the player stands relative to the boss's facing — a crusher hit just uses the default.
+    private void OnDamaged(float amount)
+    {
+        if (amount <= hurtAnimThreshold) return;
+        if (pm == null || controller == null || controller.IsDead) return;
+
+        bool fromFront = true;
+        if (player != null)
+        {
+            bool playerOnRight = player.position.x >= transform.position.x;
+            bool facingRight = pm.Facing == PixelMonster.FacingType.Right;
+            fromFront = (playerOnRight == facingRight);
+        }
+
+        if (fromFront) pm.InjuredFront();
+        else pm.InjuredBack();
     }
 
     void Update()
@@ -316,7 +353,11 @@ public class MossKnightBoss : MonoBehaviour
         if (Mathf.Abs(dx) > 0.01f) dir = Mathf.Sign(dx);
         FaceDirection(dir);
 
-        // Parabolic launch velocity from the rb's own gravity.
+        // Boost gravity for the leap so the arc is snappy and weighty instead of floaty.
+        float savedGrav = rb.gravityScale;
+        rb.gravityScale = savedGrav * Mathf.Max(1f, leapGravityMul);
+
+        // Parabolic launch velocity from the (boosted) gravity — apex height is preserved.
         float g = Mathf.Abs(Physics2D.gravity.y) * Mathf.Max(0.1f, rb.gravityScale);
         float vy = Mathf.Sqrt(2f * g * Mathf.Max(0.5f, leapApexHeight));
         float airTime = 2f * vy / g;
@@ -333,6 +374,10 @@ public class MossKnightBoss : MonoBehaviour
             {
                 if (pm != null) { pm.IsGrounded = false; pm.SpeedVertical = rb.linearVelocity.y; }
 
+                // Extra downward pull on the way down for a weighty, decisive slam.
+                if (rb.linearVelocity.y < 0f)
+                    rb.linearVelocity += Vector2.up * (Physics2D.gravity.y * (leapFallMul - 1f) * rb.gravityScale * Time.deltaTime);
+
                 bool descending = rb.linearVelocity.y <= 0.1f;
                 bool atFloor = transform.position.y <= startY + 0.15f;
                 bool stoppedVert = Mathf.Abs(rb.linearVelocity.y) < 0.05f;   // landed on ground/platform
@@ -347,7 +392,8 @@ public class MossKnightBoss : MonoBehaviour
         }
         finally
         {
-            controller.enabled = true;   // always hand control back, even if interrupted
+            rb.gravityScale = savedGrav;   // restore normal gravity
+            controller.enabled = true;      // always hand control back, even if interrupted
         }
 
         DoSlamImpact();
@@ -360,7 +406,11 @@ public class MossKnightBoss : MonoBehaviour
     {
         if (slamShockwaveEffect != null)
             Instantiate(slamShockwaveEffect, transform.position, Quaternion.identity);
-        if (CameraShake.instance != null) CameraShake.instance.Shake(0.18f, 0.5f);
+
+        // Punch: a brief freeze-frame + a heavy shake + a gel splatter burst.
+        if (HitStop.instance != null) HitStop.instance.Stop(0.07f);
+        if (CameraShake.instance != null) CameraShake.instance.Shake(0.32f, 1.1f);
+        SpawnSlamDebris(transform.position);
 
         if (player != null && Vector2.Distance(transform.position, player.position) <= slamRadius)
         {
@@ -374,6 +424,51 @@ public class MossKnightBoss : MonoBehaviour
             }
         }
         // TODO (acid system): spread a temporary acid pool at the landing point.
+    }
+
+    // A short-lived burst of gel chunks flung up and out from the impact — cheap, contained juice.
+    private void SpawnSlamDebris(Vector2 origin)
+    {
+        if (slamDebrisSprite == null) return;
+        StartCoroutine(DebrisRoutine(origin));
+    }
+
+    private IEnumerator DebrisRoutine(Vector2 origin)
+    {
+        const int count = 7;
+        var gos = new GameObject[count];
+        var srs = new SpriteRenderer[count];
+        var vel = new Vector2[count];
+        for (int i = 0; i < count; i++)
+        {
+            GameObject go = new GameObject("SlamDebris");
+            go.transform.position = origin + Vector2.up * 0.2f;
+            go.transform.localScale = Vector3.one * Random.Range(0.18f, 0.34f);
+            SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = slamDebrisSprite;
+            sr.color = new Color(0.55f, 0.8f, 0.32f, 1f);
+            sr.sortingOrder = 12;
+            gos[i] = go; srs[i] = sr;
+            float ang = Mathf.Deg2Rad * Random.Range(35f, 145f);   // upward-biased fan
+            vel[i] = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * Random.Range(4f, 9f);
+        }
+
+        float t = 0f; const float life = 0.6f;
+        while (t < life)
+        {
+            float dt = Time.deltaTime;
+            for (int i = 0; i < count; i++)
+            {
+                if (gos[i] == null) continue;
+                vel[i] += Vector2.up * (Physics2D.gravity.y * 1.2f * dt);   // arc back down
+                gos[i].transform.position += (Vector3)(vel[i] * dt);
+                gos[i].transform.Rotate(0f, 0f, 300f * dt);
+                Color c = srs[i].color; c.a = 1f - t / life; srs[i].color = c;
+            }
+            t += dt;
+            yield return null;
+        }
+        for (int i = 0; i < count; i++) if (gos[i] != null) Destroy(gos[i]);
     }
 
     // --- Lob (Acid Blob / Slime) ---
