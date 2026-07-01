@@ -16,8 +16,7 @@ public class DashAction : CardAction
         float direction = player.isFacingRight ? 1f : -1f;
         player.rb.AddForce(new Vector2(direction * player.dashImpulse, 0f), ForceMode2D.Impulse);
 
-        if (player.dashSound != null && player.audioSource != null)
-            player.audioSource.PlayOneShot(player.dashSound);
+        SfxManager.PlayOn(player.audioSource, player.dashSound);
 
         if (player.dashEffectPrefab != null)
             Object.Instantiate(player.dashEffectPrefab, player.transform.position, Quaternion.identity);

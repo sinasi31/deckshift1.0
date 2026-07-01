@@ -5098,6 +5098,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   shiftAmount: 1
   destroyOnCollect: 1
+  collectSound: {fileID: 8300000, guid: c48f8c4cdaa0e804c850ded330c5d849, type: 3}
+  collectVolume: 1
 --- !u!70 &2487678003886901083
 CapsuleCollider2D:
   m_ObjectHideFlags: 0

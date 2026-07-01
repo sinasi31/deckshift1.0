@@ -400,10 +400,7 @@ public class PlayerController : MonoBehaviour
         {
             currentGold -= amount;
             OnGoldChanged?.Invoke(currentGold);
-            if (spendSound != null && audioSource != null)
-            {
-                audioSource.PlayOneShot(spendSound, soundVolume);
-            }
+            SfxManager.PlayOn(audioSource, spendSound, soundVolume);
             return true;
         }
         return false;
@@ -456,7 +453,7 @@ public class PlayerController : MonoBehaviour
                 rb.AddForce(new Vector2(0f, defaultJumpForce), ForceMode2D.Impulse);
                 ChangeState(PlayerState.Jumping);
 
-                if (audioSource != null && jumpSound != null) audioSource.PlayOneShot(jumpSound);
+                SfxManager.PlayOn(audioSource, jumpSound);
                 Debug.Log("SPECTRAL WINGS: Bedava Zıplama!");
                 return;
             }
@@ -612,7 +609,7 @@ public class PlayerController : MonoBehaviour
     {
         swimExitTimer = swimExitDuration;
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, swimExitJumpForce);
-        if (audioSource != null && jumpSound != null) audioSource.PlayOneShot(jumpSound, soundVolume);
+        SfxManager.PlayOn(audioSource, jumpSound, soundVolume);
     }
 
     // Detailed outcome of the most recent card play (Success / Failed / Blocked).
@@ -632,7 +629,7 @@ public class PlayerController : MonoBehaviour
             if (audioSource != null && jumpSound != null)
             {
                 audioSource.pitch = Random.Range(0.95f, 1.05f);
-                audioSource.PlayOneShot(jumpSound);
+                SfxManager.PlayOn(audioSource, jumpSound);
                 audioSource.pitch = 1f;
             }
             if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
@@ -738,10 +735,7 @@ public class PlayerController : MonoBehaviour
 
     private void PerformFireball(float damageFromCard)
     {
-        if (audioSource != null && fireballCastSound != null)
-        {
-            audioSource.PlayOneShot(fireballCastSound);
-        }
+        SfxManager.PlayOn(audioSource, fireballCastSound);
         if (fireballPrefab == null || firePoint == null) return;
 
         Quaternion fireballRotation = !isFacingRight ? Quaternion.Euler(0, 180, 0) : Quaternion.identity;
@@ -842,8 +836,7 @@ public class PlayerController : MonoBehaviour
 
     internal void PerformVampiricBite(float damageAmount)
     {
-        if (audioSource != null && vampireBiteSound != null)
-            audioSource.PlayOneShot(vampireBiteSound);
+        SfxManager.PlayOn(audioSource, vampireBiteSound);
 
         // ~0 = all layers: avoids the AeroBat/MeleeEnemy Default-layer miss from enemyLayer mask.
         // GetComponentInParent finds EnemyHealth even when the collider is on a child.
@@ -869,10 +862,7 @@ public class PlayerController : MonoBehaviour
 
     internal void PerformGlassWail(float stunDuration)
     {
-        if (audioSource != null && glassVailSound != null)
-        {
-            audioSource.PlayOneShot(glassVailSound);
-        }
+        SfxManager.PlayOn(audioSource, glassVailSound);
 
         EnemyHealth[] allEnemies = FindObjectsByType<EnemyHealth>(FindObjectsSortMode.None);
 
@@ -1029,8 +1019,7 @@ public class PlayerController : MonoBehaviour
         cardActionExecutor?.SetManualFlag(ConflictFlags.PlayerVelocity, true);
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, -cometSpeed);
         if (diveTrail != null) diveTrail.emitting = true;
-        if (audioSource != null && cometDiveSound != null)
-            audioSource.PlayOneShot(cometDiveSound);
+        SfxManager.PlayOn(audioSource, cometDiveSound);
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
@@ -1152,10 +1141,7 @@ public class PlayerController : MonoBehaviour
 
     internal void UseAdrenaline(float value)
     {
-        if (audioSource != null && adrenalineSound != null)
-        {
-            audioSource.PlayOneShot(adrenalineSound);
-        }
+        SfxManager.PlayOn(audioSource, adrenalineSound);
 
         float healthPercentage = playerHealth.HealthPercent;
 
@@ -1332,8 +1318,7 @@ public class PlayerController : MonoBehaviour
         }
 
         // Warning at t=4.5s: sound + visual strobe
-        if (warningSoundClip != null && audioSource != null)
-            audioSource.PlayOneShot(warningSoundClip, soundVolume);
+        SfxManager.PlayOn(audioSource, warningSoundClip, soundVolume);
         yield return StartCoroutine(WarningFlashRoutine());
 
         // t=5.0s: gravity snaps back instantly, visual lerps back

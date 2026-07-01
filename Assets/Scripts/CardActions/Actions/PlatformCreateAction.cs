@@ -10,8 +10,7 @@ public class PlatformCreateAction : CardAction
         keepCardInHand = false;
         if (player.platformPrefab == null) return false;
         if (player.mainCamera == null) return false;
-        if (player.audioSource != null && player.createPlatformSound != null)
-            player.audioSource.PlayOneShot(player.createPlatformSound);
+        SfxManager.PlayOn(player.audioSource, player.createPlatformSound);
         Vector2 spawnPosition = player.mainCamera.ScreenToWorldPoint(Input.mousePosition);
         Object.Instantiate(player.platformPrefab, spawnPosition, Quaternion.identity);
         return true;

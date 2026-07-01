@@ -799,7 +799,7 @@ MonoBehaviour:
   crushDamage: 80
   playerDamage: 20
   damagePadding: {x: 0.3, y: 0.6}
-  slamSound: {fileID: 0}
+  slamSound: {fileID: 8300000, guid: b67eba144566b63458fbc0541939ad9e, type: 3}
   shakeDuration: 0.25
   shakeIntensity: 0.35
   shiftCrystalPrefab: {fileID: 8096823719252344264, guid: 738e8751a02a1344eb634cdabe172263, type: 3}

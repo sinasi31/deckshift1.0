@@ -96,8 +96,8 @@ public class Lever : MonoBehaviour, IInteractable
     private void PlayFlip()
     {
         if (flipSound == null) return;
-        if (audioSource != null) audioSource.PlayOneShot(flipSound);
-        else AudioSource.PlayClipAtPoint(flipSound, transform.position);
+        if (audioSource != null) SfxManager.PlayOn(audioSource, flipSound);
+        else SfxManager.PlayAtPoint(flipSound, transform.position);
     }
 
     public string GetInteractText()

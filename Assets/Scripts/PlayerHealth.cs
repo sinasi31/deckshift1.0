@@ -50,8 +50,7 @@ public class PlayerHealth : MonoBehaviour
 
         currentHealth = Mathf.Max(currentHealth - damage, 0f);
 
-        if (hurtSound != null && audioSource != null)
-            audioSource.PlayOneShot(hurtSound);
+        SfxManager.PlayOn(audioSource, hurtSound);
 
         if (animator != null) animator.SetTrigger("InjuredFront");
 
@@ -88,9 +87,9 @@ public class PlayerHealth : MonoBehaviour
         if (deathSound != null)
         {
             if (Camera.main != null)
-                AudioSource.PlayClipAtPoint(deathSound, Camera.main.transform.position, deathVolume);
+                SfxManager.PlayAtPoint(deathSound, Camera.main.transform.position, deathVolume);
             else
-                AudioSource.PlayClipAtPoint(deathSound, transform.position, deathVolume);
+                SfxManager.PlayAtPoint(deathSound, transform.position, deathVolume);
         }
 
         if (animator != null) animator.SetBool("IsDead", true);

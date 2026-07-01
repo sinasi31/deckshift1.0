@@ -161,11 +161,25 @@ public class MossKnightBoss : MonoBehaviour
 
         // Flinch on big hits (Crusher, heavy cards).
         if (health != null) health.OnDamagedAmount += OnDamaged;
+
+        // Boss music: start the boss theme now, and hand it back to the level track on death.
+        if (MusicManager.instance != null) MusicManager.instance.PlayBossMusic();
+        if (health != null) health.OnDied += OnBossDied;
     }
 
     void OnDestroy()
     {
-        if (health != null) health.OnDamagedAmount -= OnDamaged;
+        if (health != null)
+        {
+            health.OnDamagedAmount -= OnDamaged;
+            health.OnDied -= OnBossDied;
+        }
+    }
+
+    // Return the soundtrack to the level's music once the boss is defeated.
+    private void OnBossDied()
+    {
+        if (MusicManager.instance != null) MusicManager.instance.StopBossMusic();
     }
 
     // Plays the injured/flinch animation when a single hit is heavy enough. Front vs back is chosen

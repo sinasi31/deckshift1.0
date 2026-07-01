@@ -36,9 +36,9 @@ public class Chest : MonoBehaviour, IInteractable
         if (openSound != null)
         {
             if (audioSource != null)
-                audioSource.PlayOneShot(openSound);
+                SfxManager.PlayOn(audioSource, openSound);
             else
-                AudioSource.PlayClipAtPoint(openSound, transform.position);
+                SfxManager.PlayAtPoint(openSound, transform.position);
         }
 
         RelicData relic = PickRandomRelic();

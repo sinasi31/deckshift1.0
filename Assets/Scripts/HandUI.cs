@@ -134,7 +134,7 @@ public class HandUI : MonoBehaviour
             {
                 // Pitch'i hafifçe değiştiriyoruz (0.9 ile 1.1 arası) ki ses doğal gelsin
                 audioSource.pitch = Random.Range(0.9f, 1.1f);
-                audioSource.PlayOneShot(drawSound, soundVolume);
+                SfxManager.PlayOn(audioSource, drawSound, soundVolume);
             }
             // -----------------------------
 
