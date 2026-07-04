@@ -10,6 +10,17 @@ Tool notes (things that didn't work first try, all worked around read-only):
 
 ---
 
+> ## ⏱️ STATUS UPDATE — 2026-07-02 (read this first)
+>
+> **Historical snapshot from 2026-06-10, editor data as it was then.** Not auto-maintained — treat every finding as **still open unless it carries a 【…】 tag**. Most of these are Inspector/asset-data items that can only be re-verified inside Unity, which this update did not do.
+>
+> **Behavioural change relevant to a finding:**
+> - **Exec #2 / P2 (run repeats efeslevel1 forever)** — 【PARTLY SUPERSEDED 2026-07-02】 `LevelManager` was reworked in *code* from endless-refill into a **finite run: hub → each pool level once (random, no repeats) → boss room → loop to hub**, with a new separate **`bossRoomPrefab`** slot. So the "efeslevel1 over and over" *behaviour* is gone. **BUT** the underlying data gap this finding is really about — `roomPrefabs` only containing hub + efeslevel1, leaving efeslevel2/3/4 unused — is a **scene-data** issue not touched by the code change; **Chunk 2 (populate the Room Prefabs list in the Inspector) still applies** unless it's since been done. This update could not read the current scene list to confirm.
+>
+> **New since this audit (context, not findings):** the boss room is now the intended **run finale** (`LevelManager.bossRoomPrefab`), and the Act 1 Moss Knight boss got a full build-out (see `BossDesign_MossKnight.md`). None of the other findings here (build-list Hub row, 85 MB WAV import, gravity-warning clip unassigned, SettingsMenu triplication, enemy-healthbar wiring, dead content, tag/layer tidy) have been confirmed fixed — assume open.
+
+---
+
 ## Executive Summary — the five things that matter most
 
 1. **(Critical) The Build Settings contain a scene that no longer exists.** `Assets/Scenes/Hub.unity` was deleted from disk but is still enabled at build index 1. The main menu's Play button loads "build index + 1" — in the editor that's the missing scene (Play does nothing/errors); in a real build all the indices silently shift, so "SampleScene = build index 2" (which CLAUDE.md and this project assume) is no longer true in builds.
@@ -104,7 +115,7 @@ Identified by extracting the broken GUIDs from the prefab files and matching the
 - **EfeVrl3.prefab:** this is the source of the missing-script console warning at load **if** EfeVrl3 is ever loaded; it's currently unreferenced legacy. Clean up together with the legacy-level decision (Chunk F below).
 - **BiteVFX consequence:** `PlayerController` already does `Destroy(vfx, 1.0f)` after spawning it, so **nothing leaks** — the cost is one console warning per Vampire Bite and whatever visual behavior DestroyEffect used to add. **Severity: Low.** Fix: remove the dead component from the prefab (Inspector: select prefab → remove the "Missing (Mono Script)" entry), since cleanup is handled by code.
 
-### P2. The room pool — only 2 of the ~5 levels are actually in the game (Critical)
+### P2. The room pool — only 2 of the ~5 levels are actually in the game (Critical)  ·  【PARTLY SUPERSEDED 2026-07-02 — LevelManager code now runs a finite hub→levels→boss run (no more endless efeslevel1); but populating `roomPrefabs` with efeslevel2/3/4 in the Inspector (below) is a scene-data step that still applies unless already done】
 
 `LevelManager.roomPrefabs` in SampleScene contains:
 

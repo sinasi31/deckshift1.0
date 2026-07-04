@@ -77,6 +77,15 @@ public class PlayerController : MonoBehaviour
     public AudioClip warningSoundClip;
     public float soundVolume = 1f;
 
+    [Header("Footsteps")]
+    [Tooltip("Footstep clips — a random one plays each time the walk/run animation plants a foot. " +
+             "Add a few variations so steps don't sound identical. Leave empty for no footstep sound.")]
+    public AudioClip[] footstepClips;
+    [Range(0f, 1f)] public float footstepVolume = 0.6f;
+    [Tooltip("Random pitch range per step so repeated footsteps feel natural (x = min, y = max).")]
+    public Vector2 footstepPitchRange = new Vector2(0.92f, 1.08f);
+    private AudioSource footstepSource;   // dedicated 2D source (built on first step) so per-step pitch doesn't touch other SFX
+
     [Header("VFX Settings")]
     public GameObject biteEffectPrefab;
     public GameObject leapEffectPrefab;
@@ -834,10 +843,11 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    internal void PerformVampiricBite(float damageAmount)
+    // Returns true if the bite landed on a target. Returns false when nothing damageable is in
+    // range, so the play is refused upstream (no Shift/charge spent, card stays in hand) instead
+    // of whiffing into empty air.
+    internal bool PerformVampiricBite(float damageAmount)
     {
-        SfxManager.PlayOn(audioSource, vampireBiteSound);
-
         // ~0 = all layers: avoids the AeroBat/MeleeEnemy Default-layer miss from enemyLayer mask.
         // GetComponentInParent finds EnemyHealth even when the collider is on a child.
         Collider2D[] hits = Physics2D.OverlapCircleAll(firePoint.position, biteRange, ~0);
@@ -846,6 +856,7 @@ public class PlayerController : MonoBehaviour
             IDamageable targetHealth = hit.GetComponentInParent<IDamageable>();
             if (targetHealth == null) continue;
 
+            SfxManager.PlayOn(audioSource, vampireBiteSound);   // only chomp when there's a real target
             targetHealth.TakeDamage(damageAmount);
             if (targetHealth is EnemyHealth) Heal(biteHealAmount);
             if (biteEffectPrefab != null)
@@ -854,8 +865,9 @@ public class PlayerController : MonoBehaviour
             if (CameraShake.instance != null)
                 CameraShake.instance.Shake(0.08f, 0.25f);   // chomp impact
 
-            return; // one bite, one target
+            return true; // one bite, one target
         }
+        return false; // nothing in range — play refused, card retained
     }
 
     public void Heal(float amount) => playerHealth.Heal(amount);
@@ -1101,6 +1113,23 @@ public class PlayerController : MonoBehaviour
     public void FlashCardPlay()
     {
         StartCoroutine(CardPlayFlashRoutine());
+    }
+
+    // Called by the walk/run animation's footstep event, relayed from PlayerAnimEventSink on the
+    // Animator child. Clips/volume live here on the main player object.
+    public void PlayFootstep()
+    {
+        if (footstepClips == null || footstepClips.Length == 0) return;
+        AudioClip clip = footstepClips[Random.Range(0, footstepClips.Length)];
+        if (clip == null) return;
+        if (footstepSource == null)
+        {
+            footstepSource = gameObject.AddComponent<AudioSource>();
+            footstepSource.playOnAwake = false;
+            footstepSource.spatialBlend = 0f;
+        }
+        footstepSource.pitch = Random.Range(footstepPitchRange.x, footstepPitchRange.y);
+        SfxManager.PlayOn(footstepSource, clip, footstepVolume);
     }
 
     private IEnumerator CardPlayFlashRoutine()

@@ -73,7 +73,7 @@ This is a large script (~1,200 lines). It currently handles movement, jumping, c
 - The Animator component lives on the child GameObject named `Animator`, found via `GetComponentInChildren<Animator>()`. There is only one Animator in the hierarchy.
 - The Animator Controller is `Assets/Cainos/Customizable Pixel Character/Animation/AC Character.controller`.
 - **`Cainos.CustomizablePixelCharacter.AnimationEventReceiver` component on the Animator GameObject must remain DISABLED.** It throws NullReferenceExceptions on the built-in footstep animation events (the pack expects a footstep audio system that we don't use). Re-enabling it floods the console with errors during the cast animation.
-- **`PlayerAnimEventSink` component (added 2026-07-01) must stay on that same Animator GameObject.** With the Cainos receiver disabled, the pack's ~20 animation events (`OnFootstep`, `OnAttackCast`, etc.) had no receiver, spamming `"'OnFootstep' has no receiver!"` every step. `Assets/Scripts/PlayerAnimEventSink.cs` is an inert sink with an empty method for every event name (including the pack's `OnLedgeClimbFinised` typo) so the events land harmlessly. Do NOT delete it or the spam returns. Footstep/attack SFX, if ever wanted, hook here.
+- **`PlayerAnimEventSink` component (added 2026-07-01) must stay on that same Animator GameObject.** With the Cainos receiver disabled, the pack's ~20 animation events (`OnFootstep`, `OnAttackCast`, etc.) had no receiver, spamming `"'OnFootstep' has no receiver!"` every step. `Assets/Scripts/PlayerAnimEventSink.cs` is a sink with a method for every event name (including the pack's `OnLedgeClimbFinised` typo) so the events land harmlessly. Do NOT delete it or the spam returns. It is no longer fully inert: as of 2026-07-02 its `OnFootstep(AnimationEvent)` relays to `PlayerController.PlayFootstep()` (footstep SFX). The receiver MUST stay on this Animator child (that's where Unity delivers the events); the footstep *fields* (`footstepClips[]`, `footstepVolume`, `footstepPitchRange`) live on `PlayerController` (the player root) per the designer's request. Other event methods remain empty; hook new anim-driven SFX here.
 
 ### Animator Parameter Map
 
@@ -372,8 +372,8 @@ Current relic assets at `Assets/Relics/`:
 
 - Subscribes to `RelicManager.OnRelicAdded` in `Start()`.
 - Also iterates existing `RelicManager.instance.OwnedRelics` at Start so it populates on late wake-up.
-- Each new relic instantiates `RelicIconPrefab.prefab` as a child, setting the `Image` component's sprite to the relic's `relicArt`.
-- 48×48 icon size. No tooltip, no activation flash — both deferred as future polish.
+- Each new relic instantiates `RelicIconPrefab.prefab` (unchanged 48×48 root) as a child, then `AddComponent<RelicIcon>().Build(relic)` styles it (2026-07-02). **`RelicIcon.cs`** disables the root Image and builds 4 procedural UGUI child Images back-to-front — rarity **glow** aura / dark rounded **plate** / **icon** art (`relicArt`, preserveAspect) / rarity **frame** border — with the SAME rarity colour language as the chest burst (Legendary gold / Epic purple / Rare blue / Common pale-grey). Pop-in is **Update-driven** (EaseOutBack, unscaled) so it survives being built while GameplayHUD is inactive (relics granted from a hidden shop/slot pop in when the HUD reshows); Epic/Legendary get an idle glow pulse.
+- Still visual-only: no tooltip, no activation flash, no interaction (deliberate — see the slot-constrained relic redesign caveat below; don't invest further in relic UX until that lands).
 
 ---
 
@@ -439,22 +439,22 @@ Related: a missing-script warning for `CameraBoundsController` appears in the co
 
 ### Room Pool
 
-`LevelManager.roomPrefabs` holds the pool of room prefabs that can be spawned. Element 0 is the hub by convention.
+`LevelManager.roomPrefabs` holds the pool of room prefabs. **Element 0 must be the hub;** elements 1..n are the run's combat levels. The boss room is NOT in this list — it has its own `bossRoomPrefab` slot.
 
-### First-Room Logic
+### Run Order — finite run: hub → levels → boss (reworked 2026-07-02)
 
-`LevelManager` has a private bool `hasSpawnedFirstRoom` that defaults to false. On first call to the room-pick block:
-- Forces `selectedRoomIndex = 0` (the hub).
-- Sets `hasSpawnedFirstRoom = true`.
-- Removes index 0 from the available pool immediately.
+`LevelManager` was changed from an endless-refill pool (which repeated the same level forever) into a **finite, structured run**. Driven by `PickNextRoomPrefab()`:
 
-On all subsequent calls:
-- Strips index 0 from the available pool every call (no-op if not present; covers cases where pool refill re-adds it).
-- If the strip empties the pool, refill and strip again.
-- Pick from whatever remains with a normal `Random.Range(0, count)`.
-- Falls back to index 0 only if `roomPrefabs` has a single entry (the only physical possibility).
+1. **First room is always the hub** (`roomPrefabs[0]`), and `BuildLevelQueue()` fills `availableRoomIndices` with indices `1..n`.
+2. **Then every other pool level, once each, in random order (no repeats)** — pulled from `availableRoomIndices` until empty.
+3. **Pool exhausted → the boss room** (`bossRoomPrefab`, gated by a `bossSpawned` flag so it only happens once).
+4. **After the boss (or if no boss is assigned) → reset the flags and loop back to the hub** for a fresh run.
 
-Net effect: **the hub is the first room of every run and never spawns again during the same run.** If/when proper scene flow gets built (player starts in hub from main menu and returns after death), this logic should be reviewed.
+So a run is: **hub → each combat level once (random) → boss → (loop to hub)**. The old `RefillRoomPool()` and index-stripping logic are gone; `hasSpawnedFirstRoom` + `bossSpawned` are the state.
+
+**Inspector requirements:** assign the BossRoom prefab to the new **`Boss Room Prefab`** slot (and REMOVE it from `roomPrefabs` if it was ever in the pool). The boss room prefab must satisfy the same room contract as every other room — a **`CameraBounds`** child (zone `BoxCollider2D`s) and a **`GirisNoktasi`** entry-point child — or the camera/spawn won't set up. Leaving `Boss Room Prefab` empty just loops hub→levels→hub.
+
+If/when proper scene flow gets built (player starts in hub from main menu, returns after death/run completion), this loop-back should be revisited.
 
 ---
 
@@ -462,7 +462,7 @@ Net effect: **the hub is the first room of every run and never spawns again duri
 
 ### Pattern
 
-- **`EnemyHealth`** base script — handles damage, flash, death, drops. **Currently the only callsite that reports KillEnemy/AirKill to QuestSystem.** `Die()` calls `RelicManager.OnEnemyKilled()`, `QuestSystem.ReportEvent(QuestType.KillEnemy, 1)`, and (if airborne) `QuestSystem.ReportEvent(QuestType.AirKill, 1)`. **No C# event for death** — death consequences are direct calls inside `Die()`. If you need to react to enemy death from a new system, add a call inside `Die()`; don't try to subscribe to a non-existent event.
+- **`EnemyHealth`** base script — handles damage, flash, death, drops. **Currently the only callsite that reports KillEnemy/AirKill to QuestSystem.** `Die()` calls `RelicManager.OnEnemyKilled()`, `QuestSystem.ReportEvent(QuestType.KillEnemy, 1)`, and (if airborne) `QuestSystem.ReportEvent(QuestType.AirKill, 1)`. It now also exposes C# events: **`OnDamaged`**, **`OnDamagedAmount(float)`** (carries the hit size — the boss flinches on big hits), and **`OnDied`** (fired inside `Die()` right before the GameObject is destroyed — the boss uses it to hand music back and to spawn its death VFX). **CRITICAL: `Die()` fires `OnDied` and then `Destroy(gameObject)` in the SAME frame**, so an `OnDied` handler must NOT rely on the enemy surviving — anything that needs to outlive the death (VFX, loot) has to run on its own separate object (see `BossDeathVFX`). Non-event death consequences are still direct calls inside `Die()`.
 - **AeroBat (BatMan)** — uses Cainos pack visual + custom `AeroBatAI`. Parent has Kinematic Rigidbody2D + Polygon trigger collider. Raycast LOS aimed at player chest (+0.5 Y), shortened by 0.3 to avoid hitting tile at player's feet. State machine: Idle → Preparing → Diving → Returning.
 - **MeleeEnemy**, **RangedEnemy** — based on Cainos pack patterns.
 
@@ -505,9 +505,13 @@ Wired and working across all six enemy types (AeroBat, MeleeEnemy, RangedEnemy, 
 
 ## Audio System
 
-Currently minimal. `MusicManager` handles background music. Individual scripts play SFX via `AudioSource.PlayOneShot()` or `AudioSource.PlayClipAtPoint()`. No central SFX manager.
+`MusicManager` handles background music (incl. `PlayBossMusic()`/`StopBossMusic()`).
 
-When adding audio cues for new cards/effects, follow the existing pattern: expose a `[SerializeField] AudioClip` field and play it with a null guard.
+**There IS a central SFX helper now: `SfxManager` (singleton).** Two static entry points, both multiplying a per-call `localVolume` by a global `SfxManager.Volume`:
+- **`SfxManager.PlayOn(AudioSource source, AudioClip clip, float localVolume = 1f)`** — a `PlayOneShot` on a **2D** source you own. Use this for sounds that must be clearly audible regardless of distance (boss abilities, player footsteps, the crusher slam). Because it's a one-shot on a 2D source, `localVolume` can go **past 1** for headroom, and the source can be `.Stop()`ped for looping/sustained sounds (e.g. the boss charge).
+- **`SfxManager.PlayAtPoint(AudioClip clip, Vector3 pos, float localVolume = 1f)`** — positional/3D (`PlayClipAtPoint`), **distance-attenuated and clamped to [0,1]**. Fine for small local pickups (gold), but it goes quiet in a big arena and can't be boosted — that's exactly why the crusher slam was switched to a 2D `PlayOn` source with a `[0,2]` slider.
+
+When adding audio cues: expose a `[SerializeField] AudioClip` (+ optional `[Range]` volume) field, and route it through `SfxManager` with a null guard. For a runtime-built source, add an `AudioSource` in code with `playOnAwake=false` and `spatialBlend=0` (2D). Animation-driven SFX (footsteps) come in via `PlayerAnimEventSink` relaying to `PlayerController.PlayFootstep()`; boss ability SFX are frame-synced via the Cainos `AnimationEventReceiver.onAttack` event.
 
 ---
 
@@ -689,7 +693,7 @@ The `CardTemplate` prefab has fundamental scale corruption: root scale is non-un
 - Glass archetype: cards exist in theory, not implemented.
 - Expand Vampiric archetype.
 - Three-act structure: Act 1 prototype exists; Acts 2-3 not started.
-- Boss encounters per act (3 bosses per act, randomly selected from pool).
+- Boss encounters per act (3 bosses per act, randomly selected from pool). **Act 1's Moss Knight is a playable encounter** (moveset, gated fight start, awaken cinematic, SFX, boss health bar, and a death celebration that drops real collectible gold + shift crystals). It's the run finale (`LevelManager.bossRoomPrefab`). Full doc: `BossDesign_MossKnight.md`. Still open there: the acid arena (flank pools + platforms) and an optional post-kill RewardManager card/relic screen. The other Act-1 bosses and the pool/random-select aren't built.
 - Chunk-based level system (currently hand-crafted levels).
 - **Starting relic system** + **Fireball relic** for the wizard identity (auto-fires fireball every 10s). Deferred when the broader relic redesign was prioritized — may be revisited as a small early demo polish.
 

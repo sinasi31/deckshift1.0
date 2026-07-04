@@ -13,6 +13,26 @@ using Cainos.PixelArtMonster_Dungeon;
 [RequireComponent(typeof(EnemyHealth))]
 public class MossKnightBoss : MonoBehaviour
 {
+    [Header("Fight Start")]
+    [Tooltip("Sleep until a BossFightTrigger wakes him (place one over the arena platform). " +
+             "Uncheck to restore the old behavior: fight starts the moment the room loads.")]
+    public bool startDormant = true;
+    [Tooltip("Play the dramatic coil→roar awakening when the fight starts. The health bar and boss " +
+             "music land on the roar. Uncheck for an instant, effect-free start.")]
+    public bool playAwakenEffect = true;
+    [Tooltip("Seconds he coils/rumbles before the roar burst.")]
+    public float awakenWindup = 0.75f;
+    [Tooltip("Green screen-flash colour on the roar.")]
+    public Color awakenFlashColor = new Color(0.45f, 0.95f, 0.35f, 0.55f);
+    [Tooltip("Scale multiplier on the awaken shockwave rings vs. the slam (reuses Slam Shockwave Effect).")]
+    public float awakenShockwaveScale = 1.7f;
+    [Tooltip("Gentle, non-damaging upward shove pushed onto the player by the roar. 0 = no shove.")]
+    public float awakenPushback = 5f;
+    [Tooltip("Number of hard ground-pound stomps during the awakening (0 = none).")]
+    public int awakenPounds = 2;
+    [Tooltip("Upward launch of each stomp hop — higher = bigger hop, lower/faster = harder slam.")]
+    public float poundHopVelocity = 6f;
+
     [Header("Pursuit")]
     [Tooltip("Engage range. Default arena-wide so the boss always pursues.")]
     public float aggroRange = 40f;
@@ -23,7 +43,8 @@ public class MossKnightBoss : MonoBehaviour
     public float cleaveRange = 2.2f;
     public float cleaveCooldown = 2.0f;
     public float cleaveDamage = 15f;
-    [Tooltip("Delay from swing start to the contact frame.")]
+    [Tooltip("Fallback only: damage now lands on the animation's contact-frame event. This is the " +
+             "safety timeout used if that event never fires.")]
     public float cleaveDamageDelay = 0.3f;
     public float cleaveKnockback = 6f;
     public float cleaveRecover = 0.3f;
@@ -107,6 +128,51 @@ public class MossKnightBoss : MonoBehaviour
     [Tooltip("A single hit above this plays the boss's injured/flinch animation (e.g. the Crusher's 80).")]
     public float hurtAnimThreshold = 50f;
 
+    [Header("Death")]
+    [Tooltip("Play the death celebration (freeze-frame, slow-mo, loot shower) when the boss dies. " +
+             "Uncheck for a plain, instant despawn.")]
+    public bool playDeathEffect = true;
+    [Tooltip("One-shot played on death (2D, always audible). Optional.")]
+    public AudioClip deathSound;
+    [Range(0f, 2f)] public float deathVolume = 1.4f;
+    [Tooltip("REAL collectible gold dropped on death — assign the 'Gold New' prefab (YeniLeveller). " +
+             "Each piece gives its own gold amount when the player grabs it. Empty = no gold drops.")]
+    public GameObject deathGoldPrefab;
+    [Tooltip("REAL collectible shift crystals dropped on death — assign the ShiftCrystal prefab (Prefabs). " +
+             "Empty = no crystal drops.")]
+    public GameObject deathShiftCrystalPrefab;
+    [Tooltip("How many gold pieces erupt and scatter on death.")]
+    public int deathGoldCount = 14;
+    [Tooltip("How many shift crystals erupt and scatter on death.")]
+    public int deathCrystalCount = 5;
+
+    [Header("Audio")]
+    // All boss SFX play as 2D sound (always audible across the big arena); sliders go past 1 for headroom.
+    [Tooltip("Roar on the awaken beat when the fight starts.")]
+    public AudioClip roarSound;
+    [Range(0f, 2f)] public float roarVolume = 1.4f;
+    [Tooltip("Each ground-pound stomp during the awakening.")]
+    public AudioClip poundSound;
+    [Range(0f, 2f)] public float poundVolume = 1f;
+    [Tooltip("Acid Cleave — the melee swing.")]
+    public AudioClip cleaveSound;
+    [Range(0f, 2f)] public float cleaveVolume = 1f;
+    [Tooltip("Charge — the dash launch.")]
+    public AudioClip chargeSound;
+    [Range(0f, 2f)] public float chargeVolume = 1f;
+    [Tooltip("Leap — the jump launch into the air.")]
+    public AudioClip leapSound;
+    [Range(0f, 2f)] public float leapVolume = 1f;
+    [Tooltip("Leap Slam — the landing impact.")]
+    public AudioClip slamSound;
+    [Range(0f, 2f)] public float slamVolume = 1.3f;
+    [Tooltip("Lob — spitting the acid blob / slime.")]
+    public AudioClip lobSound;
+    [Range(0f, 2f)] public float lobVolume = 1f;
+    [Tooltip("Plays when the boss takes damage (on every landed hit).")]
+    public AudioClip hurtSound;
+    [Range(0f, 2f)] public float hurtVolume = 1f;
+
     [Header("Edge Detection")]
     [Tooltip("Stop at ledges. Requires Ground Layer to be set, or it is ignored.")]
     public bool avoidLedges = false;
@@ -118,8 +184,13 @@ public class MossKnightBoss : MonoBehaviour
     private PixelMonster pm;
     private EnemyHealth health;
     private Transform player;
+    private AudioSource bossSfx;        // 2D source built at runtime for all one-shot boss SFX
+    private AudioSource chargeSource;   // separate 2D source for the charge, so it can be Stop()ped mid-dash
+    private AnimationEventReceiver animEvents;   // Cainos monster event source; onAttack = the strike frame
+    private System.Action pendingAttackHit;      // fired on the next onAttack event (set only during a cleave)
 
     private bool isActing;              // true while an attack coroutine drives the inputs
+    private bool fightStarted;          // set by StartFight(); dormant (no AI, no music, no bar) until then
     private float cleaveReadyTime;
     private float chargeReadyTime;
     private float leapReadyTime;
@@ -130,6 +201,20 @@ public class MossKnightBoss : MonoBehaviour
         controller = GetComponent<MonsterController>();
         pm = GetComponent<PixelMonster>();
         health = GetComponent<EnemyHealth>();
+
+        // 2D sources so boss SFX are always clearly audible regardless of distance across the arena.
+        bossSfx = gameObject.AddComponent<AudioSource>();
+        bossSfx.playOnAwake = false;
+        bossSfx.spatialBlend = 0f;
+
+        chargeSource = gameObject.AddComponent<AudioSource>();
+        chargeSource.playOnAwake = false;
+        chargeSource.spatialBlend = 0f;
+
+        // The attack clip fires onAttack at its authored contact frame — drive cleave damage/SFX off it
+        // so they stay in sync with the swing instead of a guessed delay.
+        animEvents = GetComponentInChildren<AnimationEventReceiver>();
+        if (animEvents != null) animEvents.onAttack.AddListener(OnAttackAnimHit);
 
         GameObject p = GameObject.FindGameObjectWithTag("Player");
         if (p != null) player = p.transform;
@@ -151,6 +236,31 @@ public class MossKnightBoss : MonoBehaviour
         if (controller == null)
             Debug.LogWarning("MossKnightBoss: no MonsterController found — add this to the Moss Knight (Cainos) prefab.");
 
+        // Flinch on big hits (Crusher, heavy cards).
+        if (health != null) health.OnDamagedAmount += OnDamaged;
+        if (health != null) health.OnDied += OnBossDied;
+
+        // Dormant bosses wait for a BossFightTrigger (arena platform) to call StartFight().
+        if (!startDormant) StartFight();
+    }
+
+    // Wakes the boss, so landing on the arena platform IS the fight starting. Called by
+    // BossFightTrigger (or Start if not dormant). With the awaken effect on, the coil→roar
+    // sequence plays and the bar/music land on the roar; otherwise the battle begins instantly.
+    public void StartFight()
+    {
+        if (fightStarted) return;
+        fightStarted = true;
+
+        if (playAwakenEffect)
+            StartCoroutine(AwakenRoutine());
+        else
+            BeginBattle();
+    }
+
+    // Health bar intro + boss music. Split out so the awaken sequence can land it on the roar beat.
+    private void BeginBattle()
+    {
         // Spawn the dedicated boss health bar and bind it to our EnemyHealth.
         if (bossHealthBarPrefab != null && health != null)
         {
@@ -159,12 +269,165 @@ public class MossKnightBoss : MonoBehaviour
             if (bar != null) bar.Initialize(health, bossName);
         }
 
-        // Flinch on big hits (Crusher, heavy cards).
-        if (health != null) health.OnDamagedAmount += OnDamaged;
-
         // Boss music: start the boss theme now, and hand it back to the level track on death.
         if (MusicManager.instance != null) MusicManager.instance.PlayBossMusic();
-        if (health != null) health.OnDied += OnBossDied;
+    }
+
+    // --- Awakening: coil (rumble) → roar (freeze-frame + shockwave + flash + shove) → battle. ---
+    private IEnumerator AwakenRoutine()
+    {
+        if (controller == null) { BeginBattle(); yield break; }   // no rig to animate — just start
+
+        isActing = true;                 // hold the AI off until the intro finishes
+        ClearInputs();
+        FaceTowardPlayer();
+
+        // Cinematic: pan the camera onto the boss for the intro, roaring as it snaps to him.
+        if (CameraFollow.instance != null) CameraFollow.instance.FocusOn(transform);
+        PlayBossSfx(roarSound, roarVolume);
+
+        // Beat 1 — ground pounds: a couple of hard stomps that shake the arena as he wakes.
+        yield return GroundPound(awakenPounds);
+
+        // Beat 1b — final coil: a short crouch + rising tremor for anticipation before the roar.
+        if (pm != null) pm.IsInJumpPrepare = true;
+        float t = 0f;
+        float windup = Mathf.Max(0.1f, awakenWindup);
+        while (t < windup)
+        {
+            float n = t / windup;
+            if (CameraShake.instance != null)
+                CameraShake.instance.Shake(0.08f, Mathf.Lerp(0.1f, 0.5f, n));   // escalating tremor
+            t += Time.deltaTime;
+            yield return null;
+        }
+        if (pm != null) pm.IsInJumpPrepare = false;
+
+        // Beat 2 — ROAR: everything lands together. (The roar SFX already fired on the camera pan.)
+        if (HitStop.instance != null) HitStop.instance.Stop(0.09f);             // freeze-frame punch
+        if (CameraShake.instance != null) CameraShake.instance.Shake(0.55f, 1.5f);
+
+        controller.inputAttack = true;                                          // aggressive swing to announce
+        StartCoroutine(ScreenFlashRoutine(awakenFlashColor, 0.35f));            // green screen flash
+
+        // Green acid shockwave rings, scaled up for a boss-sized pulse (reuses the slam VFX).
+        if (slamShockwaveEffect != null)
+        {
+            GameObject ring = Instantiate(slamShockwaveEffect, transform.position, Quaternion.identity);
+            ring.transform.localScale *= Mathf.Max(0.1f, awakenShockwaveScale);
+        }
+        SpawnDebrisBurst(transform.position, 14, 1.4f);                          // gel eruption
+
+        // A gentle, clearly non-damaging shove so the roar has physical weight.
+        if (awakenPushback > 0.01f && player != null)
+        {
+            PlayerController pc = player.GetComponent<PlayerController>();
+            if (pc != null)
+            {
+                Vector2 away = (player.position - transform.position);
+                away.x = Mathf.Approximately(away.x, 0f) ? 0f : Mathf.Sign(away.x);
+                Vector2 shove = new Vector2(away.x * 0.7f, 1f).normalized * awakenPushback;
+                pc.ApplyKnockback(shove);
+            }
+        }
+
+        yield return new WaitForSecondsRealtime(0.02f);
+        controller.inputAttack = false;
+
+        // The bar sweeps in and the music drops on the roar, and the camera eases back to the player.
+        BeginBattle();
+        if (CameraFollow.instance != null) CameraFollow.instance.ReleaseFocus();
+
+        // Beat 3 — brief settle (lets the camera finish panning back), then the AI takes over.
+        yield return new WaitForSeconds(0.4f);
+        isActing = false;
+    }
+
+    // A couple of hard downward stomps: quick crouch → snap up → slam back to the floor with an
+    // impact (shake + gel burst + ground ring). Drives the Rigidbody directly (same proven pattern
+    // as the Leap), so the controller doesn't brake the hop; control is always restored in finally.
+    private IEnumerator GroundPound(int count)
+    {
+        Rigidbody2D rb = GetComponent<Rigidbody2D>();
+        if (rb == null || pm == null || controller == null) yield break;
+
+        for (int i = 0; i < Mathf.Max(0, count); i++)
+        {
+            // Quick crouch tell.
+            pm.IsInJumpPrepare = true;
+            yield return new WaitForSeconds(0.1f);
+            pm.IsInJumpPrepare = false;
+
+            float startY = transform.position.y;
+            float savedGrav = rb.gravityScale;
+            rb.gravityScale = savedGrav * 2.5f;     // heavy, so the slam is fast and decisive
+            controller.enabled = false;             // take manual control of the hop
+            try
+            {
+                rb.linearVelocity = new Vector2(0f, poundHopVelocity);
+                float t = 0f;
+                while (t < 1.2f)
+                {
+                    pm.IsGrounded = false;
+                    pm.SpeedVertical = rb.linearVelocity.y;
+                    bool descending = rb.linearVelocity.y <= 0.1f;
+                    bool atFloor = transform.position.y <= startY + 0.1f;
+                    if (descending && t > 0.08f && atFloor) break;   // landed
+                    t += Time.deltaTime;
+                    yield return null;
+                }
+                rb.linearVelocity = Vector2.zero;
+                pm.IsGrounded = true;
+                pm.SpeedVertical = 0f;
+            }
+            finally
+            {
+                rb.gravityScale = savedGrav;
+                controller.enabled = true;
+            }
+
+            // Impact juice.
+            PlayBossSfx(poundSound, poundVolume);
+            if (HitStop.instance != null) HitStop.instance.Stop(0.05f);
+            if (CameraShake.instance != null) CameraShake.instance.Shake(0.28f, 0.8f);
+            SpawnDebrisBurst(transform.position, 6, 1.1f);
+            if (slamShockwaveEffect != null)
+                Instantiate(slamShockwaveEffect, transform.position, Quaternion.identity);
+
+            yield return new WaitForSeconds(0.1f);
+        }
+    }
+
+    // Full-screen colour flash that fades out. Self-contained ScreenSpaceOverlay canvas (house style),
+    // unscaled so it plays through the roar's freeze-frame; destroys itself when done.
+    private IEnumerator ScreenFlashRoutine(Color color, float duration)
+    {
+        GameObject canvasGO = new GameObject("BossAwakenFlash");
+        Canvas canvas = canvasGO.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 9000;                    // above HUD, below nothing important
+
+        GameObject imgGO = new GameObject("Flash");
+        imgGO.transform.SetParent(canvasGO.transform, false);
+        UnityEngine.UI.Image img = imgGO.AddComponent<UnityEngine.UI.Image>();
+        img.raycastTarget = false;
+        RectTransform rt = img.rectTransform;
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+
+        float startA = color.a;
+        float t = 0f;
+        while (t < duration)
+        {
+            float n = 1f - (t / duration);
+            Color c = color; c.a = startA * n * n;     // quick, punchy fade
+            img.color = c;
+            t += Time.unscaledDeltaTime;
+            yield return null;
+        }
+        Destroy(canvasGO);
     }
 
     void OnDestroy()
@@ -174,20 +437,77 @@ public class MossKnightBoss : MonoBehaviour
             health.OnDamagedAmount -= OnDamaged;
             health.OnDied -= OnBossDied;
         }
+        if (animEvents != null) animEvents.onAttack.RemoveListener(OnAttackAnimHit);
     }
 
-    // Return the soundtrack to the level's music once the boss is defeated.
+    // Attack animation reached its contact frame. Only a cleave arms pendingAttackHit, so lob/charge/
+    // awaken swings (which reuse the same Attack anim) harmlessly no-op here.
+    private void OnAttackAnimHit()
+    {
+        System.Action cb = pendingAttackHit;
+        pendingAttackHit = null;
+        cb?.Invoke();
+    }
+
+    // Return the soundtrack to the level's music once the boss is defeated, and fire the death
+    // celebration. EnemyHealth destroys this GameObject the same frame it calls us, so the effect
+    // must run on its OWN self-destroying object (BossDeathVFX) rather than a coroutine here.
     private void OnBossDied()
     {
         if (MusicManager.instance != null) MusicManager.instance.StopBossMusic();
+
+        if (playDeathEffect)
+        {
+            // Resolve the loot's resting height: the real floor beneath the boss if there is one,
+            // otherwise the boss stays "airborne" and the loot floats in mid-air where it died.
+            bool airborne;
+            float groundY = ResolveDeathGroundY(out airborne);
+
+            Vector3 center = transform.position + Vector3.up * 0.9f;   // mid-body burst origin
+            GameObject go = new GameObject("BossDeathVFX");
+            go.transform.position = center;
+            go.AddComponent<BossDeathVFX>().Play(groundY, airborne,
+                                                 deathGoldPrefab, deathShiftCrystalPrefab,
+                                                 deathSound, deathVolume,
+                                                 deathGoldCount, deathCrystalCount);
+        }
+    }
+
+    // Casts down from the boss to find the floor loot should land on. Returns that floor's Y and sets
+    // airborne=true when there's no ground close below (a mid-air death → the loot hovers instead).
+    private float ResolveDeathGroundY(out bool airborne)
+    {
+        Vector3 feet = transform.position;
+        airborne = true;
+        float groundY = feet.y;
+
+        RaycastHit2D[] hits = Physics2D.RaycastAll(feet + Vector3.up * 0.3f, Vector2.down, 2.2f);
+        float nearest = float.MaxValue;
+        foreach (RaycastHit2D h in hits)
+        {
+            if (h.collider == null || h.collider.isTrigger) continue;
+            if (h.collider.transform == transform || h.collider.transform.IsChildOf(transform)) continue;
+            if (h.collider.CompareTag("Player")) continue;   // don't land loot on the player
+            if (h.distance < nearest)
+            {
+                nearest = h.distance;
+                groundY = h.point.y;
+                airborne = false;
+            }
+        }
+        return groundY;
     }
 
     // Plays the injured/flinch animation when a single hit is heavy enough. Front vs back is chosen
     // from where the player stands relative to the boss's facing — a crusher hit just uses the default.
     private void OnDamaged(float amount)
     {
-        if (amount <= hurtAnimThreshold) return;
-        if (pm == null || controller == null || controller.IsDead) return;
+        if (controller != null && controller.IsDead) return;   // no hurt reaction on/after death
+
+        PlayBossSfx(hurtSound, hurtVolume);                    // every landed hit
+
+        if (amount <= hurtAnimThreshold) return;               // flinch animation only on heavy hits
+        if (pm == null || controller == null) return;
 
         bool fromFront = true;
         if (player != null)
@@ -210,6 +530,7 @@ public class MossKnightBoss : MonoBehaviour
 
         ClearInputs();
 
+        if (!fightStarted) return;   // dormant — waiting for the arena trigger
         if (player == null || controller.IsDead) return;
         if (health != null && health.IsStunned) return;
 
@@ -264,12 +585,32 @@ public class MossKnightBoss : MonoBehaviour
         ClearInputs();
         FaceTowardPlayer();
 
+        // Damage + sound land on the animation's OnAttack contact frame (in sync with the visible
+        // swing), not a guessed delay. A timeout still forces the hit if the event never fires.
+        bool hitDone = false;
+        System.Action doHit = () =>
+        {
+            if (hitDone) return;
+            hitDone = true;
+            PlayBossSfx(cleaveSound, cleaveVolume);
+            TryMeleeHit(cleaveRange + 0.5f, cleaveDamage, cleaveKnockback);
+        };
+        pendingAttackHit = doHit;
+
         controller.inputAttack = true;       // trigger the Attack anim
-        yield return null;                    // hold it for a full frame so the controller reads it
+        yield return null;                    // hold it a frame so the controller reads it
         controller.inputAttack = false;
 
-        yield return new WaitForSeconds(cleaveDamageDelay);
-        TryMeleeHit(cleaveRange + 0.5f, cleaveDamage, cleaveKnockback);
+        // Proceed the instant the strike frame fires; otherwise fall back after a safety window.
+        float timeout = Mathf.Max(0.15f, cleaveDamageDelay) + 0.4f;
+        float waited = 0f;
+        while (!hitDone && waited < timeout)
+        {
+            waited += Time.deltaTime;
+            yield return null;
+        }
+        if (pendingAttackHit == doHit) pendingAttackHit = null;   // don't let a stale callback linger
+        doHit();                                                  // no-op if the event already hit
 
         yield return new WaitForSeconds(cleaveRecover);
         isActing = false;
@@ -292,6 +633,13 @@ public class MossKnightBoss : MonoBehaviour
         // then it's locked — dodge by getting to his other side.
         if (player != null) dir = player.position.x > transform.position.x ? 1f : -1f;
         FaceDirection(dir);
+        // Sustained dash sound on its own source so it can be cut the moment the charge ends.
+        if (chargeSound != null)
+        {
+            chargeSource.clip = chargeSound;
+            chargeSource.volume = chargeVolume * SfxManager.Volume;
+            chargeSource.Play();
+        }
 
         // Temporarily override the controller's run cap/accel so this is a real dash, not a jog.
         float savedMax = controller.runSpeedMax;
@@ -338,6 +686,7 @@ public class MossKnightBoss : MonoBehaviour
         // Restore normal movement, then the vulnerable recovery window.
         controller.runSpeedMax = savedMax;
         controller.runAcc = savedAcc;
+        if (chargeSource != null) chargeSource.Stop();   // cut the dash sound the instant he stops
         ClearInputs();
         yield return new WaitForSeconds(chargeRecover);
         isActing = false;
@@ -379,6 +728,7 @@ public class MossKnightBoss : MonoBehaviour
 
         // Take manual control of the arc (the controller would brake the horizontal velocity).
         controller.enabled = false;
+        PlayBossSfx(leapSound, leapVolume);   // launch grunt/whoosh
         try
         {
             rb.linearVelocity = new Vector2(vx, vy);
@@ -421,6 +771,8 @@ public class MossKnightBoss : MonoBehaviour
         if (slamShockwaveEffect != null)
             Instantiate(slamShockwaveEffect, transform.position, Quaternion.identity);
 
+        PlayBossSfx(slamSound, slamVolume);
+
         // Punch: a brief freeze-frame + a heavy shake + a gel splatter burst.
         if (HitStop.instance != null) HitStop.instance.Stop(0.07f);
         if (CameraShake.instance != null) CameraShake.instance.Shake(0.32f, 1.1f);
@@ -441,15 +793,18 @@ public class MossKnightBoss : MonoBehaviour
     }
 
     // A short-lived burst of gel chunks flung up and out from the impact — cheap, contained juice.
-    private void SpawnSlamDebris(Vector2 origin)
+    private void SpawnSlamDebris(Vector2 origin) => SpawnDebrisBurst(origin, 7, 1f);
+
+    // Parameterized so the awaken can throw a bigger, faster eruption than a slam.
+    private void SpawnDebrisBurst(Vector2 origin, int count, float speedMul)
     {
         if (slamDebrisSprite == null) return;
-        StartCoroutine(DebrisRoutine(origin));
+        StartCoroutine(DebrisRoutine(origin, count, speedMul));
     }
 
-    private IEnumerator DebrisRoutine(Vector2 origin)
+    private IEnumerator DebrisRoutine(Vector2 origin, int count, float speedMul)
     {
-        const int count = 7;
+        count = Mathf.Max(1, count);
         var gos = new GameObject[count];
         var srs = new SpriteRenderer[count];
         var vel = new Vector2[count];
@@ -464,7 +819,7 @@ public class MossKnightBoss : MonoBehaviour
             sr.sortingOrder = 12;
             gos[i] = go; srs[i] = sr;
             float ang = Mathf.Deg2Rad * Random.Range(35f, 145f);   // upward-biased fan
-            vel[i] = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * Random.Range(4f, 9f);
+            vel[i] = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * Random.Range(4f, 9f) * speedMul;
         }
 
         float t = 0f; const float life = 0.6f;
@@ -499,6 +854,7 @@ public class MossKnightBoss : MonoBehaviour
         FaceTowardPlayer();
 
         // Throw gesture (the Attack anim doubles as the overhead lob).
+        PlayBossSfx(lobSound, lobVolume);
         controller.inputAttack = true;
         yield return null;
         controller.inputAttack = false;
@@ -539,6 +895,9 @@ public class MossKnightBoss : MonoBehaviour
         if (player == null) return;
         FaceDirection(player.position.x > transform.position.x ? 1f : -1f);
     }
+
+    // All boss SFX route through here: 2D, global-volume-aware, null-safe.
+    private void PlayBossSfx(AudioClip clip, float volume) => SfxManager.PlayOn(bossSfx, clip, volume);
 
     private void TryMeleeHit(float range, float damage, float knockback)
     {

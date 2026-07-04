@@ -272,7 +272,7 @@ MonoBehaviour:
   OnFlippedOff:
     m_PersistentCalls:
       m_Calls: []
-  flipSound: {fileID: 0}
+  flipSound: {fileID: 8300000, guid: 2e9b47f9e30e9d54ab7c7d8278ffb89b, type: 3}
   prompt: {fileID: 5039348767456238711}
   crusher: {fileID: 0}
   clockHeight: 0.95

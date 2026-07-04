@@ -10,6 +10,18 @@ public class RewardManager : MonoBehaviour
     [Header("References")]
     public GameObject rewardScreen;
 
+    // Hidden while the reward screen is up (visual clarity). Optional — auto-found by name if unassigned.
+    [SerializeField] private GameObject gameplayHUD;
+    private GameObject ResolveHUD()
+    {
+        if (gameplayHUD == null)
+        {
+            GameObject g = GameObject.Find("GameplayHUD");
+            if (g != null) gameplayHUD = g;
+        }
+        return gameplayHUD;
+    }
+
     // --- DE����KL�K: Art�k Button listesi de�il, CardUI listesi tutuyoruz ---
     public List<CardUI> rewardCardSlots;
     // --- B�T�� ---
@@ -17,6 +29,18 @@ public class RewardManager : MonoBehaviour
     private List<CardData> offeredCards = new List<CardData>();
     private int bonusCardIndex = -1;
     private bool isShowing = false;
+
+    // Procedural presentation layer (atmosphere, staggered reveal, bonus badge, selection burst).
+    // Auto-added to the reward screen so it needs no Inspector wiring.
+    private RewardScreenFX fx;
+    private RewardScreenFX GetFX()
+    {
+        if (fx != null) return fx;
+        if (rewardScreen == null) return null;
+        fx = rewardScreen.GetComponent<RewardScreenFX>();
+        if (fx == null) fx = rewardScreen.AddComponent<RewardScreenFX>();
+        return fx;
+    }
 
     private void Awake()
     {
@@ -99,10 +123,23 @@ public class RewardManager : MonoBehaviour
 
         rewardScreen.SetActive(true);
         if (GameManager.instance != null) GameManager.instance.RequestPause();
+
+        // Hide the gameplay HUD for a clean presentation; the reward screen's "View Deck" button
+        // keeps the deck reachable. Lock the hand drawer so it can't slide up behind the screen.
+        GameObject hud = ResolveHUD();
+        if (hud != null) hud.SetActive(false);
+        if (HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(true);
+
+        // Play the entrance choreography (fade-in, dealt reveal, +1 SHIFT badge on the bonus card).
+        RewardScreenFX intro = GetFX();
+        if (intro != null) intro.PlayIntro(rewardCardSlots, offeredCards.Count, bonusCardIndex);
     }
 
     public void SelectCard(int cardIndex)
     {
+        if (!isShowing) return;   // ignore extra clicks while the selection burst / fade-out plays
+        isShowing = false;
+
         CardData selectedCard = offeredCards[cardIndex];
         DeckManager.instance.AddCardToDeck(selectedCard);
 
@@ -111,8 +148,22 @@ public class RewardManager : MonoBehaviour
             GameManager.instance.player.AddShift(1);
         }
 
-        isShowing = false;
+        // Card is granted immediately; the visual close (burst + fade-out) is deferred to the FX,
+        // which fires FinishReward when the screen has faded away. Falls back to instant close.
+        RewardScreenFX outro = GetFX();
+        if (outro != null) outro.PlaySelect(cardIndex, FinishReward);
+        else FinishReward();
+    }
+
+    private void FinishReward()
+    {
         rewardScreen.SetActive(false);
+
+        // Restore the HUD + hand drawer, and close the deck view if the player left it open.
+        if (gameplayHUD != null) gameplayHUD.SetActive(true);
+        if (HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(false);
+        if (DeckViewUI.instance != null) DeckViewUI.instance.CloseView();
+
         if (GameManager.instance != null) GameManager.instance.ReleasePause();
         GameManager.instance.SetGameState(GameState.Playing);
         LevelManager.instance.SpawnNextRoom();

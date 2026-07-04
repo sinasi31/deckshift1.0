@@ -14,6 +14,10 @@ public class Chest : MonoBehaviour, IInteractable
     [SerializeField] private AudioClip openSound;
     [SerializeField] private GameObject prompt;
 
+    [Header("Open VFX")]
+    [Tooltip("Height above the chest where the reward burst spawns.")]
+    [SerializeField] private float openVfxHeight = 0.6f;
+
     private bool isOpened = false;
     private Animator animator;
     private AudioSource audioSource;
@@ -48,6 +52,11 @@ public class Chest : MonoBehaviour, IInteractable
                 RelicManager.instance.AddRelic(relic);
             else
                 Debug.LogWarning($"[Chest] '{name}': RelicManager.instance is null, relic grant skipped.");
+
+            // Reward burst, colour-coded to the relic's rarity, spawned above the lid.
+            GameObject fxGO = new GameObject("ChestOpenVFX");
+            fxGO.transform.position = transform.position + Vector3.up * openVfxHeight;
+            fxGO.AddComponent<ChestOpenVFX>().Play(relic.rarity, relic.relicArt);
         }
     }
 

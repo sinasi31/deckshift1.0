@@ -303,6 +303,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b3e6a1c9d7f24805ab9c3e2d1f6a8b40, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  startDormant: 1
+  playAwakenEffect: 1
+  awakenWindup: 0.75
+  awakenFlashColor: {r: 0.45, g: 0.95, b: 0.35, a: 0.55}
+  awakenShockwaveScale: 1.7
+  awakenPushback: 5
+  awakenPounds: 2
+  poundHopVelocity: 6
   aggroRange: 40
   moveStopRange: 1.8
   cleaveRange: 2.2
@@ -334,6 +342,9 @@ MonoBehaviour:
   slamKnockback: 11
   leapRecover: 0.6
   slamShockwaveEffect: {fileID: 5028461739205847163, guid: a8e3c1f60d9b42578e1a4c2b9f6d3e07, type: 3}
+  leapGravityMul: 2.2
+  leapFallMul: 1.4
+  slamDebrisSprite: {fileID: 0}
   lobProjectile: {fileID: 7711461739205847163, guid: f1a0c3e7b2d94856ac1b9e0d7f6a2c84, type: 3}
   slimeEnemy: {fileID: 7955309611018997317, guid: 0bde29ded6f62f14ab6d437d8882e376, type: 3}
   lobMinRange: 6
@@ -346,6 +357,30 @@ MonoBehaviour:
   lobAboveThreshold: 2
   bossHealthBarPrefab: {fileID: 8800461739205847163, guid: e2d9f4c7a1b04e58b9c3d6e0f7a2b1c5, type: 3}
   bossName: The Moss Knight
+  hurtAnimThreshold: 50
+  playDeathEffect: 1
+  deathSound: {fileID: 0}
+  deathVolume: 1.4
+  deathGoldPrefab: {fileID: 36429608721029561, guid: 2d3e20ebe97aafe4cb7d40cea6f64c78, type: 3}
+  deathShiftCrystalPrefab: {fileID: 8096823719252344264, guid: 738e8751a02a1344eb634cdabe172263, type: 3}
+  deathGoldCount: 8
+  deathCrystalCount: 6
+  roarSound: {fileID: 8300000, guid: 09b96d19aac9020419e4eb3766104457, type: 3}
+  roarVolume: 0.6
+  poundSound: {fileID: 0}
+  poundVolume: 1
+  cleaveSound: {fileID: 8300000, guid: 95798448d1097054cb27617aad2c68b2, type: 3}
+  cleaveVolume: 1
+  chargeSound: {fileID: 8300000, guid: 26e9afbfe4abf4941bf6def61960ab51, type: 3}
+  chargeVolume: 1
+  leapSound: {fileID: 0}
+  leapVolume: 1
+  slamSound: {fileID: 8300000, guid: de1b23a504c36db42a79349ea11200e1, type: 3}
+  slamVolume: 0.83
+  lobSound: {fileID: 8300000, guid: 726b34f4518a904468116edb33e8a860, type: 3}
+  lobVolume: 1
+  hurtSound: {fileID: 8300000, guid: 95798448d1097054cb27617aad2c68b2, type: 3}
+  hurtVolume: 1
   avoidLedges: 0
   groundLayer:
     serializedVersion: 2

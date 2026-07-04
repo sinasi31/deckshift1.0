@@ -13,7 +13,19 @@ using UnityEngine;
 // Method names (including the pack's "OnLedgeClimbFinised" typo) must match the clips exactly.
 public class PlayerAnimEventSink : MonoBehaviour
 {
-    public void OnFootstep(AnimationEvent evt) { }
+    private PlayerController player;
+
+    void Awake()
+    {
+        player = GetComponentInParent<PlayerController>();
+    }
+
+    // Fired by the walk/run animation as each foot lands. The footstep clips/volume live on the
+    // PlayerController (main player object); this just relays the event up to it.
+    public void OnFootstep(AnimationEvent evt)
+    {
+        if (player != null) player.PlayFootstep();
+    }
 
     public void OnReviveStart() { }
     public void OnReviveEnd() { }

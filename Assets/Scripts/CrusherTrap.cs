@@ -28,8 +28,12 @@ public class CrusherTrap : MonoBehaviour
 
     [Header("Feedback")]
     [SerializeField] private AudioClip slamSound;
+    [Tooltip("Loudness of the slam. Plays as a 2D sound (no distance falloff); above 1 boosts it.")]
+    [SerializeField, Range(0f, 2f)] private float slamVolume = 1.5f;
     [SerializeField] private float shakeDuration = 0.25f;
     [SerializeField] private float shakeIntensity = 0.35f;
+
+    private AudioSource sfxSource;   // 2D one-shot source built at runtime so the slam is always audible
 
     [Header("Shift Reward (only when it crushes the boss)")]
     [Tooltip("Shift crystal spawned at each point below when this crushes the boss. Assign Prefabs/ShiftCrystal.")]
@@ -63,6 +67,12 @@ public class CrusherTrap : MonoBehaviour
     private void Start()
     {
         if (pressHead != null) idleHeadPos = pressHead.position;
+
+        // 2D source so the slam plays at a flat, controllable volume regardless of how far the
+        // press is from the camera (PlayClipAtPoint was 3D-attenuated, which made it too quiet).
+        sfxSource = gameObject.AddComponent<AudioSource>();
+        sfxSource.playOnAwake = false;
+        sfxSource.spatialBlend = 0f;
     }
 
     // Called by the Lever's UnityEvents. Ignores the pull if the press isn't rearmed yet.
@@ -97,7 +107,7 @@ public class CrusherTrap : MonoBehaviour
         ApplyImpactDamage();
 
         if (CameraShake.instance != null) CameraShake.instance.Shake(shakeDuration, shakeIntensity);
-        SfxManager.PlayAtPoint(slamSound, pressHead.position);
+        SfxManager.PlayOn(sfxSource, slamSound, slamVolume);
 
         yield return new WaitForSeconds(holdTime);
 

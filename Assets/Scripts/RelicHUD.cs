@@ -30,12 +30,9 @@ public class RelicHUD : MonoBehaviour
 
         GameObject icon = Instantiate(iconPrefab, iconContainer);
 
-        Image img = icon.GetComponentInChildren<Image>();
-        if (img == null) return;
-
-        // Leave the prefab's default sprite intact when relicArt is unassigned,
-        // so the slot is visible even for relics without art yet.
-        if (relic.relicArt != null)
-            img.sprite = relic.relicArt;
+        // RelicIcon builds the rarity chip (glow + plate + framed art) + pop-in procedurally.
+        RelicIcon styler = icon.GetComponent<RelicIcon>();
+        if (styler == null) styler = icon.AddComponent<RelicIcon>();
+        styler.Build(relic);
     }
 }
