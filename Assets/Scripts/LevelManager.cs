@@ -10,11 +10,15 @@ public class LevelManager : MonoBehaviour
     public Transform playerTransform;
 
     [Header("Oda Ayarları")]
+    [Tooltip("Element 0 must be the hub. The rest are the run's levels, each played once per run.")]
     public List<GameObject> roomPrefabs;
+    [Tooltip("Boss room — spawned after every level in roomPrefabs has been played. Leave empty to just loop back to the hub.")]
+    public GameObject bossRoomPrefab;
 
     private List<int> availableRoomIndices = new List<int>();
     private GameObject currentRoom;
     private bool hasSpawnedFirstRoom = false;
+    private bool bossSpawned = false;
 
     private void Awake()
     {
@@ -30,18 +34,52 @@ public class LevelManager : MonoBehaviour
 
     private void Start()
     {
-        RefillRoomPool();
         SpawnNextRoom();
     }
 
-    private void RefillRoomPool()
+    // Queue every non-hub level (indices 1..n). The hub (0) is the always-first room and the boss
+    // is a separate prefab, so neither belongs in this queue.
+    private void BuildLevelQueue()
     {
         availableRoomIndices.Clear();
-        for (int i = 0; i < roomPrefabs.Count; i++)
-        {
+        for (int i = 1; i < roomPrefabs.Count; i++)
             availableRoomIndices.Add(i);
+    }
+
+    // Run order: hub first → each queued level once (random order, no repeats) → boss room →
+    // then loop back to a fresh run from the hub.
+    private GameObject PickNextRoomPrefab()
+    {
+        if (roomPrefabs == null || roomPrefabs.Count == 0) return null;
+
+        // 1) Hub is always the first room of the run.
+        if (!hasSpawnedFirstRoom)
+        {
+            hasSpawnedFirstRoom = true;
+            BuildLevelQueue();
+            return roomPrefabs[0];
         }
-        Debug.Log("Oda havuzu yenilendi/dolduruldu.");
+
+        // 2) Then every other level, once each, in random order.
+        if (availableRoomIndices.Count > 0)
+        {
+            int pick = Random.Range(0, availableRoomIndices.Count);
+            int idx = availableRoomIndices[pick];
+            availableRoomIndices.RemoveAt(pick);
+            return roomPrefabs[idx];
+        }
+
+        // 3) Pool exhausted → the boss room.
+        if (!bossSpawned && bossRoomPrefab != null)
+        {
+            bossSpawned = true;
+            return bossRoomPrefab;
+        }
+
+        // 4) After the boss (or if no boss is assigned) → restart the cycle from the hub.
+        hasSpawnedFirstRoom = false;
+        bossSpawned = false;
+        return PickNextRoomPrefab();
     }
 
     public void SpawnNextRoom()
@@ -51,45 +89,15 @@ public class LevelManager : MonoBehaviour
 
         if (currentRoom != null) Destroy(currentRoom);
 
-        if (availableRoomIndices.Count == 0)
+        GameObject selectedRoomPrefab = PickNextRoomPrefab();
+        if (selectedRoomPrefab == null)
         {
-            RefillRoomPool();
+            Debug.LogError("LevelManager: no room prefab to spawn (is roomPrefabs empty?).");
+            return;
         }
 
-        int selectedRoomIndex;
-        if (!hasSpawnedFirstRoom)
-        {
-            hasSpawnedFirstRoom = true;
-            selectedRoomIndex = 0;
-            availableRoomIndices.Remove(0);
-        }
-        else
-        {
-            // Strip hub (index 0) from the pool — it may have re-entered via a refill above.
-            availableRoomIndices.Remove(0);
+        Debug.Log($"Spawning room: {selectedRoomPrefab.name}. Levels left this run: {availableRoomIndices.Count}, bossSpawned: {bossSpawned}");
 
-            // If stripping hub left the pool empty, refill and strip again.
-            if (availableRoomIndices.Count == 0)
-            {
-                RefillRoomPool();
-                availableRoomIndices.Remove(0);
-            }
-
-            if (availableRoomIndices.Count > 0)
-            {
-                int randomIndexInPool = Random.Range(0, availableRoomIndices.Count);
-                selectedRoomIndex = availableRoomIndices[randomIndexInPool];
-                availableRoomIndices.RemoveAt(randomIndexInPool);
-            }
-            else
-            {
-                selectedRoomIndex = 0; // only one prefab in the list; fall back to hub
-            }
-        }
-
-        Debug.Log($"Seçilen Oda Indexi: {selectedRoomIndex}. Kalan Oda Sayısı: {availableRoomIndices.Count}");
-
-        GameObject selectedRoomPrefab = roomPrefabs[selectedRoomIndex];
         currentRoom = Instantiate(selectedRoomPrefab, Vector3.zero, Quaternion.identity);
 
         Transform boundsObj = currentRoom.transform.Find("CameraBounds");

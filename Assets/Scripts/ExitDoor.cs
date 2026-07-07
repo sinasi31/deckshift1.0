@@ -62,7 +62,11 @@ public class ExitDoor : MonoBehaviour
         }
         else
         {
-            if (currentPlayer != null && !currentPlayer.TookDamageThisRoom)
+            // The hub is not a real combat room — leaving it undamaged must NOT count as a flawless
+            // clear (this is why the "Invincible" quest was auto-completing on the very first exit).
+            bool isHub = LevelManager.instance != null && LevelManager.instance.IsCurrentRoomHub();
+
+            if (!isHub && currentPlayer != null && !currentPlayer.TookDamageThisRoom)
             {
                 AchievementManager.instance.OnRoomClearedFlawlessly();
 

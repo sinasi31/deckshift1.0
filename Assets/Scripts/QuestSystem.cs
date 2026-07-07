@@ -36,9 +36,20 @@ public class QuestSystem : MonoBehaviour
         }
     }
 
+    // Procedural board presentation (dim + vignette + torch glow + dust motes + drop-in). Auto-added so
+    // there's no Inspector wiring; its OnEnable plays the entrance each time the board opens.
+    private QuestBoardFX boardFX;
+    private void EnsureFX()
+    {
+        if (boardFX != null || overlayPanel == null) return;
+        boardFX = overlayPanel.GetComponent<QuestBoardFX>();
+        if (boardFX == null) boardFX = overlayPanel.AddComponent<QuestBoardFX>();
+    }
+
     private void Start()
     {
         overlayPanel.SetActive(false);
+        EnsureFX();   // add while inactive so OnEnable fires on the first open, not now
     }
 
     // "E"ye bas�nca bu �a�r�lacak

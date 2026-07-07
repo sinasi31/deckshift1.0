@@ -22,9 +22,9 @@ Each jump consumes one Shift, turning movement into a limited resource and forci
   - Limited Shift prevents collecting everything in a single run
 
 - **Roguelike Structure**
-  - 3 Acts (planned)
-  - 10 levels + 1 boss per Act
-  - Shops, enemies, and permanent run upgrades
+  - 3 Acts (planned; **Act 1 "Oxidation District" prototype is playable**)
+  - A run is: hub → several hand-crafted levels → an **Act boss** as the finale
+  - Shops, enemies, quests, relics, and run upgrades
 
 ---
 
@@ -43,6 +43,17 @@ Designed to provide strong utility without fully bypassing core constraints.
 ### Create Platform Card
 - Spawns a temporary platform at the cursor position
 - Helps players recover from risky jumps without trivializing level design
+
+---
+
+## 👹 Boss Encounters
+
+Each Act ends with a boss. **Act 1's boss — the Moss Knight** — is implemented:
+
+- Stays dormant until the player drops into the arena, then wakes with a cinematic (camera pan, ground pounds, roar).
+- A four-move kit (Acid Cleave, Charge, Leap Slam, Slime/Acid Lob) built entirely from existing animations, driven by range + cooldown.
+- Two damage avenues: your cards, and a lever-triggered **Crusher Trap** for when the deck runs dry — the crusher also bursts Shift crystals so the boss doesn't starve your core resource.
+- A dedicated boss health bar, per-ability sound, and a **death celebration** that drops real, collectible gold and Shift crystals (and handles a mid-air kill by leaving the loot floating).
 
 ---
 
@@ -71,10 +82,10 @@ Example Upgrade:
 
 ## 🛠️ Development Notes
 
-- Engine: Unity
+- Engine: Unity 6 (URP, 2D renderer)
 - Language: C#
-- Project Status: Active prototype
-- Visuals are placeholder; focus is on gameplay systems and player decision-making
+- Project Status: Active prototype — Act 1 vertical slice (~10 cards, several hand-crafted levels, one full boss)
+- Art is pixel-art (Cainos asset packs) plus procedural, code-built effects (VFX, HUD chips, boss/chest bursts); focus is on gameplay systems and player decision-making
 
 ---
 

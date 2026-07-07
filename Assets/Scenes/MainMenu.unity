@@ -984,7 +984,7 @@ MonoBehaviour:
   menuMusic: {fileID: 8300000, guid: 4eca0139fa48e7748898dba17afdd2e9, type: 3}
   levelMusic: {fileID: 8300000, guid: 3465451c4e71bc64d88353ea3e56e632, type: 3}
   bossMusic: {fileID: 8300000, guid: d9be9b02b9de45c4f8f822580138b296, type: 3}
-  musicVolume: 0.5
+  musicVolume: 0.37
   menuSceneName: MainMenu
 --- !u!4 &842832070
 Transform:

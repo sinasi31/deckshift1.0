@@ -8,7 +8,8 @@ public class VampiricBiteAction : CardAction
     public override bool Execute(PlayerController player, float value, out bool keepCardInHand)
     {
         keepCardInHand = false;
-        player.PerformVampiricBite(value);
-        return true;
+        // Refuse the play when nothing is in bite range — returns false so PlayCard skips the cost
+        // and keeps the card in hand (same "failed play" path as Comet Dive while grounded).
+        return player.PerformVampiricBite(value);
     }
 }
