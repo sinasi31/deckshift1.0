@@ -91,8 +91,14 @@ public class PlayerController : MonoBehaviour
     public GameObject leapEffectPrefab;
     public TrailRenderer diveTrail;
     public GameObject dashEffectPrefab;
-    [SerializeField] internal float dashImpulse = 18f;
-    [SerializeField] internal float dashIFrameDuration = 0.15f;
+
+    [Header("Dash Settings")]
+    [SerializeField] internal float dashSpeed = 26f;            // driven horizontal speed during the dash
+    [SerializeField] internal float dashDuration = 0.16f;       // how long the dash drives velocity
+    [SerializeField] internal float dashEndSpeed = 9f;          // momentum carried out of the dash (no dead stop)
+    [SerializeField] internal float dashIFrameDuration = 0.22f; // i-frames; keep >= dashDuration to stay safe through the dash
+    [SerializeField] internal bool  dashAfterimages = true;     // procedural motion-blur ghosts (no art needed)
+    [SerializeField] internal Color dashAfterimageTint = new Color(0.6f, 0.85f, 1f, 0.55f);
 
     [Header("Adrenaline VFX")]
     public GameObject ghostPrefab;
@@ -123,6 +129,18 @@ public class PlayerController : MonoBehaviour
     [Header("Movement Settings")]
     public float moveSpeed = 8f;
     private float moveInput;
+
+    [Header("Locomotion Animation")]
+    [Tooltip("TEST TOGGLE: play the Cainos pack's dedicated RUN animation (the Shift-to-run clip) while moving, via the pack's IsRunning bool. Uncheck to go back to the normal walk.")]
+    [SerializeField] private bool useRunAnimation = true;
+    [Tooltip("Base locomotion pose used when NOT running. 0 = idle, 1 = walk, 3 = run — blends in between. Default 1 (walk).")]
+    [SerializeField] private float locomotionPose = 1f;
+    [Tooltip("How strongly the leg cadence follows actual ground speed. Higher = feet cycle faster. Tune this until the feet stop sliding at your move speed. At speed 8 a value of 0.16 gives ~1.28x cadence.")]
+    [SerializeField] private float animCadenceScale = 0.16f;
+    [Tooltip("Lower clamp on the cadence multiplier (keeps slow-nudge steps from crawling).")]
+    [SerializeField] private float minCadence = 0.7f;
+    [Tooltip("Upper clamp on the cadence multiplier (keeps top speed / dash from looking frantic).")]
+    [SerializeField] private float maxCadence = 2.2f;
 
     // --- Temporary movement slow (acid drag / sticky goo) ---
     // Kept as a separate multiplier ON TOP of moveSpeed rather than mutating moveSpeed itself,
@@ -168,10 +186,11 @@ public class PlayerController : MonoBehaviour
     [Header("Comet Dive Settings")]
     public float cometSpeed = 25f;
     public float cometDamage = 40f;
+    [Tooltip("Blast radius on landing. CometDiveVFX telegraphs exactly this value on the ground while falling.")]
     public float cometRadius = 3f;
-    public GameObject cometImpactEffect;
-    public GameObject cometShockwaveEffect;
-    [Range(0.005f, 0.1f)] public float cometVfxScale = 0.055f;
+    // The comet, its ground telegraph and the landing burst are all built procedurally by
+    // CometDiveVFX — no prefabs to assign.
+    private CometDiveVFX cometVfx;
 
     [Header("Adrenaline Card Settings")]
     public float adrenalineDuration = 3f;
@@ -419,13 +438,29 @@ public class PlayerController : MonoBehaviour
     {
         if (animator == null) return;
 
-        // GÜNCELLENDİ: Yeni paket "MovingBlend" kullanıyor (0.0 Durma, 1.0 Koşma)
-        float movingBlend = (Mathf.Abs(moveInput) > 0.1f) ? 1.0f : 0.0f;
-        animator.SetFloat("MoveBlendX", movingBlend);
+        float speed = Mathf.Abs(rb.linearVelocity.x);
+        bool moving = Mathf.Abs(moveInput) > 0.1f && speed > 0.1f;
 
-        // GÜNCELLENDİ: Yeni paket "SpeedVertical" kullanıyor
+        // Pose: hold the walk (or chosen) locomotion pose while actually moving, idle otherwise.
+        // MoveBlendX blends idle(0)/walk(1)/run(3) in the grounded locomotion blend tree.
+        // Gated on real speed too, so pushing into a wall shows idle instead of walking in place.
+        animator.SetFloat("MoveBlendX", moving ? locomotionPose : 0f);
+
+        // Run animation: the Cainos pack reaches its dedicated RUN clip via the IsRunning bool,
+        // normally flipped by the pack's own Shift-to-run input controller — which was removed
+        // when the character was integrated, so nothing ever set it and the character was stuck
+        // walking. Drive it ourselves. Toggle off (useRunAnimation) to revert to the walk.
+        animator.SetBool("IsRunning", moving && useRunAnimation);
+
+        // Cadence: scale the walk-cycle PLAYBACK to the actual ground speed so the feet grip the
+        // ground instead of sliding. This drives the pack's built-in MoveSpeedMul (the "Movement
+        // Blend" state's speed parameter), which was never set — that's why the walk always
+        // played at a fixed cadence regardless of how fast the body travelled. Also scales down
+        // naturally when acid/goo slows the player, keeping the feet locked.
+        float cadence = moving ? Mathf.Clamp(speed * animCadenceScale, minCadence, maxCadence) : 1f;
+        animator.SetFloat("MoveSpeedMul", cadence);
+
         animator.SetFloat("VelocityY", rb.linearVelocity.y);
-
         animator.SetBool("IsGrounded", isGrounded);
     }
 
@@ -652,6 +687,60 @@ public class PlayerController : MonoBehaviour
 
     internal IEnumerator DashIFrames(float duration) => playerHealth.GrantInvincibility(duration);
 
+    // Driven dash. Enters the Dashing state — which both the movement FixedUpdate and
+    // HandleStateTransitions deliberately leave alone — and HOLDS a flat horizontal velocity
+    // for dashDuration, re-asserting it every physics step (with y forced to 0) so it stays
+    // level and snappy and works identically on the ground and in the air. Gravity scale is
+    // never touched, so the dash composes cleanly with Floor is Lava. On exit it carries a
+    // little momentum out instead of dead-stopping. i-frames + procedural afterimages for feel.
+    // The PlayerVelocity | Invincibility conflict flags are held by the executor's managed
+    // coroutine for the full duration of this routine.
+    internal IEnumerator DashRoutine()
+    {
+        float dir = isFacingRight ? 1f : -1f;
+
+        ChangeState(PlayerState.Dashing);
+
+        // Instant feedback.
+        SfxManager.PlayOn(audioSource, dashSound);
+        if (dashEffectPrefab != null)
+            Instantiate(dashEffectPrefab, transform.position, Quaternion.identity);
+        if (CameraShake.instance != null)
+            CameraShake.instance.Shake(0.12f, 0.55f);
+
+        // i-frames for the whole dash (the field's buffer keeps the momentum tail safe too).
+        StartCoroutine(DashIFrames(dashIFrameDuration));
+
+        float elapsed = 0f;
+        float ghostTimer = 0f;
+        while (elapsed < dashDuration)
+        {
+            if (playerHealth != null && playerHealth.IsDead) yield break;
+
+            rb.linearVelocity = new Vector2(dir * dashSpeed, 0f);
+
+            if (dashAfterimages && visualModel != null)
+            {
+                ghostTimer -= Time.fixedDeltaTime;
+                if (ghostTimer <= 0f)
+                {
+                    DashAfterimage.Spawn(visualModel.transform, dashAfterimageTint);
+                    ghostTimer = 0.03f;
+                }
+            }
+
+            elapsed += Time.fixedDeltaTime;
+            yield return new WaitForFixedUpdate();
+        }
+
+        // Carry a bit of momentum out in the dash direction — feels better than a hard stop.
+        rb.linearVelocity = new Vector2(dir * dashEndSpeed, rb.linearVelocity.y);
+
+        // Hand control back to the state machine.
+        if (currentState == PlayerState.Dashing)
+            ChangeState(isGrounded ? PlayerState.Idle : PlayerState.Jumping);
+    }
+
     public void ApplyKnockback(Vector2 knockbackForce) => playerHealth.ApplyKnockback(knockbackForce);
 
     public void TakeDamage(float damage) => playerHealth.TakeDamage(damage);
@@ -857,7 +946,10 @@ public class PlayerController : MonoBehaviour
             if (targetHealth == null) continue;
 
             SfxManager.PlayOn(audioSource, vampireBiteSound);   // only chomp when there's a real target
-            targetHealth.TakeDamage(damageAmount);
+            float biteDamage = RelicManager.instance != null
+                ? RelicManager.instance.ModifyPlayerDamage(damageAmount, targetHealth as EnemyHealth)
+                : damageAmount;
+            targetHealth.TakeDamage(biteDamage);
             if (targetHealth is EnemyHealth) Heal(biteHealAmount);
             if (biteEffectPrefab != null)
                 Instantiate(biteEffectPrefab, hit.transform.position, Quaternion.identity);  // BiteVFX self-destroys
@@ -1032,6 +1124,9 @@ public class PlayerController : MonoBehaviour
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, -cometSpeed);
         if (diveTrail != null) diveTrail.emitting = true;
         SfxManager.PlayOn(audioSource, cometDiveSound);
+
+        if (cometVfx != null) cometVfx.Cancel();   // defensive: never leave an orphan telegraph behind
+        cometVfx = CometDiveVFX.Begin(this, cometRadius);
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
@@ -1040,7 +1135,7 @@ public class PlayerController : MonoBehaviour
         {
             bool isGround = (groundLayer.value & (1 << collision.gameObject.layer)) > 0;
             if (isGround)
-                LandCometDive(collision.GetContact(0).point);
+                LandCometDive();
             return;
         }
 
@@ -1082,29 +1177,34 @@ public class PlayerController : MonoBehaviour
             cardActionExecutor?.SetManualFlag(ConflictFlags.PlayerVelocity, false);
         }
         if (diveTrail != null) diveTrail.emitting = false;
+
+        // A dive that ends without landing (knockback, death, fall-respawn) fades the comet out.
+        // LandCometDive hands the VFX off first, so this can't cancel the landing burst.
+        if (cometVfx != null) { cometVfx.Cancel(); cometVfx = null; }
     }
 
-    private void LandCometDive(Vector2 contactPoint)
+    private void LandCometDive()
     {
+        // The blast is centred on the player's root (the feet). CometDiveVFX telegraphs and draws
+        // its rings around this same point — keep the two in sync if either ever moves.
         Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, cometRadius, ~0);
         HashSet<IDamageable> damaged = new HashSet<IDamageable>();
         foreach (Collider2D hit in hits)
         {
             IDamageable target = hit.GetComponentInParent<IDamageable>();
             if (target != null && damaged.Add(target))
-                target.TakeDamage(cometDamage);
+            {
+                float diveDamage = RelicManager.instance != null
+                    ? RelicManager.instance.ModifyPlayerDamage(cometDamage, target as EnemyHealth)
+                    : cometDamage;
+                target.TakeDamage(diveDamage);
+            }
         }
 
-        // Offset up by half the canvas height so the bottom of the VFX sits on the surface
-        // rather than the center, which would put half the explosion inside the ground.
-        float halfCanvasWorld = 32f * cometVfxScale;
-        Vector3 vfxPos = new Vector3(contactPoint.x, contactPoint.y + halfCanvasWorld, 0f);
-
-        if (cometImpactEffect != null)
-            SpawnUIVFX(cometImpactEffect, vfxPos, cometVfxScale, 0.75f);
-        if (cometShockwaveEffect != null)
-            SpawnUIVFX(cometShockwaveEffect, vfxPos, cometVfxScale, 0.75f);
-        if (CameraShake.instance != null) CameraShake.instance.Shake(0.15f, 0.5f);
+        // Hand off before EndCometDive so its Cancel() sees nothing to cancel. Camera shake and
+        // hit-stop live inside the burst.
+        if (cometVfx != null) { cometVfx.Land(transform.position); cometVfx = null; }
+        else CometDiveVFX.PlayImpact(transform.position, cometRadius);
 
         EndCometDive();
         ChangeState(PlayerState.Idle);
@@ -1150,22 +1250,6 @@ public class PlayerController : MonoBehaviour
 
         for (int i = 0; i < renderers.Length; i++)
             if (renderers[i] != null) renderers[i].color = original[i];
-    }
-
-    void SpawnUIVFX(GameObject vfxPrefab, Vector3 worldPos, float scale, float destroyAfter)
-    {
-        GameObject canvasGO = new GameObject("VFX_Canvas");
-
-        UnityEngine.Canvas canvas = canvasGO.AddComponent<UnityEngine.Canvas>();
-        canvas.renderMode = UnityEngine.RenderMode.WorldSpace;
-        canvas.sortingOrder = 10;
-
-        canvasGO.GetComponent<RectTransform>().sizeDelta = new Vector2(64f, 64f);
-        canvasGO.transform.position = worldPos;
-        canvasGO.transform.localScale = Vector3.one * scale;
-
-        Instantiate(vfxPrefab, canvasGO.transform);
-        Destroy(canvasGO, destroyAfter);
     }
 
     internal void UseAdrenaline(float value)

@@ -15,11 +15,17 @@ public class PlayerHealth : MonoBehaviour
 
     private float currentHealth;
     private bool isDead = false;
+    private float baseMaxHealth;
 
     public float CurrentHealth => currentHealth;
     public float MaxHealth => maxHealth;
     public bool IsDead => isDead;
     public float HealthPercent => maxHealth > 0 ? currentHealth / maxHealth : 0f;
+
+    // The unmodified max HP, captured before any relic touches it. Relic passives are always
+    // recomputed from THIS (see RelicManager.RecomputePassives) so selling a relic reverses it
+    // exactly, regardless of what order relics were gained or sold in.
+    public float BaseMaxHealth => baseMaxHealth;
 
     public event System.Action<float> OnDamaged;
     public event System.Action OnDied;
@@ -37,6 +43,19 @@ public class PlayerHealth : MonoBehaviour
         animator = GetComponentInChildren<Animator>();
         audioSource = GetComponent<AudioSource>();
         playerController = GetComponent<PlayerController>();
+        baseMaxHealth = maxHealth;
+    }
+
+    // Applied by relic passives (RelicManager.RecomputePassives). Clamp-only, deliberately:
+    // healing on a capacity GAIN would let the player equip Glass Heart (halved max HP), take
+    // damage, then SELL it for a free ~50 HP refill. Never drops below 1, so equipping a
+    // max-HP-reducing relic can't kill you outright.
+    public void SetMaxHealth(float newMax)
+    {
+        if (isDead) return;
+
+        maxHealth = Mathf.Max(1f, newMax);
+        currentHealth = Mathf.Clamp(currentHealth, 1f, maxHealth);
     }
 
     void Start()
@@ -59,7 +78,18 @@ public class PlayerHealth : MonoBehaviour
         OnDamaged?.Invoke(damage);
 
         if (currentHealth <= 0)
+        {
+            // Phoenix Cog: once per run, a lethal hit leaves you at 1 HP and erupts instead.
+            if (RelicManager.instance != null && RelicManager.instance.TryConsumePhoenixCog())
+            {
+                currentHealth = 1f;
+                RelicManager.instance.PhoenixBlast(transform.position);
+                StartCoroutine(GrantInvincibility(1.5f));   // mercy window so 1 HP isn't instant death
+                return;
+            }
+
             Die();
+        }
     }
 
     public void Heal(float amount)

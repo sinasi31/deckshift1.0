@@ -14702,6 +14702,18 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 8300000, guid: e41a7d00afe07be4ebe4d42dc03c77b3, type: 3}
     - target: {fileID: 1641162466347240171, guid: 418762c5259557645bc3ca542f249d74, type: 3}
+      propertyPath: moveSpeed
+      value: 8
+      objectReference: {fileID: 0}
+    - target: {fileID: 1641162466347240171, guid: 418762c5259557645bc3ca542f249d74, type: 3}
+      propertyPath: locomotionPose
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 1641162466347240171, guid: 418762c5259557645bc3ca542f249d74, type: 3}
+      propertyPath: useRunAnimation
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1641162466347240171, guid: 418762c5259557645bc3ca542f249d74, type: 3}
       propertyPath: defaultJumpForce
       value: 11
       objectReference: {fileID: 0}
@@ -14717,6 +14729,18 @@ PrefabInstance:
       propertyPath: adrenalineAuraEffect
       value: 
       objectReference: {fileID: 7401582936470158293, guid: c1f4a7d92b8e406c95a3d1e6f7b0c284, type: 3}
+    - target: {fileID: 1641162466347240171, guid: 418762c5259557645bc3ca542f249d74, type: 3}
+      propertyPath: dashAfterimageTint.b
+      value: 0.1981132
+      objectReference: {fileID: 0}
+    - target: {fileID: 1641162466347240171, guid: 418762c5259557645bc3ca542f249d74, type: 3}
+      propertyPath: dashAfterimageTint.g
+      value: 0.15250611
+      objectReference: {fileID: 0}
+    - target: {fileID: 1641162466347240171, guid: 418762c5259557645bc3ca542f249d74, type: 3}
+      propertyPath: dashAfterimageTint.r
+      value: 0.075694196
+      objectReference: {fileID: 0}
     - target: {fileID: 3361453070665275633, guid: 418762c5259557645bc3ca542f249d74, type: 3}
       propertyPath: onFootstep.m_PersistentCalls.m_Calls.Array.size
       value: 0

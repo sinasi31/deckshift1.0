@@ -81,7 +81,8 @@ PlayerController writes to these parameters on the Animator:
 
 | Parameter        | Type    | Driven by                                                | Purpose                                            |
 |------------------|---------|----------------------------------------------------------|----------------------------------------------------|
-| `MoveBlendX`     | Float   | `UpdateAnimations()` — 0.0 still, 1.0 running            | Walk/idle blend                                    |
+| `MoveBlendX`     | Float   | `UpdateAnimations()` — 0 idle / `locomotionPose` moving  | Locomotion pose blend: idle(0)/walk(1)/run(3)      |
+| `MoveSpeedMul`   | Float   | `UpdateAnimations()` — `speed * animCadenceScale` clamped | Scales walk-cycle PLAYBACK to real ground speed (kills foot-slide) |
 | `VelocityY`      | Float   | `UpdateAnimations()` — `rb.linearVelocity.y`             | Jump/fall vertical state                           |
 | `IsGrounded`     | Bool    | `UpdateAnimations()`                                     | Land/airborne distinction                          |
 | `InjuredFront`   | Trigger | `TakeDamage()` on every damage hit                       | Hurt reaction                                      |
@@ -179,18 +180,18 @@ When Shift is 0 AND no playable cards exist, a Stagger card is auto-added to the
 
 Discovered when hub mode allowed free card spamming: playing multiple state-modifying cards in close succession (e.g., Floor is Lava + Adrenaline + Phase) can leave the player in a permanently broken state (flying, frozen gravity, etc.). Each card's effect captures "original" state at start and restores it at end, but **none of them know about each other**. Card A captures the current state (already modified by still-active Card B), then later restores to that mid-effect snapshot — corrupting baseline.
 
-**Current state (audited 2026-06-10):** the CardActionExecutor extraction is done and the conflict-flag system is half built. Each `CardAction` declares a `ModifiedState` (`ConflictFlags`), and the executor tracks flags in `activeFlags` while coroutine-based actions run — **but `TryExecute` never checks the flags. Blocking/enforcement is NOT implemented; overlapping effects still run concurrently, so this bug class is still live.**
+**Current state (updated 2026-07-06): RESOLVED.** The CardActionExecutor extraction is done AND conflict-flag enforcement is live. Each `CardAction` declares a `ModifiedState` (`ConflictFlags`); the executor accumulates flags in `activeFlags` (via `ManagedCoroutine` for coroutine actions, via `SetManualFlag` for the manual-lifecycle ones) and **`TryExecute` now checks them: if an action's `ModifiedState` overlaps `activeFlags`, it is refused up front with `CardExecuteResult.Blocked` and none of its code runs.** A blocked play costs no Shift and no charge, and the card stays in hand (`DeckManager.PlayCard` only spends/consumes on `Success`). The state-corruption bug class (Floor is Lava + Adrenaline + Phase leaving the player flying/frozen) can no longer occur — the conflicting second card is refused instead of corrupting the baseline snapshot.
 
 Per-effect conversion status:
-- **Dash** ✅ converted — managed coroutine; flags `PlayerVelocity | Invincibility` held live, cleared in `finally`.
+- **Dash** ✅ converted — managed coroutine; flags `PlayerVelocity | Invincibility` held for the whole dash. **Reworked 2026-07-06 into a driven dash** (`PlayerController.DashRoutine`): enters `PlayerState.Dashing` and holds a flat horizontal velocity for `dashDuration` (re-asserted each FixedUpdate with y forced to 0), so it works on the ground too — the old one-shot `AddForce` impulse was erased the next frame by the grounded movement line (`rb.linearVelocity = moveInput * moveSpeed`). Never touches `gravityScale` (composes cleanly with Floor is Lava). Procedural afterimages via `DashAfterimage.cs`; tunables `dashSpeed`/`dashDuration`/`dashEndSpeed`/`dashIFrameDuration`/`dashAfterimages` on PlayerController.
 - **Phase** ✅ converted — managed coroutine; flags `GravityScale | LayerCollisionMatrix | PlayerVelocity`.
-- **Adrenaline** ✅ converted (manual-flag pattern) — `UseAdrenaline`'s sub-coroutines call `SetManualFlag(TimeScale | MoveSpeed, …)` at start/end. Caveats: both flags are set regardless of which branch runs, and `SetManualFlag` is not refcounted (overlapping plays clear flags early).
+- **Adrenaline** ✅ converted (manual-flag pattern) — `UseAdrenaline`'s two sub-coroutines are mutually exclusive (`if/else` on health %), and each calls `SetManualFlag(TimeScale | MoveSpeed, …)` at start/end. The old "not refcounted / overlapping plays clear flags early" caveat is now moot: a second Adrenaline play while one is active is Blocked (its flags overlap), so concurrent same-flag effects can't happen.
 - **Fireball** ✅ converted — managed coroutine; `AnimatorAttackState`.
-- **ReverseGravity** ⚠️ NOT converted — it declares `GravityScale | VisualTransform`, but those flags are **dead**: `IsCoroutine = false` and the executor only registers flags for coroutine actions, and `StartGravityReversal`/`GravityReversalRoutine` never call `SetManualFlag`. While Floor is Lava is active, `ActiveFlags` shows nothing.
+- **ReverseGravity** ✅ converted (manual-flag pattern) — `StartGravityReversal`/`GravityReversalRoutine` now call `SetManualFlag(GravityScale | VisualTransform, …)` with a restart-safe lifecycle: flags are cleared BEFORE `StopCoroutine` and re-set synchronously inside the new `StartCoroutine`, so there is never a flags-set-but-no-routine window and the clear can't stomp the new set. The same-card timer-refresh branch is now unreachable (a replay while active is Blocked because its flags overlap `activeFlags`); it's kept deliberately in case the policy later allows same-card refresh.
 
-Remaining work: (1) register ReverseGravity's flags via `SetManualFlag` with a restart-safe lifecycle (`StartGravityReversal` stops and restarts the coroutine without cleanup, so flags must not double-clear or leak); (2) implement enforcement in `TryExecute` — block or queue when `ModifiedState & ActiveFlags != 0`. Until enforcement exists, the flags are bookkeeping only.
+**Known interaction (found 2026-07-06):** enforcement makes the **Echo Chamber** skill's instant double-cast (`DeckManager.PlayCard` re-calls `ExecuteAction` immediately after the first play) silently no-op for *stateful* cards — the second cast's `ModifiedState` overlaps the first's still-live flags and is Blocked. It still works on instant cards (Jump, Glass Wail, etc.). Fix options if this becomes design-relevant: defer the echo cast until the first effect ends, or let a same-card replay bypass the block. Not yet done — flagged, not urgent.
 
-**In normal play, Shift cost gates spamming heavily enough that this is rarely reachable.** It is fully reachable in the hub. For now: known issue, do not patch individual cards — the enforcement work supersedes per-card patches.
+**Enforcement applies everywhere, including the hub** (where free card spamming used to make this bug trivially reproducible). The class is now handled centrally in `TryExecute`, so there is no need to patch individual cards.
 
 ---
 
@@ -600,7 +601,7 @@ If the user is about to discard uncommitted Unity changes via GitHub Desktop, **
 
 ### Architecture (planned, highest priority)
 
-- **CardActionExecutor conflict-flag enforcement** — the ExecuteAction() extraction itself is **DONE** (see Player System). What remains: register ReverseGravity's flags via `SetManualFlag` and make `TryExecute` actually check `ActiveFlags` before running an overlapping effect (currently flags are tracked but never checked). This is the step that resolves the card-effect-conflict bug class.
+- ~~CardActionExecutor conflict-flag enforcement~~ — **DONE (2026-07-06).** The ExecuteAction() extraction, all per-effect flag registration (incl. ReverseGravity via `SetManualFlag`), AND enforcement in `TryExecute` (Blocked on flag overlap) are complete. The card-effect-conflict bug class is resolved. Only remaining nuance: the Echo Chamber double-cast no-ops on stateful cards (see Card System → Known interaction) — flagged, not urgent.
 - ~~CameraPeek rebuild~~ — **done**; rebuilt without Cinemachine (see Camera System).
 - **Manager dependency graph** — undocumented. Long-term docs task.
 - ~~QuestSystem DontDestroyOnLoad inconsistency~~ — **resolved 2026-06-10**: removed; QuestSystem is scene-local like every other manager, and quests are per-run by design. Quest meta-progression, if ever wanted, should go through the save system (PlayerPrefs, like AchievementManager), not DontDestroyOnLoad.
@@ -649,7 +650,7 @@ The current relic system follows Slay-the-Spire conventions: strictly additive, 
 
 ### Bugs (deferred)
 
-- **Card effect conflict class of bug** — playing multiple state-modifying cards in close succession breaks player state permanently. Reachable in hub, mostly gated by Shift cost in normal play. The CardActionExecutor extraction is done; what resolves this bug class is the remaining **conflict-flag enforcement** work (flags are tracked but `TryExecute` never checks them — see Card System). Do not patch individual cards.
+- ~~Card effect conflict class of bug~~ — **RESOLVED (2026-07-06).** `TryExecute` now refuses (Blocked) any card whose `ModifiedState` overlaps a live effect's flags; blocked plays cost nothing and stay in hand. Stacking Floor is Lava + Adrenaline + Phase can no longer corrupt player state. See Card System for detail.
 - **Phase card wall-stuck:** if Phase ends while player is inside a wall, player gets stuck. Plan: prevent Phase expiration inside collider.
 - **Comet Dive identity loss:** does the same thing as head-bounce relic. Plan: redesign.
 - **Head bounce + gravity reversal:** velocity sign check doesn't account for reversed gravity. Low priority.

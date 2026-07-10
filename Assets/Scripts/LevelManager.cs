@@ -139,7 +139,12 @@ public class LevelManager : MonoBehaviour
         {
             DeckManager.instance.ReloadHand();
             DeckManager.instance.ResetRecallCost();
+            DeckManager.instance.ResetRoomRelicState();
         }
+
+        // Per-room relic triggers (Pocket Battery, Flux Regulator, ...).
+        if (RelicManager.instance != null)
+            RelicManager.instance.OnRoomStart();
     }
 
     // Returns true when the active room has a HubMarker on its root.

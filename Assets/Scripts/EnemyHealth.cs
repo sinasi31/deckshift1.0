@@ -6,6 +6,9 @@ public class EnemyHealth : MonoBehaviour, IDamageable
     [Header("Can Ayarları")]
     public float maxHealth = 30f;
 
+    // Set the first time the player damages this enemy (Whetstone relic reads/sets it).
+    [HideInInspector] public bool playerHasStruck = false;
+
     [Header("Head Bounce")]
     public bool canBeHeadBounced = true;
 
@@ -115,6 +118,16 @@ public class EnemyHealth : MonoBehaviour, IDamageable
         }
 
         currentHealth -= damage;
+
+        // Executioner's Seal (relic): a hit that leaves a non-boss enemy at/under 20% HP finishes it.
+        // NOTE: only the Moss Knight is excluded today — future bosses must be added to this guard.
+        if (currentHealth > 0 && currentHealth <= maxHealth * 0.2f
+            && RelicManager.instance != null && RelicManager.instance.HasRelic("ExecutionersSeal")
+            && GetComponent<MossKnightBoss>() == null)
+        {
+            currentHealth = 0;
+        }
+
         OnDamaged?.Invoke();
         OnDamagedAmount?.Invoke(damage);
         if (HitStop.instance != null) HitStop.instance.Stop(0.15f);

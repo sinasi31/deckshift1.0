@@ -5,14 +5,152 @@ public class RelicManager : MonoBehaviour
 {
     public static RelicManager instance;
 
+    // --- Slot-constrained loadout (see RelicRedesign.md) ---
+    // The player owns at most MaxSlots relics; list index == slot index.
+    public const int MaxSlots = 5;
+    public bool IsFull => ownedRelics.Count >= MaxSlots;
+
     // Oyuncunun şu anda sahip olduğu tüm pasif eşyaların (Relic) listesi
     private List<RelicData> ownedRelics = new List<RelicData>();
 
     // Fired each time a new relic is successfully added; RelicHUD subscribes to this.
     public event System.Action<RelicData> OnRelicAdded;
+    // Fired when a relic is removed (sold). HUD/panels rebuild on this too.
+    public event System.Action<RelicData> OnRelicRemoved;
 
     // Read-only view of the owned list for HUD population on Start.
     public IReadOnlyList<RelicData> OwnedRelics => ownedRelics;
+
+    // Fixed sell refund by rarity (RelicRedesign.md v1). Tunable.
+    public int SellValueFor(RelicData relic)
+    {
+        if (relic == null) return 0;
+        switch (relic.rarity)
+        {
+            case Rarity.Legendary: return 150;
+            case Rarity.Epic:      return 90;
+            case Rarity.Rare:      return 50;
+            default:               return 25; // Common
+        }
+    }
+
+    // Sells a relic: removes it from the loadout, credits its gold value, and fires
+    // OnRelicRemoved so the HUD/panels reflow. No-op if the relic isn't owned.
+    public void SellRelic(RelicData relic)
+    {
+        if (relic == null || !ownedRelics.Contains(relic)) return;
+
+        int value = SellValueFor(relic);
+        ownedRelics.Remove(relic);
+
+        if (GameManager.instance != null && GameManager.instance.player != null)
+            GameManager.instance.player.AddGold(value);
+
+        Debug.Log($"Relic sold: {relic.relicName} (+{value} gold)");
+        OnRelicRemoved?.Invoke(relic);
+
+        // Foundry Rights: while owned, each relic you sell permanently raises max Shift this run.
+        // Checked AFTER removal, so selling Foundry Rights itself doesn't trigger on its own sale.
+        if (HasRelic("FoundryRights") && GameManager.instance != null && GameManager.instance.player != null)
+            GameManager.instance.player.IncreaseMaxShift(1);
+
+        RecomputePassives();   // reverse any stat relic that was just sold
+    }
+
+    // Per-room relic effects — called by LevelManager.SpawnNextRoom at the start of each room.
+    public void OnRoomStart()
+    {
+        PlayerController player = GameManager.instance != null ? GameManager.instance.player : null;
+
+        // Pocket Battery: +1 Shift at the start of each room.
+        if (player != null && HasRelic("PocketBattery"))
+            player.AddShift(1);
+
+        // Flux Regulator: the first card played this room is free.
+        if (HasRelic("FluxRegulator") && DeckManager.instance != null)
+            DeckManager.instance.isNextCardFree = true;
+    }
+
+    // --- Stat passives -------------------------------------------------------
+    // Recomputed from the player's BASE stats every time the loadout changes, so selling a relic
+    // reverses it exactly. Never add/subtract incrementally — that breaks the moment relics stack
+    // (e.g. Reinforced Plating + Glass Heart) or are sold out of order.
+    public void RecomputePassives()
+    {
+        PlayerController player = GameManager.instance != null ? GameManager.instance.player : null;
+        if (player == null) return;
+
+        PlayerHealth health = player.GetComponent<PlayerHealth>();
+        if (health == null) return;
+
+        float flat = 0f;
+        if (HasRelic("ReinforcedPlating")) flat += 15f;
+
+        float mult = 1f;
+        if (HasRelic("GlassHeart")) mult *= 0.5f;
+
+        health.SetMaxHealth((health.BaseMaxHealth + flat) * mult);
+    }
+
+    // --- Outgoing player damage ----------------------------------------------
+    // Central modifier for damage the PLAYER deals. Every player damage source routes through
+    // this. Flat bonuses apply first, then multipliers. 'target' may be null (breakable walls).
+    public float ModifyPlayerDamage(float baseDamage, EnemyHealth target = null)
+    {
+        float dmg = baseDamage;
+
+        // Whetstone: your first hit on each enemy deals +5. (Flag is only set while the relic is
+        // owned, so acquiring it later still grants the bonus on already-wounded enemies.)
+        if (target != null && !target.playerHasStruck && HasRelic("Whetstone"))
+        {
+            target.playerHasStruck = true;
+            dmg += 5f;
+        }
+
+        // Midas Recoil: +1 damage per 25 gold carried.
+        if (HasRelic("MidasRecoil") && GameManager.instance != null && GameManager.instance.player != null)
+            dmg += GameManager.instance.player.currentGold / 25;
+
+        // Glass Heart: double damage (paid for with half max HP).
+        if (HasRelic("GlassHeart")) dmg *= 2f;
+
+        return dmg;
+    }
+
+    // --- Phoenix Cog ---------------------------------------------------------
+    [Header("Phoenix Cog")]
+    [Tooltip("Optional screech/eruption clip played when Phoenix Cog saves you.")]
+    public AudioClip phoenixSound;
+    [Range(0f, 2f)] public float phoenixVolume = 1.3f;
+
+    private bool phoenixUsed = false;
+
+    // Returns true at most once per run, and only while the relic is owned.
+    public bool TryConsumePhoenixCog()
+    {
+        if (phoenixUsed || !HasRelic("PhoenixCog")) return false;
+        phoenixUsed = true;
+        return true;
+    }
+
+    // Screen-clearing eruption that fires when Phoenix Cog saves you. The freeze-frame, shake,
+    // slow-mo and the whole rebirth spectacle live in PhoenixRebirthVFX (its own GameObject, so it
+    // outlives the hit-stop); this just deals the damage and lights the fuse.
+    public void PhoenixBlast(Vector3 origin)
+    {
+        EnemyHealth[] all = FindObjectsByType<EnemyHealth>(FindObjectsSortMode.None);
+        foreach (EnemyHealth enemy in all)
+            if (enemy != null) enemy.TakeDamage(60f);
+
+        GameObject fx = new GameObject("PhoenixRebirthVFX");
+        fx.transform.position = origin + Vector3.up * 0.9f;
+        Transform follow = GameManager.instance != null && GameManager.instance.player != null
+            ? GameManager.instance.player.transform
+            : null;
+        fx.AddComponent<PhoenixRebirthVFX>().Play(follow, phoenixSound, phoenixVolume);
+
+        Debug.Log("🔥 Phoenix Cog: survived a lethal hit and erupted!");
+    }
 
     private void Awake()
     {
@@ -42,6 +180,28 @@ public class RelicManager : MonoBehaviour
         Debug.Log($"Yeni eşya kazanıldı: {newRelic.relicName}");
 
         OnRelicAdded?.Invoke(newRelic);
+        RecomputePassives();   // apply stat relics (Reinforced Plating, Glass Heart, ...)
+    }
+
+    // Central grant entry point (RelicRedesign.md Stage 3). All grant sources route through this.
+    // Slot free  -> add immediately and run onAcquired.
+    // Slots full -> open the Swap Screen; TAKE sells the chosen relic then adds this one and runs
+    //               onAcquired, LEAVE runs nothing. onAcquired is where the caller finalizes side
+    //               effects (e.g. the shop charges gold only when the relic is actually taken), so
+    //               a declined full-slot grant costs nothing.
+    public void TryGrantRelic(RelicData relic, System.Action onAcquired = null)
+    {
+        if (relic == null || ownedRelics.Contains(relic)) return;
+
+        if (!IsFull)
+        {
+            AddRelic(relic);
+            onAcquired?.Invoke();
+        }
+        else
+        {
+            RelicSwapScreen.Open(relic, onAcquired);
+        }
     }
 
     /// <summary>
@@ -60,19 +220,6 @@ public class RelicManager : MonoBehaviour
         return false; // Eşya bulunamadı
     }
 
-    // (Test için: Sahip olunan tüm eşyaları listele)
-    void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.R)) // 'R' tuşuna bas (Relics)
-        {
-            Debug.Log("--- SAHİP OLUNAN EŞYALAR ---");
-            foreach (var relic in ownedRelics)
-            {
-                Debug.Log(relic.relicName);
-            }
-            Debug.Log("---------------------");
-        }
-    }
     public void OnEnemyKilled()
     {
         // RELIC 1: Vampire Tooth (ID: VampireTooth)

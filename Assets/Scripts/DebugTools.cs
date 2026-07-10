@@ -43,7 +43,7 @@ public class DebugTools : MonoBehaviour
             if (GUILayout.Button(owned ? $"{relic.relicName} ✓" : relic.relicName))
             {
                 if (RelicManager.instance != null)
-                    RelicManager.instance.AddRelic(relic);
+                    RelicManager.instance.TryGrantRelic(relic);   // full loadout -> Swap Screen
                 else
                     Debug.LogWarning("[DebugTools] RelicManager sahnede bulunamadı.");
             }

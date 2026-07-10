@@ -49,7 +49,7 @@ public class Chest : MonoBehaviour, IInteractable
         if (relic != null)
         {
             if (RelicManager.instance != null)
-                RelicManager.instance.AddRelic(relic);
+                RelicManager.instance.TryGrantRelic(relic);   // full loadout -> Swap Screen
             else
                 Debug.LogWarning($"[Chest] '{name}': RelicManager.instance is null, relic grant skipped.");
 

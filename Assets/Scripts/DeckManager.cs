@@ -33,6 +33,9 @@ public class DeckManager : MonoBehaviour
     private int selectedIndex = -1;
     private bool isReloading = false;
 
+    // Reclaimer's Clamp salvages one exhausting card per room; reset on each new room.
+    private bool clampUsedThisRoom = false;
+
     // Getterlar
     public List<RuntimeCard> GetDrawPile() { return drawPile; }
     public List<RuntimeCard> GetDiscardPile() { return discardPile; }
@@ -142,9 +145,22 @@ public class DeckManager : MonoBehaviour
             if (!playedCard.isInfinite && !inHub) playedCard.currentUses--;
 
             if (inHub || (playedCard.isInfinite || playedCard.currentUses > 0) && (!data.singleUse || playedCard.isInfinite))
+            {
                 discardPile.Add(playedCard);
+            }
+            else if (!clampUsedThisRoom && RelicManager.instance != null
+                     && RelicManager.instance.HasRelic("ReclaimersClamp"))
+            {
+                // Reclaimer's Clamp: the first card that would exhaust each room is salvaged —
+                // it returns to hand with a single charge instead of going to the exhaust pile.
+                clampUsedThisRoom = true;
+                playedCard.currentUses = 1;
+                hand.Add(playedCard);
+            }
             else
+            {
                 exhaustPile.Add(playedCard);
+            }
             OnHandChanged?.Invoke(false);
         }
     }
@@ -164,6 +180,12 @@ public class DeckManager : MonoBehaviour
     {
         currentRecallCost = baseRecallCost;
         OnRecallCostChanged?.Invoke(currentRecallCost);
+    }
+
+    // Clears per-room relic state (currently Reclaimer's Clamp's once-per-room salvage).
+    public void ResetRoomRelicState()
+    {
+        clampUsedThisRoom = false;
     }
     private void CheckForStaggerCondition()
     {
@@ -210,23 +232,32 @@ public class DeckManager : MonoBehaviour
         // 1. Zaten el yenileniyorsa dur
         if (isReloading) return;
 
-        // 2. Maliyet kontrolü
-        if (player.GetCurrentShift() < currentRecallCost)
+        bool inHub = LevelManager.instance != null && LevelManager.instance.IsCurrentRoomHub();
+        bool overclocked = RelicManager.instance != null && RelicManager.instance.HasRelic("OverclockedRecall");
+
+        if (overclocked)
         {
-            Debug.Log("Yetersiz Shift! Recall yapılamıyor.");
-            // Buraya "Yetersiz Enerji" sesi veya görseli eklenebilir
-            return;
+            // Overclocked Recall: no Shift cost — paid in blood instead (5 HP per Recall,
+            // never in the sandbox hub). Cost escalation is irrelevant when Shift is free.
+            if (!inHub) player.TakeDamage(5);
         }
-
-        // 3. Shift Harca
-        if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
-            player.SpendShift(currentRecallCost);
-
-        // 4. Maliyeti Artır (Level bitene kadar)
-        if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
+        else
         {
-            currentRecallCost++;
-            OnRecallCostChanged?.Invoke(currentRecallCost);
+            // 2. Maliyet kontrolü
+            if (player.GetCurrentShift() < currentRecallCost)
+            {
+                Debug.Log("Yetersiz Shift! Recall yapılamıyor.");
+                // Buraya "Yetersiz Enerji" sesi veya görseli eklenebilir
+                return;
+            }
+
+            // 3. Shift Harca + 4. Maliyeti Artır (Level bitene kadar)
+            if (!inHub)
+            {
+                player.SpendShift(currentRecallCost);
+                currentRecallCost++;
+                OnRecallCostChanged?.Invoke(currentRecallCost);
+            }
         }
 
         // 5. Asıl işlemi başlat
