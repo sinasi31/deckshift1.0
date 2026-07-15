@@ -174,12 +174,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   commonRewards:
   - {fileID: 11400000, guid: e3ed7c54e5cf12e40ba922beb90f774d, type: 2}
+  - {fileID: 11400000, guid: ebb6cbb425d023c43ac5f56d88ebd7b8, type: 2}
   rareRewards:
   - {fileID: 11400000, guid: de572fb6a583df144b6669a3cbee2bc9, type: 2}
   epicRewards:
   - {fileID: 11400000, guid: 455b2f54bc410fe41836ecf31c6ec249, type: 2}
   legendaryRewards:
-  - {fileID: 11400000, guid: ebb6cbb425d023c43ac5f56d88ebd7b8, type: 2}
+  - {fileID: 11400000, guid: 34c0d3b79847909418b8d5012f5cac42, type: 2}
   animatorBoolParam: IsOpened
   openSound: {fileID: 8300000, guid: 8f967f68d5211954b99c73f6acf25fa7, type: 3}
   prompt: {fileID: 3411865167544342154}

@@ -6,14 +6,14 @@ public class Shopkeeper : MonoBehaviour
     private bool playerInRange = false;
     public KeyCode interactKey = KeyCode.E;
 
-    [Header("Görsel Referans")]
+    [Header("Gï¿½rsel Referans")]
     public GameObject interactionPopup;
 
-    [Header("Bu Dükkanýn Ýçeriði")]
+    [Header("Bu Dï¿½kkanï¿½n ï¿½ï¿½eriï¿½i")]
     public List<CardData> specificCardPool;
     public List<RelicData> specificRelicPool;
 
-    // Dükkanýn Hafýzasý
+    // Dï¿½kkanï¿½n Hafï¿½zasï¿½
     public List<ShopSlotData> myInventory = new List<ShopSlotData>();
 
     private bool isInitialized = false;
@@ -31,45 +31,45 @@ public class Shopkeeper : MonoBehaviour
 
     private void GenerateShopContent()
     {
-        if (specificCardPool.Count == 0 && ShopManager.instance != null)
+        if ((specificCardPool == null || specificCardPool.Count == 0) && ShopManager.instance != null)
             specificCardPool = ShopManager.instance.allCardsPool;
 
-        if (specificRelicPool.Count == 0 && ShopManager.instance != null)
+        if ((specificRelicPool == null || specificRelicPool.Count == 0) && ShopManager.instance != null)
             specificRelicPool = ShopManager.instance.allRelicsPool;
 
-        // Kartlarý Oluþtur
-        for (int i = 0; i < 5; i++)
+        // Cards â€” up to 5 DISTINCT offers (draw without replacement so no duplicates show).
+        if (specificCardPool != null)
         {
-            if (specificCardPool != null && specificCardPool.Count > 0)
+            List<CardData> pool = new List<CardData>(specificCardPool);
+            int n = Mathf.Min(5, pool.Count);
+            for (int i = 0; i < n; i++)
             {
-                CardData card = specificCardPool[Random.Range(0, specificCardPool.Count)];
-
-                ShopSlotData data = new ShopSlotData();
-                data.itemType = ShopItemType.Card;
-                data.cardReference = card;
-                data.itemName = card.cardName;
-                data.price = Random.Range(40, 70);
-                data.isSold = false;
-
-                myInventory.Add(data);
+                int idx = Random.Range(0, pool.Count);
+                CardData card = pool[idx];
+                pool.RemoveAt(idx);
+                myInventory.Add(new ShopSlotData
+                {
+                    itemType = ShopItemType.Card, cardReference = card, itemName = card.cardName,
+                    price = Random.Range(40, 70), isSold = false
+                });
             }
         }
 
-        // Relicleri Oluþtur
-        for (int i = 0; i < 3; i++)
+        // Relics â€” up to 3 DISTINCT offers.
+        if (specificRelicPool != null)
         {
-            if (specificRelicPool != null && specificRelicPool.Count > 0)
+            List<RelicData> pool = new List<RelicData>(specificRelicPool);
+            int n = Mathf.Min(3, pool.Count);
+            for (int i = 0; i < n; i++)
             {
-                RelicData relic = specificRelicPool[Random.Range(0, specificRelicPool.Count)];
-
-                ShopSlotData data = new ShopSlotData();
-                data.itemType = ShopItemType.Relic;
-                data.relicReference = relic;
-                data.itemName = relic.relicName;
-                data.price = Random.Range(100, 150);
-                data.isSold = false;
-
-                myInventory.Add(data);
+                int idx = Random.Range(0, pool.Count);
+                RelicData relic = pool[idx];
+                pool.RemoveAt(idx);
+                myInventory.Add(new ShopSlotData
+                {
+                    itemType = ShopItemType.Relic, relicReference = relic, itemName = relic.relicName,
+                    price = Random.Range(100, 150), isSold = false
+                });
             }
         }
     }

@@ -1,0 +1,81 @@
+﻿// GenLevel6 - "The Bellows"
+// Carved chamber loop (58x42). Feedback build: NO one-way platforms,
+// NO turrets, all ledges are solid strips, mandatory rises are 4
+// (jump is 5-6), same-column ledge spacing 8.
+//
+// FLOW: entry ledge -> step off into THE GREAT SHAFT (25-tile drop,
+//   one wall ledge breaks the fall + crystal) -> land at the ALTAR DAIS
+//   -> flooded undercroft east: trapdoor bridges over two acid pits with
+//   a WRECKING BALL swinging over the island between them -> THE BELLOWS:
+//   a wide shaft climbed on solid zig-zag ledges (rise 4, alternating
+//   walls), updraft fan makes the first hops free, a bat contests the
+//   middle, spikes wait under the first ledge -> upper gallery: LEVER
+//   right at the arrival - flip it and the exit gate grinds open across
+//   the hall -> fight west past melee, archer, and a MIMIC parked next
+//   to gold bait right before the gate -> threshold spikes, exit.
+// ENTRY/EXIT LAW: exit is top-center, 20 tiles from the spawn with
+//   solid rock chambers between - Phase/Portal cannot skip the level.
+// TOLL MOMENT: the altar at the shaft base opens the sealed TREASURY
+//   ALCOVE just above it - signal orb arcs up the wall, chest + gold,
+//   reachable by a rise-3 step then rise-2 hop. No cards needed, only
+//   Shift.
+// SECRETS: phase vault behind the 1-thick wall at the right end of the
+//   bellows floor (mind the spikes); shopkeeper attic above the
+//   undercroft - 8-tile chute, cards only (Leap / Create Platform /
+//   Portal); the attic's right wall is also 1-thick on purpose - a
+//   second Phase route from ledge L2.
+// SEALED TREASURY (designer request): a 16-wide hall buried in the rock
+//   mass between the exit gallery and the shop attic. COMPLETELY blocked
+//   off from walking/jumping - every wall is thick rock except the
+//   1-thick col-42 wall shared with the bellows shaft, right beside
+//   ledge L4 and at the same floor height: Phase/Portal in, loot
+//   (2 gold, chest, crystal) visible through the wall as you climb -
+//   the card incentive made visible.
+// LAW CHECK: mandatory path is jump+move only (drop, walk, six rise-4
+//   jumps, flat fight). Fan/altar/cards gate loot only.
+// TUNING: altar cost (default 3); wrecking ball anchor/swing length.
+
+!name: GenLevel6
+##########################################################
+##########################################################
+##########################################################
+##########################################################
+######################.......G.............###############
+######################.......G.............###############
+######################.......G.....................#######
+######################.......G.....................#######
+######################..X.^^.G.M.g.r..m..L.........#######
+###########################################........#######
+###########################################........#######
+##............#############################........#######
+##....................#####################........#######
+##....................########################.....#######
+##..S...+.............#####################........#######
+##############........#####################........#######
+##############........#####################......+.#######
+##############........####................#.....##########
+##############........####................#........#######
+##############........####................#........#######
+##############........####..g..+..C...g...#........#######
+##############........########################.....#######
+##############........#####################...b....#######
+##############.+......#####################........#######
+#################.....#####################........#######
+##############........#####################.....##########
+##############........###############.....#........#######
+##############........###############.....#........#######
+##############........###############+..$.#.+......#######
+#########....G........################..######.....#######
+#########....G........################..###........#######
+#########g.C.G........################..###........#######
+#############................K.....................#######
+#############..........................b........####....##
+#############.##...................................#....##
+#############....A.................................#....##
+#############...###...l.T.T....T.T...m........F.^^.#g.C.##
+########################.w..###.w..#######################
+##########################################################
+##########################################################
+##########################################################
+##########################################################
+

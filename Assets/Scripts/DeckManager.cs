@@ -36,6 +36,11 @@ public class DeckManager : MonoBehaviour
     // Reclaimer's Clamp salvages one exhausting card per room; reset on each new room.
     private bool clampUsedThisRoom = false;
 
+    // The RuntimeCard currently mid-play — set around ExecuteAction in PlayCard so actions
+    // that need a handle on their own card (Glass Parry's refund) can capture it. Only
+    // valid during that call; null at all other times.
+    public RuntimeCard CardBeingPlayed { get; private set; }
+
     // Getterlar
     public List<RuntimeCard> GetDrawPile() { return drawPile; }
     public List<RuntimeCard> GetDiscardPile() { return discardPile; }
@@ -110,7 +115,9 @@ public class DeckManager : MonoBehaviour
         if (player.GetCurrentShift() < cost) return;
         if (!playedCard.isInfinite && playedCard.currentUses <= 0) return;
 
+        CardBeingPlayed = playedCard;
         bool success = player.ExecuteAction(data.actionType, data.actionValue, out bool keepInHand);
+        CardBeingPlayed = null;
 
         // Shift is deducted only when the action actually executed — Blocked plays
         // (conflict refusal) and Failed plays (e.g. Comet Dive while grounded) cost
@@ -186,6 +193,36 @@ public class DeckManager : MonoBehaviour
     public void ResetRoomRelicState()
     {
         clampUsedThisRoom = false;
+    }
+
+    // Glass Parry's mastery refund: gives one charge back to a card that was already
+    // played this frame. If spending that charge exhausted the card, pull it back out
+    // of the exhaust pile — perfect play means the card never really left.
+    public void RefundCharge(RuntimeCard card)
+    {
+        if (card == null) return;
+        if (!card.isInfinite)
+            card.currentUses = Mathf.Min(card.currentUses + 1, card.cardData.maxUses);
+        if (exhaustPile.Remove(card))
+            discardPile.Add(card);
+        OnHandChanged?.Invoke(false);
+    }
+
+    // Called by LevelManager.SpawnNextRoom at the moment a COMBAT room ends, while the
+    // ending room's hand still exists (the reload that discards it comes right after).
+    // Held payoff cards trigger here — Dead Weight: +actionValue Shift per copy still
+    // in hand. Recalling earlier discarded it and forfeited this.
+    public void OnRoomEnd()
+    {
+        foreach (RuntimeCard card in hand)
+        {
+            if (card.cardData != null && card.cardData.actionType == CardActionType.DeadWeight)
+            {
+                int payout = Mathf.RoundToInt(card.cardData.actionValue);
+                player.AddShift(payout);
+                Debug.Log($"DEAD WEIGHT held to room end: +{payout} Shift.");
+            }
+        }
     }
     private void CheckForStaggerCondition()
     {

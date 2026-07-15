@@ -71,6 +71,8 @@ public class PlayerController : MonoBehaviour
     public AudioClip createPlatformSound;
     public AudioClip vampireBiteSound;
     public AudioClip glassVailSound;
+    public AudioClip glassParrySound;      // successful parry: chime + shatter
+    public AudioClip freefallBladeSound;   // slash swipe
     public AudioClip jumpSound;
     public AudioClip leapSound;
     public AudioClip spendSound;
@@ -210,6 +212,24 @@ public class PlayerController : MonoBehaviour
     public float biteHealAmount = 10f;
     public LayerMask enemyLayer;
     public GameObject glassWailEffect;   // Glass Wail shockwave VFX (world-space ShockwaveVFX prefab; size set on the prefab)
+    public float freefallBladeRange = 1.7f;   // radius of the ")" arc slash (front + below)
+    public float parryRiposteRange = 2.5f;    // shard burst radius on a successful Glass Parry
+
+    [Header("Meteor Greaves (relic)")]
+    [Tooltip("Minimum fall (world units, apex→landing) before the landing shockwave triggers.")]
+    public float meteorMinFall = 4f;
+    [Tooltip("Fall height at which the shockwave's size/damage max out.")]
+    public float meteorMaxFall = 14f;
+    public float meteorMinRadius = 2.5f;
+    public float meteorMaxRadius = 5.5f;
+    public float meteorMinDamage = 12f;
+    public float meteorMaxDamage = 55f;
+
+    // Fall tracking for Meteor Greaves: record the highest point reached while airborne,
+    // so the landing knows how far the player dropped. Reset on teleports (respawn / room
+    // enter) and consumed by comet-dive landings so they don't also meteor.
+    private bool trackingFall = false;
+    private float fallApexY = 0f;
 
     [Header("Interaction Settings")]
     public float interactionRange = 2f;
@@ -307,9 +327,23 @@ public class PlayerController : MonoBehaviour
         }
         isWallDetected = WallCheck();
 
+        // Meteor Greaves fall tracking: remember the apex while airborne.
+        if (!isGrounded)
+        {
+            if (!trackingFall) { trackingFall = true; fallApexY = transform.position.y; }
+            else if (transform.position.y > fallApexY) fallApexY = transform.position.y;
+        }
+
         if (isGrounded && !wasGrounded)
         {
             currentAirJumps = 0;
+
+            if (trackingFall)
+            {
+                float fallDist = fallApexY - transform.position.y;
+                trackingFall = false;
+                TryMeteorGreavesLanding(fallDist);
+            }
         }
 
         if (GameManager.instance != null && GameManager.instance.currentState == GameState.Paused)
@@ -748,6 +782,38 @@ public class PlayerController : MonoBehaviour
     public void OnNewRoomEnter()
     {
         tookDamageThisRoom = false;
+        ResetFallTracking();
+    }
+
+    // Clears Meteor Greaves fall tracking so a teleport (fall-respawn, room spawn) isn't
+    // read as an enormous drop on the next landing. Called from PlayerHealth.FallAndRespawn.
+    public void ResetFallTracking() => trackingFall = false;
+
+    // Meteor Greaves: landing after a fall of at least meteorMinFall stomps a shockwave whose
+    // radius and damage scale with how far you dropped (capped at meteorMaxFall). Damage routes
+    // through the relic damage hook like every other player source. No-op without the relic.
+    private void TryMeteorGreavesLanding(float fallDist)
+    {
+        if (RelicManager.instance == null || !RelicManager.instance.HasRelic("MeteorGreaves")) return;
+        if (fallDist < meteorMinFall) return;
+
+        float denom = Mathf.Max(0.01f, meteorMaxFall - meteorMinFall);
+        float power01 = Mathf.Clamp01((fallDist - meteorMinFall) / denom);
+        float radius = Mathf.Lerp(meteorMinRadius, meteorMaxRadius, power01);
+        float damage = Mathf.Lerp(meteorMinDamage, meteorMaxDamage, power01);
+
+        HashSet<IDamageable> struck = new HashSet<IDamageable>();
+        foreach (Collider2D hit in Physics2D.OverlapCircleAll(transform.position, radius, ~0))
+        {
+            IDamageable target = hit.GetComponentInParent<IDamageable>();
+            if (target == null || !struck.Add(target)) continue;
+            float dmg = RelicManager.instance.ModifyPlayerDamage(damage, target as EnemyHealth);
+            target.TakeDamage(dmg);
+        }
+
+        MeteorGreavesVFX.Play(transform.position, radius, power01);
+        if (CameraShake.instance != null)
+            CameraShake.instance.Shake(Mathf.Lerp(0.12f, 0.4f, power01), Mathf.Lerp(0.25f, 0.6f, power01));
     }
 
     public bool IsGroundedCheck()
@@ -984,6 +1050,95 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    // Glass Parry: a 0.5s window. Eat a hit inside it and the hit is negated, the card's
+    // charge is refunded (mastery = self-sustaining), and glass shards riposte everything
+    // close for actionValue damage. Let the window close on nothing and the charge is
+    // simply gone — Glass identity: brutal on failure, brilliant on success.
+    private const float ParryWindowDuration = 0.5f;
+
+    internal IEnumerator GlassParryRoutine(float riposteDamage, RuntimeCard playedCard)
+    {
+        GlassParryVFX windowVfx = GlassParryVFX.SpawnWindow(transform, ParryWindowDuration);
+        playerHealth.BeginParryWindow();
+
+        float elapsed = 0f;
+        while (elapsed < ParryWindowDuration && !playerHealth.ParryTriggered)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        bool success = playerHealth.ParryTriggered;   // must read BEFORE EndParryWindow clears it
+        playerHealth.EndParryWindow();
+
+        if (!success)
+        {
+            // Window closed on nothing. The charge was already spent — that's the cost.
+            yield break;
+        }
+
+        if (windowVfx != null) windowVfx.CutShort();
+
+        if (DeckManager.instance != null) DeckManager.instance.RefundCharge(playedCard);
+
+        SfxManager.PlayOn(audioSource, glassParrySound);
+        GlassParryVFX.SpawnShatter(transform.position);
+        if (CameraShake.instance != null) CameraShake.instance.Shake(0.25f, 0.45f);
+
+        // Brief mercy so the parried enemy's lingering hitbox can't clip you next frame.
+        StartCoroutine(playerHealth.GrantInvincibility(0.35f));
+
+        // The riposte: shards bite everyone close. Same all-layers + parent-lookup pattern
+        // as Vampiric Bite (enemy colliders aren't reliably on the Enemy layer).
+        HashSet<IDamageable> struck = new HashSet<IDamageable>();
+        foreach (Collider2D hit in Physics2D.OverlapCircleAll(transform.position, parryRiposteRange, ~0))
+        {
+            IDamageable target = hit.GetComponentInParent<IDamageable>();
+            if (target == null || struck.Contains(target)) continue;
+            struck.Add(target);
+
+            float finalDamage = RelicManager.instance != null
+                ? RelicManager.instance.ModifyPlayerDamage(riposteDamage, target as EnemyHealth)
+                : riposteDamage;
+            target.TakeDamage(finalDamage);
+        }
+    }
+
+    // Freefall Blade: a ")" arc slash — out in front and wrapping down below the feet.
+    // Playable grounded or airborne, but hits for DOUBLE damage while actually falling
+    // (Momentum: the fall you already paid for becomes a weapon). Always plays, even
+    // into empty air (designer 2026-07-15) — the swing itself costs the charge.
+    internal bool PerformFreefallBlade(float damageAmount)
+    {
+        bool falling = !isGrounded && rb.linearVelocity.y < -0.01f;
+        float damage = falling ? damageAmount * 2f : damageAmount;
+        float facing = isFacingRight ? 1f : -1f;
+
+        // One circle seated forward-and-low covers the bracket: its top edge reaches
+        // chest height in front, its bottom wraps under the feet.
+        Vector2 center = (Vector2)transform.position
+                       + new Vector2(facing * freefallBladeRange * 0.55f, -freefallBladeRange * 0.35f);
+
+        HashSet<IDamageable> struck = new HashSet<IDamageable>();
+        foreach (Collider2D hit in Physics2D.OverlapCircleAll(center, freefallBladeRange, ~0))
+        {
+            IDamageable target = hit.GetComponentInParent<IDamageable>();
+            if (target == null || struck.Contains(target)) continue;
+            struck.Add(target);
+
+            float finalDamage = RelicManager.instance != null
+                ? RelicManager.instance.ModifyPlayerDamage(damage, target as EnemyHealth)
+                : damage;
+            target.TakeDamage(finalDamage);
+        }
+
+        SfxManager.PlayOn(audioSource, freefallBladeSound);
+        FreefallBladeVFX.Spawn(transform.position, isFacingRight, falling, freefallBladeRange);
+        if (struck.Count > 0 && CameraShake.instance != null)
+            CameraShake.instance.Shake(falling ? 0.15f : 0.08f, falling ? 0.35f : 0.2f);
+
+        return true;
+    }
+
     internal IEnumerator PhaseRoutine(float duration)
     {
         isPhasing = true;
@@ -1205,6 +1360,10 @@ public class PlayerController : MonoBehaviour
         // hit-stop live inside the burst.
         if (cometVfx != null) { cometVfx.Land(transform.position); cometVfx = null; }
         else CometDiveVFX.PlayImpact(transform.position, cometRadius);
+
+        // Consume the fall so the normal-landing detector doesn't ALSO fire Meteor Greaves —
+        // the dive is its own landing burst.
+        trackingFall = false;
 
         EndCometDive();
         ChangeState(PlayerState.Idle);

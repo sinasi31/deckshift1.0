@@ -12,6 +12,12 @@ public class ShiftCrystal : MonoBehaviour
     [SerializeField] private AudioClip collectSound;
     [SerializeField, Range(0f, 1f)] private float collectVolume = 1f;
 
+    // Scrap Magnet relic pulls the crystal toward the player when in range (no-op without it).
+    private void Update()
+    {
+        ScrapMagnet.Attract(transform);
+    }
+
     private void OnTriggerEnter2D(Collider2D other)
     {
         // SADECE OYUNCU DOKUNURSA ALINSIN

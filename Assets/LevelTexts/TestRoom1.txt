@@ -1,0 +1,29 @@
+// Deckshift level text format — import via menu: Deckshift > Import Level From Text...
+//
+// LEGEND
+//   #  ground tile          .  or space = empty
+//   S  player spawn (GirisNoktasi) — exactly one required
+//   X  exit door
+//   m  MeleeEnemy    r  RangedEnemy   l  SlimeEnemy   M  Mimic   b  AeroBat
+//   ^  spikers       T  Trapdoor      W  BreakableWall_Bookshelf
+//   +  ShiftCrystal  g  Gold          C  Chest
+//
+// Directives (optional): !name
+// Tiles are automatic: room frame gets border/floor tiles, floating '#'
+// platforms get chunky block tiles, and the whole room gets the dungeon
+// wall backdrop — same visual language as the hand-built levels.
+
+!name: TestRoom1
+
+##############################################
+#............................................#
+#........................................C...#
+#.......................................####.#
+#..+.............g.g.........................#
+#.####........#####..............####........#
+#............................................#
+#........r................l..........+.......#
+#.......#####...........#####....######......#
+#............................................#
+#S...........m.......^^^.......l........X....#
+##############################################

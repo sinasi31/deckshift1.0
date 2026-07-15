@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: OverclockedRecall
   m_EditorClassIdentifier:
   relicID: OverclockedRecall
-  relicName: Overclocked Recall
+  relicName: Pay in Blood
   description: Recall costs no Shift, but each Recall deals 5 damage to you.
   relicArt: {fileID: 0}
   rarity: 2

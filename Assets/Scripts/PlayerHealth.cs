@@ -27,6 +27,19 @@ public class PlayerHealth : MonoBehaviour
     // exactly, regardless of what order relics were gained or sold in.
     public float BaseMaxHealth => baseMaxHealth;
 
+    // --- Glass Parry window (opened by PlayerController.GlassParryRoutine) ---
+    // The first hit that lands inside the window is negated entirely and flips
+    // ParryTriggered instead of dealing damage; the routine watches that flag.
+    private bool parryWindowActive = false;
+    public bool ParryTriggered { get; private set; }
+
+    public void BeginParryWindow() { parryWindowActive = true; ParryTriggered = false; }
+
+    // Clears BOTH flags — ParryTriggered also gates ApplyKnockback, and leaving it set
+    // would suppress every knockback for the rest of the run after one good parry.
+    // Callers must read ParryTriggered BEFORE ending the window.
+    public void EndParryWindow()   { parryWindowActive = false; ParryTriggered = false; }
+
     public event System.Action<float> OnDamaged;
     public event System.Action OnDied;
     public event System.Action<Vector2> OnKnockback;
@@ -66,6 +79,14 @@ public class PlayerHealth : MonoBehaviour
     public void TakeDamage(float damage)
     {
         if (isInvincible || isDead) return;
+
+        // Glass Parry: the hit shatters on the glass — no damage, no hurt anim,
+        // no OnDamaged. One hit per window; the parry routine handles the payoff.
+        if (parryWindowActive && !ParryTriggered)
+        {
+            ParryTriggered = true;
+            return;
+        }
 
         currentHealth = Mathf.Max(currentHealth - damage, 0f);
 
@@ -140,6 +161,11 @@ public class PlayerHealth : MonoBehaviour
 
     public void ApplyKnockback(Vector2 knockbackForce)
     {
+        // Glass-steady: while a parry window is open (or just triggered), the player
+        // doesn't get shoved — a parried hit that still knocked you into spikes
+        // would make the negation feel like a lie.
+        if (parryWindowActive || ParryTriggered) return;
+
         OnKnockback?.Invoke(knockbackForce);
         StartCoroutine(KnockbackRoutine(knockbackForce));
     }
@@ -162,6 +188,7 @@ public class PlayerHealth : MonoBehaviour
             playerController.EndCometDive();
         rb.linearVelocity = Vector2.zero;
         transform.position = playerController.currentRoomEntryPoint;
+        playerController.ResetFallTracking();   // the teleport isn't a fall — don't Meteor on landing
         OnFallRespawn?.Invoke();
     }
 

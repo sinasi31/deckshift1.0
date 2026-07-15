@@ -8,8 +8,9 @@ public class Lever : MonoBehaviour, IInteractable
     // States are Off / Turn On / On / Turn Of — "IsOn" is the only parameter.
     [SerializeField] string animatorBoolParam = "IsOn";
     [SerializeField] bool startOn = false;
-    [SerializeField] UnityEvent OnFlippedOn;
-    [SerializeField] UnityEvent OnFlippedOff;
+    // Public so the level importer can wire persistent listeners (Gate.Open/Close).
+    public UnityEvent OnFlippedOn;
+    public UnityEvent OnFlippedOff;
     [SerializeField] AudioClip flipSound;
     [SerializeField] GameObject prompt;
 

@@ -9,6 +9,12 @@ public class GoldPickup : MonoBehaviour
     public AudioClip goldSound;
     [Range(0f, 1f)] public float soundVolume = 0.5f;
 
+    // Scrap Magnet relic pulls the coin toward the player when in range (no-op without it).
+    private void Update()
+    {
+        ScrapMagnet.Attract(transform);
+    }
+
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (other.CompareTag("Player"))

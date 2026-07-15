@@ -84,6 +84,12 @@ public class LevelManager : MonoBehaviour
 
     public void SpawnNextRoom()
     {
+        // Room-end Held payoffs (Dead Weight): fire while the ending room's hand still
+        // exists — the ReloadHand below discards it. Only when actually leaving a combat
+        // room: not on the first spawn (currentRoom null), not when leaving the hub.
+        if (currentRoom != null && !IsCurrentRoomHub() && DeckManager.instance != null)
+            DeckManager.instance.OnRoomEnd();
+
         TemporaryObject[] junk = FindObjectsByType<TemporaryObject>(FindObjectsSortMode.None);
         foreach (TemporaryObject obj in junk) Destroy(obj.gameObject);
 

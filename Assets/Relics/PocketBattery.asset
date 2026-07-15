@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: PocketBattery
   m_EditorClassIdentifier:
   relicID: PocketBattery
-  relicName: Pocket Battery
+  relicName: Pocket Lightning
   description: Start each room with +1 Shift.
   relicArt: {fileID: 0}
   rarity: 0
