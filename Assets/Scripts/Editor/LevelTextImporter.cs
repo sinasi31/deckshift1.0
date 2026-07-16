@@ -47,6 +47,13 @@ public static class LevelTextImporter
         { 'r', "Assets/YeniLeveller/RangedEnemy.prefab" },
         { 'l', "Assets/YeniLeveller/SlimeEnemy.prefab" },
         { 'M', "Assets/YeniLeveller/Mimic.prefab" },
+        // Zombie early-enemy tiers (Cainos rig + game AI). See CardAnchors.md §6.
+        // 'z' Shambler: fodder (12 HP, one-shot), melee contact. Built from PF Zombie - A.
+        // 'Z' Rotbrute: grunt (25 HP), bigger/slower, harder contact hit. PF Zombie - B skin.
+        // 's' Spitter: weak ranged (18 HP), lobs a projectile via ZombieSpitterAI. PF Zombie - C skin.
+        { 'z', "Assets/YeniLeveller/Shambler.prefab" },
+        { 'Z', "Assets/YeniLeveller/Rotbrute.prefab" },
+        { 's', "Assets/YeniLeveller/Spitter.prefab" },
         // NOTE: the flying bat is BatMan.prefab (has AeroBatAI). Assets/Prefabs/AeroBat.prefab
         // is a legacy husk without AI — do not point markers at it.
         { 'b', "Assets/YeniLeveller/BatMan.prefab" },
@@ -85,7 +92,7 @@ public static class LevelTextImporter
     // by hand in the Inspector.
     private static readonly HashSet<char> GroundedMarkers = new HashSet<char>
     {
-        'X', 'm', 'r', 'l', 'M', 'C', '^', 'W', 'T', 'F', 'w', 'c', 't', '$', 'L',
+        'X', 'm', 'r', 'l', 'M', 'z', 'Z', 's', 'C', '^', 'W', 'T', 'F', 'w', 'c', 't', '$', 'L',
     };
 
     // ---- Tile roles (the biseyler copies are the ones hand-made levels reference) ----
