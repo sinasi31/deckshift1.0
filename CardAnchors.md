@@ -65,13 +65,16 @@ The card's total effect — damage + heal-value + condition-value — should lan
 | **Vampiric Bite** | 15 ×1.1(5) ×1.3(melee) = **21** +1 Shift | 20 dmg + 10 heal | slightly hot (fan favourite — leave, or trim heal to 8) |
 | **Comet Dive** | 15 ×1.25(4) ×1.8(AoE) = **34** | 40 AoE, needs airborne setup | fits (setup = discount) ✓ |
 
-**Fixes it flags for our 3 new cards (placeholders):**
-- **Freefall Blade** (1 Shift, 3 ch, arc) — budget ≈ 15 ×1.45 ×1.3 ≈ **28**. Current 12 / 24-falling
-  is under. → propose **15 grounded / 30 falling**, or drop to 0 Shift as a cheap momentum poke.
-- **Dead Weight** — +3 Shift is now **weak** (3 of 40) for the cost of a whole hand slot all room.
-  → reconsider payoff: **+8–10 Shift**, or a different reward (gold / a free card next room).
-  Designer originally said +3 under the (wrong) assumption Shift was scarce — worth revisiting.
-- **Glass Parry** (25 riposte + negate a hit + refund charge on success) ≈ on curve for a skill card ✓.
+**Fixes it flagged for our 3 new cards — APPLIED 2026-07-16:**
+- **Freefall Blade** (1 Shift, 3 ch, arc) — budget ≈ 15 ×1.45 ×1.3 ≈ **28**. Was 12 / 24-falling (under).
+  → **DONE: actionValue 12→15** (15 grounded / **30 falling**, on budget). Kept 1 Shift as the small
+  premium. Open feel-test: if the Shift cost fights the momentum "flow," drop it to 0 (the doc's
+  alternative) — that's a playtest call, not a balance one.
+- **Dead Weight** — +3 Shift was **weak** (3 of 40) for the cost of a whole hand slot all room.
+  → **DONE: actionValue 3→8** (+8 Shift held-to-room-end). Picked the floor of the +8–10 range
+  because Dead Weight is a *Basic* — modest-but-real, easy to bump to +10 if it feels flat in play.
+- **Glass Parry** (25 riposte + negate a hit + refund charge on success) ≈ on curve for a skill card
+  → **left at 25** ✓.
 
 ---
 
@@ -79,9 +82,9 @@ The card's total effect — damage + heal-value + condition-value — should lan
 
 | Tier | HP | Fireballs to kill | Members |
 |---|---|---|---|
-| **Fodder** | 12 | **1 (one-shot)** | Zombie Shambler (new), Slime (10, keep) |
-| **Grunt** | 25 | 2 | Zombie Rotbrute (later), Ranged → bump 20→25 |
-| **Soldier** | 40 | 3 (or 1 Comet Dive) | Melee → bump 30→40, Mimic ~35, Shield ~40 |
+| **Fodder** | 12 | **1 (one-shot)** | Zombie Shambler `z` (12), Slime (10), Spitter `s` (18, ranged glass) |
+| **Grunt** | 25 | 2 | Zombie Rotbrute `Z` (25), Ranged (25) |
+| **Soldier** | 40 | 3 (or 1 Comet Dive) | Melee (40), Mimic (30), Shield ~40 (no sprite) |
 | **Elite** | 70 | ~5 | future |
 | **Mini-boss** | 140 | ~10 | future |
 | **Boss** | 300 | — | Moss Knight (keep) |
@@ -94,27 +97,46 @@ intended synergy, not a problem.
 ## 6. Zombie early-enemies (build order: Shambler first)
 
 Cainos `PF Zombie - A/B/C/D` are ART prefabs with Cainos' own AI — building a game enemy means a
-new prefab: zombie sprite/animator + the game's `EnemyHealth` + a game AI.
-- **Shambler** — 12 HP, slow walk, contact damage (reuse MeleeEnemy's AI, slowed). Core one-shot
-  fodder, travels in packs. New importer marker `z`. **← build this first.**
-- **Rotbrute** (later) — 25 HP, bigger/slower, harder contact hit. Grunt-tier variety.
-- **Spitter** (later) — weak ranged, reuse RangedEnemy AI. Keep early enemies simple for now.
+new prefab: zombie sprite/animator + the game's `EnemyHealth` + a game AI. **All three BUILT
+2026-07-16** (`Assets/YeniLeveller/`), capsule colliders baked in, importer markers live:
+- **Shambler** `z` — 12 HP, slow walk (0.45), contact damage 8 (MeleeEnemyAI). Core one-shot fodder,
+  travels in packs. PF Zombie - A skin.
+- **Rotbrute** `Z` — 25 HP grunt, 1.15× bigger, slower walk (0.38) + heavier (mass 5), harder
+  contact hit (damage 14, cooldown 2.2, knockback 6, MeleeEnemyAI). PF Zombie - B skin.
+- **Spitter** `s` — 18 HP weak ranged. New **`ZombieSpitterAI`** (approach → stop at range 8 →
+  spit on a 2.8s cadence): the zombie rig has no ranged animation, so the AI reuses the melee
+  gesture and spawns the projectile itself on a 0.35s windup (mirrored-by-facing origin, no
+  firepoint child). Fires the existing turret bolt `Mermi.prefab` (8 dmg) — a **placeholder look**;
+  a green goo reskin is an easy follow-up. PF Zombie - C skin.
+
+**Reusable recipe (any Cainos monster → game enemy):** copy `PF <Monster>`, remove
+`MonsterInputMouseAndKeyboard`, add `EnemyHealth` (wire healthBar+damagePopup, stunSkinnedRenderers
+→ the SkinnedMeshRenderer) + a game AI that drives `MonsterController.inputMove/inputAttack`, swap
+the source `BoxCollider2D` → a vertical `CapsuleCollider2D` (box snags on tile seams), re-skin via
+the two `m_Materials.Array.data[0]` modifications on the nested FBX instance.
 
 ---
 
 ## 7. TODOs surfaced here
 
-- **Fireball hitbox:** collider is a 0.137 circle at wand height → sails over slimes/mimics. Fix =
-  bigger collider **+** lower launch height, tuned so the hitbox bottom sits between floor and
-  enemy chest (can't go full-tall or it explodes on the floor). Needs a playtest tune.
+- ~~**Fireball hitbox**~~ **DONE 2026-07-16.** The 0.137 circle at wand height became a vertical
+  `CapsuleCollider2D` "curtain" (local size 0.309×0.622, offset y −0.168; prefab scale 2.008× →
+  world hitbox **F+0.30 to F+1.55**). Keeps its top at wand height (still hits tall enemies) but
+  reaches down through slime (top F+0.88) / mimic (top F+1.0) bodies, with 0.30 clearance above the
+  floor so it doesn't detonate on ground tiles. Launch height unchanged (sprite still casts from the
+  wand). Known cosmetic: the explosion VFX spawns at the fireball's center (wand height), so a hit
+  on a low slime pops slightly above it — lower the spawn in `PerformFireball` if that reads badly.
 - **ShieldEnemy has no sprite** → unused in levels. Compose one from the Cainos packs (armored
   humanoid + a shield prop) later. Purely art; the enemy logic works.
-- **Retune existing enemy HP** to the tiers above when we implement (Melee 30→40, Ranged 20→25).
-- **Fix the 3 new cards' placeholder numbers** per §4 once anchors are approved.
+- ~~**Retune existing enemy HP**~~ **DONE 2026-07-16.** Melee 30→40, Ranged 20→25. Slime 10 (fodder,
+  kept), Shambler 12 (fodder), Boss 300 (kept). Mimic left at 30 — sits between grunt (25) and
+  soldier (40); designer's call whether to snap it to a tier.
+- ~~**Fix the 3 new cards' placeholder numbers**~~ **DONE 2026-07-16** — see §4.
 
 ---
 
 ## 8. Open decisions (designer)
 
-Anchors §2–3 are approved-for-now (2026-07-15). Still open: Dead Weight's real payoff (§4);
-whether to trim Bite's heal; exact Freefall numbers. Everything else derives from the table.
+Anchors §2–3 are approved-for-now (2026-07-15). Dead Weight (+8) and Freefall (15/30) resolved
+2026-07-16 (§4). Still open: whether to trim Vampiric Bite's heal (20+10 runs slightly hot);
+whether Mimic should snap to a clean tier; the Freefall 1-Shift-vs-0 feel-test.

@@ -16,7 +16,7 @@ GameObject:
   - component: {fileID: 5500000000000000011}
   - component: {fileID: 5500000000000000012}
   m_Layer: 0
-  m_Name: Shambler
+  m_Name: Spitter
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -170,7 +170,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4813e138349d3bd47bc9e51b493d345a, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  maxHealth: 12
+  maxHealth: 18
   canBeHeadBounced: 1
   healthBarPrefab: {fileID: 5647382910293847562, guid: 7a3f9b4c1d8e2f6b5c3d7e9f4a1b2c3d, type: 3}
   headBarOffset: {x: 0, y: 2}
@@ -187,22 +187,25 @@ MonoBehaviour:
   m_GameObject: {fileID: 6418267430543814824}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: facc39d94e9e8054e9b5fb215579a41a, type: 3}
+  m_Script: {fileID: 11500000, guid: a7f1e3d5c96b2c8d4f1a9e53072c4db6, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  aggroRange: 7
-  attackRange: 1.2
-  attackCooldown: 1.8
-  damage: 8
-  damageDelay: 0.4
-  knockbackPower: 4
+  aggroRange: 11
+  attackRange: 8
+  fireCooldown: 2.8
+  yTolerance: 2.5
+  projectilePrefab: {fileID: 4286991970044149987, guid: 6b73fab4fba96814294a378972349c17, type: 3}
+  projectileDamage: 8
+  mouthHeight: 1.2
+  mouthForward: 0.6
+  windupDelay: 0.35
   groundLayer:
     serializedVersion: 2
     m_Bits: 8
   edgeCheckOffsetX: 0.5
   edgeCheckDepth: 1
-  attackSound: {fileID: 0}
-  attackVolume: 1
+  spitSound: {fileID: 0}
+  spitVolume: 1
 --- !u!1001 &503869603661458961
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -266,11 +269,11 @@ PrefabInstance:
     - target: {fileID: 13700000, guid: 1c2d7922cbb86ba4c8b2322a6e04cc37, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value:
-      objectReference: {fileID: 2100000, guid: 7fca668c6a2a5bb458fe186b94a5058f, type: 2}
+      objectReference: {fileID: 2100000, guid: 68ee080a0686a004fa75a11d30c78318, type: 2}
     - target: {fileID: 13700002, guid: 1c2d7922cbb86ba4c8b2322a6e04cc37, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value:
-      objectReference: {fileID: 2100000, guid: 7fca668c6a2a5bb458fe186b94a5058f, type: 2}
+      objectReference: {fileID: 2100000, guid: 68ee080a0686a004fa75a11d30c78318, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

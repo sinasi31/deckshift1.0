@@ -119,8 +119,8 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 0
---- !u!58 &8324526200269074279
-CircleCollider2D:
+--- !u!70 &8324526200269074279
+CapsuleCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -153,8 +153,9 @@ CircleCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0.0021838066, y: 0.0021838855}
-  m_Radius: 0.1374759
+  m_Offset: {x: 0.0021838066, y: -0.16833}
+  m_Size: {x: 0.30876, y: 0.62249}
+  m_Direction: 0
 --- !u!114 &3101831543337624085
 MonoBehaviour:
   m_ObjectHideFlags: 0

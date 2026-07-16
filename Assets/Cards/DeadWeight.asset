@@ -14,10 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardName: Dead Weight
   description: 'Unplayable - it just sits there. If it is still in your hand when
-    the room ends: +3 Shift. Recall discards it like any other card.'
+    the room ends: +8 Shift. Recall discards it like any other card.'
   cardArt: {fileID: 6441538611088192299, guid: 4826b8a3ec1d911498cd29ae81170436, type: 3}
   actionType: 17
-  actionValue: 3
+  actionValue: 8
   singleUse: 0
   shiftCost: 0
   maxUses: 1
