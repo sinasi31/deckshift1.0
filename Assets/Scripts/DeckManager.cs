@@ -33,6 +33,14 @@ public class DeckManager : MonoBehaviour
     private int selectedIndex = -1;
     private bool isReloading = false;
 
+    // Reclaimer's Clamp salvages one exhausting card per room; reset on each new room.
+    private bool clampUsedThisRoom = false;
+
+    // The RuntimeCard currently mid-play — set around ExecuteAction in PlayCard so actions
+    // that need a handle on their own card (Glass Parry's refund) can capture it. Only
+    // valid during that call; null at all other times.
+    public RuntimeCard CardBeingPlayed { get; private set; }
+
     // Getterlar
     public List<RuntimeCard> GetDrawPile() { return drawPile; }
     public List<RuntimeCard> GetDiscardPile() { return discardPile; }
@@ -107,7 +115,9 @@ public class DeckManager : MonoBehaviour
         if (player.GetCurrentShift() < cost) return;
         if (!playedCard.isInfinite && playedCard.currentUses <= 0) return;
 
+        CardBeingPlayed = playedCard;
         bool success = player.ExecuteAction(data.actionType, data.actionValue, out bool keepInHand);
+        CardBeingPlayed = null;
 
         // Shift is deducted only when the action actually executed — Blocked plays
         // (conflict refusal) and Failed plays (e.g. Comet Dive while grounded) cost
@@ -142,9 +152,22 @@ public class DeckManager : MonoBehaviour
             if (!playedCard.isInfinite && !inHub) playedCard.currentUses--;
 
             if (inHub || (playedCard.isInfinite || playedCard.currentUses > 0) && (!data.singleUse || playedCard.isInfinite))
+            {
                 discardPile.Add(playedCard);
+            }
+            else if (!clampUsedThisRoom && RelicManager.instance != null
+                     && RelicManager.instance.HasRelic("ReclaimersClamp"))
+            {
+                // Reclaimer's Clamp: the first card that would exhaust each room is salvaged —
+                // it returns to hand with a single charge instead of going to the exhaust pile.
+                clampUsedThisRoom = true;
+                playedCard.currentUses = 1;
+                hand.Add(playedCard);
+            }
             else
+            {
                 exhaustPile.Add(playedCard);
+            }
             OnHandChanged?.Invoke(false);
         }
     }
@@ -164,6 +187,42 @@ public class DeckManager : MonoBehaviour
     {
         currentRecallCost = baseRecallCost;
         OnRecallCostChanged?.Invoke(currentRecallCost);
+    }
+
+    // Clears per-room relic state (currently Reclaimer's Clamp's once-per-room salvage).
+    public void ResetRoomRelicState()
+    {
+        clampUsedThisRoom = false;
+    }
+
+    // Glass Parry's mastery refund: gives one charge back to a card that was already
+    // played this frame. If spending that charge exhausted the card, pull it back out
+    // of the exhaust pile — perfect play means the card never really left.
+    public void RefundCharge(RuntimeCard card)
+    {
+        if (card == null) return;
+        if (!card.isInfinite)
+            card.currentUses = Mathf.Min(card.currentUses + 1, card.cardData.maxUses);
+        if (exhaustPile.Remove(card))
+            discardPile.Add(card);
+        OnHandChanged?.Invoke(false);
+    }
+
+    // Called by LevelManager.SpawnNextRoom at the moment a COMBAT room ends, while the
+    // ending room's hand still exists (the reload that discards it comes right after).
+    // Held payoff cards trigger here — Dead Weight: +actionValue Shift per copy still
+    // in hand. Recalling earlier discarded it and forfeited this.
+    public void OnRoomEnd()
+    {
+        foreach (RuntimeCard card in hand)
+        {
+            if (card.cardData != null && card.cardData.actionType == CardActionType.DeadWeight)
+            {
+                int payout = Mathf.RoundToInt(card.cardData.actionValue);
+                player.AddShift(payout);
+                Debug.Log($"DEAD WEIGHT held to room end: +{payout} Shift.");
+            }
+        }
     }
     private void CheckForStaggerCondition()
     {
@@ -210,23 +269,32 @@ public class DeckManager : MonoBehaviour
         // 1. Zaten el yenileniyorsa dur
         if (isReloading) return;
 
-        // 2. Maliyet kontrolü
-        if (player.GetCurrentShift() < currentRecallCost)
+        bool inHub = LevelManager.instance != null && LevelManager.instance.IsCurrentRoomHub();
+        bool overclocked = RelicManager.instance != null && RelicManager.instance.HasRelic("OverclockedRecall");
+
+        if (overclocked)
         {
-            Debug.Log("Yetersiz Shift! Recall yapılamıyor.");
-            // Buraya "Yetersiz Enerji" sesi veya görseli eklenebilir
-            return;
+            // Overclocked Recall: no Shift cost — paid in blood instead (5 HP per Recall,
+            // never in the sandbox hub). Cost escalation is irrelevant when Shift is free.
+            if (!inHub) player.TakeDamage(5);
         }
-
-        // 3. Shift Harca
-        if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
-            player.SpendShift(currentRecallCost);
-
-        // 4. Maliyeti Artır (Level bitene kadar)
-        if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
+        else
         {
-            currentRecallCost++;
-            OnRecallCostChanged?.Invoke(currentRecallCost);
+            // 2. Maliyet kontrolü
+            if (player.GetCurrentShift() < currentRecallCost)
+            {
+                Debug.Log("Yetersiz Shift! Recall yapılamıyor.");
+                // Buraya "Yetersiz Enerji" sesi veya görseli eklenebilir
+                return;
+            }
+
+            // 3. Shift Harca + 4. Maliyeti Artır (Level bitene kadar)
+            if (!inHub)
+            {
+                player.SpendShift(currentRecallCost);
+                currentRecallCost++;
+                OnRecallCostChanged?.Invoke(currentRecallCost);
+            }
         }
 
         // 5. Asıl işlemi başlat

@@ -8,13 +8,26 @@ This file is loaded automatically into Claude Code at the start of every session
 
 **Deckshift** is a 2D pixel-art roguelike deckbuilder platformer for PC (Steam target). Built in **Unity 6.0+** with URP (2D renderer) enabled.
 
-**Core concept:** "Movement is a Resource." Jumping consumes **Shift**, a non-regenerating resource per-room. Most other actions (attacks, special movement, utility) are delivered via cards. Cards have **charges**; when charges deplete the card moves to the exhaust pile and must be recovered via scrap.
+**Core concept:** "Movement is a Resource." Jumping consumes **Shift**, which does not regenerate on its own — and **Shift CARRIES OVER between rooms** (designer-confirmed 2026-07-13: it is a run-long resource, and this persistence is "the whole identity of the game" — spending Shift now means having less for the rest of the run). Do NOT describe or implement Shift as a per-room resource. Most other actions (attacks, special movement, utility) are delivered via cards. Cards have **charges**; when charges deplete the card moves to the exhaust pile and must be recovered via scrap.
 
 **Current state:** Act 1 (Oxidation District) prototype. ~5 hand-crafted levels, ~10 cards in the game. Two acts (Vapor Stratum, Final Forge) planned but not started. Target: 45-50 minute run length, 60+ cards total at content-complete.
 
 The player character was recently swapped from a SkinnedMeshRenderer-based rig (`PF Skeleton - Mage`) to a sprite-based one (`PF Pixel Character - Mage M`) from the Cainos Customizable Pixel Character pack. The wizard identity is now the canonical character. The skeleton remains in the Player prefab disabled, intended for future use as an enemy.
 
 **Active scene:** `Assets/Scenes/SampleScene.unity` (build index 2). Other scene files exist (`GameScene`, `MasterLevel`, `Hub`) but are inactive/legacy. When debugging "is this in the scene?" issues, always check SampleScene first.
+
+---
+
+## Tone & Voice (designer-stated 2026-07-15 — applies to ALL player-facing text)
+
+**Deckshift does not take itself too seriously.** Player-facing names and flavor — relics, cards, items, enemies, quests, UI — should have **personality and a wink**, not dry functional labels. The goal is that players get *attached* to specific things partly because the name is fun ("I love running Loot Goblin"). The world-building is currently thin, so this is where character comes from.
+
+**The line to walk:** playful, NOT a complete joke. Mix registers so it feels like a real world with a sense of humor, not a parody:
+- **Cool-with-personality** (the default): evocative names with a slight grin — "Pocket Lightning", "Blood Money", "Pay in Blood", "Glass Heart". These carry the world.
+- **Straight-up fun** (sprinkle, don't flood): the occasional pure wink — "Bubble Wrap", "Do Not Pet", "Loot Goblin". These are the ones players quote.
+- **Keep the genuinely cool ones cool:** if a name already lands (Phoenix Cog, Executioner's Seal, Meteor Greaves, Glass Heart), leave it — don't jokify everything, or nothing stands out.
+
+Names should still *hint at what the thing does* where possible (First One's Free = first card free; Do Not Pet = touch it and get hurt). Keep mechanical **descriptions** clear and literal — the humor lives in the NAME and any short flavor line, never at the cost of the player understanding the effect. **`relicID` / enum / code identifiers NEVER change for flavor** — only the display `relicName` / `cardName` / description text.
 
 ---
 
@@ -81,7 +94,8 @@ PlayerController writes to these parameters on the Animator:
 
 | Parameter        | Type    | Driven by                                                | Purpose                                            |
 |------------------|---------|----------------------------------------------------------|----------------------------------------------------|
-| `MoveBlendX`     | Float   | `UpdateAnimations()` — 0.0 still, 1.0 running            | Walk/idle blend                                    |
+| `MoveBlendX`     | Float   | `UpdateAnimations()` — 0 idle / `locomotionPose` moving  | Locomotion pose blend: idle(0)/walk(1)/run(3)      |
+| `MoveSpeedMul`   | Float   | `UpdateAnimations()` — `speed * animCadenceScale` clamped | Scales walk-cycle PLAYBACK to real ground speed (kills foot-slide) |
 | `VelocityY`      | Float   | `UpdateAnimations()` — `rb.linearVelocity.y`             | Jump/fall vertical state                           |
 | `IsGrounded`     | Bool    | `UpdateAnimations()`                                     | Land/airborne distinction                          |
 | `InjuredFront`   | Trigger | `TakeDamage()` on every damage hit                       | Hurt reaction                                      |
@@ -179,18 +193,18 @@ When Shift is 0 AND no playable cards exist, a Stagger card is auto-added to the
 
 Discovered when hub mode allowed free card spamming: playing multiple state-modifying cards in close succession (e.g., Floor is Lava + Adrenaline + Phase) can leave the player in a permanently broken state (flying, frozen gravity, etc.). Each card's effect captures "original" state at start and restores it at end, but **none of them know about each other**. Card A captures the current state (already modified by still-active Card B), then later restores to that mid-effect snapshot — corrupting baseline.
 
-**Current state (audited 2026-06-10):** the CardActionExecutor extraction is done and the conflict-flag system is half built. Each `CardAction` declares a `ModifiedState` (`ConflictFlags`), and the executor tracks flags in `activeFlags` while coroutine-based actions run — **but `TryExecute` never checks the flags. Blocking/enforcement is NOT implemented; overlapping effects still run concurrently, so this bug class is still live.**
+**Current state (updated 2026-07-06): RESOLVED.** The CardActionExecutor extraction is done AND conflict-flag enforcement is live. Each `CardAction` declares a `ModifiedState` (`ConflictFlags`); the executor accumulates flags in `activeFlags` (via `ManagedCoroutine` for coroutine actions, via `SetManualFlag` for the manual-lifecycle ones) and **`TryExecute` now checks them: if an action's `ModifiedState` overlaps `activeFlags`, it is refused up front with `CardExecuteResult.Blocked` and none of its code runs.** A blocked play costs no Shift and no charge, and the card stays in hand (`DeckManager.PlayCard` only spends/consumes on `Success`). The state-corruption bug class (Floor is Lava + Adrenaline + Phase leaving the player flying/frozen) can no longer occur — the conflicting second card is refused instead of corrupting the baseline snapshot.
 
 Per-effect conversion status:
-- **Dash** ✅ converted — managed coroutine; flags `PlayerVelocity | Invincibility` held live, cleared in `finally`.
+- **Dash** ✅ converted — managed coroutine; flags `PlayerVelocity | Invincibility` held for the whole dash. **Reworked 2026-07-06 into a driven dash** (`PlayerController.DashRoutine`): enters `PlayerState.Dashing` and holds a flat horizontal velocity for `dashDuration` (re-asserted each FixedUpdate with y forced to 0), so it works on the ground too — the old one-shot `AddForce` impulse was erased the next frame by the grounded movement line (`rb.linearVelocity = moveInput * moveSpeed`). Never touches `gravityScale` (composes cleanly with Floor is Lava). Procedural afterimages via `DashAfterimage.cs`; tunables `dashSpeed`/`dashDuration`/`dashEndSpeed`/`dashIFrameDuration`/`dashAfterimages` on PlayerController.
 - **Phase** ✅ converted — managed coroutine; flags `GravityScale | LayerCollisionMatrix | PlayerVelocity`.
-- **Adrenaline** ✅ converted (manual-flag pattern) — `UseAdrenaline`'s sub-coroutines call `SetManualFlag(TimeScale | MoveSpeed, …)` at start/end. Caveats: both flags are set regardless of which branch runs, and `SetManualFlag` is not refcounted (overlapping plays clear flags early).
+- **Adrenaline** ✅ converted (manual-flag pattern) — `UseAdrenaline`'s two sub-coroutines are mutually exclusive (`if/else` on health %), and each calls `SetManualFlag(TimeScale | MoveSpeed, …)` at start/end. The old "not refcounted / overlapping plays clear flags early" caveat is now moot: a second Adrenaline play while one is active is Blocked (its flags overlap), so concurrent same-flag effects can't happen.
 - **Fireball** ✅ converted — managed coroutine; `AnimatorAttackState`.
-- **ReverseGravity** ⚠️ NOT converted — it declares `GravityScale | VisualTransform`, but those flags are **dead**: `IsCoroutine = false` and the executor only registers flags for coroutine actions, and `StartGravityReversal`/`GravityReversalRoutine` never call `SetManualFlag`. While Floor is Lava is active, `ActiveFlags` shows nothing.
+- **ReverseGravity** ✅ converted (manual-flag pattern) — `StartGravityReversal`/`GravityReversalRoutine` now call `SetManualFlag(GravityScale | VisualTransform, …)` with a restart-safe lifecycle: flags are cleared BEFORE `StopCoroutine` and re-set synchronously inside the new `StartCoroutine`, so there is never a flags-set-but-no-routine window and the clear can't stomp the new set. The same-card timer-refresh branch is now unreachable (a replay while active is Blocked because its flags overlap `activeFlags`); it's kept deliberately in case the policy later allows same-card refresh.
 
-Remaining work: (1) register ReverseGravity's flags via `SetManualFlag` with a restart-safe lifecycle (`StartGravityReversal` stops and restarts the coroutine without cleanup, so flags must not double-clear or leak); (2) implement enforcement in `TryExecute` — block or queue when `ModifiedState & ActiveFlags != 0`. Until enforcement exists, the flags are bookkeeping only.
+**Known interaction (found 2026-07-06):** enforcement makes the **Echo Chamber** skill's instant double-cast (`DeckManager.PlayCard` re-calls `ExecuteAction` immediately after the first play) silently no-op for *stateful* cards — the second cast's `ModifiedState` overlaps the first's still-live flags and is Blocked. It still works on instant cards (Jump, Glass Wail, etc.). Fix options if this becomes design-relevant: defer the echo cast until the first effect ends, or let a same-card replay bypass the block. Not yet done — flagged, not urgent.
 
-**In normal play, Shift cost gates spamming heavily enough that this is rarely reachable.** It is fully reachable in the hub. For now: known issue, do not patch individual cards — the enforcement work supersedes per-card patches.
+**Enforcement applies everywhere, including the hub** (where free card spamming used to make this bug trivially reproducible). The class is now handled centrally in `TryExecute`, so there is no need to patch individual cards.
 
 ---
 
@@ -410,13 +424,13 @@ The hand drawer at the bottom of the screen auto-slides up on hover and down whe
 
 ### CameraFollow.cs (custom)
 
-Replaces Cinemachine for the main follow camera. Each level prefab contains a `LevelBounds` child GameObject with `BoxCollider2D` zone children. `LevelManager.SetZones()` passes these to `CameraFollow` on spawn.
+Replaces Cinemachine for the main follow camera. Each level prefab contains a **`CameraBounds`** child GameObject with `BoxCollider2D` zone children (the shared `Assets/Prefabs/CameraBounds.prefab` carries one zone collider on its root). `LevelManager` finds it via `transform.Find("CameraBounds")` on spawn and passes the zones to `CameraFollow`.
 
 - Camera clamps to the zone the player is currently in.
 - Zone transitions use hysteresis (zone doesn't change until player leaves current zone).
 - No lerp on zone transition — direct follow (lerp was tried, caused jitter).
 
-**Naming is case-sensitive:** the child must be named exactly `LevelBounds`. Earlier code looked for `CameraBounds` and silently failed.
+**Naming is case-sensitive:** the child must be named exactly **`CameraBounds`** — verified against `LevelManager.cs` (`Find("CameraBounds")`) and the real level prefabs on 2026-07-13. (An earlier version of this file claimed the name was `LevelBounds`; that was stale/backwards — `LevelBounds` appears nowhere in the codebase.)
 
 ### CameraShake.cs
 
@@ -436,6 +450,26 @@ Related: a missing-script warning for `CameraBoundsController` appears in the co
 ---
 
 ## Level System
+
+### LEVEL DESIGN LAWS (designer-stated 2026-07-14 — absolute)
+
+1. **Every level must be completable with ONLY jumping and moving.** Cards, fans, elevators, trapdoors, and any other mechanic may only gate OPTIONAL things: loot, shortcuts, Shift savings. If a mechanic fails or the player has no cards, the exit must still be reachable. (Violation that prompted this rule: GenLevel3's first draft made a fan relay the only way over a tall wall.)
+2. Mandatory-path geometry (**recalibrated from designer playtest 2026-07-14: the character jumps ~5-6 tiles**, not the 4 the old physics math said): design mandatory rises at **4** (comfortable), 5 only for optional challenge, card-gated pockets need rises ≥ 8. Flat gaps ≤ 5-6 tiles. ≥ 5 tiles of clear air above launch surfaces. **Don't crowd platforms** — same-column vertical spacing between floating ledges ≥ 7 tiles; GenLevel5's 3-tile ladder spacing read as clutter.
+3. Hazard pits on the mandatory path must be escapable (shallow enough to jump out) and crossable without aid platforms.
+4. **NO one-way (`=`) platforms in levels** (designer 2026-07-14: "they feel wrong and also work bad and buggy, and there is no visual clearance for them"). The importer still supports `=` but don't place it — use solid 1-thick `#` strips (the `Extra_112/113/114` platform-strip look) and route jumps AROUND them, zig-zag ladder style on alternating shaft walls.
+5. **Turrets (`t`) only on walls or ceilings** — that's how the hand-made levels use them, so they're hard to kill. The importer can only floor-ground them, so generated levels must NOT use `t` at all; use a melee (`m`) or ranged (`r`) enemy instead. (Designer 2026-07-14, after GenLevel5's exposed floor turret.)
+6. The player has **no wall-breaking attack** (fireballs don't break walls) — never design a secret that requires destroying terrain. Card-gated secrets = Phase through a 1-thick wall, Portal, or an 8+ tile rise.
+7. **Entry and exit must be far apart in the map** (designer 2026-07-14, after GenLevel6 v1 put the exit directly above the spawn behind a 2-thick slab): a Phase/Portal card must never be able to skip the level. Keep the spawn and the ExitDoor in different regions — roughly 20+ tiles apart, separated by whole chambers of solid rock, never by a thin wall or single floor slab.
+
+### Level Text Importer (NEW 2026-07-13 — Stage 1)
+
+`Assets/Scripts/Editor/LevelTextImporter.cs` adds menu **Deckshift → Import Level From Text…**: it reads an ASCII grid `.txt` (legend + example: `Assets/LevelTexts/TestRoom1.txt`) and builds a room prefab into `Assets/LevelGenerated/` satisfying the room contract (`CameraBounds` zone auto-sized to the grid, `GirisNoktasi` spawn, ExitDoor). Markers: `#` ground, `S` spawn (exactly one), `X` exit, `m/r/l/M/b` enemies (`b` = `YeniLeveller/BatMan.prefab` — the real flying bat with AeroBatAI; **`Assets/Prefabs/AeroBat.prefab` is a legacy husk with NO AI**, its dead missing-script component was removed 2026-07-13 because Unity refuses to save any new prefab containing missing scripts, which broke level import), `^/T/W` hazards, `+/g/C` pickups, and mechanics (added 2026-07-13): `E` Elevator (Cainos prop, floats at cell center — tune travel in Inspector), `F` UpdraftFan (draft zone ~3 tall, liftForce 20 ≈ 5-7 tiles of lift — chain fans as relays for taller climbs), `w` AcidWater (~6 wide pool, damage+slow), `K` WreckingBall (floats at cell center, tune anchor/swing), `c` CrumblingPlatform (**do NOT use in levels — its sprites are outdated; use `T` Trapdoor instead, designer 2026-07-14**), `t` Taret turret, `$` Shopkeeper_NPC (its TMP/UI scripts live in Library/PackageCache — an Assets-only guid scan wrongly flags them "missing").
+
+**Interactive structure markers (2026-07-14):** `=` one-way platform tiles (own tilemap: TilemapCollider2D via CompositeCollider2D + one-way PlatformEffector2D on Ground layer; painted with the thin `_144` lip so they read differently from solid strips) · `G` gate cells (vertical G-runs become one sliding **Gate** — `Assets/Scripts/Gate.cs`, solid Ground-layer collider, slides down + fades on Open, Cainos Gate 01 sprite scaled to height) · `L` Lever (`YeniLeveller/Lever.prefab`; its `OnFlippedOn/Off` UnityEvents are now public) · `A` **Shift Altar** (`Assets/Scripts/ShiftAltar.cs`: IInteractable on the Interactable layer (12), pays `shiftCost` Shift via `player.SpendShift`, free in hub per the umbrella rule, procedural floating TMP cost label, fires public `OnPaid`). **The importer auto-wires each `L` and `A` to its NEAREST `G` gate** (lever On→Open/Off→Close, altar OnPaid→Open) via `UnityEventTools.AddPersistentListener` — rewire in Inspector if a level needs different pairing. Only header directive besides `!backwall` is `!name`. The importer pre-checks for missing scripts before saving and names the culprit object.
+
+**Tile painting reproduces the hand-built visual language** (learned by auditing EfeVrl7's 546 painted tiles, 2026-07-13): an optional "BackWall" backdrop tilemap (**opt-in via `!backwall: on`** — the designer prefers adding backdrop/decoration by hand; when on it must be on the **"Background" sorting LAYER**, NOT Default: ExitDoor's sprite is Default order -1 and gets swallowed by a Default-layer backdrop), plus a "Ground" tilemap (layer 3, TilemapCollider2D, Default sortingOrder 1, z=1). Any 1-tile-thick run (air above AND below, wall-attached or floating) gets the `_112/_113/_114` strip treatment with caps on open ends; the gappy `_186` fill goes in exactly ONE row under a surface, deeper cells get dark `_185` (repeating `_186` looks like a broken colonnade). Frame cells (`#` connected to the grid edge) get role tiles from `Assets/LevelSinasi/biseyler/`: air-above → floor surface `_144`, air-below → ceiling face `_96`, wall faces → inner accent tiles `_188`/`_157` ONLY when backed by a real solid tile (2-thick walls), else the clean outer tiles `_189`/`_156` (the inner tiles have protruding brick nubs + bumpy collision — wrong for 1-thick walls), buried → `_153/_154` top rows, `_156/_189` outer walls, `_186/_185` floor fill. Free-standing `#` platforms: horizontal runs of 2+ get the **platform strip set `Extra_112/_113/_114`** (left cap / middle / right cap — learned from EfeVrl6's interior platforms); lone blocks and 1-wide pillars get chunky `Ground Dirt` block tiles (`#..#..#` = the hand-made stepping-stone style); buried rows of thick platforms get floor fill. NOTE: the edge-strip tiles look like sparse floating crumbs if painted in mid-air, and adjacent Dirt blocks melt into dark blobs — never tile either as strips.
+
+**Entity placement:** most enemies have kinematic physics and do NOT fall, so the importer auto-grounds standing markers (`X m r l M C ^ W T` + the spawn): after instantiating, it measures the instance's combined renderer bounds (ignoring particles/trails, collider fallback) and shifts it so bounds-bottom sits exactly on the cell floor. Floaty pickups (`+ g`) and flyers (`b`) stay at cell center. Decoration (props) stays a manual pass by design. Planned next stages: movement-metrics doc (jump/dash distances in tiles) then batch room drafting.
 
 ### Room Pool
 
@@ -459,6 +493,12 @@ If/when proper scene flow gets built (player starts in hub from main menu, retur
 ---
 
 ## Enemy System
+
+### Card & Enemy Numbers — see `CardAnchors.md`
+
+All card and enemy numbers derive from the anchor table in **`CardAnchors.md`** (project root, 2026-07-15). Key facts: damage unit = **15** (one Fireball); **player starts with 40 Shift** (Player.prefab overrides the `maxShift = 3` script default — do NOT treat Shift as scarce at base; lowering the pool is the planned ascension difficulty knob); enemy HP is tiered so **fodder ≈ 12 HP dies to one Fireball**, up to Moss Knight 300. Early "fodder" enemies are being built from the Cainos zombie prefabs (**Shambler** first). Two open art/tuning TODOs live in that doc:
+- **ShieldEnemy has no sprite** → it's unused in levels. Compose one from the Cainos packs (armored humanoid + shield prop) when convenient. The enemy *logic* works; it's purely missing art.
+- **Fireball sails over short enemies** (slimes/mimics): its collider is a tiny 0.137-radius circle spawned at wand height. Fix = bigger collider + lower launch, tuned so the hitbox bottom sits between floor and enemy chest (can't be full-tall or it explodes on the floor).
 
 ### Pattern
 
@@ -600,7 +640,7 @@ If the user is about to discard uncommitted Unity changes via GitHub Desktop, **
 
 ### Architecture (planned, highest priority)
 
-- **CardActionExecutor conflict-flag enforcement** — the ExecuteAction() extraction itself is **DONE** (see Player System). What remains: register ReverseGravity's flags via `SetManualFlag` and make `TryExecute` actually check `ActiveFlags` before running an overlapping effect (currently flags are tracked but never checked). This is the step that resolves the card-effect-conflict bug class.
+- ~~CardActionExecutor conflict-flag enforcement~~ — **DONE (2026-07-06).** The ExecuteAction() extraction, all per-effect flag registration (incl. ReverseGravity via `SetManualFlag`), AND enforcement in `TryExecute` (Blocked on flag overlap) are complete. The card-effect-conflict bug class is resolved. Only remaining nuance: the Echo Chamber double-cast no-ops on stateful cards (see Card System → Known interaction) — flagged, not urgent.
 - ~~CameraPeek rebuild~~ — **done**; rebuilt without Cinemachine (see Camera System).
 - **Manager dependency graph** — undocumented. Long-term docs task.
 - ~~QuestSystem DontDestroyOnLoad inconsistency~~ — **resolved 2026-06-10**: removed; QuestSystem is scene-local like every other manager, and quests are per-run by design. Quest meta-progression, if ever wanted, should go through the save system (PlayerPrefs, like AchievementManager), not DontDestroyOnLoad.
@@ -649,7 +689,7 @@ The current relic system follows Slay-the-Spire conventions: strictly additive, 
 
 ### Bugs (deferred)
 
-- **Card effect conflict class of bug** — playing multiple state-modifying cards in close succession breaks player state permanently. Reachable in hub, mostly gated by Shift cost in normal play. The CardActionExecutor extraction is done; what resolves this bug class is the remaining **conflict-flag enforcement** work (flags are tracked but `TryExecute` never checks them — see Card System). Do not patch individual cards.
+- ~~Card effect conflict class of bug~~ — **RESOLVED (2026-07-06).** `TryExecute` now refuses (Blocked) any card whose `ModifiedState` overlaps a live effect's flags; blocked plays cost nothing and stay in hand. Stacking Floor is Lava + Adrenaline + Phase can no longer corrupt player state. See Card System for detail.
 - **Phase card wall-stuck:** if Phase ends while player is inside a wall, player gets stuck. Plan: prevent Phase expiration inside collider.
 - **Comet Dive identity loss:** does the same thing as head-bounce relic. Plan: redesign.
 - **Head bounce + gravity reversal:** velocity sign check doesn't account for reversed gravity. Low priority.

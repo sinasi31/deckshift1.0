@@ -12,7 +12,6 @@ GameObject:
   - component: {fileID: 2012188161917317062}
   - component: {fileID: 4974620481379533558}
   - component: {fileID: 5946757459841159558}
-  - component: {fileID: 4974319120112828237}
   - component: {fileID: 8800200811210391934}
   m_Layer: 0
   m_Name: AeroBat
@@ -135,24 +134,6 @@ MonoBehaviour:
   healthBarPrefab: {fileID: 5647382910293847562, guid: 7a3f9b4c1d8e2f6b5c3d7e9f4a1b2c3d, type: 3}
   headBarOffset: {x: 0, y: 1}
   damagePopupPrefab: {fileID: 0}
---- !u!114 &4974319120112828237
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3289393925549370949}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dedcb0df1f85ebb428e6baeecad98fa5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  detectRange: 8
-  diveSpeed: 7
-  returnSpeed: 3
-  hoverHeight: 1
-  windUpTime: 0.8
-  alertIcon: {fileID: 3342004859413165866}
 --- !u!60 &8800200811210391934
 PolygonCollider2D:
   m_ObjectHideFlags: 0

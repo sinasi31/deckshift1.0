@@ -1,0 +1,57 @@
+// GenLevel3 — "The Machine Hall"
+// A mechanical gauntlet: every section is a moving-parts moment.
+// FLOW (S-curve): bottom-left -> right across the floor -> WIND RELAY up the
+// far right -> upper walkway right-to-left -> exit shelf top-left.
+//
+//   1. ACID PIT A: crumbling stepping platforms over acid — quick feet or a slow swim.
+//   2. WRECKING BALL HALL: a ball swings over the walkway; time your run.
+//      (Risky crystal directly under the swing.)
+//   3. ACID PIT B: trapdoor bridge, with an AeroBat diving at you mid-crossing.
+//   4. THE CLIMB: a zigzag staircase up the pillar's left face — the pure
+//      jump-and-move route to the walkway (LAW: every level completable with
+//      only jumping and moving). OR: THE WIND RELAY on the right — the floor
+//      fan boosts you onto a ledge with a second fan, which boosts you to the
+//      pillar top. Same destination, zero Shift spent, crystals in the drafts.
+//      Mechanics assist; they never gate.
+//   5. UPPER WALKWAY (right to left): turret covers a crumbling gap, then a
+//      ranged skeleton, gold... and a Mimic two steps before the exit hop.
+//   6. THE VAULT (optional): an elevator hovers over mid-walkway. Ride it up
+//      through the split shelf to the chest, gold and a crystal.
+//
+// TUNING (Inspector, after import): elevator travel = hover (~y19) up through
+// the shelf gap to vault level (y24); wrecking ball anchor/chain to swing over
+// the lower hall; fan liftForce (20) if a relay hop lands short.
+// All jump rises <= 3 (max jump ~4). Backwall: add by hand.
+
+!name: GenLevel3
+
+############################################################
+#..........................................................#
+#..........................................................#
+#..........................................................#
+#..........................................................#
+#........................Cg...+g...........................#
+#........................##...##...........................#
+#..........................................................#
+#..........................................................#
+#..........................................................#
+#...........................E..............................#
+#.....X....................................................#
+#....####..................................................#
+#...........M....gg......r.....+.........t....g............#
+#.........######################cc##############...........#
+#.................................................#........#
+#.................................................#.+......#
+#.................................................#........#
+#...............................................###........#
+#.................................................#.F......#
+#.................................................#.##.....#
+#..........................K.................##...#........#
+#.......................................b.........#........#
+#.................................................#...+....#
+#...............................................###........#
+#..........................+......................#........#
+#..S....l....c.c.....l...........m....T..T.....g..#...F....#
+############......###################......#################
+############.w..w.###################.w..w.#################
+############################################################

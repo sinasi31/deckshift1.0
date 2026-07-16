@@ -44,7 +44,11 @@ public class Fireball : MonoBehaviour
         if (targetHealth != null)
         {
             hasHit = true;
-            targetHealth.TakeDamage(damage);
+            // Route through the relic modifier (Whetstone / Midas Recoil / Glass Heart).
+            float dealt = RelicManager.instance != null
+                ? RelicManager.instance.ModifyPlayerDamage(damage, targetHealth as EnemyHealth)
+                : damage;
+            targetHealth.TakeDamage(dealt);
             if (CameraShake.instance != null)
                 CameraShake.instance.Shake(0.15f, 0.5f);
             CreateExplosionEffect();

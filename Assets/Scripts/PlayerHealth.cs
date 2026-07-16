@@ -15,11 +15,30 @@ public class PlayerHealth : MonoBehaviour
 
     private float currentHealth;
     private bool isDead = false;
+    private float baseMaxHealth;
 
     public float CurrentHealth => currentHealth;
     public float MaxHealth => maxHealth;
     public bool IsDead => isDead;
     public float HealthPercent => maxHealth > 0 ? currentHealth / maxHealth : 0f;
+
+    // The unmodified max HP, captured before any relic touches it. Relic passives are always
+    // recomputed from THIS (see RelicManager.RecomputePassives) so selling a relic reverses it
+    // exactly, regardless of what order relics were gained or sold in.
+    public float BaseMaxHealth => baseMaxHealth;
+
+    // --- Glass Parry window (opened by PlayerController.GlassParryRoutine) ---
+    // The first hit that lands inside the window is negated entirely and flips
+    // ParryTriggered instead of dealing damage; the routine watches that flag.
+    private bool parryWindowActive = false;
+    public bool ParryTriggered { get; private set; }
+
+    public void BeginParryWindow() { parryWindowActive = true; ParryTriggered = false; }
+
+    // Clears BOTH flags — ParryTriggered also gates ApplyKnockback, and leaving it set
+    // would suppress every knockback for the rest of the run after one good parry.
+    // Callers must read ParryTriggered BEFORE ending the window.
+    public void EndParryWindow()   { parryWindowActive = false; ParryTriggered = false; }
 
     public event System.Action<float> OnDamaged;
     public event System.Action OnDied;
@@ -37,6 +56,19 @@ public class PlayerHealth : MonoBehaviour
         animator = GetComponentInChildren<Animator>();
         audioSource = GetComponent<AudioSource>();
         playerController = GetComponent<PlayerController>();
+        baseMaxHealth = maxHealth;
+    }
+
+    // Applied by relic passives (RelicManager.RecomputePassives). Clamp-only, deliberately:
+    // healing on a capacity GAIN would let the player equip Glass Heart (halved max HP), take
+    // damage, then SELL it for a free ~50 HP refill. Never drops below 1, so equipping a
+    // max-HP-reducing relic can't kill you outright.
+    public void SetMaxHealth(float newMax)
+    {
+        if (isDead) return;
+
+        maxHealth = Mathf.Max(1f, newMax);
+        currentHealth = Mathf.Clamp(currentHealth, 1f, maxHealth);
     }
 
     void Start()
@@ -47,6 +79,14 @@ public class PlayerHealth : MonoBehaviour
     public void TakeDamage(float damage)
     {
         if (isInvincible || isDead) return;
+
+        // Glass Parry: the hit shatters on the glass — no damage, no hurt anim,
+        // no OnDamaged. One hit per window; the parry routine handles the payoff.
+        if (parryWindowActive && !ParryTriggered)
+        {
+            ParryTriggered = true;
+            return;
+        }
 
         currentHealth = Mathf.Max(currentHealth - damage, 0f);
 
@@ -59,7 +99,18 @@ public class PlayerHealth : MonoBehaviour
         OnDamaged?.Invoke(damage);
 
         if (currentHealth <= 0)
+        {
+            // Phoenix Cog: once per run, a lethal hit leaves you at 1 HP and erupts instead.
+            if (RelicManager.instance != null && RelicManager.instance.TryConsumePhoenixCog())
+            {
+                currentHealth = 1f;
+                RelicManager.instance.PhoenixBlast(transform.position);
+                StartCoroutine(GrantInvincibility(1.5f));   // mercy window so 1 HP isn't instant death
+                return;
+            }
+
             Die();
+        }
     }
 
     public void Heal(float amount)
@@ -110,6 +161,11 @@ public class PlayerHealth : MonoBehaviour
 
     public void ApplyKnockback(Vector2 knockbackForce)
     {
+        // Glass-steady: while a parry window is open (or just triggered), the player
+        // doesn't get shoved — a parried hit that still knocked you into spikes
+        // would make the negation feel like a lie.
+        if (parryWindowActive || ParryTriggered) return;
+
         OnKnockback?.Invoke(knockbackForce);
         StartCoroutine(KnockbackRoutine(knockbackForce));
     }
@@ -132,6 +188,7 @@ public class PlayerHealth : MonoBehaviour
             playerController.EndCometDive();
         rb.linearVelocity = Vector2.zero;
         transform.position = playerController.currentRoomEntryPoint;
+        playerController.ResetFallTracking();   // the teleport isn't a fall — don't Meteor on landing
         OnFallRespawn?.Invoke();
     }
 

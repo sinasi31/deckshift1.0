@@ -15,10 +15,9 @@ public class PauseMenu : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Escape))
         {
             // The shop owns ESC while it's open. Two checks because script order is
-            // undefined: the panel is still open if PauseMenu ran first this frame, and
-            // the consumed-frame stamp catches it if ShopManager ran (and closed) first.
-            if (ShopManager.instance != null && ShopManager.instance.shopPanel != null &&
-                ShopManager.instance.shopPanel.activeSelf)
+            // undefined: the stall is still open if PauseMenu ran first this frame, and
+            // the consumed-frame stamp catches it if ShopScreenUI ran (and closed) first.
+            if (ShopScreenUI.IsOpen)
                 return;
             if (ShopManager.escapeConsumedFrame == Time.frameCount)
                 return;

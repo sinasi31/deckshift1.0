@@ -10,10 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 71417128076b2fb429c3677f2e47bf2d, type: 3}
-  m_Name: New Relic 1
-  m_EditorClassIdentifier: 
-  relicID: Oops
-  relicName: Oops! All 7's
-  description: 
-  relicArt: {fileID: 21300000, guid: e577f30c6bd976a429addedf4c4ad662, type: 3}
+  m_Name: MeteorGreaves
+  m_EditorClassIdentifier:
+  relicID: MeteorGreaves
+  relicName: Meteor Greaves
+  description: 'Land from a height to slam the ground: a shockwave damages nearby
+    enemies. The farther you fell, the bigger and harder it hits.'
+  relicArt: {fileID: 0}
   rarity: 2

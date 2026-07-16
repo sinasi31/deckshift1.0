@@ -1,0 +1,27 @@
+// ToyboxTest — one-click test room for the three new systems.
+//   LEFT: one-way platforms ('=') — jump UP through them from below, land on
+//     top. Two stacked hops with a crystal at the top.
+//   MIDDLE: a full wall with a Gate at the bottom; the Lever before it opens
+//     it (flip again to close it on an enemy for fun).
+//   RIGHT: a sealed loot vault; the Shift Altar in front (3 Shift) opens it.
+// The importer wires lever->gate and altar->gate automatically (nearest gate).
+// NOTE: in the HUB the altar is FREE (umbrella rule: nothing is consumed in
+// the hub) — to feel the real Shift cost, play THIS room (it's not a hub).
+
+!name: ToyboxTest
+!backwall: on
+
+########################################
+#...............#......................#
+#...............#......................#
+#...............#......................#
+#...............#......................#
+#..........+....#......................#
+#.........===...#......................#
+#...............#......................#
+#...............#.......#####..........#
+#.....===.......G.......G...#..........#
+#...............G.......G...#..........#
+#.S..........L..G..l.A..GCg.#...X......#
+########################################
+########################################
