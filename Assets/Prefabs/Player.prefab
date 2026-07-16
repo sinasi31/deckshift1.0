@@ -139,7 +139,6 @@ GameObject:
   - component: {fileID: 6756738010999442349}
   - component: {fileID: 5524391224463896992}
   - component: {fileID: 7872518250570301061}
-  - component: {fileID: 7895736338733408254}
   - component: {fileID: 5062495975001351823}
   - component: {fileID: 3837754565138129228}
   m_Layer: 7
@@ -158,7 +157,7 @@ Transform:
   m_GameObject: {fileID: 8334719470568814973}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.063402, y: 0.016487, z: 0.0017108}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -237,17 +236,29 @@ MonoBehaviour:
   createPlatformSound: {fileID: 8300000, guid: 1cac8dcf0c7c72e429604b798d25fa5d, type: 3}
   vampireBiteSound: {fileID: 8300000, guid: b99cde183dfddad499d2a40bc701e1e9, type: 3}
   glassVailSound: {fileID: 8300000, guid: 0335a30fbf68921448cf9922e6b028cb, type: 3}
-  jumpSound: {fileID: 8300000, guid: 4f25667166ce44040bd09867cd3a4042, type: 3}
-  leapSound: {fileID: 8300000, guid: 4f25667166ce44040bd09867cd3a4042, type: 3}
+  glassParrySound: {fileID: 0}
+  freefallBladeSound: {fileID: 0}
+  jumpSound: {fileID: 8300000, guid: e41a7d00afe07be4ebe4d42dc03c77b3, type: 3}
+  leapSound: {fileID: 8300000, guid: e41a7d00afe07be4ebe4d42dc03c77b3, type: 3}
   spendSound: {fileID: 8300000, guid: 70cad06b332b69049ad572f5628c41c5, type: 3}
-  warningSoundClip: {fileID: 8300000, guid: 70cad06b332b69049ad572f5628c41c5, type: 3}
+  warningSoundClip: {fileID: 8300000, guid: 2e9b47f9e30e9d54ab7c7d8278ffb89b, type: 3}
   soundVolume: 1
+  footstepClips:
+  - {fileID: 8300000, guid: 6f7497f6b29ef874d8e16a76a182727e, type: 3}
+  - {fileID: 8300000, guid: d70451e05316e264baa018f822270cb0, type: 3}
+  - {fileID: 8300000, guid: 44136c5cfe2bc5a4098267fdb833a872, type: 3}
+  footstepVolume: 0.6
+  footstepPitchRange: {x: 0.92, y: 1.08}
   biteEffectPrefab: {fileID: 3283776623164260811, guid: 793631f470e29814da8521d7548720a4, type: 3}
   leapEffectPrefab: {fileID: 4494037052561318430, guid: 1da5ff91634c74043845a8b98d0d41a1, type: 3}
   diveTrail: {fileID: 5524391224463896992}
   dashEffectPrefab: {fileID: 360610054379895922, guid: 8c5d0b3cd252ba348ab3d0759f00ddb1, type: 3}
-  dashImpulse: 18
+  dashSpeed: 26
+  dashDuration: 0.16
+  dashEndSpeed: 9
   dashIFrameDuration: 0.15
+  dashAfterimages: 1
+  dashAfterimageTint: {r: 0.075694196, g: 0.15250611, b: 0.1981132, a: 0.55}
   ghostPrefab: {fileID: 8206942591932987561, guid: 9929fef1cd00017488413345ad5bb556, type: 3}
   adrenalineSpeedMult: 2
   ghostDelay: 0.05
@@ -257,19 +268,22 @@ MonoBehaviour:
   wallCheckDistance: 0.5
   wallSlideSpeed: 2
   wallJumpForce: {x: 10, y: 15}
-  moveSpeed: 5
-  defaultJumpForce: 10
+  moveSpeed: 8
+  useRunAnimation: 1
+  locomotionPose: 3
+  animCadenceScale: 0.16
+  minCadence: 0.7
+  maxCadence: 2.2
+  defaultJumpForce: 11
   maxShift: 40
   currentShift: 1
   cometSpeed: 25
   cometDamage: 40
   cometRadius: 5
-  cometImpactEffect: {fileID: 1148100095273426946, guid: 11fac573aa7824f4ab01e53fe6b2e880, type: 3}
-  cometShockwaveEffect: {fileID: 3610639634387760082, guid: 02caf5a9f88e25a46b92c7b33debfce1, type: 3}
-  cometVfxScale: 0.0299
   adrenalineDuration: 2.5
   slowMotionFactor: 0.4
   speedBoostMultiplier: 4
+  adrenalineAuraEffect: {fileID: 7401582936470158293, guid: c1f4a7d92b8e406c95a3d1e6f7b0c284, type: 3}
   currentState: 0
   fireballPrefab: {fileID: 6847861146471343392, guid: c410de68076b28846bb5e156129b8267, type: 3}
   firePoint: {fileID: 7525573285496672760}
@@ -281,6 +295,14 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 2048
   glassWailEffect: {fileID: 4801726395048172630, guid: e1d4b8a26f3c40579ab1c2d3e4f5a6b7, type: 3}
+  freefallBladeRange: 1.7
+  parryRiposteRange: 2.5
+  meteorMinFall: 4
+  meteorMaxFall: 14
+  meteorMinRadius: 2.5
+  meteorMaxRadius: 5.5
+  meteorMinDamage: 12
+  meteorMaxDamage: 55
   interactionRange: 2
   interactableLayer:
     serializedVersion: 2
@@ -292,6 +314,7 @@ MonoBehaviour:
   staggerRadius: 2
   staggerEffect: {fileID: 0}
   visualFlipYOffset: 1.6875
+  gravityAuraEffect: {fileID: 5910283746501928374, guid: d2a7e9c4b1f3406a8c5d2e1b3f4a6c70, type: 3}
   phaseVisuals:
   - {fileID: 9072995722623145862}
   - {fileID: 9072995722623145958}
@@ -481,7 +504,7 @@ AudioSource:
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 0}
-  m_PlayOnAwake: 1
+  m_PlayOnAwake: 0
   m_Volume: 1
   m_Pitch: 1
   Loop: 0
@@ -566,21 +589,6 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
---- !u!114 &7895736338733408254
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8334719470568814973}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fa14f4e81b467824fbbd79d045afe1ad, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  maxOffset: 3
-  lerpDuration: 0.3
-  peekKey: 306
 --- !u!114 &5062495975001351823
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -872,9 +880,17 @@ PrefabInstance:
     - {fileID: 3016187934527726210, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
     - {fileID: 726649114791577718, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
     - {fileID: 6370598690341371159, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
+    - {fileID: 2749707801620835149, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
+    - {fileID: 1901886589439229969, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
+    - {fileID: 7139425636342509463, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
+    - {fileID: 3451642063873560230, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
+    - {fileID: 63699593872861006, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 9111872853346976527, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7845517357466246489}
   m_SourcePrefab: {fileID: 100100000, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
 --- !u!137 &1045048363762776297 stripped
 SkinnedMeshRenderer:
@@ -891,6 +907,23 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5230306948048977582, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
   m_PrefabInstance: {fileID: 259556885127125483}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &9072995722617936612 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 9111872853346976527, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
+  m_PrefabInstance: {fileID: 259556885127125483}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &7845517357466246489
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9072995722617936612}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a12e1739791cae746982465a84ae1240, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!137 &9072995722623145856 stripped
 SkinnedMeshRenderer:
   m_CorrespondingSourceObject: {fileID: 9111872853352189547, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
