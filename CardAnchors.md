@@ -102,15 +102,26 @@ intended synergy, not a problem.
 Cainos `PF Zombie - A/B/C/D` are ART prefabs with Cainos' own AI — building a game enemy means a
 new prefab: zombie sprite/animator + the game's `EnemyHealth` + a game AI. **All three BUILT
 2026-07-16** (`Assets/YeniLeveller/`), capsule colliders baked in, importer markers live:
-- **Shambler** `z` — 12 HP, slow walk (0.45), contact damage 8 (MeleeEnemyAI). Core one-shot fodder,
+- **Shambler** `z` — 12 HP, contact damage 8 (MeleeEnemyAI). Core one-shot fodder,
   travels in packs. PF Zombie - A skin.
-- **Rotbrute** `Z` — 25 HP grunt, 1.15× bigger, slower walk (0.38) + heavier (mass 5), harder
+- **Rotbrute** `Z` — 25 HP grunt, 1.15× bigger + heavier (mass 5), harder
   contact hit (damage 14, cooldown 2.2, knockback 6, MeleeEnemyAI). PF Zombie - B skin.
-- **Spitter** `s` — 18 HP weak ranged. New **`ZombieSpitterAI`** (approach → stop at range 8 →
+- **Spitter** `s` — 18 HP weak ranged. **`ZombieSpitterAI`** (approach → stop at range 8 →
   spit on a 2.8s cadence): the zombie rig has no ranged animation, so the AI reuses the melee
   gesture and spawns the projectile itself on a 0.35s windup (mirrored-by-facing origin, no
-  firepoint child). Fires the existing turret bolt `Mermi.prefab` (8 dmg) — a **placeholder look**;
-  a green goo reskin is an easy follow-up. PF Zombie - C skin.
+  firepoint child). PF Zombie - C skin.
+  Fires **`SpitGlob.prefab`** (green acid glob, 8 dmg) — procedural goo visual (`SpitGlob.cs`,
+  runtime sprite + wobble + goo trail, no art), on the Projectile layer. Was the turret's red
+  `Mermi.prefab` (still the turret's); reskinned 2026-07-17.
+
+**Enemy move speeds (retuned 2026-07-17):** the AIs (MeleeEnemyAI / ZombieSpitterAI) leave
+`inputMoveModifier:false`, so effective speed = the `defaultMovement` mode's max. Current values
+(all **Walk** mode): **all three zombies 1.2** (Shambler/Rotbrute/Spitter, deliberately uniform),
+**MeleeEnemy 1.4** (buffed a hair above the zombies so it's the stronger threat), RangedEnemy 1.2.
+MeleeEnemy is a prefab **variant** sharing a base with RangedEnemy — its 1.4 is a variant override,
+so bumping it did NOT move RangedEnemy. (History: zombies were briefly set to Run mode at ~3.x,
+which felt too fast; walk 1.2 matches the melee baseline. Note the Cainos animator has no
+speed-scaled playback, only a walk/run blend, so pushing these much higher foot-slides.)
 
 **Reusable recipe (any Cainos monster → game enemy):** copy `PF <Monster>`, remove
 `MonsterInputMouseAndKeyboard`, add `EnemyHealth` (wire healthBar+damagePopup, stunSkinnedRenderers

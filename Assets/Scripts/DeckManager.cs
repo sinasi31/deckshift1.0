@@ -178,7 +178,8 @@ public class DeckManager : MonoBehaviour
             TryRecall();
         }
         // Her karede kontrol etmek yerine sadece oyun akarken bak
-        if (GameManager.instance.currentState == GameState.Playing)
+        // (null guard: a recompile during Play mode resets the singleton's static instance.)
+        if (GameManager.instance != null && GameManager.instance.currentState == GameState.Playing)
         {
             CheckForStaggerCondition();
         }
