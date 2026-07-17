@@ -1,0 +1,42 @@
+// GenLevel8 — "Foundry Climb" (46x24)  [reference feel: Celeste + Dead Cells]
+// A vertical smokestack. Enter BOTTOM-LEFT (S), climb the zig-zag shaft, exit
+// on the TOP rock deck (X). Spawn and exit sit ~24 tiles apart with the solid
+// deck slab (rows 5-6) walling the exit chamber off from the shaft below.
+//
+// MANDATORY ROUTE (jump + move only, every rise is exactly 4 — Celeste climb):
+//   bottom corridor (Shambler, spike hop, Rotbrute, Spitter) ->
+//   LEDGE A (right) -> LEDGE B (left) -> LEDGE C (left) -> up onto the DECK's
+//   left edge -> walk right across the elite deck (Rotbrute guard) -> X.
+//   Crystals hover over each ledge to reward the climb.
+// DEAD CELLS SECRETS (optional — cards gate ONLY loot, never the exit):
+//   - PHASE VAULT, bottom-right: walk to the dead-end and PHASE through the
+//     1-thick wall into the Chest room (Spitter guards the approach).
+//   - CRYSTAL CACHE, top-left ledge: an expert leap off LEDGE C, or Portal /
+//     Create Platform in from the deck (8-tile gap). Pure Shift payout.
+// TUNING: backwall by hand. No fan/elevator — this one is all platforming.
+
+!name: GenLevel8
+##############################################
+#............................................#
+#..+g........................................#
+#.###........................................#
+#.....................Z.....X.+..............#
+#............#####################...........#
+#............#####################...........#
+#............................................#
+#........+...................................#
+#.......####.................................#
+#............................................#
+#............................................#
+#..............g.............................#
+#.............####...........................#
+#............................................#
+#............................................#
+#.....................+......................#
+#...................####.................###.#
+#.......................................#...##
+#....................+..................#...##
+#....................+..................#...##
+#.S...z.^^.g.Z...s.................s....#gCg##
+##############################################
+##############################################
