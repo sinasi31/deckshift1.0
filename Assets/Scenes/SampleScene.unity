@@ -7326,9 +7326,12 @@ MonoBehaviour:
   currentRecallCost: 0
   player: {fileID: 8822436801064664179}
   startingDeck:
-  - {fileID: 11400000, guid: bd9944be4ce1de34686c1ca1291cd0a9, type: 2}
+  - {fileID: 11400000, guid: 4ed05ca2f31dc07448877e4390a4ee60, type: 2}
   - {fileID: 11400000, guid: 6176739808bedcc4e8bac1bfe479058a, type: 2}
   - {fileID: 11400000, guid: f1db857c51730034d88b552efac326b9, type: 2}
+  - {fileID: 11400000, guid: 5a5a5f031de93eb47aa35dc69d7c61e0, type: 2}
+  - {fileID: 11400000, guid: 2b6b5dacabc9303428fb6c97dad09625, type: 2}
+  - {fileID: 11400000, guid: 523cee4ce9c65d749ba3e978c44ae531, type: 2}
   staggerCardData: {fileID: 11400000, guid: 05d4bd0adf108bd46b120738ac1c1c36, type: 2}
   handCapacity: 3
 --- !u!4 &1329495661

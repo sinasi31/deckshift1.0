@@ -11,9 +11,9 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 71417128076b2fb429c3677f2e47bf2d, type: 3}
   m_Name: OverclockedRecall
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   relicID: OverclockedRecall
-  relicName: Pay in Blood
+  relicName: Offering
   description: Recall costs no Shift, but each Recall deals 5 damage to you.
   relicArt: {fileID: 0}
   rarity: 2
