@@ -62,7 +62,7 @@ The card's total effect — damage + heal-value + condition-value — should lan
 | Card | Budget calc | Effect | Verdict |
 |---|---|---|---|
 | **Fireball** | 15 ×1.0 ×1.0 ×1.0 = **15** | 15 dmg | on the nose ✓ |
-| **Vampiric Bite** | 15 ×1.1(5) ×1.3(melee) = **21** +1 Shift | 20 dmg + 10 heal | slightly hot (fan favourite — leave, or trim heal to 8) |
+| **Vampiric Bite** | 15 ×1.1(5) ×1.3(melee) = **21** +1 Shift | 20 dmg + 10 heal | slightly hot (fan favourite — leave, or trim heal to 8). NOTE 2026-07-17: bite is now a **regular circle around the body** (`PlayerController.BiteCenter`), no longer offset to the wand — symmetric reach front/back, ~0.5u less forward. |
 | **Comet Dive** | 15 ×1.25(4) ×1.8(AoE) = **34** | 40 AoE, needs airborne setup | fits (setup = discount) ✓ |
 
 **Fixes it flagged for our 3 new cards — APPLIED 2026-07-16:**
@@ -70,6 +70,9 @@ The card's total effect — damage + heal-value + condition-value — should lan
   → **DONE: actionValue 12→15** (15 grounded / **30 falling**, on budget). Kept 1 Shift as the small
   premium. Open feel-test: if the Shift cost fights the momentum "flow," drop it to 0 (the doc's
   alternative) — that's a playtest call, not a balance one.
+  → **BIGGER falling arc (2026-07-17):** while falling the swing radius is now ×`freefallBladeFallingRangeMul`
+  (default **1.4**, PlayerController field) on top of the 2× damage, and the slash VFX scales to match —
+  the empowered slash both hits a wider area and looks meaner. Grounded arc unchanged.
 - **Dead Weight** — +3 Shift was **weak** (3 of 40) for the cost of a whole hand slot all room.
   → **DONE: actionValue 3→8** (+8 Shift held-to-room-end). Picked the floor of the +8–10 range
   because Dead Weight is a *Basic* — modest-but-real, easy to bump to +10 if it feels flat in play.

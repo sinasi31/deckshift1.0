@@ -115,6 +115,8 @@ public class PlayerController : MonoBehaviour
     public GameObject portalPrefab;
     public float portalMaxRange = 10f;
     private Portal firstPortalInstance;
+    // Read-only view for CardAimIndicator's portal ghost (first vs second placement preview).
+    internal Portal FirstPortalInstance => firstPortalInstance;
 
     [Header("Wall Settings")]
     public Transform wallCheck;
@@ -210,9 +212,24 @@ public class PlayerController : MonoBehaviour
     [SerializeField] internal float fireballCastDelay = 0.12f;
     public float biteRange = 1.5f;
     public float biteHealAmount = 10f;
+    // Vampiric Bite is a regular circle around the BODY center (designer 2026-07-17) — it used
+    // to be centered on the wand-side firePoint, which read as lopsided. Derived from the
+    // capsule's serialized offset so it's valid in both play mode and editor gizmos.
+    private CapsuleCollider2D bodyCapsule;
+    internal Vector2 BiteCenter
+    {
+        get
+        {
+            if (bodyCapsule == null) bodyCapsule = GetComponent<CapsuleCollider2D>();
+            return bodyCapsule != null
+                ? (Vector2)transform.position + bodyCapsule.offset
+                : (Vector2)transform.position;
+        }
+    }
     public LayerMask enemyLayer;
     public GameObject glassWailEffect;   // Glass Wail shockwave VFX (world-space ShockwaveVFX prefab; size set on the prefab)
     public float freefallBladeRange = 1.7f;   // radius of the ")" arc slash (front + below)
+    public float freefallBladeFallingRangeMul = 1.4f;   // falling slash swings BIGGER (designer 2026-07-17)
     public float parryRiposteRange = 2.5f;    // shard burst radius on a successful Glass Parry
 
     [Header("Meteor Greaves (relic)")]
@@ -855,11 +872,8 @@ public class PlayerController : MonoBehaviour
             Gizmos.color = Color.blue;
             Gizmos.DrawLine(wallCheck.position, wallCheck.position + (Vector3.right * (isFacingRight ? 1f : -1f) * wallCheckDistance));
         }
-        if (firePoint != null)
-        {
-            Gizmos.color = Color.red;
-            Gizmos.DrawWireSphere(firePoint.position, biteRange);
-        }
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(BiteCenter, biteRange);
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, cometRadius);
     }
@@ -1005,7 +1019,8 @@ public class PlayerController : MonoBehaviour
     {
         // ~0 = all layers: avoids the AeroBat/MeleeEnemy Default-layer miss from enemyLayer mask.
         // GetComponentInParent finds EnemyHealth even when the collider is on a child.
-        Collider2D[] hits = Physics2D.OverlapCircleAll(firePoint.position, biteRange, ~0);
+        // Centered on the body (BiteCenter), not the wand — a regular circle around the player.
+        Collider2D[] hits = Physics2D.OverlapCircleAll(BiteCenter, biteRange, ~0);
         foreach (Collider2D hit in hits)
         {
             IDamageable targetHealth = hit.GetComponentInParent<IDamageable>();
@@ -1104,22 +1119,24 @@ public class PlayerController : MonoBehaviour
     }
 
     // Freefall Blade: a ")" arc slash — out in front and wrapping down below the feet.
-    // Playable grounded or airborne, but hits for DOUBLE damage while actually falling
-    // (Momentum: the fall you already paid for becomes a weapon). Always plays, even
+    // Playable grounded or airborne, but while actually falling it hits for DOUBLE damage
+    // AND swings a BIGGER arc (freefallBladeFallingRangeMul, designer 2026-07-17) —
+    // Momentum: the fall you already paid for becomes a weapon. Always plays, even
     // into empty air (designer 2026-07-15) — the swing itself costs the charge.
     internal bool PerformFreefallBlade(float damageAmount)
     {
         bool falling = !isGrounded && rb.linearVelocity.y < -0.01f;
         float damage = falling ? damageAmount * 2f : damageAmount;
+        float range = falling ? freefallBladeRange * freefallBladeFallingRangeMul : freefallBladeRange;
         float facing = isFacingRight ? 1f : -1f;
 
         // One circle seated forward-and-low covers the bracket: its top edge reaches
         // chest height in front, its bottom wraps under the feet.
         Vector2 center = (Vector2)transform.position
-                       + new Vector2(facing * freefallBladeRange * 0.55f, -freefallBladeRange * 0.35f);
+                       + new Vector2(facing * range * 0.55f, -range * 0.35f);
 
         HashSet<IDamageable> struck = new HashSet<IDamageable>();
-        foreach (Collider2D hit in Physics2D.OverlapCircleAll(center, freefallBladeRange, ~0))
+        foreach (Collider2D hit in Physics2D.OverlapCircleAll(center, range, ~0))
         {
             IDamageable target = hit.GetComponentInParent<IDamageable>();
             if (target == null || struck.Contains(target)) continue;
@@ -1132,7 +1149,7 @@ public class PlayerController : MonoBehaviour
         }
 
         SfxManager.PlayOn(audioSource, freefallBladeSound);
-        FreefallBladeVFX.Spawn(transform.position, isFacingRight, falling, freefallBladeRange);
+        FreefallBladeVFX.Spawn(transform.position, isFacingRight, falling, range);
         if (struck.Count > 0 && CameraShake.instance != null)
             CameraShake.instance.Shake(falling ? 0.15f : 0.08f, falling ? 0.35f : 0.2f);
 
