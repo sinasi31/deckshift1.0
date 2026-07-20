@@ -1,0 +1,42 @@
+// GenLevel7 — "Rust Gauntlet" (56x22)
+// Oxidation District combat corridor. Enter BOTTOM-LEFT (S), exit TOP-MID
+// on the elevated deck (X). Two chambers split by a 3-thick rock divider so
+// no Phase/Portal can shortcut the ~48-tile gap between spawn and exit.
+//
+// MANDATORY ROUTE (jump + move only, every rise is 4):
+//   ground chamber A (fight Shambler + Rotbrute, hop the spike patch) ->
+//   LEDGE1 (Spitter perch, grab crystal) -> LEDGE2 -> through the rock
+//   PASSAGE at deck height -> deck walkway rightward, clear two 3-tile gaps
+//   (Shambler, Spitter, bat overhead, Rotbrute guarding the door) -> X.
+//   If you fall to chamber-B ground, climb LEDGE P (under the first gap) back
+//   up — the deck is always re-reachable.
+// CARD-GATED EXTRAS (allowed to be jump-impossible — gate ONLY loot):
+//   - HIGH VAULT A, top-left ledge (rise 10 from LEDGE1): Chest + gold.
+//     Create Platform / Portal territory.
+//   - HIGH VAULT B, above the deck (rise 8 from the walkway): Chest + gold,
+//     guarded by the circling bat. Portal / Create Platform.
+// TUNING: backwall by hand. No elevator/fan needed — pure platforming.
+
+!name: GenLevel7
+########################################################
+#........................###...........................#
+#........................###...........................#
+#........................###.............gCg...........#
+#........................###.............###...........#
+#....Cg..................###...........................#
+#...####.................###...........................#
+#........................###...........................#
+#........................###........b..................#
+#......................................................#
+#......................................................#
+#.....................g.......+z.......s.....g.Z.X.+...#
+#....................#############...#######...#######.#
+#........................###...........................#
+#........................###...........................#
+#.................s+.....###...........................#
+#................####.....###......###.................#
+#........................###...........................#
+#........................###...........................#
+#.S.....z.^^...Z........###.....g......................#
+########################################################
+########################################################
