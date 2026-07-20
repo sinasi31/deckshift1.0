@@ -723,6 +723,8 @@ public class PlayerController : MonoBehaviour
         {
             if (audioSource != null && jumpSound != null)
             {
+                // Live sound is back to the original clip while the procedural "shift" SFX is
+                // paused (designer hunting the vibe). Re-wire to ProcSfx.Jump to resume the test.
                 audioSource.pitch = Random.Range(0.95f, 1.05f);
                 SfxManager.PlayOn(audioSource, jumpSound);
                 audioSource.pitch = 1f;
