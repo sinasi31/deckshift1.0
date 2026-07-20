@@ -5,9 +5,9 @@ public class Portal : MonoBehaviour
     public Portal linkedPortal;
     public SpriteRenderer spriteRenderer;
 
-    [Header("Görsel Efektler")]
+    [Header("Gï¿½rsel Efektler")]
     public GameObject rangeIndicator;
-    [Tooltip("Eðer daire küçük kalýyorsa bu sayýyý artýr (örn: 1.1 veya 1.2)")]
+    [Tooltip("Eï¿½er daire kï¿½ï¿½ï¿½k kalï¿½yorsa bu sayï¿½yï¿½ artï¿½r (ï¿½rn: 1.1 veya 1.2)")]
     public float visualSizeMultiplier = 1.0f;
     // ---------------------------------------
 
@@ -15,30 +15,34 @@ public class Portal : MonoBehaviour
     {
         if (linkedPortal == null) return;
 
-        // Teleportable (Iþýnlanabilir) kontrolü
+        // Teleportable (Iï¿½ï¿½nlanabilir) kontrolï¿½
         Teleportable traveller = other.GetComponent<Teleportable>();
         if (traveller != null)
         {
             traveller.TeleportTo(linkedPortal.transform.position);
         }
     }
+    // The range border is now a procedural rotating dashed ring (PortalRangeRing) built at the
+    // EXACT gameplay radius â€” the old flat rangeIndicator sprite is kept assigned on the prefab
+    // for compatibility but stays hidden.
+    private PortalRangeRing rangeRing;
+
     public void ShowRangeCircle(float range)
     {
-        if (rangeIndicator != null)
-        {
-            rangeIndicator.SetActive(true);
+        if (rangeIndicator != null) rangeIndicator.SetActive(false);   // superseded by the animated ring
 
-            float finalSize = range * 2f * visualSizeMultiplier;
-
-            rangeIndicator.transform.localScale = new Vector3(finalSize, finalSize, 1);
-        }
+        if (rangeRing == null)
+            rangeRing = PortalRangeRing.Spawn(transform, range);
     }
 
     public void HideRangeCircle()
     {
-        if (rangeIndicator != null)
+        if (rangeIndicator != null) rangeIndicator.SetActive(false);
+
+        if (rangeRing != null)
         {
-            rangeIndicator.SetActive(false);
+            Destroy(rangeRing.gameObject);
+            rangeRing = null;
         }
     }
 

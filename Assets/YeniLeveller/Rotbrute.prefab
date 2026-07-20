@@ -48,8 +48,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9417f4774a985e84aa085a73471db9fe, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   renderers:
   - {fileID: 503869603664537011}
   animator: {fileID: 503869603668777841}
@@ -70,10 +70,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4497db7d25354634983039c0b64cdaf8, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   defaultMovement: 0
-  walkSpeedMax: 0.38
+  walkSpeedMax: 1.2
   walkAcc: 10
   runSpeedMax: 1.8
   runAcc: 10
@@ -168,9 +168,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4813e138349d3bd47bc9e51b493d345a, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   maxHealth: 25
+  playerHasStruck: 0
   canBeHeadBounced: 1
   healthBarPrefab: {fileID: 5647382910293847562, guid: 7a3f9b4c1d8e2f6b5c3d7e9f4a1b2c3d, type: 3}
   headBarOffset: {x: 0, y: 2.3}
@@ -188,8 +189,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: facc39d94e9e8054e9b5fb215579a41a, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   aggroRange: 7
   attackRange: 1.4
   attackCooldown: 2.2
@@ -261,15 +262,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9500000, guid: 1c2d7922cbb86ba4c8b2322a6e04cc37, type: 3}
       propertyPath: m_Controller
-      value:
+      value: 
       objectReference: {fileID: 9100000, guid: 8623cfd670f20bf47b2278eb91c1483a, type: 2}
     - target: {fileID: 13700000, guid: 1c2d7922cbb86ba4c8b2322a6e04cc37, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
-      value:
+      value: 
       objectReference: {fileID: 2100000, guid: a0b7f0aab04a16d4db61ab67f891fec8, type: 2}
     - target: {fileID: 13700002, guid: 1c2d7922cbb86ba4c8b2322a6e04cc37, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
-      value:
+      value: 
       objectReference: {fileID: 2100000, guid: a0b7f0aab04a16d4db61ab67f891fec8, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -294,8 +295,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: df24e6268e38ccd4ea11123551ddd708, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   onFootstep:
     m_PersistentCalls:
       m_Calls: []

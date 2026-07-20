@@ -56,6 +56,10 @@ PrefabInstance:
       propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5536704174068243463, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
+      propertyPath: walkSpeedMax
+      value: 1.4
+      objectReference: {fileID: 0}
     - target: {fileID: 6418267430543814824, guid: 38fd06fc9c7e4184da8dc95926a785d6, type: 3}
       propertyPath: m_Name
       value: MeleeEnemy
@@ -238,6 +242,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealth: 40
+  playerHasStruck: 0
   canBeHeadBounced: 1
   healthBarPrefab: {fileID: 5647382910293847562, guid: 7a3f9b4c1d8e2f6b5c3d7e9f4a1b2c3d, type: 3}
   headBarOffset: {x: 0, y: 2.2}

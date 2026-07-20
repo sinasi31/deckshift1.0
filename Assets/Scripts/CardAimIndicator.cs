@@ -1,0 +1,831 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+// House-style aim/targeting indicator (no prefab, no art — self-building, same pattern as
+// DashAfterimage / EnemyHealthBar). Watches DeckManager's selected card each frame and shows
+// an honest preview of what the card will actually do when cast:
+//
+//   Fireball      -> ember dots flowing along the TRUE flight line (capsule-cast with the real
+//                    fireball collider, so short targets register) + a pulsing impact ring.
+//                    Ring runs hot red when the impact would be an enemy, orange for walls.
+//   Dash          -> afterimage trail: frozen silhouettes fading in along the dash path,
+//                    strongest at the TRUE end point (dashSpeed * dashDuration, wall-clamped
+//                    with the player capsule) — the look the real dash leaves, in advance.
+//   VampiricBite  -> aura ring at the real bite radius around the BODY center; green when an
+//                    enemy is inside (the play lands), dim red when it would be refused.
+//   Portal        -> ghost portal following the cursor from the moment the card is selected;
+//                    while the second placement is pending it tints by in-range validity.
+//   PlatformCreate-> ghost of the platform prefab (true art, true size) following the cursor.
+//   FreefallBlade -> the real ")" slash circle (forward-and-low); grows while falling
+//                    (bigger empowered arc) and turns green when an enemy is inside.
+//   GlassWail     -> expanding ripples from the player + a glint over every enemy that
+//                    would be stunned (the wail is screen-wide).
+//
+// Every indicator dims when the player can't afford the card's EFFECTIVE Shift cost (mirrors
+// DeckManager.PlayCard: KineticDiscount and First One's Free included). Hidden while paused,
+// dead, or when a non-indicator card (or nothing) is selected.
+//
+// Lives on the Player prefab root. All visuals are children of this transform (root scale is
+// a hard (1,1,1) so world-space positioning is safe).
+public class CardAimIndicator : MonoBehaviour
+{
+    [Header("Common")]
+    [SerializeField] private int sortingOrder = 40;                 // above ground tiles (order 1), below UI
+    [Range(0.05f, 1f)]
+    [SerializeField] private float unaffordableDim = 0.3f;          // alpha multiplier when Shift can't pay the card
+
+    [Header("Fireball")]
+    [SerializeField] private int emberCount = 10;
+    [SerializeField] private float emberFlowSpeed = 7f;             // world units per second along the line
+    [SerializeField] private float emberSize = 0.14f;
+    [SerializeField] private Color emberColor = new Color(1f, 0.62f, 0.18f, 0.9f);
+    [SerializeField] private float impactRingSize = 0.55f;
+    [SerializeField] private Color impactWallColor = new Color(1f, 0.55f, 0.15f, 0.8f);
+    [SerializeField] private Color impactEnemyColor = new Color(1f, 0.2f, 0.1f, 0.95f);
+
+    [Header("Dash")]
+    [SerializeField] private int dashTrailSteps = 4;                // silhouettes along the path (last = destination)
+
+    [Header("Vampiric Bite")]
+    [SerializeField] private Color biteValidColor = new Color(0.35f, 1f, 0.45f, 0.85f);
+    [SerializeField] private Color biteInvalidColor = new Color(1f, 0.25f, 0.25f, 0.4f);
+    [SerializeField] private float biteRingWidth = 0.05f;
+
+    [Header("Portal")]
+    [SerializeField] private Color portalFirstColor = new Color(0.85f, 0.85f, 0.85f, 0.6f);
+    [SerializeField] private Color portalValidColor = new Color(0.3f, 0.95f, 1f, 0.65f);
+    [SerializeField] private Color portalInvalidColor = new Color(1f, 0.25f, 0.25f, 0.6f);
+
+    [Header("Platform Create")]
+    [SerializeField] private Color platformGhostColor = new Color(1f, 1f, 1f, 0.45f);
+
+    [Header("Freefall Blade")]
+    [SerializeField] private Color freefallNeutralColor = new Color(0.8f, 0.9f, 1f, 0.55f);
+    [SerializeField] private Color freefallFallingColor = new Color(1f, 0.55f, 0.15f, 0.85f);  // empowered: 2x dmg + bigger arc
+    [SerializeField] private Color freefallHitColor = new Color(0.35f, 1f, 0.45f, 0.85f);      // an enemy is inside the arc
+    [SerializeField] private float freefallRingWidth = 0.05f;
+
+    [Header("Glass Wail")]
+    [SerializeField] private Color wailColor = new Color(0.75f, 0.95f, 1f, 0.6f);
+    [SerializeField] private float wailRippleMaxRadius = 6f;
+    [SerializeField] private float wailRipplePeriod = 1.1f;
+
+    private enum Kind { None, Fireball, Dash, Bite, Portal, Platform, Freefall, Wail }
+    private Kind activeKind = Kind.None;
+
+    // All layers, triggers included — same as the game code's OverlapCircleAll(..., ~0).
+    private static readonly ContactFilter2D NoFilter = new ContactFilter2D().NoFilter();
+
+    private PlayerController player;
+    private PlayerHealth playerHealth;
+    private CapsuleCollider2D playerCapsule;
+    private Camera cam;                                             // cached: Camera.main is slow and can be null
+
+    // --- Fireball visuals + cached prefab facts ---
+    private GameObject fireballRoot;
+    private SpriteRenderer[] embers;
+    private SpriteRenderer impactRing;
+    private bool fireballParamsCached;
+    private float fbMaxRange = 30f;
+    private Vector2 fbCapsuleSize = new Vector2(0.3f, 1f);
+    private Vector2 fbCapsuleOffset;
+    private CapsuleDirection2D fbCapsuleDir = CapsuleDirection2D.Vertical;
+    private readonly RaycastHit2D[] castHits = new RaycastHit2D[16];
+
+    // --- Dash visuals ---
+    // The Cainos pixel character body is SkinnedMeshRenderers (16 parts: Body, Hair, Hat...);
+    // only the staff is a SpriteRenderer. Skinned parts are baked (BakeMesh) once per frame
+    // into shared meshes; each trail step renders them via MeshRenderer ghost copies.
+    private GameObject dashRoot;
+    private readonly List<Renderer> ghostSources = new List<Renderer>();       // SpriteRenderer or SkinnedMeshRenderer
+    private readonly List<Mesh> sourceBakes = new List<Mesh>();                // parallel; null for sprite sources
+    private readonly List<Renderer[]> trailSteps = new List<Renderer[]>();     // [step][srcIndex] ghost copies
+    private readonly List<Material[]> trailStepMats = new List<Material[]>();  // parallel; null for sprite ghosts
+
+    // --- Bite visuals ---
+    private GameObject biteRoot;
+    private LineRenderer biteRing;
+    private SpriteRenderer biteFill;
+    private const int BITE_SEGMENTS = 48;
+    private float biteScanTimer;
+    private bool biteValid;
+    private readonly Collider2D[] overlapHits = new Collider2D[16];
+
+    // --- Portal visuals ---
+    private GameObject portalRoot;
+    private SpriteRenderer portalGhost;
+
+    // --- Platform visuals ---
+    private GameObject platformRoot;
+    private readonly List<SpriteRenderer> platformGhostParts = new List<SpriteRenderer>();
+
+    // --- Freefall Blade visuals ---
+    private GameObject freefallRoot;
+    private LineRenderer freefallRing;
+    private SpriteRenderer freefallFill;
+    private float freefallScanTimer;
+    private bool freefallHit;
+
+    // --- Glass Wail visuals ---
+    private GameObject wailRoot;
+    private SpriteRenderer[] wailRipples;
+    private readonly List<SpriteRenderer> wailGlints = new List<SpriteRenderer>();
+    private EnemyHealth[] wailTargets;
+    private float wailScanTimer;
+
+    // --- Shared procedural resources (built once, survive across instances) ---
+    private static Sprite cachedDotSprite;
+    private static Sprite cachedRingSprite;
+    private static Material cachedLineMaterial;
+
+    private void Awake()
+    {
+        player = GetComponent<PlayerController>();
+        playerHealth = GetComponent<PlayerHealth>();
+        playerCapsule = GetComponent<CapsuleCollider2D>();
+        cam = Camera.main;
+    }
+
+    private void LateUpdate()
+    {
+        DeckManager deck = DeckManager.instance;
+        if (deck == null || player == null) { SetKind(Kind.None); return; }
+        if (Time.timeScale == 0f) { SetKind(Kind.None); return; }                       // paused / full-screen UI open
+        if (playerHealth != null && playerHealth.IsDead) { SetKind(Kind.None); return; }
+
+        int idx = deck.GetSelectedIndex();
+        List<RuntimeCard> hand = deck.GetCurrentHand();
+        if (idx < 0 || idx >= hand.Count) { SetKind(Kind.None); return; }
+
+        RuntimeCard card = hand[idx];
+        float dim = CanAfford(deck, card) ? 1f : unaffordableDim;
+
+        switch (card.cardData.actionType)
+        {
+            case CardActionType.Fireball:       SetKind(Kind.Fireball); UpdateFireball(dim); break;
+            case CardActionType.Dash:           SetKind(Kind.Dash);     UpdateDash(dim);     break;
+            case CardActionType.VampiricBite:   SetKind(Kind.Bite);     UpdateBite(dim);     break;
+            case CardActionType.Portal:         SetKind(Kind.Portal);   UpdatePortal(dim);   break;
+            case CardActionType.PlatformCreate: SetKind(Kind.Platform); UpdatePlatform(dim); break;
+            case CardActionType.FreefallBlade:  SetKind(Kind.Freefall); UpdateFreefall(dim); break;
+            case CardActionType.GlassWail:      SetKind(Kind.Wail);     UpdateWail(dim);     break;
+            default:                            SetKind(Kind.None);                          break;
+        }
+    }
+
+    // Mirrors DeckManager.PlayCard's affordability gate exactly (KineticDiscount, First One's
+    // Free). Note the gate applies even in the hub — only the SPEND is hub-exempt.
+    private bool CanAfford(DeckManager deck, RuntimeCard card)
+    {
+        int cost = card.cardData.shiftCost;
+        if (SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.KineticDiscount))
+            cost = Mathf.Max(0, cost - 1);
+        if (deck.isNextCardFree) cost = 0;
+        return player.GetCurrentShift() >= cost;
+    }
+
+    // Activates the container for `kind`, hides all others. Containers are built lazily.
+    private void SetKind(Kind kind)
+    {
+        if (activeKind == kind) return;
+        activeKind = kind;
+
+        if (fireballRoot != null) fireballRoot.SetActive(kind == Kind.Fireball);
+        if (dashRoot != null) dashRoot.SetActive(kind == Kind.Dash);
+        if (biteRoot != null) biteRoot.SetActive(kind == Kind.Bite);
+        if (portalRoot != null) portalRoot.SetActive(kind == Kind.Portal);
+        if (platformRoot != null) platformRoot.SetActive(kind == Kind.Platform);
+        if (freefallRoot != null) freefallRoot.SetActive(kind == Kind.Freefall);
+        if (wailRoot != null) wailRoot.SetActive(kind == Kind.Wail);
+
+        switch (kind)
+        {
+            case Kind.Fireball: EnsureFireballVisuals(); fireballRoot.SetActive(true); break;
+            case Kind.Dash:     EnsureDashVisuals();     RebuildDashTrail(); dashRoot.SetActive(true); break;
+            case Kind.Bite:     EnsureBiteVisuals();     biteScanTimer = 0f; biteRoot.SetActive(true); break;
+            case Kind.Portal:   EnsurePortalVisuals();   if (portalRoot != null) portalRoot.SetActive(true); break;
+            case Kind.Platform: EnsurePlatformVisuals(); if (platformRoot != null) platformRoot.SetActive(true); break;
+            case Kind.Freefall: EnsureFreefallVisuals(); freefallScanTimer = 0f; freefallRoot.SetActive(true); break;
+            case Kind.Wail:     EnsureWailVisuals();     wailScanTimer = 0f; wailRoot.SetActive(true); break;
+        }
+    }
+
+    // ------------------------------------------------------------------ FIREBALL
+
+    private void EnsureFireballVisuals()
+    {
+        if (fireballRoot != null) return;
+
+        fireballRoot = MakeContainer("Aim_Fireball");
+
+        embers = new SpriteRenderer[Mathf.Max(2, emberCount)];
+        for (int i = 0; i < embers.Length; i++)
+        {
+            embers[i] = MakeSpriteChild(fireballRoot.transform, "Ember" + i, GetDotSprite(), sortingOrder);
+            embers[i].transform.localScale = Vector3.one * emberSize;
+        }
+
+        impactRing = MakeSpriteChild(fireballRoot.transform, "ImpactRing", GetRingSprite(), sortingOrder + 1);
+    }
+
+    // The real flight facts live on the Fireball prefab; read them once.
+    private void CacheFireballParams()
+    {
+        if (fireballParamsCached || player.fireballPrefab == null) return;
+        fireballParamsCached = true;
+
+        Fireball fb = player.fireballPrefab.GetComponent<Fireball>();
+        if (fb != null) fbMaxRange = fb.speed * fb.lifeTime;
+
+        CapsuleCollider2D col = player.fireballPrefab.GetComponent<CapsuleCollider2D>();
+        if (col != null)
+        {
+            fbCapsuleSize = col.size;
+            fbCapsuleOffset = col.offset;
+            fbCapsuleDir = col.direction;
+        }
+    }
+
+    private void UpdateFireball(float dim)
+    {
+        if (player.fireballPrefab == null || player.firePoint == null) { fireballRoot.SetActive(false); return; }
+        if (!fireballRoot.activeSelf) fireballRoot.SetActive(true);
+        CacheFireballParams();
+
+        float dir = player.isFacingRight ? 1f : -1f;
+        Vector2 start = player.firePoint.position;
+
+        // Cast the true fireball capsule (yaw-180 flip mirrors the collider offset's X).
+        Vector2 origin = start + new Vector2(fbCapsuleOffset.x * dir, fbCapsuleOffset.y);
+        int hitCount = Physics2D.CapsuleCast(origin, fbCapsuleSize, fbCapsuleDir, 0f,
+            new Vector2(dir, 0f), NoFilter, castHits, fbMaxRange);
+
+        // Mirror Fireball.OnTriggerEnter2D's rules: skip own body and portals; damageables stop
+        // it (even triggers); other triggers pass through; anything solid left is a wall.
+        bool found = false;
+        bool enemyHit = false;
+        Vector2 end = start + new Vector2(dir * fbMaxRange, 0f);
+        for (int i = 0; i < hitCount; i++)
+        {
+            Collider2D col = castHits[i].collider;
+            if (col.GetComponentInParent<PlayerController>() != null) continue;
+            if (col.GetComponent<Portal>() != null) continue;
+            IDamageable dmg = col.GetComponentInParent<IDamageable>();
+            if (dmg == null && col.isTrigger) continue;
+
+            found = true;
+            enemyHit = dmg != null;
+            end = castHits[i].point;
+            break;
+        }
+
+        // Ember dots drifting from wand to impact at a constant world speed.
+        float len = Mathf.Max(Vector2.Distance(start, end), 0.01f);
+        float cyclesPerSecond = emberFlowSpeed / len;
+        for (int i = 0; i < embers.Length; i++)
+        {
+            float phase = Mathf.Repeat(Time.unscaledTime * cyclesPerSecond + (float)i / embers.Length, 1f);
+            Vector2 p = Vector2.Lerp(start, end, phase);
+            embers[i].transform.position = new Vector3(p.x, p.y, 0f);
+
+            Color c = emberColor;
+            c.a *= (0.2f + 0.8f * Mathf.Sin(phase * Mathf.PI)) * dim;   // fade in from the wand, out at impact
+            embers[i].color = c;
+        }
+
+        // Pulsing impact ring; hot red = the shot would land on an enemy.
+        impactRing.enabled = found;
+        if (found)
+        {
+            float t = Time.unscaledTime;
+            impactRing.transform.position = new Vector3(end.x, end.y, 0f);
+            impactRing.transform.localScale = Vector3.one * (impactRingSize * (1f + 0.15f * Mathf.Sin(t * 7f)));
+
+            Color rc = enemyHit ? impactEnemyColor : impactWallColor;
+            rc.a *= (0.75f + 0.25f * Mathf.Sin(t * 7f)) * dim;
+            impactRing.color = rc;
+        }
+    }
+
+    // ------------------------------------------------------------------ DASH
+
+    private void EnsureDashVisuals()
+    {
+        if (dashRoot != null) return;
+        dashRoot = MakeContainer("Aim_Dash");
+    }
+
+    // Builds `dashTrailSteps` silhouette sets — one ghost copy of every visual-model renderer
+    // per step. Poses are refreshed every frame in UpdateDash; the alpha ramp along the path
+    // makes them read as a motion streak (the dash's own afterimage look), not a twin.
+    private void RebuildDashTrail()
+    {
+        ReleaseDashTrail();
+        for (int i = dashRoot.transform.childCount - 1; i >= 0; i--)
+            Destroy(dashRoot.transform.GetChild(i).gameObject);
+
+        if (player.visualModel == null) return;
+
+        // Collect sources: skinned body parts + plain sprites (the staff). Particles skipped.
+        foreach (Renderer r in player.visualModel.GetComponentsInChildren<Renderer>(true))
+        {
+            if (r is SkinnedMeshRenderer)
+            {
+                ghostSources.Add(r);
+                sourceBakes.Add(new Mesh());
+            }
+            else if (r is SpriteRenderer)
+            {
+                ghostSources.Add(r);
+                sourceBakes.Add(null);
+            }
+        }
+
+        int steps = Mathf.Max(2, dashTrailSteps);
+        for (int s = 0; s < steps; s++)
+        {
+            var stepRoot = new GameObject("Trail" + s);
+            stepRoot.transform.SetParent(dashRoot.transform, false);
+
+            var copies = new Renderer[ghostSources.Count];
+            var mats = new Material[ghostSources.Count];
+            for (int i = 0; i < ghostSources.Count; i++)
+            {
+                var go = new GameObject(ghostSources[i].name + "_aimGhost");
+                go.transform.SetParent(stepRoot.transform, false);
+
+                if (ghostSources[i] is SkinnedMeshRenderer smr)
+                {
+                    // Mesh ghost: all steps share the per-frame bake; each step owns a
+                    // Sprites/Default material carrying the part's texture + step alpha.
+                    var mf = go.AddComponent<MeshFilter>();
+                    mf.sharedMesh = sourceBakes[i];
+
+                    var mat = new Material(GetLineMaterial().shader);
+                    if (smr.sharedMaterial != null) mat.mainTexture = smr.sharedMaterial.mainTexture;
+                    mats[i] = mat;
+
+                    var mr = go.AddComponent<MeshRenderer>();
+                    mr.sharedMaterial = mat;
+                    mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    mr.receiveShadows = false;
+                    mr.sortingLayerID = smr.sortingLayerID;
+                    mr.sortingOrder = smr.sortingOrder - 1;   // just behind the real character
+                    copies[i] = mr;
+                }
+                else
+                {
+                    var sr = go.AddComponent<SpriteRenderer>();
+                    sr.sortingLayerID = ghostSources[i].sortingLayerID;
+                    sr.sortingOrder = ghostSources[i].sortingOrder - 1;
+                    copies[i] = sr;
+                }
+            }
+            trailSteps.Add(copies);
+            trailStepMats.Add(mats);
+        }
+    }
+
+    // Baked meshes and ghost materials are runtime-created assets — destroy them explicitly.
+    private void ReleaseDashTrail()
+    {
+        foreach (Mesh m in sourceBakes) if (m != null) Destroy(m);
+        foreach (Material[] mats in trailStepMats)
+            foreach (Material m in mats) if (m != null) Destroy(m);
+        ghostSources.Clear();
+        sourceBakes.Clear();
+        trailSteps.Clear();
+        trailStepMats.Clear();
+    }
+
+    private void OnDestroy()
+    {
+        ReleaseDashTrail();
+    }
+
+    private void UpdateDash(float dim)
+    {
+        float dir = player.isFacingRight ? 1f : -1f;
+        float dist = player.dashSpeed * player.dashDuration;
+
+        // Wall-clamp with the player's own capsule so the trail never previews standing in rock.
+        if (playerCapsule != null)
+        {
+            var filter = new ContactFilter2D { useTriggers = false };
+            filter.SetLayerMask(player.groundLayer);
+            int n = playerCapsule.Cast(new Vector2(dir, 0f), filter, castHits, dist);
+            for (int i = 0; i < n; i++)
+                dist = Mathf.Min(dist, Mathf.Max(0f, castHits[i].distance - 0.02f));
+        }
+
+        // Bake each visible skinned part once; all trail steps share the result.
+        for (int i = 0; i < ghostSources.Count; i++)
+        {
+            if (ghostSources[i] is SkinnedMeshRenderer smr && sourceBakes[i] != null
+                && smr.enabled && smr.gameObject.activeInHierarchy)
+                smr.BakeMesh(sourceBakes[i], true);   // includes transform scale (carries the facing flip)
+        }
+
+        // Silhouettes spaced along the path, faint near the player, strongest at the destination.
+        Color tint = player.dashAfterimageTint;
+        for (int s = 0; s < trailSteps.Count; s++)
+        {
+            float t = (s + 1f) / trailSteps.Count;
+            Vector3 offset = new Vector3(dir * dist * t, 0f, 0f);
+            Color c = new Color(tint.r, tint.g, tint.b, tint.a * Mathf.Lerp(0.25f, 0.85f, t) * dim);
+
+            Renderer[] copies = trailSteps[s];
+            Material[] mats = trailStepMats[s];
+            for (int i = 0; i < ghostSources.Count && i < copies.Length; i++)
+            {
+                Renderer src = ghostSources[i];
+                Renderer copy = copies[i];
+                if (src == null || copy == null) continue;
+
+                bool visible = src.enabled && src.gameObject.activeInHierarchy;
+                if (src is SpriteRenderer srcSprite && srcSprite.sprite == null) visible = false;
+                copy.enabled = visible;
+                if (!visible) continue;
+
+                if (copy is SpriteRenderer copySprite && src is SpriteRenderer srcSr)
+                {
+                    copySprite.sprite = srcSr.sprite;
+                    copySprite.flipX = srcSr.flipX;
+                    copySprite.flipY = srcSr.flipY;
+                    copySprite.color = c;
+                    copy.transform.localScale = src.transform.lossyScale;   // carries the facing flip
+                }
+                else if (mats[i] != null)
+                {
+                    mats[i].color = c;
+                    copy.transform.localScale = Vector3.one;   // scale is baked into the mesh
+                }
+
+                copy.transform.position = src.transform.position + offset;
+                copy.transform.rotation = src.transform.rotation;
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ VAMPIRIC BITE
+
+    private void EnsureBiteVisuals()
+    {
+        if (biteRoot != null) return;
+
+        biteRoot = MakeContainer("Aim_Bite");
+
+        biteRing = MakeLineChild(biteRoot.transform, "Ring", biteRingWidth, sortingOrder);
+        biteRing.loop = true;
+        biteRing.positionCount = BITE_SEGMENTS;
+
+        biteFill = MakeSpriteChild(biteRoot.transform, "Fill", GetDotSprite(), sortingOrder - 1);
+    }
+
+    private void UpdateBite(float dim)
+    {
+        // Same center as PerformVampiricBite: a regular circle around the body, not the wand.
+        Vector2 center = player.BiteCenter;
+        float radius = player.biteRange;
+
+        // Revalidate on a short timer — mirrors PerformVampiricBite's exact filter
+        // (all layers, IDamageable in parents; the player itself is not IDamageable).
+        biteScanTimer -= Time.unscaledDeltaTime;
+        if (biteScanTimer <= 0f)
+        {
+            biteScanTimer = 0.08f;
+            biteValid = false;
+            int n = Physics2D.OverlapCircle(center, radius, NoFilter, overlapHits);
+            for (int i = 0; i < n; i++)
+            {
+                if (overlapHits[i].GetComponentInParent<IDamageable>() == null) continue;
+                biteValid = true;
+                break;
+            }
+        }
+
+        // Gentle breathing only while the bite would land.
+        float breath = biteValid ? 1f + 0.03f * Mathf.Sin(Time.unscaledTime * 5f) : 1f;
+        float r = radius * breath;
+        for (int i = 0; i < BITE_SEGMENTS; i++)
+        {
+            float a = (float)i / BITE_SEGMENTS * Mathf.PI * 2f;
+            biteRing.SetPosition(i, new Vector3(center.x + Mathf.Cos(a) * r, center.y + Mathf.Sin(a) * r, 0f));
+        }
+
+        Color rc = biteValid ? biteValidColor : biteInvalidColor;
+        biteRing.startColor = biteRing.endColor = new Color(rc.r, rc.g, rc.b, rc.a * dim);
+
+        biteFill.transform.position = new Vector3(center.x, center.y, 0f);
+        biteFill.transform.localScale = Vector3.one * (r * 2f);
+        biteFill.color = new Color(rc.r, rc.g, rc.b, 0.07f * dim);
+    }
+
+    // ------------------------------------------------------------------ PORTAL
+
+    private void EnsurePortalVisuals()
+    {
+        if (portalRoot != null) return;
+        if (player.portalPrefab == null) return;
+
+        // Steal the portal's look straight from the prefab so the ghost always matches.
+        Portal prefabPortal = player.portalPrefab.GetComponent<Portal>();
+        SpriteRenderer srcSr = prefabPortal != null && prefabPortal.spriteRenderer != null
+            ? prefabPortal.spriteRenderer
+            : player.portalPrefab.GetComponentInChildren<SpriteRenderer>(true);
+        if (srcSr == null || srcSr.sprite == null) return;
+
+        portalRoot = MakeContainer("Aim_Portal");
+
+        portalGhost = MakeSpriteChild(portalRoot.transform, "PortalGhost", srcSr.sprite, sortingOrder);
+        portalGhost.sortingLayerID = srcSr.sortingLayerID;
+        portalGhost.sortingOrder = srcSr.sortingOrder + 5;
+        portalGhost.transform.localScale = srcSr.transform.lossyScale;
+    }
+
+    private void UpdatePortal(float dim)
+    {
+        if (portalRoot == null || portalGhost == null) return;
+        if (cam == null) cam = Camera.main;
+        if (cam == null) return;
+
+        Vector2 mouse = cam.ScreenToWorldPoint(Input.mousePosition);
+        portalGhost.transform.position = new Vector3(mouse.x, mouse.y, 0f);
+
+        // First placement is free-form (spawns gray); the second must land inside the
+        // first portal's range circle or TryPlacePortal refuses it.
+        Portal first = player.FirstPortalInstance;
+        Color c;
+        if (first == null)
+            c = portalFirstColor;
+        else
+            c = Vector2.Distance(first.transform.position, mouse) <= player.portalMaxRange
+                ? portalValidColor
+                : portalInvalidColor;
+
+        c.a *= (0.75f + 0.25f * Mathf.Sin(Time.unscaledTime * 5f)) * dim;
+        portalGhost.color = c;
+    }
+
+    // ------------------------------------------------------------------ PLATFORM CREATE
+
+    // Ghost copies of the platform prefab's sprites at their true relative offsets and
+    // scales, so the preview is exactly the platform that will spawn.
+    private void EnsurePlatformVisuals()
+    {
+        if (platformRoot != null) return;
+        if (player.platformPrefab == null) return;
+
+        Transform prefabRoot = player.platformPrefab.transform;
+        SpriteRenderer[] sources = player.platformPrefab.GetComponentsInChildren<SpriteRenderer>(true);
+        if (sources.Length == 0) return;
+
+        platformRoot = MakeContainer("Aim_Platform");
+        platformGhostParts.Clear();
+
+        foreach (SpriteRenderer src in sources)
+        {
+            if (src.sprite == null) continue;
+
+            var part = MakeSpriteChild(platformRoot.transform, src.name + "_ghost", src.sprite, sortingOrder);
+            part.flipX = src.flipX;
+            part.flipY = src.flipY;
+            part.sortingLayerID = src.sortingLayerID;
+            part.sortingOrder = src.sortingOrder + 5;
+            part.drawMode = src.drawMode;
+            if (src.drawMode != SpriteDrawMode.Simple) part.size = src.size;
+
+            // Pose relative to the prefab root, reproduced under our container.
+            part.transform.localPosition = prefabRoot.InverseTransformPoint(src.transform.position);
+            part.transform.localRotation = Quaternion.Inverse(prefabRoot.rotation) * src.transform.rotation;
+            part.transform.localScale = src.transform.lossyScale;
+
+            platformGhostParts.Add(part);
+        }
+    }
+
+    private void UpdatePlatform(float dim)
+    {
+        if (platformRoot == null || platformGhostParts.Count == 0) return;
+
+        Camera c = player.mainCamera != null ? player.mainCamera : cam;
+        if (c == null) return;
+
+        Vector2 mouse = c.ScreenToWorldPoint(Input.mousePosition);
+        platformRoot.transform.position = new Vector3(mouse.x, mouse.y, 0f);
+
+        Color pc = platformGhostColor;
+        pc.a *= (0.8f + 0.2f * Mathf.Sin(Time.unscaledTime * 4f)) * dim;
+        foreach (SpriteRenderer part in platformGhostParts)
+            if (part != null) part.color = pc;
+    }
+
+    // ------------------------------------------------------------------ FREEFALL BLADE
+
+    private void EnsureFreefallVisuals()
+    {
+        if (freefallRoot != null) return;
+
+        freefallRoot = MakeContainer("Aim_Freefall");
+
+        freefallRing = MakeLineChild(freefallRoot.transform, "Ring", freefallRingWidth, sortingOrder);
+        freefallRing.loop = true;
+        freefallRing.positionCount = BITE_SEGMENTS;
+
+        freefallFill = MakeSpriteChild(freefallRoot.transform, "Fill", GetDotSprite(), sortingOrder - 1);
+    }
+
+    private void UpdateFreefall(float dim)
+    {
+        // Mirror PerformFreefallBlade exactly: forward-and-low circle, BIGGER while falling.
+        bool falling = !player.isGrounded && player.rb != null && player.rb.linearVelocity.y < -0.01f;
+        float range = falling ? player.freefallBladeRange * player.freefallBladeFallingRangeMul
+                              : player.freefallBladeRange;
+        float facing = player.isFacingRight ? 1f : -1f;
+        Vector2 center = (Vector2)transform.position
+                       + new Vector2(facing * range * 0.55f, -range * 0.35f);
+
+        // Hit preview on a short timer (same IDamageable-in-parents filter as the slash).
+        freefallScanTimer -= Time.unscaledDeltaTime;
+        if (freefallScanTimer <= 0f)
+        {
+            freefallScanTimer = 0.08f;
+            freefallHit = false;
+            int n = Physics2D.OverlapCircle(center, range, NoFilter, overlapHits);
+            for (int i = 0; i < n; i++)
+            {
+                if (overlapHits[i].GetComponentInParent<IDamageable>() == null) continue;
+                freefallHit = true;
+                break;
+            }
+        }
+
+        for (int i = 0; i < BITE_SEGMENTS; i++)
+        {
+            float a = (float)i / BITE_SEGMENTS * Mathf.PI * 2f;
+            freefallRing.SetPosition(i, new Vector3(center.x + Mathf.Cos(a) * range, center.y + Mathf.Sin(a) * range, 0f));
+        }
+
+        // Green = something's in the arc; orange = empowered falling slash; pale = neutral.
+        Color rc = freefallHit ? freefallHitColor : (falling ? freefallFallingColor : freefallNeutralColor);
+        freefallRing.startColor = freefallRing.endColor = new Color(rc.r, rc.g, rc.b, rc.a * dim);
+
+        freefallFill.transform.position = new Vector3(center.x, center.y, 0f);
+        freefallFill.transform.localScale = Vector3.one * (range * 2f);
+        freefallFill.color = new Color(rc.r, rc.g, rc.b, 0.07f * dim);
+    }
+
+    // ------------------------------------------------------------------ GLASS WAIL
+
+    private void EnsureWailVisuals()
+    {
+        if (wailRoot != null) return;
+
+        wailRoot = MakeContainer("Aim_Wail");
+
+        // Two staggered expanding ripples read as a continuous shockwave preview.
+        wailRipples = new SpriteRenderer[2];
+        for (int i = 0; i < wailRipples.Length; i++)
+            wailRipples[i] = MakeSpriteChild(wailRoot.transform, "Ripple" + i, GetRingSprite(), sortingOrder);
+    }
+
+    private void UpdateWail(float dim)
+    {
+        // The wail stuns EVERY EnemyHealth in the scene — refresh the target list on a timer.
+        wailScanTimer -= Time.unscaledDeltaTime;
+        if (wailScanTimer <= 0f)
+        {
+            wailScanTimer = 0.25f;
+            wailTargets = FindObjectsByType<EnemyHealth>(FindObjectsSortMode.None);
+        }
+
+        Vector2 center = player.BiteCenter;
+
+        // Expanding ripples from the body, fading as they travel.
+        // The ring sprite's band sits at ~0.41 world units at scale 1.
+        for (int i = 0; i < wailRipples.Length; i++)
+        {
+            float t = Mathf.Repeat(Time.unscaledTime / wailRipplePeriod + (float)i / wailRipples.Length, 1f);
+            float r = Mathf.Max(t * wailRippleMaxRadius, 0.01f);
+            wailRipples[i].transform.position = new Vector3(center.x, center.y, 0f);
+            wailRipples[i].transform.localScale = Vector3.one * (r / 0.41f);
+            wailRipples[i].color = new Color(wailColor.r, wailColor.g, wailColor.b, wailColor.a * (1f - t) * dim);
+        }
+
+        // A pulsing glint over every enemy that would be stunned.
+        int targetCount = wailTargets != null ? wailTargets.Length : 0;
+        while (wailGlints.Count < targetCount)
+        {
+            var glint = MakeSpriteChild(wailRoot.transform, "Glint" + wailGlints.Count, GetDotSprite(), sortingOrder + 1);
+            glint.transform.localScale = Vector3.one * 0.35f;
+            wailGlints.Add(glint);
+        }
+
+        float pulse = 0.55f + 0.45f * Mathf.Sin(Time.unscaledTime * 6f);
+        for (int i = 0; i < wailGlints.Count; i++)
+        {
+            bool live = i < targetCount && wailTargets[i] != null;
+            wailGlints[i].enabled = live;
+            if (!live) continue;
+
+            Vector3 p = wailTargets[i].transform.position + Vector3.up * 0.9f;
+            wailGlints[i].transform.position = p;
+            wailGlints[i].color = new Color(wailColor.r, wailColor.g, wailColor.b, pulse * dim);
+        }
+    }
+
+    // ------------------------------------------------------------------ BUILD HELPERS
+
+    private GameObject MakeContainer(string name)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(transform, false);
+        go.SetActive(false);
+        return go;
+    }
+
+    private static SpriteRenderer MakeSpriteChild(Transform parent, string name, Sprite sprite, int order)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite = sprite;
+        sr.sortingOrder = order;
+        return sr;
+    }
+
+    private static LineRenderer MakeLineChild(Transform parent, string name, float width, int order)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        var lr = go.AddComponent<LineRenderer>();
+        lr.material = GetLineMaterial();
+        lr.useWorldSpace = true;
+        lr.startWidth = lr.endWidth = width;
+        lr.numCapVertices = 4;
+        lr.numCornerVertices = 2;
+        lr.sortingOrder = order;
+        return lr;
+    }
+
+    private static Material GetLineMaterial()
+    {
+        if (cachedLineMaterial == null)
+            cachedLineMaterial = new Material(Shader.Find("Sprites/Default"));
+        return cachedLineMaterial;
+    }
+
+    // Soft radial dot, 64px, 1 world unit at scale 1. Doubles as the bite aura's inner fill.
+    private static Sprite GetDotSprite()
+    {
+        if (cachedDotSprite != null) return cachedDotSprite;
+
+        const int S = 64;
+        var tex = new Texture2D(S, S, TextureFormat.RGBA32, false)
+        { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+
+        float half = S * 0.5f;
+        for (int y = 0; y < S; y++)
+        {
+            for (int x = 0; x < S; x++)
+            {
+                float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(half, half)) / half;
+                float a = Mathf.Clamp01(1f - d);
+                a *= a;   // soft falloff
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+            }
+        }
+        tex.Apply();
+
+        cachedDotSprite = Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), S);
+        return cachedDotSprite;
+    }
+
+    // Soft ring band, 128px, 1 world unit outer diameter at scale 1.
+    private static Sprite GetRingSprite()
+    {
+        if (cachedRingSprite != null) return cachedRingSprite;
+
+        const int S = 128;
+        var tex = new Texture2D(S, S, TextureFormat.RGBA32, false)
+        { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+
+        float half = S * 0.5f;
+        const float bandCenter = 0.82f;   // normalized radius of the ring band
+        const float bandWidth = 0.14f;
+        for (int y = 0; y < S; y++)
+        {
+            for (int x = 0; x < S; x++)
+            {
+                float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(half, half)) / half;
+                float a = Mathf.Clamp01(1f - Mathf.Abs(d - bandCenter) / bandWidth);
+                a *= a;
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+            }
+        }
+        tex.Apply();
+
+        cachedRingSprite = Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), S);
+        return cachedRingSprite;
+    }
+}
