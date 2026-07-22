@@ -717,6 +717,33 @@ The user often consults a separate Claude instance (the conversational one in cl
 
 If the user is about to discard uncommitted Unity changes via GitHub Desktop, **Unity should be closed first with "Don't Save"** on the unsaved-changes prompt. Saving the broken state right before throwing it away is pointless and can interfere with the discard.
 
+### Prefab override auditor (2026-07-22) — run this when something "should work but doesn't"
+
+`Assets/Scripts/Editor/PrefabOverrideAuditor.cs`, menu **Deckshift → Audit Prefab Overrides**.
+Scans the active scene + every prefab asset (~2,000 prefab instances, ~9s) and reports **prefab-instance
+overrides that have silently diverged from their source prefab** — this project's most recurrent
+invisible bug class. Two categories, both deliberately high-signal (it finds ~1 hit in 31,000 overrides):
+
+- **NULLED** — the instance blanks an object reference the source prefab HAS. Almost always a bug,
+  and a nasty one: the prefab looks correct, so you debug the code instead. It further distinguishes
+  *"reference cleared"* (revert the property) from *"the instance DELETED the object it pointed at"*
+  (revert won't help — restore the child or remove the leftover).
+- **PINNED** — an override that merely repeats the source's CURRENT value. Harmless today, but the
+  instance is frozen and will not follow future prefab edits. Restricted to **our own scripts**:
+  Unity's built-ins (especially `RectTransform`) emit value-identical overrides constantly, which
+  buried the real findings ~500:1 before the filter.
+
+**Implementation caveat worth preserving:** the NULLED check does NOT read
+`PrefabUtility.GetPropertyModifications`. That record can contain **stale entries Unity no longer
+applies** — GenLevel3's AcidWater carries an `m_Materials.Array.data[0] = null` record while every
+material is in fact assigned, which produced a confident false positive. The auditor instead compares
+the **effective instance value** against `PrefabUtility.GetCorrespondingObjectFromSource(...)`. If you
+extend this tool, keep that principle: *trust live values, not modification records.*
+
+Verified by regression test: temporarily re-introducing the `warningSoundClip` null override made the
+auditor flag it immediately. Note that restoring a value by **assigning** it creates a PINNED override —
+always fix these with `PrefabUtility.RevertPropertyOverride`, not by re-typing the value.
+
 ### Visual inspection via MCP screenshots (2026-07-18)
 
 Claude Code CAN see the running game — this is the fix for "I can't judge how it looks." The reliable recipe (via `execute_code`):
