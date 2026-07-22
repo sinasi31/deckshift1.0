@@ -9617,29 +9617,9 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 1033049030518988878, guid: ad6cd0613b14af44982fab78c81df223, type: 3}
-      propertyPath: m_SortingOrder
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2471675103256394897, guid: ad6cd0613b14af44982fab78c81df223, type: 3}
-      propertyPath: m_SortingOrder
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6215016698635103415, guid: ad6cd0613b14af44982fab78c81df223, type: 3}
-      propertyPath: m_SortingOrder
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7661185541891739338, guid: ad6cd0613b14af44982fab78c81df223, type: 3}
-      propertyPath: m_SortingOrder
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 8300989727309744542, guid: ad6cd0613b14af44982fab78c81df223, type: 3}
       propertyPath: m_Name
       value: GirisNoktasi
-      objectReference: {fileID: 0}
-    - target: {fileID: 8871101003756658842, guid: ad6cd0613b14af44982fab78c81df223, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0.5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
