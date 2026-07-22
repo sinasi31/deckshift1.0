@@ -473,12 +473,57 @@ Related: a missing-script warning for `CameraBoundsController` appears in the co
 ### LEVEL DESIGN LAWS (designer-stated 2026-07-14 — absolute)
 
 1. **Every level must be completable with ONLY jumping and moving.** Cards, fans, elevators, trapdoors, and any other mechanic may only gate OPTIONAL things: loot, shortcuts, Shift savings. If a mechanic fails or the player has no cards, the exit must still be reachable. (Violation that prompted this rule: GenLevel3's first draft made a fan relay the only way over a tall wall.)
-2. Mandatory-path geometry (**recalibrated from designer playtest 2026-07-14: the character jumps ~5-6 tiles**, not the 4 the old physics math said): design mandatory rises at **4** (comfortable), 5 only for optional challenge, card-gated pockets need rises ≥ 8. Flat gaps ≤ 5-6 tiles. ≥ 5 tiles of clear air above launch surfaces. **Don't crowd platforms** — same-column vertical spacing between floating ledges ≥ 7 tiles; GenLevel5's 3-tile ladder spacing read as clutter.
+2. Mandatory-path geometry — **now MEASURED, not estimated (2026-07-22, `Tools/LevelLab -- metrics`, full table in `MovementMetrics.md`).** Apex is **4.82 tiles** and a running jump clears **11.9 tiles** of flat gap. So: mandatory rises at **3** (default) or **4** (tight — that is already 83% of maximum), card-gated pockets need rises ≥ 6. **Flat gaps should be 8-10 tiles to register at all** — the old "≤ 5-6 tiles" guidance is under half of what a jump covers, which is why generated rooms felt like empty walking. ≥ 5 tiles of clear air above launch surfaces. **Don't crowd platforms** — same-column vertical spacing between floating ledges ≥ 7 tiles; GenLevel5's 3-tile ladder spacing read as clutter.
 3. Hazard pits on the mandatory path must be escapable (shallow enough to jump out) and crossable without aid platforms.
 4. **NO one-way (`=`) platforms in levels** (designer 2026-07-14: "they feel wrong and also work bad and buggy, and there is no visual clearance for them"). The importer still supports `=` but don't place it — use solid 1-thick `#` strips (the `Extra_112/113/114` platform-strip look) and route jumps AROUND them, zig-zag ladder style on alternating shaft walls.
 5. **Turrets (`t`) only on walls or ceilings** — that's how the hand-made levels use them, so they're hard to kill. The importer can only floor-ground them, so generated levels must NOT use `t` at all; use a melee (`m`) or ranged (`r`) enemy instead. (Designer 2026-07-14, after GenLevel5's exposed floor turret.)
 6. The player has **no wall-breaking attack** (fireballs don't break walls) — never design a secret that requires destroying terrain. Card-gated secrets = Phase through a 1-thick wall, Portal, or an 8+ tile rise.
 7. **Entry and exit must be far apart in the map** (designer 2026-07-14, after GenLevel6 v1 put the exit directly above the spawn behind a 2-thick slab): a Phase/Portal card must never be able to skip the level. Keep the spawn and the ExitDoor in different regions — roughly 20+ tiles apart, separated by whole chambers of solid rock, never by a thin wall or single floor slab.
+
+### LevelLab — measure and validate before showing the designer (2026-07-22)
+
+`Tools/LevelLab` (outside `Assets/`, so Unity ignores it) is a C# console tool that reads the
+player's real physics and the level grids directly from disk — Unity does not need to be open.
+**Full ruleset and the reasoning: `LevelDesignRules.md` at the project root. Read it before
+drafting any room.**
+
+**Mandatory:** every level text goes through the validator before the designer ever sees it.
+
+```
+dotnet run --project Tools/LevelLab -- check Assets/LevelTexts/YourLevel.txt --map
+```
+
+It fails the level if the exit is unreachable on jump+move alone (LAW 1), if any pickup/enemy
+marker is stranded, or if the room falls outside the shape bands measured from the nine
+hand-built rooms. Exit code 0 = clean.
+
+**Why this exists (designer verdict 2026-07-22: generated levels are "empty and huge, no
+rhythm, wrong jump distances, visually messy"). The audit found:**
+- **2 of 8 generated levels could not be finished without cards** (GenLevel5, GenLevel8) —
+  one-way drops into shafts with nothing to climb back out on. Violates LAW 1.
+- **All 8** sat outside the hand-built band for `open %` and `1-tile ledges %`.
+- **The stepping-stone signature:** in hand-built rooms **55-83%** of standable ledges are
+  exactly ONE tile wide; in generated rooms only 5-38%. A Deckshift room is a compact climbing
+  gym peppered with small irregular footholds, not a system of wide carved corridors.
+- Hand-built combat rooms are all **44-56 x 22-30**; generated ones ran up to 64x46.
+
+**The bands are calibrated on the seven hand-built COMBAT rooms only** (`efeslevel1-4`,
+`EfeVrl4-6`). `hub` and `BossRoom` are excluded on purpose — a sandbox and a boss arena are
+not what a combat room should imitate, and including them silently widened three bands.
+
+**Geometry was only half the gap — the object census (`LevelLab -- objects`) found the rest.**
+Hand-built rooms carry **76-144 placed prefabs each**: ~20 gameplay objects (≈6 ShiftCrystal,
+≈4 Gold, ≈4-5 enemies, 0-1 Chest, plus the structural ExitDoor / GirisNoktasi / CameraBounds)
+and **55-124 DECORATION props** — 70-86% of everything in the room. A generated room ships
+with zero decoration, which is the direct cause of the "visually messy / bare" verdict: its
+geometry gets judged naked against rooms wearing ~68 Cainos Dungeon Props. Full palette and
+per-category budget in `LevelDesignRules.md` §2b. **A generated level is not finished when it
+validates — only when it has also been dressed.**
+
+`Tools/LevelLab/extracted/` holds ASCII conversions of the hand-built rooms (produced by the
+tool's `extract` command from their tilemaps). **Use them as the reference texture when
+drafting.** Known limitation: the validator does not model wall jumping, so a reachability
+FAIL is "prove me wrong", not proof.
 
 ### Level Text Importer (NEW 2026-07-13 — Stage 1)
 
@@ -488,7 +533,7 @@ Related: a missing-script warning for `CameraBoundsController` appears in the co
 
 **Tile painting reproduces the hand-built visual language** (learned by auditing EfeVrl7's 546 painted tiles, 2026-07-13): an optional "BackWall" backdrop tilemap (**opt-in via `!backwall: on`** — the designer prefers adding backdrop/decoration by hand; when on it must be on the **"Background" sorting LAYER**, NOT Default: ExitDoor's sprite is Default order -1 and gets swallowed by a Default-layer backdrop), plus a "Ground" tilemap (layer 3, TilemapCollider2D, Default sortingOrder 1, z=1). Any 1-tile-thick run (air above AND below, wall-attached or floating) gets the `_112/_113/_114` strip treatment with caps on open ends; the gappy `_186` fill goes in exactly ONE row under a surface, deeper cells get dark `_185` (repeating `_186` looks like a broken colonnade). Frame cells (`#` connected to the grid edge) get role tiles from `Assets/LevelSinasi/biseyler/`: air-above → floor surface `_144`, air-below → ceiling face `_96`, wall faces → inner accent tiles `_188`/`_157` ONLY when backed by a real solid tile (2-thick walls), else the clean outer tiles `_189`/`_156` (the inner tiles have protruding brick nubs + bumpy collision — wrong for 1-thick walls), buried → `_153/_154` top rows, `_156/_189` outer walls, `_186/_185` floor fill. Free-standing `#` platforms: horizontal runs of 2+ get the **platform strip set `Extra_112/_113/_114`** (left cap / middle / right cap — learned from EfeVrl6's interior platforms); lone blocks and 1-wide pillars get chunky `Ground Dirt` block tiles (`#..#..#` = the hand-made stepping-stone style); buried rows of thick platforms get floor fill. NOTE: the edge-strip tiles look like sparse floating crumbs if painted in mid-air, and adjacent Dirt blocks melt into dark blobs — never tile either as strips.
 
-**Entity placement:** most enemies have kinematic physics and do NOT fall, so the importer auto-grounds standing markers (`X m r l M C ^ W T` + the spawn): after instantiating, it measures the instance's combined renderer bounds (ignoring particles/trails, collider fallback) and shifts it so bounds-bottom sits exactly on the cell floor. Floaty pickups (`+ g`) and flyers (`b`) stay at cell center. Decoration (props) stays a manual pass by design. Planned next stages: movement-metrics doc (jump/dash distances in tiles) then batch room drafting.
+**Entity placement:** most enemies have kinematic physics and do NOT fall, so the importer auto-grounds standing markers (`X m r l M C ^ W T` + the spawn): after instantiating, it measures the instance's combined renderer bounds (ignoring particles/trails, collider fallback) and shifts it so bounds-bottom sits exactly on the cell floor. Floaty pickups (`+ g`) and flyers (`b`) stay at cell center. **Decoration is now AUTOMATIC (2026-07-22) — this replaces the old "props stay a manual pass by design" policy** (designer-approved, after the census showed generated rooms were shipping with zero props against hand-built rooms wearing ~68). `DressRoom()` at the end of `Build()` adds a `Decoration` child and places roughly one prop per 18 cells, split by the hand-built ratio: 44% small floor clutter / 23% large floor furniture / 24% wall decoration / 6% ceiling hangings / 3% wall dirt, drawn from the Cainos Dungeon Props pack by keyword palette. **Safe by construction: those prefabs have NO colliders, so decoration can never change what the player can reach**, and anything functional (platforms, ladders, traps, gates, chests, doors) is blocklisted. Props sort at order 2 (above ground's 1, far below the player's 1000). Placement is seeded off the level name, so re-importing a level reproduces the same dressing; the spawn and exit keep a 2-cell clearance. Hand-place on top of this whenever a room wants a set piece. ~~Planned next stage: movement-metrics doc~~ — **done**, see `MovementMetrics.md`. Still planned: batch room drafting.
 
 ### Room Pool
 

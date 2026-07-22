@@ -549,6 +549,11 @@ public static class LevelTextImporter
                 altar.signalTarget = g2.transform; // the signal orb flies here on payment
             }
 
+            // Decoration pass. Hand-built rooms carry 55-124 props each — 70-86% of everything
+            // in them (census in LevelDesignRules.md 2b). A room that ships with bare tiles
+            // gets judged naked against them, which is exactly what happened.
+            DressRoom(root, At, IsSolid, width, height, levelName, entityCounts, warnings);
+
             // Camera zone: one BoxCollider2D covering the whole grid (with margin).
             var camBounds = (GameObject)PrefabUtility.InstantiatePrefab(camBoundsPrefab);
             camBounds.name = "CameraBounds"; // LevelManager finds it by this exact name
@@ -640,6 +645,234 @@ public static class LevelTextImporter
 
         float dy = surfaceY - b.Value.min.y;
         go.transform.position += new Vector3(0f, dy, 0f);
+    }
+
+    // ================= Decoration pass =================
+    //
+    // Dresses a freshly built room the way the hand-built ones are dressed. Measured from
+    // efeslevel1-3 and EfeVrl4-6 (Tools/LevelLab -- objects): ~68 props per room, split
+    // 44% small floor clutter / 23% large floor furniture / 24% wall decoration /
+    // 6% ceiling hangings / 3% wall dirt, drawn from a wide variety rather than repeats.
+    //
+    // Safe by construction: every Cainos Dungeon Props prefab is a pure visual with NO
+    // collider, so nothing placed here can change what the player can reach. Anything that
+    // IS functional (platforms, ladders, traps, gates, chests, doors) is blocklisted.
+
+    private const string PropsFolder = "Assets/Cainos/Pixel Art Platformer - Dungeon/Prefab/Props";
+    private const string WallDecoFolder = "Assets/Cainos/Pixel Art Platformer - Dungeon/Prefab/Wall Deco";
+    private const string WallDirtFolder = "Assets/Cainos/Pixel Art Platformer - Dungeon/Prefab/Wall Dirt";
+
+    // Ground tilemap renders at GroundSortingOrder (1); the player's body is at 1000.
+    // Sitting decoration at 2 keeps it above the tiles and always behind the player.
+    private const int DecorSortingOrder = 2;
+
+    // One prop per ~18 cells reproduces the hand-built density (~68 in a 48x26 room).
+    private const float CellsPerProp = 18f;
+
+    private static readonly string[] CeilingKeywords =
+        { "Chandelier", "Ceiling Chain", "Lamp", "Hanger", "Cage", "Manacle" };
+    private static readonly string[] WallKeywords =
+        { "Painting", "Window", "Banner", "Wall Altar", "Torch", "Wall Cave", "Shelf Side", "Key Holder", "Rack" };
+    private static readonly string[] FurnitureKeywords =
+        { "Table", "Chair", "Bench", "Stool", "Bed", "Bookshelf", "Cupboard", "Cabinet", "Shelf",
+          "Barrel", "Crate", "Coffin", "Statue", "Stove", "Fireplace", "Chimney", "Pillar", "Beam",
+          "Caudron", "Lectern", "Pulpit" };
+    private static readonly string[] ClutterKeywords =
+        { "Book", "Bottle", "Pot", "Jar", "Bag", "Basket", "Bone", "Skull", "Coin Pile", "Debris",
+          "Fry Pan", "Kettle", "Bowl", "Bucket", "Cup", "Candle", "Silver", "Rotten Food",
+          "Package", "Knife", "Arrow", "Chopping Board", "Bookend" };
+
+    // Functional or gameplay objects that happen to live in the same folder. Never auto-place.
+    private static readonly string[] DecorBlocklist =
+        { "Platform", "Ladder", "Stairs", "Trapdoor", "Switch", "Gate", "Elevator",
+          "Spike", "Trap", "Chest", "Door", "Fence", "Stage", "Toilet", "Sword", "Spear" };
+
+    private static bool MatchesAny(string name, string[] keys)
+    {
+        foreach (string k in keys)
+            if (name.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        return false;
+    }
+
+    private static List<GameObject> LoadPalette(string folder, string[] keywords)
+    {
+        var list = new List<GameObject>();
+        if (!AssetDatabase.IsValidFolder(folder)) return list;
+
+        foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { folder }))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            string name = Path.GetFileNameWithoutExtension(path);
+            if (MatchesAny(name, DecorBlocklist)) continue;
+            if (keywords != null && !MatchesAny(name, keywords)) continue;
+
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (go != null) list.Add(go);
+        }
+        return list;
+    }
+
+    /// <summary>Deterministic per level name, so re-importing a level gives the same dressing.</summary>
+    private static int StableSeed(string s)
+    {
+        unchecked
+        {
+            int h = 17;
+            foreach (char c in s) h = h * 31 + c;
+            return h;
+        }
+    }
+
+    private static void Shuffle<T>(IList<T> list, System.Random rng)
+    {
+        for (int i = list.Count - 1; i > 0; i--)
+        {
+            int j = rng.Next(i + 1);
+            (list[i], list[j]) = (list[j], list[i]);
+        }
+    }
+
+    private static void DressRoom(GameObject root, Func<int, int, char> at, Func<int, int, bool> isSolid,
+                                  int width, int height, string levelName,
+                                  Dictionary<string, int> entityCounts, List<string> warnings)
+    {
+        var clutter = LoadPalette(PropsFolder, ClutterKeywords);
+        var furniture = LoadPalette(PropsFolder, FurnitureKeywords);
+        var wallDecor = LoadPalette(PropsFolder, WallKeywords);
+        wallDecor.AddRange(LoadPalette(WallDecoFolder, null));
+        var ceiling = LoadPalette(PropsFolder, CeilingKeywords);
+        var dirt = LoadPalette(WallDirtFolder, null);
+
+        if (clutter.Count == 0 && furniture.Count == 0)
+        {
+            warnings.Add("Decoration pass found no props — is the Cainos Dungeon pack still at "
+                         + PropsFolder + "? Room saved undressed.");
+            return;
+        }
+
+        // Keep the spawn and the exit clear — nobody wants to wake up inside a wardrobe.
+        var keepClear = new List<Vector2Int>();
+        for (int row = 0; row < height; row++)
+            for (int col = 0; col < width; col++)
+                if (at(col, row) == 'S' || at(col, row) == 'X')
+                    keepClear.Add(new Vector2Int(col, row));
+
+        bool TooCloseToDoorway(int col, int row)
+        {
+            foreach (var k in keepClear)
+                if (Mathf.Abs(k.x - col) <= 2 && Mathf.Abs(k.y - row) <= 1) return true;
+            return false;
+        }
+
+        // ---- collect candidate spots ----
+        var floorSpots = new List<Vector2Int>();
+        var wallSpots = new List<Vector2Int>();
+        var ceilSpots = new List<Vector2Int>();
+
+        for (int row = 0; row < height; row++)
+        {
+            for (int col = 0; col < width; col++)
+            {
+                if (isSolid(col, row)) continue;
+                if (at(col, row) != '.' && at(col, row) != ' ') continue;   // a marker lives here
+                if (TooCloseToDoorway(col, row)) continue;
+
+                bool floorBelow = isSolid(col, row + 1);
+                bool airAbove = !isSolid(col, row - 1);
+                bool solidLeft = isSolid(col - 1, row);
+                bool solidRight = isSolid(col + 1, row);
+
+                if (floorBelow && airAbove) floorSpots.Add(new Vector2Int(col, row));
+                else if ((solidLeft || solidRight) && !floorBelow) wallSpots.Add(new Vector2Int(col, row));
+
+                if (isSolid(col, row - 1) && !isSolid(col, row + 1) && !floorBelow)
+                    ceilSpots.Add(new Vector2Int(col, row));
+            }
+        }
+
+        var rng = new System.Random(StableSeed(levelName));
+        Shuffle(floorSpots, rng);
+        Shuffle(wallSpots, rng);
+        Shuffle(ceilSpots, rng);
+
+        int budget = Mathf.RoundToInt(width * height / CellsPerProp);
+        int wantClutter = Mathf.RoundToInt(budget * 0.44f);
+        int wantFurniture = Mathf.RoundToInt(budget * 0.23f);
+        int wantWall = Mathf.RoundToInt(budget * 0.24f);
+        int wantCeiling = Mathf.RoundToInt(budget * 0.06f);
+        int wantDirt = Mathf.RoundToInt(budget * 0.03f);
+
+        var decorRoot = new GameObject("Decoration");
+        decorRoot.transform.SetParent(root.transform);
+        decorRoot.transform.localPosition = Vector3.zero;
+
+        int placed = 0;
+        int floorCursor = 0, wallCursor = 0, ceilCursor = 0;
+
+        void PlaceFloor(List<GameObject> palette, int count)
+        {
+            if (palette.Count == 0) return;
+            for (int i = 0; i < count && floorCursor < floorSpots.Count; i++, floorCursor++)
+            {
+                var cell = floorSpots[floorCursor];
+                int cellY = height - 1 - cell.y;
+                var go = Spawn(palette[rng.Next(palette.Count)], decorRoot,
+                               new Vector3(cell.x + 0.5f, cellY + 0.5f, 0f), rng.Next(2) == 0);
+                GroundToSurface(go, cellY);
+                placed++;
+            }
+        }
+
+        PlaceFloor(clutter, wantClutter);
+        PlaceFloor(furniture, wantFurniture);
+
+        // Wall props hug the face they are attached to.
+        for (int i = 0; i < wantWall && wallCursor < wallSpots.Count && wallDecor.Count > 0; i++, wallCursor++)
+        {
+            var cell = wallSpots[wallCursor];
+            int cellY = height - 1 - cell.y;
+            bool onLeft = isSolid(cell.x - 1, cell.y);
+            float x = cell.x + (onLeft ? 0.25f : 0.75f);
+            Spawn(wallDecor[rng.Next(wallDecor.Count)], decorRoot, new Vector3(x, cellY + 0.5f, 0f), !onLeft);
+            placed++;
+        }
+
+        for (int i = 0; i < wantCeiling && ceilCursor < ceilSpots.Count && ceiling.Count > 0; i++, ceilCursor++)
+        {
+            var cell = ceilSpots[ceilCursor];
+            int cellY = height - 1 - cell.y;
+            Spawn(ceiling[rng.Next(ceiling.Count)], decorRoot, new Vector3(cell.x + 0.5f, cellY + 0.9f, 0f), false);
+            placed++;
+        }
+
+        for (int i = 0; i < wantDirt && wallCursor < wallSpots.Count && dirt.Count > 0; i++, wallCursor++)
+        {
+            var cell = wallSpots[wallCursor];
+            int cellY = height - 1 - cell.y;
+            Spawn(dirt[rng.Next(dirt.Count)], decorRoot, new Vector3(cell.x + 0.5f, cellY + 0.5f, 0f), rng.Next(2) == 0);
+            placed++;
+        }
+
+        entityCounts["(decoration props)"] = placed;
+
+        if (placed < budget / 2)
+            warnings.Add($"Decoration pass placed only {placed} of a target {budget} props — the room "
+                         + "has few floor/wall faces to dress. Consider more small ledges and alcoves.");
+    }
+
+    private static GameObject Spawn(GameObject prefab, GameObject parent, Vector3 pos, bool flipX)
+    {
+        var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+        go.transform.SetParent(parent.transform);
+        go.transform.position = pos;
+        if (flipX)
+        {
+            var s = go.transform.localScale;
+            go.transform.localScale = new Vector3(-s.x, s.y, s.z);
+        }
+        foreach (var sr in go.GetComponentsInChildren<SpriteRenderer>())
+            sr.sortingOrder += DecorSortingOrder;
+        return go;
     }
 
     private static Sprite LoadPropSprite(string spriteName)
