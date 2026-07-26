@@ -26,16 +26,16 @@ public class RelicTooltip : MonoBehaviour
         group.blocksRaycasts = false;
         group.interactable = false;
 
-        // Dark rounded background (this object's own Image).
+        // Dark stone background (this object's own Image).
         Image bg = gameObject.AddComponent<Image>();
-        bg.sprite = RelicUISprites.Panel();
+        bg.sprite = RelicUISprites.StonePanel();
         bg.type = Image.Type.Sliced;
-        bg.color = new Color(0.06f, 0.06f, 0.09f, 0.96f);
+        bg.color = new Color(0.55f, 0.53f, 0.58f, 0.97f);   // dims the baked stone to a dark tooltip
         bg.raycastTarget = false;
 
-        // Vertical content layout, height driven by a ContentSizeFitter.
+        // Vertical content layout, height driven by a ContentSizeFitter. Padding clears the gold border.
         VerticalLayoutGroup vlg = gameObject.AddComponent<VerticalLayoutGroup>();
-        vlg.padding = new RectOffset(14, 14, 12, 12);
+        vlg.padding = new RectOffset(18, 18, 14, 14);
         vlg.spacing = 5f;
         vlg.childControlWidth = true;
         vlg.childControlHeight = true;
@@ -60,8 +60,10 @@ public class RelicTooltip : MonoBehaviour
         LayoutElement le = frameGo.AddComponent<LayoutElement>();
         le.ignoreLayout = true;
         frame = frameGo.AddComponent<Image>();
-        frame.sprite = RelicUISprites.Frame();
+        frame.sprite = RelicUISprites.GoldBorder();
         frame.type = Image.Type.Sliced;
+        frame.pixelsPerUnitMultiplier = 2.2f;   // thin the ornate border down for a small tooltip
+        frame.color = Color.white;
         frame.raycastTarget = false;
 
         gameObject.SetActive(false);
@@ -92,8 +94,7 @@ public class RelicTooltip : MonoBehaviour
 
         int value = RelicManager.instance != null ? RelicManager.instance.SellValueFor(relic) : 0;
         valueText.text = $"Sell: {value} gold";
-
-        frame.color = RelicUISprites.RarityColor(relic.rarity);
+        // Border stays gold (Deckshift chrome); rarity reads through the name colour above.
 
         gameObject.SetActive(true);
         transform.SetAsLastSibling();

@@ -92,31 +92,40 @@ public class RelicManagePanel : MonoBehaviour
         // Window
         window = AddPoint(transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(WIN_W, WIN_H));
         Image winBg = window.gameObject.AddComponent<Image>();
-        winBg.sprite = RelicUISprites.Panel();
+        winBg.sprite = RelicUISprites.StonePanel();
         winBg.type = Image.Type.Sliced;
-        winBg.color = new Color(0.11f, 0.12f, 0.15f, 0.98f);
+        winBg.color = new Color(0.8f, 0.78f, 0.82f, 1f);   // shows the baked dark stone
         winBg.raycastTarget = true;   // blocks the backdrop-close behind it
-        Image winFrame = AddImage(window, "Frame", RelicUISprites.Frame(), new Color(0.82f, 0.66f, 0.32f, 1f), false);
+        Image winFrame = AddImage(window, "Frame", RelicUISprites.GoldBorder(), Color.white, false);
         winFrame.type = Image.Type.Sliced;
         Stretch(winFrame.rectTransform);
+        RelicUISprites.AddGemStuds(window, WIN_W, WIN_H, RelicUISprites.GemColor(Rarity.Common), topRight: false);   // ruby studs; top-right left open for the close button
 
-        // Header
-        AddText(window, "Title", new Vector2(0f, 1f), new Vector2(30f, -22f), new Vector2(320f, 44f),
+        // Header — inset clear of the ornate gold border + corner/edge gem studs.
+        AddText(window, "Title", new Vector2(0f, 1f), new Vector2(52f, -34f), new Vector2(300f, 44f),
             "RELICS", 32f, FontStyles.Bold, new Color(0.95f, 0.86f, 0.6f), TextAlignmentOptions.TopLeft);
-        countText = AddText(window, "Count", new Vector2(1f, 1f), new Vector2(-64f, -30f), new Vector2(120f, 32f),
+        countText = AddText(window, "Count", new Vector2(1f, 1f), new Vector2(-96f, -36f), new Vector2(120f, 32f),
             "0 / 5", 22f, FontStyles.Bold, new Color(0.8f, 0.83f, 0.9f), TextAlignmentOptions.TopRight);
 
-        // Close X (top-right corner)
-        RectTransform closeRt = AddPoint(window, "Close", new Vector2(1f, 1f), new Vector2(-26f, -26f), new Vector2(34f, 34f));
-        Image closeBg = closeRt.gameObject.AddComponent<Image>();
-        closeBg.sprite = RelicUISprites.Panel();
-        closeBg.type = Image.Type.Sliced;
-        closeBg.color = new Color(0.6f, 0.2f, 0.2f, 1f);
+        // Close button — occupies the top-right corner where a gem stud would sit (AddGemStuds skips
+        // it), styled as a red gem in a gold setting so it matches the studs but reads as "close".
+        const float closeSz = 62f;                 // larger than a plain stud so the X fits inside the gem
+        float closeInset = 46f * 0.45f;            // keep the corner alignment of the other studs
+        RectTransform closeRt = AddPoint(window, "Close", new Vector2(1f, 1f), new Vector2(-closeInset, -closeInset), new Vector2(closeSz, closeSz));
+        Image closeSet = AddImage(closeRt, "Setting", RelicUISprites.GemSetting(), Color.white, false);
+        Stretch(closeSet.rectTransform);
+        Image closeGem = AddImage(closeRt, "Gem", RelicUISprites.Gem(), new Color(0.80f, 0.20f, 0.22f), false);
+        closeGem.rectTransform.anchorMin = closeGem.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        closeGem.rectTransform.sizeDelta = new Vector2(closeSz * 0.78f, closeSz * 0.78f);
+        Image closeHit = AddImage(closeRt, "Hit", null, new Color(0f, 0f, 0f, 0f), true);
+        Stretch(closeHit.rectTransform);
         Button closeBtn = closeRt.gameObject.AddComponent<Button>();
-        closeBtn.targetGraphic = closeBg;
+        closeBtn.transition = Selectable.Transition.None;
+        closeBtn.targetGraphic = closeHit;
         closeBtn.onClick.AddListener(Hide);
-        AddText(closeRt, "X", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(34f, 34f),
-            "X", 22f, FontStyles.Bold, Color.white, TextAlignmentOptions.Center);
+        // Small X centred in the gem face; drawn last so it sits on top.
+        AddText(closeRt, "X", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(closeSz, closeSz),
+            "X", 15f, FontStyles.Bold, new Color(1f, 0.93f, 0.9f), TextAlignmentOptions.Center);
 
         // Slot row (horizontal, centred under the header)
         RectTransform rowRt = AddPoint(window, "SlotRow", new Vector2(0.5f, 1f), new Vector2(0f, -76f),
@@ -129,25 +138,25 @@ public class RelicManagePanel : MonoBehaviour
         hlg.childForceExpandWidth = hlg.childForceExpandHeight = false;
         slotRow = rowRt;
 
-        // Divider under the slots
+        // Divider under the slots — inset so it clears the side gem studs.
         Image div = AddImage(window, "Divider", RelicUISprites.White(), new Color(1f, 1f, 1f, 0.12f), false);
         RectTransform drt = div.rectTransform;
         drt.anchorMin = drt.anchorMax = new Vector2(0.5f, 1f);
         drt.pivot = new Vector2(0.5f, 1f);
-        drt.sizeDelta = new Vector2(WIN_W - 64f, 2f);
+        drt.sizeDelta = new Vector2(WIN_W - 108f, 2f);
         drt.anchoredPosition = new Vector2(0f, -208f);
 
-        // Detail area (lower)
-        detailName = AddText(window, "DetailName", new Vector2(0f, 1f), new Vector2(34f, -224f), new Vector2(WIN_W - 68f, 34f),
+        // Detail area (lower) — left inset clears the border + left-edge stud.
+        detailName = AddText(window, "DetailName", new Vector2(0f, 1f), new Vector2(52f, -224f), new Vector2(WIN_W - 104f, 34f),
             "", 24f, FontStyles.Bold, Color.white, TextAlignmentOptions.TopLeft);
         // Narrow column on the left so a long description never runs under the sell button.
-        detailDesc = AddText(window, "DetailDesc", new Vector2(0f, 1f), new Vector2(34f, -262f), new Vector2(WIN_W - 300f, 150f),
+        detailDesc = AddText(window, "DetailDesc", new Vector2(0f, 1f), new Vector2(52f, -262f), new Vector2(WIN_W - 320f, 150f),
             "", 17f, FontStyles.Normal, new Color(0.82f, 0.84f, 0.9f), TextAlignmentOptions.TopLeft);
         detailDesc.enableWordWrapping = true;
 
-        // Sell button (bottom-right)
-        sellButtonGo = BuildButton(window, "SellButton", new Vector2(1f, 0f), new Vector2(-34f, 34f),
-            new Vector2(250f, 56f), new Color(0.86f, 0.68f, 0.28f), out sellLabel, DoSell);
+        // Sell button (bottom-right) — inset off the border/studs.
+        sellButtonGo = BuildButton(window, "SellButton", new Vector2(1f, 0f), new Vector2(-46f, 44f),
+            new Vector2(244f, 54f), new Color(0.86f, 0.68f, 0.28f), out sellLabel, DoSell);
 
         gameObject.SetActive(false);
     }
@@ -260,12 +269,12 @@ public class RelicManagePanel : MonoBehaviour
             }
             else
             {
-                Image fill = AddImage(cell, "EmptyFill", RelicUISprites.Panel(), new Color(0.12f, 0.13f, 0.16f, 0.5f), false);
-                fill.type = Image.Type.Sliced;
+                Image fill = AddImage(cell, "EmptyFill", RelicUISprites.StonePanel(), new Color(0.5f, 0.5f, 0.5f, 0.85f), false);
+                fill.type = Image.Type.Simple;
                 fill.rectTransform.anchorMin = fill.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-                fill.rectTransform.sizeDelta = new Vector2(CELL - 8f, CELL - 8f);
-                Image frame = AddImage(cell, "EmptyFrame", RelicUISprites.Frame(), new Color(0.45f, 0.48f, 0.55f, 0.5f), false);
-                frame.type = Image.Type.Sliced;
+                fill.rectTransform.sizeDelta = new Vector2((CELL - 8f) * 0.86f, (CELL - 8f) * 0.86f);
+                Image frame = AddImage(cell, "EmptyFrame", RelicUISprites.GoldBorder(), new Color(0.55f, 0.52f, 0.5f, 0.8f), false);
+                frame.type = Image.Type.Simple;
                 frame.rectTransform.anchorMin = frame.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
                 frame.rectTransform.sizeDelta = new Vector2(CELL - 8f, CELL - 8f);
             }

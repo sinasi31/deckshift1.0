@@ -146,7 +146,7 @@ Key fields on PlayerController:
 
 `GravityReversalRoutine()` handles the full timeline. `LerpVisualTransform` uses a tracked Z-angle float (never reads back from `localEulerAngles`, which Unity normalizes unpredictably).
 
-The 0.5s **warning flash** is implemented against `SkinnedMeshRenderer` via `material.SetColor("_Color", ...)`. CORRECTION (2026-07-17): the Mage M body IS SkinnedMeshRenderers (an earlier version of this file claimed SpriteRenderers — wrong), so `GetComponentInChildren<SkinnedMeshRenderer>()` does find a renderer. Whether the flash actually shows is UNVERIFIED — the Cainos "Alpha Cut" shader may not expose a `_Color` property, in which case `SetColor` silently no-ops. **The expiration audio cue plays** (clip re-assigned 2026-07-16 after being found null), so the warning is audible. If the flash is still invisible in playtests, check the shader's tint property name first. Low priority.
+The 0.5s **warning flash** is `WarningFlashRoutine` (3 rapid on/off cycles ≈ 0.5s) — **FIXED and screenshot-verified 2026-07-26.** History: it originally tinted `SkinnedMeshRenderer._Color`, which silently no-ops because the Cainos **"Alpha Cut"** shader (most outfit parts) exposes no color property at all (only `_MainTex` + `_Alpha`); a later "fix" switched it to `GetComponentsInChildren<SpriteRenderer>()`, but the Mage M rig is **16 SkinnedMeshRenderers (body/outfit) + 1 SpriteRenderer (the staff ONLY)**, so that flashed just the staff and the body never reacted. Current implementation strobes **`_Alpha`** (the one handle EVERY Cainos rig shader shares — the same one Phase uses) across all SkinnedMeshRenderers via a `MaterialPropertyBlock`, blinking the WHOLE character (a blink reads as "effect expiring"), and additionally red-tints the staff (which does support color). `_Alpha == 1` is the confirmed "normal" value. **Audio cue also plays** (clip re-assigned 2026-07-16). If you ever swap the character rig, re-check that its shaders still expose `_Alpha`.
 
 ### Facing System
 
@@ -593,7 +593,7 @@ Two consequences, both load-bearing:
 - Uses both `OnCollisionEnter2D` and `OnTriggerEnter2D` (AeroBat has trigger collider, others have solid).
 - Contact normal check: `contact.normal.y > 0.7`.
 
-**Known gap:** the velocity sign check (`rb.linearVelocity.y < -0.1f`) doesn't account for gravity reversal. Will silently fail during reversed-gravity head-bounce attempts. Low priority — gravity reversal duration is short and head-bouncing during it is an edge case.
+**Gravity reversal — HANDLED (verified in code 2026-07-26):** every branch of the head-bounce path now flips on `isGravityReversed` — the falling-direction check (`OnTriggerEnter2D`: `isGravityReversed ? velocity.y > 0.1f : velocity.y < -0.1f`), the position-vs-enemy check (top vs bottom), the collision-normal check (`normal.y < -0.7f` vs `> 0.7f`), and the bounce impulse direction. The old "velocity sign check doesn't account for gravity reversal" gap is closed; head-bouncing works upside-down.
 
 ### Enemy Healthbars (EnemyHealthBar.cs + EnemyHealthBar.prefab)
 
@@ -818,12 +818,12 @@ The current relic system follows Slay-the-Spire conventions: strictly additive, 
 ### Bugs (deferred)
 
 - ~~Card effect conflict class of bug~~ — **RESOLVED (2026-07-06).** `TryExecute` now refuses (Blocked) any card whose `ModifiedState` overlaps a live effect's flags; blocked plays cost nothing and stay in hand. Stacking Floor is Lava + Adrenaline + Phase can no longer corrupt player state. See Card System for detail.
-- **Phase card wall-stuck:** if Phase ends while player is inside a wall, player gets stuck. Plan: prevent Phase expiration inside collider.
-- **Comet Dive identity loss:** does the same thing as head-bounce relic. Plan: redesign.
-- **Head bounce + gravity reversal:** velocity sign check doesn't account for reversed gravity. Low priority.
+- **Phase card wall-stuck:** ⚠️ **MITIGATED, not fully solved (audited 2026-07-26).** `PhaseRoutine` implements the planned "prevent expiration inside collider": after the base duration it EXTENDS Phase up to 1 extra second while `IsCollidingWithGround()` is true (giving the player time to move clear), then, if still embedded, nudges the player 0.5 units along the gravity axis (`ejectDir` handles reversal). Common cases are covered. Remaining edge cases: a player who deliberately stops deep inside a 2-thick wall won't clear it in 0.5 units, and the nudge is vertical-only (no horizontal escape). Harden with a nearest-safe-position search if it recurs.
+- ~~**Comet Dive identity loss**~~ — **RESOLVED (verified 2026-07-26).** Comet Dive was redesigned into an AoE **dive-blast** (`StartCometDive`/`LandCometDive`: fast downward slam → `Physics2D.OverlapCircleAll` damage at `cometRadius`/`cometDamage`, with a `CometDiveVFX` telegraph while falling). It is no longer the single-target head-bounce; the two are distinct.
+- ~~**Head bounce + gravity reversal**~~ — **RESOLVED (verified 2026-07-26).** All head-bounce branches now flip on `isGravityReversed` (see Head Bounce section). Head-bouncing works upside-down.
 - **Duplicate ExitDoor possible in some room prefabs:** defensive guards now in place but the scene-side duplicate (if any) hasn't been cleaned up.
 - **AnimationEventReceiver may resurrect on prefab reimport.** It is now fully REMOVED from the Mage M Animator child (was previously just disabled). If OnFootstep NullRefs reappear in the console, a pack reimport probably restored it — remove it again. (The "'OnFootstep' has no receiver!" *warning* spam is absorbed by `PlayerAnimEventSink` on that same GameObject, now serialized in Player.prefab; see Visual Model Internals.)
-- **Gravity reversal warning flash may be invisible** — the rig DOES have SkinnedMeshRenderers (fact corrected 2026-07-17; see Gravity Reversal System), but the Cainos shaders may not expose `_Color`, so the `SetColor` call may no-op. Audio cue fires. If invisible in playtests: check the shader's tint property name.
+- ~~**Gravity reversal warning flash may be invisible**~~ — **RESOLVED (screenshot-verified 2026-07-26).** `WarningFlashRoutine` now strobes `_Alpha` across all 16 SkinnedMeshRenderers (whole-body blink) + red-tints the staff. The prior versions no-op'd (`_Color` unsupported by the Alpha Cut shader) or flashed only the staff. See Gravity Reversal System.
 
 ### Resolved bugs (verified by code audit 2026-06-10 — do NOT re-fix)
 
