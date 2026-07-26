@@ -904,7 +904,11 @@ public class PlayerController : MonoBehaviour
             {
                 float enemyTopY = other.bounds.center.y + other.bounds.extents.y * 0.5f;
                 float enemyBottomY = other.bounds.center.y - other.bounds.extents.y * 0.5f;
+#if UNITY_EDITOR && DECKSHIFT_VERBOSE
+                // Verbose only: this fires on EVERY enemy trigger overlap and the interpolated
+                // string allocates each time. Define DECKSHIFT_VERBOSE to re-enable.
                 Debug.Log($"[HeadBounce Trigger] {other.gameObject.name}, playerY: {transform.position.y:F2}, enemyTopY: {enemyTopY:F2}, velocity.y: {rb.linearVelocity.y:F2}");
+#endif
 
                 bool positionOk = isGravityReversed ? transform.position.y < enemyBottomY : transform.position.y > enemyTopY;
                 if (positionOk)
@@ -1318,7 +1322,10 @@ public class PlayerController : MonoBehaviour
         if (eHealth != null)
         {
             ContactPoint2D contact = collision.GetContact(0);
+#if UNITY_EDITOR && DECKSHIFT_VERBOSE
+            // Verbose only: fires on EVERY enemy collision (see the trigger path above).
             Debug.Log($"[HeadBounce] Collision: {collision.gameObject.name}, normal.y: {contact.normal.y:F2}, velocity.y: {rb.linearVelocity.y:F2}, canBounce: {eHealth.canBeHeadBounced}");
+#endif
 
             bool normalFromBelow = isGravityReversed ? contact.normal.y < -0.7f : contact.normal.y > 0.7f;
             if (normalFromBelow)

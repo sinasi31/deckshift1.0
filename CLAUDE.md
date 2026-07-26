@@ -10,7 +10,9 @@ This file is loaded automatically into Claude Code at the start of every session
 
 **Core concept:** "Movement is a Resource." Jumping consumes **Shift**, which does not regenerate on its own — and **Shift CARRIES OVER between rooms** (designer-confirmed 2026-07-13: it is a run-long resource, and this persistence is "the whole identity of the game" — spending Shift now means having less for the rest of the run). Do NOT describe or implement Shift as a per-room resource. Most other actions (attacks, special movement, utility) are delivered via cards. Cards have **charges**; when charges deplete the card moves to the exhaust pile and must be recovered via scrap.
 
-**Current state:** Act 1 (Oxidation District) prototype. **7 combat levels in the run pool** (+ hub + boss room; ~15 more contract-valid rooms exist unused — see Room Pool), **15 CardData assets and 18 relics** (all counts verified 2026-07-18; earlier text said "~5 levels", "~10 cards" and 7 relics). Two acts (Vapor Stratum, Final Forge) planned but not started. Target: 45-50 minute run length, 60+ cards total at content-complete.
+**Current state:** Act 1 (Oxidation District) prototype. **7 combat levels in the run pool** (+ hub + boss room; ~15 more contract-valid rooms exist unused — see Room Pool), **16 CardData assets in `Assets/Cards/` and 18 relics** (re-verified 2026-07-26; note 2 of the 16 are not normal reward cards — `Stagger` is the fail-state card and `AnaKartVeritabanı` is the card *database* asset, so the real playable pool is ~14). Two acts (Vapor Stratum, Final Forge) planned but not started. Target: 45-50 minute run length, 60+ cards total at content-complete.
+
+⚠️ **Content is the project's real bottleneck, and it gates the two biggest planned systems.** The run map is explicitly blocked on level count (it's mediocre at ~7 rooms, sings at ~30), and card *enhancements* ("Blompo") are a multiplier on the card pool — both want more content underneath them before they pay off. When choosing between "build another system" and "author more cards/levels", the honest answer is usually the latter.
 
 The player character was recently swapped from the skeleton rig (`PF Skeleton - Mage`) to `PF Pixel Character - Mage M` from the Cainos Customizable Pixel Character pack. The wizard identity is now the canonical character. The skeleton remains in the Player prefab disabled, intended for future use as an enemy. **Renderer facts (verified in-editor 2026-07-17): the Mage M body is 16 `SkinnedMeshRenderer` parts (Body, Hair, Hat, Cloth… — Cainos "Alpha Cut"/Body/Hair shaders); only the magic staff is a `SpriteRenderer`.** Any code that snapshots/copies the player's look must handle SkinnedMeshRenderers (e.g. `SkinnedMeshRenderer.BakeMesh`, as `CardAimIndicator`'s dash trail does) — a SpriteRenderer-only pass silently produces a staff-only ghost.
 
@@ -381,16 +383,26 @@ Because the tracker is parented under GameplayHUD, it inherits the auto-hide beh
 
 ## Relic System
 
-Currently a Slay-the-Spire-style additive system: every relic is a passive bonus, the player can own unlimited relics, no slot constraints. **This is slated for a major redesign — see "Future: Slot-Constrained Relic Redesign" in the deferred work section.** Do not invest heavily in new relic content or relic UX features until the redesign happens; that work will likely be reworked.
+**The Balatro-style slot-constrained system is BUILT and live (corrected 2026-07-26 — this section previously claimed it was an unbuilt "future direction", which was badly stale).** The player owns at most **`RelicManager.MaxSlots` = 5** relics; acquiring one while full forces a sell-or-decline decision. It is no longer an unlimited additive pile.
+
+What exists today:
+- **Slots + selling** — `MaxSlots`, `IsFull`, `SellValueFor(relic)` (fixed refund by rarity: Legendary 150 / Epic 90 / Rare 50 / Common 25), `SellRelic(relic)` which removes, credits gold, fires `OnRelicRemoved` and calls `RecomputePassives()`.
+- **Central grant entry point** — `TryGrantRelic(relic, onAcquired)`. Slot free → add immediately and run `onAcquired`. Slots full → open `RelicSwapScreen`; TAKE sells the chosen relic then adds the new one and runs `onAcquired`, LEAVE runs nothing. **`onAcquired` is where callers finalize side effects (e.g. the shop charges gold ONLY when the relic is actually taken), so a declined full-slot grant costs nothing.** New grant sources should route through `TryGrantRelic`, not `AddRelic`.
+- **UI** — `RelicHUD` (top-centre loadout bar), `RelicSlotHover` + `RelicTooltip` (hover info), `RelicManagePanel` (inspect/sell, `I` key), `RelicSwapScreen` (the forced full-slot decision). All procedural, all sharing `RelicUISprites`.
+
+**Passive recomputation rule (important):** `RecomputePassives()` recalculates stat relics from the player's BASE stats every time the loadout changes, so selling reverses exactly. **Never add/subtract stats incrementally** — that breaks the moment relics stack (Reinforced Plating + Glass Heart) or are sold out of order.
+
+Still open (see deferred work): rebalancing the 18 relics *for* a slot economy — they were authored as small always-on Slay-the-Spire bonuses, which is the wrong shape for a 5-slot loadout where each pick should be a real decision.
 
 ### RelicManager
 
 Singleton. Holds:
-- `ownedRelics` — private list of owned `RelicData`.
+- `ownedRelics` — private list of owned `RelicData`; **list index == slot index**.
 - Public `OwnedRelics` — `IReadOnlyList<RelicData>` accessor.
-- Public event `OnRelicAdded` — `System.Action<RelicData>`, fired after a successful add (not on duplicate-add).
+- Public events `OnRelicAdded` / `OnRelicRemoved` — `System.Action<RelicData>`, fired after a successful add/sell (not on duplicate-add). HUD and panels rebuild on both.
 
-Grant paths (only two are accessible in normal play):
+Grant paths:
+- `TryGrantRelic(relic, onAcquired)` — **the entry point everything should use** (handles the full-slot swap flow).
 - `ShopItemUI` — buying a shop item with a relic reference.
 - `SlotMachineUI` — slot machine payout.
 - `DebugTools.cs` F1 key — debug only.
@@ -430,12 +442,17 @@ Fields: `relicID` (string, used for `HasRelic` polling), `relicName`, `descripti
 
 ### Relic HUD (RelicHUD.cs)
 
-`Assets/Scripts/RelicHUD.cs`, attached to a `RelicHUD` GameObject under `Canvas/GameplayHUD/`, anchored middle-left, vertical column.
+`Assets/Scripts/RelicHUD.cs`, attached to a `RelicHUD` GameObject under `Canvas/GameplayHUD/`. **It is a fixed TOP-CENTRE loadout bar of `MaxSlots` cells + an "N/5" count** (corrected 2026-07-26; it was previously a middle-left vertical column). The bar **self-positions in code**, so it needs no scene re-anchoring — the legacy left-column container is disabled on `Start()`. Note `iconContainer` in SampleScene points at the HUD's OWN transform, so `BuildBar()` deliberately never disables it when `iconContainer == transform` (that would switch off the object building the bar).
 
-- Subscribes to `RelicManager.OnRelicAdded` in `Start()`.
-- Also iterates existing `RelicManager.instance.OwnedRelics` at Start so it populates on late wake-up.
-- Each new relic instantiates `RelicIconPrefab.prefab` (unchanged 48×48 root) as a child, then `AddComponent<RelicIcon>().Build(relic)` styles it (2026-07-02). **`RelicIcon.cs`** disables the root Image and builds 4 procedural UGUI child Images back-to-front — rarity **glow** aura / dark rounded **plate** / **icon** art (`relicArt`, preserveAspect) / rarity **frame** border — with the SAME rarity colour language as the chest burst (Legendary gold / Epic purple / Rare blue / Common pale-grey). Pop-in is **Update-driven** (EaseOutBack, unscaled) so it survives being built while GameplayHUD is inactive (relics granted from a hidden shop/slot pop in when the HUD reshows); Epic/Legendary get an idle glow pulse.
-- Still visual-only: no tooltip, no activation flash, no interaction (deliberate — see the slot-constrained relic redesign caveat below; don't invest further in relic UX until that lands).
+- Subscribes to both `OnRelicAdded` and `OnRelicRemoved`; rebuilds all cells on either.
+- Filled cells instantiate `RelicIconPrefab.prefab` and call `RelicIcon.Build(relic)`; empty cells draw a dim, gemless stone socket so full and empty read as one crafted row.
+- Each cell carries a transparent `RelicSlotHover` hit-target (RelicIcon's own graphics are non-raycast) which drives the shared `RelicTooltip` and opens `RelicManagePanel` on click. `I` also opens it.
+
+**Relic chip visual language (rebuilt 2026-07-26):** `RelicIcon.cs` disables the prefab's root Image and builds the chip procedurally to match the game's OWN hand-painted HUD chrome (`Assets/Art/panel 1.png`, the top-left stat panel), rather than generic UI: rarity **glow** → mottled-**stone** socket → **icon** art (`relicArt`, + drop shadow) → ornate **gold border** → four corner **gem bosses**. **Rarity is carried by the GEM colour, not by recolouring the frame** (amber Legendary / amethyst Epic / sapphire Rare / ruby Common — ruby matches the HUD panel's own studs), so every relic reads as the same gold-on-stone object as the rest of the HUD. Pop-in is **Update-driven** (EaseOutBack, unscaled) so it survives being built while GameplayHUD is inactive (relics granted from a hidden shop/slot pop in when the HUD reshows); Epic/Legendary get an idle glow pulse.
+
+All the shared sprites live in **`RelicUISprites`** (`GoldBorder()`, `StonePanel()`, `GemSetting()`, `Gem()`, `GemColor(rarity)`, plus `AddGemStuds(...)` which studs a panel's border). Procedural + statically cached, no art files. `GoldBorder` carries a 9-slice border so panels use it too; the medallion draws it as **Simple** (a 9-sliced bevel would stretch). The Manage/Swap/tooltip panels all use this same chrome.
+
+⚠️ **When editing these panels, keep content inset clear of the border AND the gem studs** (~52px on the Manage panel). The ornate border is much thicker than the old flat frame, and the original insets left text visibly crowding it.
 
 ---
 
@@ -667,9 +684,27 @@ A Cinemachine `AmplitudeGain` of 0.15 looks very different from a direct `transf
 
 `AC Character.controller` lists `AttackAction` as `m_Type: 3` in YAML, which is **Int**, not Float. The mapping is: 1=Float, 3=Int, 4=Bool, 9=Trigger. When in doubt about an Animator parameter type, read the .controller YAML directly rather than guessing from the parameter's appearance in the Animator window.
 
+### "Setting a shader property that doesn't exist fails SILENTLY" (2026-07-26)
+
+**This is the project's most expensive bug shape: code that looks correct, runs without error, and does nothing.** `material.SetColor("_Color", …)` / `MaterialPropertyBlock.SetFloat(…)` on a shader that lacks that property is a **no-op with no warning**. The gravity-reversal warning flash was "fixed" TWICE this way and stayed invisible for months — first tinting `_Color` (the Cainos **"Alpha Cut"** shader exposes no colour property at all), then switching to `GetComponentsInChildren<SpriteRenderer>()` (the Mage M rig is 16 SkinnedMeshRenderers + ONE SpriteRenderer, the staff — so only the staff flashed).
+
+Known property support (verified by dumping `ShaderUtil.GetPropertyCount`):
+| Shader | Has `_Color`? | Has `_Alpha`? |
+|---|---|---|
+| Cainos `Customizable Pixel Character/Alpha Cut` (most player outfit parts) | ❌ **no colour property** | ✅ |
+| Cainos `Customizable Pixel Character/Body` | ❌ (has `_SkinTint`) | ✅ |
+| Cainos `Customizable Pixel Character/Hair` | ✅ | ✅ |
+| Cainos `Pixel Art Monster - Dungeon/Transparent` (**all enemies**) | ✅ | ✅ |
+
+**Rules:** on the PLAYER rig, tint via **`_Alpha`** — the one handle every Cainos rig shader shares. On ENEMIES, `_Color` is fine (verified across every enemy prefab). When writing any new material-property effect, **dump the shader's property list first** rather than assuming, and prefer `HasProperty` + an explicit fallback over `HasProperty` + silently skipping (a guarded skip still produces "nothing happens", which is the bug).
+
+Also beware the inverse: `BreakableWall.cs` checks `HasProperty("_Color")` when *caching* the original colour but not when *setting* it — an asymmetry worth copying nowhere.
+
 ### "First diagnostics can be wrong; always verify"
 
 During the character swap session, Claude Code's first diagnostic incorrectly described `AttackAction` as a Float. The error only surfaced at runtime as a type mismatch. **For Animator parameter types specifically, the YAML `m_Type` integer is the source of truth.**
+
+More generally: this file itself drifts. A 2026-07-26 pass found the entire Relic System section describing a slot redesign as an unbuilt "future direction" when it had already shipped, three "deferred bugs" that were already fixed, and a HUD described as a left-side vertical column when it is a top-centre bar. **Verify against the code before planning from this document** — and when you find drift, fix the doc in the same session.
 
 ### "Transform.Find is strict and silent"
 
@@ -773,29 +808,18 @@ Use this liberally to verify visual changes, diagnose "it looks wrong" reports, 
 
 ### Future: Slot-Constrained Relic Redesign (MAJOR DESIGN DIRECTION)
 
-The current relic system follows Slay-the-Spire conventions: strictly additive, free accumulation, every relic is a small passive bonus. **This is slated to be replaced with a Balatro-style slot-constrained system.**
+✅ **THE MECHANICAL REDESIGN IS DONE (corrected 2026-07-26).** This section spent months describing a "future direction" that had in fact already shipped. What actually exists now is documented under **Relic System** above: 5 slots, rarity-based sell values, `TryGrantRelic` + the forced full-slot swap screen, a manage panel, and hover tooltips. **Do not re-plan or re-build any of that.**
 
-**Design intent:**
-- Fixed number of relic slots (probably 5 to start, may tune).
-- To acquire a new relic when slots are full, the player must **sell** one of their current relics.
-- Each acquisition becomes a real decision (synergy, swap-out math, what to give up).
-- Existing relics will likely be rebalanced or redesigned — current SOTS-style relics (small passive bonuses) won't shine in a slot-constrained system; bigger, more interactive effects will.
+**What genuinely remains is BALANCE, not code:**
+- **Rebalance the 18 relics for a slot economy.** They were authored as small always-on Slay-the-Spire bonuses (+5 HP on kill, +2 Shift on kill). In a 5-slot loadout where every pick costs you another relic, small passive trickles are the wrong shape — slot-constrained systems want **bigger, more interactive, more build-defining** effects that change how you play, not just numbers that tick up. This is the real outstanding work and it is a **design pass, not an engineering one**.
+- **Economy tuning** — sell refunds are currently flat by rarity (150/90/50/25) and untuned against a 45-50 min run and the actual rate relics are offered.
+- **Possibly** distinguish acquisition sources (shop vs. pack vs. voucher).
 
-**Why this fits the game's DNA:** Deckshift's core philosophy is "Movement is a Resource" — resources matter. A slot-constrained relic system extends that principle to relics: they become a curated resource pool the player manages, not a pile that grows passively.
+**Why this fits the game's DNA:** Deckshift's core philosophy is "Movement is a Resource" — resources matter. Slot-constrained relics extend that principle: a curated pool the player manages, not a pile that grows passively.
 
-**Scope when undertaken (multi-session work):**
-- New data model (slots, sell prices, possibly slot states like "negative")
-- Rework of RelicManager and RelicHUD into a slot manager UI (display, sell button, drag/swap)
-- Rebalance or redesign of the 5 currently-functional relics
-- 15-25 new relics to make slot decisions meaningful
-- Economy tuning (sell refund %, relic offer frequency vs. 45-50 min run length)
-- Possibly new relic-acquisition events (shop vs. pack vs. voucher distinction)
+⚠️ **The old "don't invest in relic UX / don't add relics" freeze is LIFTED** — it was guarding against a rework that has now happened. Tooltips and the manage/swap UI exist. Adding relics is fine and in fact *needed* (a 5-slot system wants a deep pool to choose from); just author them at slot-worthy power, not as another +2 trickle.
 
-**Until the redesign happens: do not invest heavily in relic UX features (tooltips, activation flashes, etc.) or in adding many new SOTS-style relics.** That work will likely be reworked. Small fixes and one-off relic additions are fine; large investments are not.
-
-**Reality check (2026-07-18 audit):** this guidance was written when there were 7 relics; the roster has since grown to **18, all wired** (see Relic System). So the content investment already happened — the *slot-constrained redesign is still pending*, and rebalancing those 18 into a slot economy is now a bigger job than this section assumes. Treat "don't add many more" as still current; treat "only 5 work" as obsolete.
-
-**Approach when starting:** paper design first, code second.
+**Approach for the balance pass:** paper design first, code second.
 
 ### Quest System Expansion (deferred)
 
@@ -858,7 +882,7 @@ The `CardTemplate` prefab has fundamental scale corruption: root scale is non-un
 
 ### Content (TODO)
 
-- Scale to 60+ cards (currently **15**).
+- Scale to 60+ cards (currently **16 assets in `Assets/Cards/`, ~14 genuinely playable** — `Stagger` is the fail-state card, `AnaKartVeritabanı` is the database asset). **This is the single biggest content gap and it gates both the map system and card enhancements.**
 - Glass archetype: cards exist in theory, not implemented.
 - Expand Vampiric archetype.
 - Three-act structure: Act 1 prototype exists; Acts 2-3 not started.
