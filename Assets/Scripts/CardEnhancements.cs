@@ -169,6 +169,26 @@ public static class CardEnhancements
         return false;
     }
 
+    // Every card in `deck` that could receive `e`.
+    public static List<RuntimeCard> CardsFor(CardEnhancement e, List<RuntimeCard> deck)
+    {
+        List<RuntimeCard> valid = new List<RuntimeCard>();
+        if (deck == null) return valid;
+        foreach (RuntimeCard c in deck)
+            if (CanApplyTo(e, c)) valid.Add(c);
+        return valid;
+    }
+
+    // Rolls the offers shown BEFORE the player picks a card. Only includes enhancements that at
+    // least one card in the deck can actually receive, so an offer is never a dead end.
+    public static List<CardEnhancement> RollOffersForDeck(List<RuntimeCard> deck, int count = 3)
+    {
+        List<CardEnhancement> pool = new List<CardEnhancement>();
+        foreach (CardEnhancement e in All)
+            if (CardsFor(e, deck).Count > 0) pool.Add(e);
+        return PickWeighted(pool, count);
+    }
+
     // Rolls up to `count` distinct enhancements that are valid for `card`, weighted so the
     // strong ones stay rare. Returns fewer than `count` only if the card has fewer valid options.
     public static List<CardEnhancement> RollOffers(RuntimeCard card, int count = 3)
@@ -176,7 +196,11 @@ public static class CardEnhancements
         List<CardEnhancement> pool = new List<CardEnhancement>();
         foreach (CardEnhancement e in All)
             if (CanApplyTo(e, card)) pool.Add(e);
+        return PickWeighted(pool, count);
+    }
 
+    private static List<CardEnhancement> PickWeighted(List<CardEnhancement> pool, int count)
+    {
         List<CardEnhancement> picked = new List<CardEnhancement>();
         while (picked.Count < count && pool.Count > 0)
         {

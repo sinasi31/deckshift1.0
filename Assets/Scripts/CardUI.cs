@@ -77,7 +77,71 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         if (costText != null) costText.text = card.cardData.shiftCost.ToString();
         // -----------------------------
 
+        RefreshBlessingBadge(card);
+
         UpdateSelectionVisual();
+    }
+
+    // --- Blompo blessing badge -----------------------------------------------------------
+    // A blessed card must be identifiable at a glance in the hand. Built procedurally here
+    // (house style) so no CardTemplate prefab rewiring is needed — that prefab has known scale
+    // corruption and is blocked on new art, so we deliberately don't touch it.
+    // PLACEHOLDER LOOK: rarity gem + glow in the top-right corner. Intended to be replaced with
+    // bespoke per-enhancement art later.
+    private GameObject blessBadge;
+
+    private void RefreshBlessingBadge(RuntimeCard card)
+    {
+        bool blessed = card != null && card.enhancement != CardEnhancement.None;
+
+        if (!blessed)
+        {
+            if (blessBadge != null) blessBadge.SetActive(false);
+            return;
+        }
+
+        Color gem = RelicUISprites.GemColor(CardEnhancements.RarityOf(card.enhancement));
+
+        if (blessBadge == null)
+        {
+            blessBadge = new GameObject("BlessBadge", typeof(RectTransform));
+            RectTransform brt = blessBadge.GetComponent<RectTransform>();
+            brt.SetParent(transform, false);
+            // Top-right corner, hanging slightly off the card so it reads as attached-on.
+            brt.anchorMin = brt.anchorMax = new Vector2(1f, 1f);
+            brt.pivot = new Vector2(0.5f, 0.5f);
+            brt.anchoredPosition = new Vector2(-14f, -14f);
+            brt.sizeDelta = new Vector2(34f, 34f);
+
+            AddBadgePart("Glow", RelicUISprites.Glow(), 54f);
+            AddBadgePart("Setting", RelicUISprites.GemSetting(), 34f);
+            AddBadgePart("Gem", RelicUISprites.Gem(), 21f);
+        }
+
+        blessBadge.SetActive(true);
+        Transform glowT = blessBadge.transform.Find("Glow");
+        Transform gemT = blessBadge.transform.Find("Gem");
+        if (glowT != null) glowT.GetComponent<Image>().color = new Color(gem.r, gem.g, gem.b, 0.55f);
+        if (gemT != null) gemT.GetComponent<Image>().color = gem;
+
+        // Say what it does on hover, alongside the card's own text.
+        if (descriptionText != null)
+            descriptionText.text =
+                $"<b>{card.cardData.cardName}</b>\n\n{card.cardData.description}\n\n" +
+                $"<b>{CardEnhancements.Name(card.enhancement)}</b> — {CardEnhancements.Description(card.enhancement)}";
+    }
+
+    private void AddBadgePart(string name, Sprite sprite, float size)
+    {
+        GameObject go = new GameObject(name, typeof(RectTransform));
+        RectTransform rt = go.GetComponent<RectTransform>();
+        rt.SetParent(blessBadge.transform, false);
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = Vector2.zero;
+        rt.sizeDelta = new Vector2(size, size);
+        Image img = go.AddComponent<Image>();
+        img.sprite = sprite;
+        img.raycastTarget = false;
     }
 
     private void Update()

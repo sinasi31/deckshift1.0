@@ -207,6 +207,15 @@ public class DeckManager : MonoBehaviour
             CheckForStaggerCondition();
         }
     }
+    // Lets systems that mutate cards IN PLACE ask the hand UI to redraw. Blompo needs this: a
+    // blessing changes an existing RuntimeCard without adding/removing/playing anything, so no
+    // normal hand event fires and the new badge would not appear until the next redraw.
+    // OnHandChanged is an event, so only DeckManager can raise it — hence this wrapper.
+    public void RefreshHandUI()
+    {
+        OnHandChanged?.Invoke(false);
+    }
+
     public void ResetRecallCost()
     {
         currentRecallCost = baseRecallCost;

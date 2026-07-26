@@ -4,41 +4,49 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-// Blompo's blessing screen. Two steps: pick a card from your deck, then pick 1 of 3 randomly
-// offered enhancements for it. Free at the point of use (reaching Blompo is the cost) and
-// strictly ONE card per visit.
+// Blompo's blessing screen.
 //
-// Built procedurally in the shared Deckshift chrome (RelicUISprites: stone + ornate gold +
-// gem studs), self-instantiating under the main Canvas — no scene/prefab wiring, same pattern
-// as RelicManagePanel / RelicSwapScreen.
+// Flow (designer-set 2026-07-27): the player sees the three ENHANCEMENT OFFERS FIRST, then picks
+// which card receives the one they chose. Choosing the card first made no sense — you'd be
+// committing before knowing what you were committing to.
+//
+// Offers are rolled so each is valid for at least one card in the deck (CardEnhancements
+// .RollOffersForDeck), so an offer is never a dead end. Free at the point of use, ONE card per
+// visit; Blompo then leaves (BlompoNPC handles the vanish).
+//
+// Built procedurally in the shared Deckshift chrome (RelicUISprites: stone + ornate gold + gem
+// studs), self-instantiating under the main Canvas — same pattern as RelicManagePanel.
 public class BlompoScreen : MonoBehaviour
 {
     public static BlompoScreen instance;
 
     private CanvasGroup group;
     private RectTransform window;
-    private Transform cardRow, offerRow;
+    private Transform offerRow, cardRow;
     private TMP_Text titleText, promptText;
     private Image portraitImage;
     private TMP_FontAsset font;
 
     private Sprite portrait;
-    private RuntimeCard chosenCard;
+    private System.Action onBlessed;
+    private CardEnhancement chosenOffer = CardEnhancement.None;
     private bool isOpen, blessingSpent;
 
     private GameState prevState;
     private GameObject cachedHud;
     private bool hudWasActive;
 
-    // WIN_H is sized to the taller of the two steps (the offer chips) plus margin — the card step
-    // is shorter, so it simply sits with a little more air beneath it.
-    private const float WIN_W = 760f, WIN_H = 396f, CARD_W = 100f, CARD_H = 138f;
+    // Near-full-screen. Sized against the project's 1920x1080 canvas with a comfortable margin.
+    private const float WIN_W = 1600f, WIN_H = 900f;
+    private const float CARD_W = 200f, CARD_H = 286f;
+    private const float OFFER_W = 380f, OFFER_H = 560f;
 
-    public static void Open(Sprite blompoPortrait = null)
+    public static void Open(Sprite blompoPortrait = null, System.Action blessedCallback = null)
     {
         EnsureInstance();
         if (instance == null || instance.isOpen) return;
         instance.portrait = blompoPortrait;
+        instance.onBlessed = blessedCallback;
         instance.Show();
     }
 
@@ -73,7 +81,7 @@ public class BlompoScreen : MonoBehaviour
         Stretch(GetComponent<RectTransform>());
         group = gameObject.AddComponent<CanvasGroup>();
 
-        Image backdrop = AddImage(transform, "Backdrop", null, new Color(0f, 0f, 0f, 0.84f), true);
+        Image backdrop = AddImage(transform, "Backdrop", null, new Color(0f, 0f, 0f, 0.88f), true);
         Stretch(backdrop.rectTransform);
         Button backBtn = backdrop.gameObject.AddComponent<Button>();
         backBtn.transition = Selectable.Transition.None;
@@ -88,22 +96,21 @@ public class BlompoScreen : MonoBehaviour
         Image winFrame = AddImage(window, "Frame", RelicUISprites.GoldBorder(), Color.white, false);
         winFrame.type = Image.Type.Sliced;
         Stretch(winFrame.rectTransform);
-        RelicUISprites.AddGemStuds(window, WIN_W, WIN_H, RelicUISprites.GemColor(Rarity.Common), topRight: false);
+        RelicUISprites.AddGemStuds(window, WIN_W, WIN_H, RelicUISprites.GemColor(Rarity.Common), 60f, true, false);
 
-        // Blompo's portrait, floating at the top-left of the window.
-        RectTransform portraitRt = AddPoint(window, "Portrait", new Vector2(0f, 1f), new Vector2(62f, -30f), new Vector2(96f, 96f));
+        RectTransform portraitRt = AddPoint(window, "Portrait", new Vector2(0f, 1f), new Vector2(70f, -48f), new Vector2(190f, 190f));
         portraitRt.pivot = new Vector2(0f, 1f);
         portraitImage = portraitRt.gameObject.AddComponent<Image>();
         portraitImage.preserveAspect = true;
         portraitImage.raycastTarget = false;
 
-        titleText = AddText(window, "Title", new Vector2(0f, 1f), new Vector2(172f, -36f), new Vector2(420f, 44f),
-            "BLOMPO", 34f, FontStyles.Bold, new Color(0.98f, 0.86f, 0.55f), TextAlignmentOptions.TopLeft);
-        promptText = AddText(window, "Prompt", new Vector2(0f, 1f), new Vector2(172f, -78f), new Vector2(520f, 30f),
-            "Choose a card to bless.", 17f, FontStyles.Normal, new Color(0.86f, 0.87f, 0.92f), TextAlignmentOptions.TopLeft);
+        titleText = AddText(window, "Title", new Vector2(0f, 1f), new Vector2(290f, -56f), new Vector2(900f, 80f),
+            "BLOMPO", 62f, FontStyles.Bold, new Color(0.98f, 0.86f, 0.55f), TextAlignmentOptions.TopLeft);
+        promptText = AddText(window, "Prompt", new Vector2(0f, 1f), new Vector2(292f, -136f), new Vector2(1100f, 44f),
+            "", 26f, FontStyles.Normal, new Color(0.88f, 0.89f, 0.93f), TextAlignmentOptions.TopLeft);
 
-        // Close button — the top-right gem stud position (AddGemStuds skips it).
-        const float closeSz = 46f;
+        // Close button occupies the top-right gem-stud position (AddGemStuds skips it).
+        const float closeSz = 62f;
         RectTransform closeRt = AddPoint(window, "Close", new Vector2(1f, 1f), new Vector2(-closeSz * 0.45f, -closeSz * 0.45f), new Vector2(closeSz, closeSz));
         Image closeSet = AddImage(closeRt, "Setting", RelicUISprites.GemSetting(), Color.white, false);
         Stretch(closeSet.rectTransform);
@@ -117,17 +124,17 @@ public class BlompoScreen : MonoBehaviour
         closeBtn.targetGraphic = closeHit;
         closeBtn.onClick.AddListener(Hide);
         AddText(closeRt, "X", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(closeSz, closeSz),
-            "X", 18f, FontStyles.Bold, Color.white, TextAlignmentOptions.Center);
+            "X", 26f, FontStyles.Bold, Color.white, TextAlignmentOptions.Center);
 
-        cardRow = BuildRow("CardRow", -138f, 16f);
-        offerRow = BuildRow("OfferRow", -138f, 20f);
+        offerRow = BuildRow("OfferRow", -230f, 44f);
+        cardRow = BuildRow("CardRow", -250f, 26f);
 
         gameObject.SetActive(false);
     }
 
     private Transform BuildRow(string name, float y, float spacing)
     {
-        RectTransform rt = AddPoint(window, name, new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(WIN_W - 120f, 300f));
+        RectTransform rt = AddPoint(window, name, new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(WIN_W - 160f, 460f));
         rt.pivot = new Vector2(0.5f, 1f);
         HorizontalLayoutGroup hlg = rt.gameObject.AddComponent<HorizontalLayoutGroup>();
         hlg.spacing = spacing;
@@ -142,7 +149,7 @@ public class BlompoScreen : MonoBehaviour
     {
         isOpen = true;
         blessingSpent = false;
-        chosenCard = null;
+        chosenOffer = CardEnhancement.None;
 
         gameObject.SetActive(true);
         transform.SetAsLastSibling();
@@ -163,7 +170,7 @@ public class BlompoScreen : MonoBehaviour
         if (cachedHud != null) cachedHud.SetActive(false);
         if (hudWasActive && HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(true);
 
-        ShowCardStep();
+        ShowOfferStep();
 
         StopAllCoroutines();
         StartCoroutine(OpenAnim());
@@ -183,36 +190,42 @@ public class BlompoScreen : MonoBehaviour
         if (hudWasActive && HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(false);
 
         gameObject.SetActive(false);
+
+        // Only now does Blompo leave — closing without blessing keeps him around.
+        if (blessingSpent)
+        {
+            System.Action cb = onBlessed;
+            onBlessed = null;
+            cb?.Invoke();
+        }
     }
 
     private IEnumerator OpenAnim()
     {
-        float t = 0f; const float dur = 0.2f;
+        float t = 0f; const float dur = 0.22f;
         while (t < dur)
         {
             t += Time.unscaledDeltaTime;
             float n = Mathf.Clamp01(t / dur);
             group.alpha = n;
-            window.localScale = Vector3.one * (0.9f + 0.1f * EaseOutBack(n));
+            window.localScale = Vector3.one * (0.92f + 0.08f * EaseOutBack(n));
             yield return null;
         }
         group.alpha = 1f;
         window.localScale = Vector3.one;
     }
 
-    // ---- step 1: choose a card ----
-    private void ShowCardStep()
+    // ---- step 1: pick a blessing ----
+    private void ShowOfferStep()
     {
         ClearRow(cardRow); ClearRow(offerRow);
-        cardRow.gameObject.SetActive(true);
-        offerRow.gameObject.SetActive(false);
+        offerRow.gameObject.SetActive(true);
+        cardRow.gameObject.SetActive(false);
 
         List<RuntimeCard> deck = CollectDeck();
-        List<RuntimeCard> eligible = new List<RuntimeCard>();
-        foreach (RuntimeCard c in deck)
-            if (CardEnhancements.CanEnhance(c)) eligible.Add(c);
+        List<CardEnhancement> offers = CardEnhancements.RollOffersForDeck(deck, 3);
 
-        if (eligible.Count == 0)
+        if (offers.Count == 0)
         {
             promptText.text = deck.Count == 0
                 ? "Your deck is empty. Blompo shrugs."
@@ -220,38 +233,7 @@ public class BlompoScreen : MonoBehaviour
             return;
         }
 
-        promptText.text = "Choose a card to bless.";
-        // Cap the row so a large deck doesn't overflow the window.
-        int max = Mathf.Min(eligible.Count, 6);
-        for (int i = 0; i < max; i++)
-        {
-            RuntimeCard card = eligible[i];
-            GameObject chip = BuildCardChip(cardRow, card);
-            Button b = chip.AddComponent<Button>();
-            b.transition = Selectable.Transition.None;
-            RuntimeCard captured = card;
-            b.onClick.AddListener(() => ChooseCard(captured));
-        }
-    }
-
-    private void ChooseCard(RuntimeCard card)
-    {
-        if (blessingSpent) return;
-        chosenCard = card;
-        ShowOfferStep();
-    }
-
-    // ---- step 2: pick 1 of 3 offers ----
-    private void ShowOfferStep()
-    {
-        ClearRow(cardRow); ClearRow(offerRow);
-        cardRow.gameObject.SetActive(false);
-        offerRow.gameObject.SetActive(true);
-
-        List<CardEnhancement> offers = CardEnhancements.RollOffers(chosenCard, 3);
-        string cardName = chosenCard.cardData != null ? chosenCard.cardData.cardName : "that card";
-        promptText.text = $"Blompo considers <b>{cardName}</b>. Pick a blessing.";
-
+        promptText.text = "Blompo offers three blessings. Take one.";
         foreach (CardEnhancement e in offers)
         {
             GameObject chip = BuildOfferChip(offerRow, e);
@@ -264,19 +246,49 @@ public class BlompoScreen : MonoBehaviour
 
     private void ChooseOffer(CardEnhancement e)
     {
-        if (blessingSpent || chosenCard == null) return;
-        if (!CardEnhancements.Apply(chosenCard, e)) return;
+        if (blessingSpent) return;
+        chosenOffer = e;
+        ShowCardStep();
+    }
 
-        blessingSpent = true;   // one card per visit
-        ClearRow(offerRow);
+    // ---- step 2: pick the card that receives it ----
+    private void ShowCardStep()
+    {
+        ClearRow(offerRow); ClearRow(cardRow);
         offerRow.gameObject.SetActive(false);
         cardRow.gameObject.SetActive(true);
-        ClearRow(cardRow);
-        BuildCardChip(cardRow, chosenCard);
 
-        string cardName = chosenCard.cardData != null ? chosenCard.cardData.cardName : "It";
-        promptText.text = $"<b>{cardName}</b> is now <b>{CardEnhancements.Name(e)}</b>. Blompo is pleased.";
-        StartCoroutine(CloseAfter(1.6f));
+        List<RuntimeCard> valid = CardEnhancements.CardsFor(chosenOffer, CollectDeck());
+        promptText.text = $"<b>{CardEnhancements.Name(chosenOffer)}</b> — {CardEnhancements.Description(chosenOffer)}  Choose a card.";
+
+        int max = Mathf.Min(valid.Count, 8);
+        for (int i = 0; i < max; i++)
+        {
+            RuntimeCard card = valid[i];
+            GameObject chip = BuildCardChip(cardRow, card);
+            Button b = chip.AddComponent<Button>();
+            b.transition = Selectable.Transition.None;
+            RuntimeCard captured = card;
+            b.onClick.AddListener(() => ChooseCard(captured));
+        }
+    }
+
+    private void ChooseCard(RuntimeCard card)
+    {
+        if (blessingSpent || chosenOffer == CardEnhancement.None) return;
+        if (!CardEnhancements.Apply(card, chosenOffer)) return;
+
+        // The blessing mutates an existing card, so no normal hand event fires — ask the hand UI
+        // to redraw or the new badge won't appear until something else happens to refresh it.
+        if (DeckManager.instance != null) DeckManager.instance.RefreshHandUI();
+
+        blessingSpent = true;
+        ClearRow(cardRow);
+        BuildCardChip(cardRow, card);
+
+        string cardName = card.cardData != null ? card.cardData.cardName : "It";
+        promptText.text = $"<b>{cardName}</b> is now <b>{CardEnhancements.Name(chosenOffer)}</b>. Blompo is pleased.";
+        StartCoroutine(CloseAfter(1.5f));
     }
 
     private IEnumerator CloseAfter(float seconds)
@@ -301,7 +313,7 @@ public class BlompoScreen : MonoBehaviour
 
         Image frame = AddImage(rt, "Frame", RelicUISprites.GoldBorder(), Color.white, false);
         frame.type = Image.Type.Sliced;
-        frame.pixelsPerUnitMultiplier = 1.8f;
+        frame.pixelsPerUnitMultiplier = 1.3f;
         Stretch(frame.rectTransform);
 
         if (card.cardData != null && card.cardData.cardArt != null)
@@ -309,39 +321,36 @@ public class BlompoScreen : MonoBehaviour
             Image art = AddImage(rt, "Art", card.cardData.cardArt, Color.white, false);
             art.preserveAspect = true;
             art.rectTransform.anchorMin = art.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-            art.rectTransform.anchoredPosition = new Vector2(0f, 12f);
-            art.rectTransform.sizeDelta = new Vector2(CARD_W - 30f, CARD_W - 30f);
+            art.rectTransform.anchoredPosition = new Vector2(0f, 36f);
+            art.rectTransform.sizeDelta = new Vector2(CARD_W - 54f, CARD_W - 54f);
         }
 
-        // Wraps + shrinks so long names ("Create Platform") don't clip the card edge.
-        TMP_Text nameText = AddText(rt, "Name", new Vector2(0.5f, 0f), new Vector2(0f, 26f), new Vector2(CARD_W - 10f, 30f),
-            card.cardData != null ? card.cardData.cardName : "?", 12f, FontStyles.Bold,
-            new Color(0.97f, 0.93f, 0.85f), TextAlignmentOptions.Center);
+        // Two lines of room so long names ("Create Platform") wrap clear of the art above.
+        TMP_Text nameText = AddText(rt, "Name", new Vector2(0.5f, 0f), new Vector2(0f, 50f), new Vector2(CARD_W - 22f, 56f),
+            card.cardData != null ? card.cardData.cardName : "?", 22f, FontStyles.Bold,
+            new Color(0.97f, 0.93f, 0.85f), TextAlignmentOptions.Bottom);
         nameText.enableWordWrapping = true;
         nameText.enableAutoSizing = true;
-        nameText.fontSizeMin = 9f;
-        nameText.fontSizeMax = 12f;
+        nameText.fontSizeMin = 15f; nameText.fontSizeMax = 22f;
 
         string charges = card.isInfinite ? "∞" : card.currentUses.ToString();
-        AddText(rt, "Charges", new Vector2(0.5f, 0f), new Vector2(0f, 12f), new Vector2(CARD_W - 14f, 20f),
-            charges, 13f, FontStyles.Bold, new Color(0.65f, 0.86f, 1f), TextAlignmentOptions.Center);
+        AddText(rt, "Charges", new Vector2(0.5f, 0f), new Vector2(0f, 18f), new Vector2(CARD_W - 22f, 34f),
+            charges, 24f, FontStyles.Bold, new Color(0.65f, 0.86f, 1f), TextAlignmentOptions.Center);
 
-        // Existing blessing badge.
         if (card.enhancement != CardEnhancement.None)
         {
             Color gem = RelicUISprites.GemColor(CardEnhancements.RarityOf(card.enhancement));
-            AddText(rt, "Badge", new Vector2(0.5f, 1f), new Vector2(0f, -6f), new Vector2(CARD_W - 10f, 20f),
-                CardEnhancements.Name(card.enhancement), 11f, FontStyles.Bold, gem, TextAlignmentOptions.Center);
+            AddText(rt, "Badge", new Vector2(0.5f, 1f), new Vector2(0f, -10f), new Vector2(CARD_W - 16f, 28f),
+                CardEnhancements.Name(card.enhancement), 16f, FontStyles.Bold, gem, TextAlignmentOptions.Center);
         }
         return rt.gameObject;
     }
 
     private GameObject BuildOfferChip(Transform parent, CardEnhancement e)
     {
-        const float W = 190f, H = 182f;
-        RectTransform rt = AddPoint(parent, "Offer", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(W, H));
+        RectTransform rt = AddPoint(parent, "Offer", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(OFFER_W, OFFER_H));
         LayoutElement le = rt.gameObject.AddComponent<LayoutElement>();
-        le.preferredWidth = W; le.preferredHeight = H;
+        le.preferredWidth = OFFER_W; le.preferredHeight = OFFER_H;
 
         Color gem = RelicUISprites.GemColor(CardEnhancements.RarityOf(e));
 
@@ -353,32 +362,40 @@ public class BlompoScreen : MonoBehaviour
 
         Image frame = AddImage(rt, "Frame", RelicUISprites.GoldBorder(), Color.white, false);
         frame.type = Image.Type.Sliced;
-        frame.pixelsPerUnitMultiplier = 1.5f;
+        frame.pixelsPerUnitMultiplier = 1.1f;
         Stretch(frame.rectTransform);
 
-        // A single rarity gem stands in for the enhancement's icon.
+        Image glow = AddImage(rt, "Glow", RelicUISprites.Glow(), new Color(gem.r, gem.g, gem.b, 0.38f), false);
+        glow.rectTransform.anchorMin = glow.rectTransform.anchorMax = new Vector2(0.5f, 1f);
+        glow.rectTransform.anchoredPosition = new Vector2(0f, -150f);
+        glow.rectTransform.sizeDelta = new Vector2(250f, 250f);
+
         Image set = AddImage(rt, "Setting", RelicUISprites.GemSetting(), Color.white, false);
         set.rectTransform.anchorMin = set.rectTransform.anchorMax = new Vector2(0.5f, 1f);
-        set.rectTransform.anchoredPosition = new Vector2(0f, -40f);
-        set.rectTransform.sizeDelta = new Vector2(52f, 52f);
+        set.rectTransform.anchoredPosition = new Vector2(0f, -150f);
+        set.rectTransform.sizeDelta = new Vector2(156f, 156f);
         Image gemImg = AddImage(rt, "Gem", RelicUISprites.Gem(), gem, false);
         gemImg.rectTransform.anchorMin = gemImg.rectTransform.anchorMax = new Vector2(0.5f, 1f);
-        gemImg.rectTransform.anchoredPosition = new Vector2(0f, -40f);
-        gemImg.rectTransform.sizeDelta = new Vector2(32f, 32f);
+        gemImg.rectTransform.anchoredPosition = new Vector2(0f, -150f);
+        gemImg.rectTransform.sizeDelta = new Vector2(94f, 94f);
 
-        AddText(rt, "Name", new Vector2(0.5f, 1f), new Vector2(0f, -76f), new Vector2(W - 22f, 30f),
-            CardEnhancements.Name(e), 18f, FontStyles.Bold, gem, TextAlignmentOptions.Top);
+        AddText(rt, "Name", new Vector2(0.5f, 1f), new Vector2(0f, -266f), new Vector2(OFFER_W - 34f, 56f),
+            CardEnhancements.Name(e), 36f, FontStyles.Bold, gem, TextAlignmentOptions.Top);
 
-        TMP_Text desc = AddText(rt, "Desc", new Vector2(0.5f, 1f), new Vector2(0f, -108f), new Vector2(W - 30f, 80f),
-            CardEnhancements.Description(e), 14f, FontStyles.Normal,
+        TMP_Text desc = AddText(rt, "Desc", new Vector2(0.5f, 1f), new Vector2(0f, -334f), new Vector2(OFFER_W - 60f, 150f),
+            CardEnhancements.Description(e), 25f, FontStyles.Normal,
             new Color(0.88f, 0.89f, 0.93f), TextAlignmentOptions.Top);
         desc.enableWordWrapping = true;
+
+        AddText(rt, "Rarity", new Vector2(0.5f, 0f), new Vector2(0f, 30f), new Vector2(OFFER_W - 40f, 34f),
+            CardEnhancements.RarityOf(e).ToString().ToUpper(), 19f, FontStyles.Bold,
+            new Color(gem.r, gem.g, gem.b, 0.85f), TextAlignmentOptions.Center);
 
         return rt.gameObject;
     }
 
-    // Every card the player still owns. Exhausted cards are deliberately excluded — they're out
-    // of the run, and blessing one would be a dead pick.
+    // Every card the player still owns. Exhausted cards are excluded — they're out of the run, so
+    // blessing one would be a dead pick.
     private List<RuntimeCard> CollectDeck()
     {
         List<RuntimeCard> all = new List<RuntimeCard>();
@@ -430,8 +447,7 @@ public class BlompoScreen : MonoBehaviour
         TextMeshProUGUI t = rt.gameObject.AddComponent<TextMeshProUGUI>();
         if (font != null) t.font = font;
         t.text = text; t.fontSize = fontSize; t.fontStyle = style; t.color = color; t.alignment = align;
-        t.enableWordWrapping = false; t.raycastTarget = false;
-        t.richText = true;
+        t.enableWordWrapping = false; t.raycastTarget = false; t.richText = true;
         return t;
     }
 
