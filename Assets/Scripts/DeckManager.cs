@@ -108,6 +108,10 @@ public class DeckManager : MonoBehaviour
         int cost = data.shiftCost;
         if (SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.KineticDiscount))
             cost = Mathf.Max(0, cost - 1);
+        // Blompo: "On the House" zeroes the cost. CardAimIndicator mirrors this in
+        // EffectiveShiftCost — keep the two in sync or the affordability dimming lies.
+        if (playedCard.enhancement == CardEnhancement.OnTheHouse)
+            cost = 0;
         if (isNextCardFree)
         {
             cost = 0;
@@ -115,8 +119,13 @@ public class DeckManager : MonoBehaviour
         if (player.GetCurrentShift() < cost) return;
         if (!playedCard.isInfinite && playedCard.currentUses <= 0) return;
 
+        // Blompo: "Extra Spicy" scales the action's damage value.
+        float actionValue = data.actionValue;
+        if (playedCard.enhancement == CardEnhancement.ExtraSpicy)
+            actionValue *= CardEnhancements.EXTRA_SPICY_MULT;
+
         CardBeingPlayed = playedCard;
-        bool success = player.ExecuteAction(data.actionType, data.actionValue, out bool keepInHand);
+        bool success = player.ExecuteAction(data.actionType, actionValue, out bool keepInHand);
         CardBeingPlayed = null;
 
         // Shift is deducted only when the action actually executed — Blocked plays
@@ -140,13 +149,27 @@ public class DeckManager : MonoBehaviour
             {
                 isNextCardFree = false;
             }
+            // Blompo: "Kickback" refunds Shift on play. Gated by the hub rule like every other
+            // resource change — the sandbox neither charges nor pays out.
+            if (playedCard.enhancement == CardEnhancement.Kickback)
+            {
+                if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
+                    player.AddShift(CardEnhancements.KICKBACK_SHIFT);
+            }
+
+            // Blompo: "Double Dip" casts a second time. Only ever offered on cards that hold no
+            // ConflictFlags (CardEnhancements.IsInstantCard), so unlike Echo Chamber below this
+            // second cast can't be silently refused by TryExecute.
+            if (playedCard.enhancement == CardEnhancement.DoubleDip)
+                player.ExecuteAction(data.actionType, actionValue, out bool _);
+
             if (SkillManager.instance != null &&
                 SkillManager.instance.HasSkill(SkillType.EchoChamber) &&
                 UnityEngine.Random.value < 0.5f) // <--- BURASI DÜZELDÝ
             {
                 Debug.Log("ECHO CHAMBER: Çift Etki!");
                 // Ýkinci kez çalýþtýr
-                player.ExecuteAction(data.actionType, data.actionValue, out bool _);
+                player.ExecuteAction(data.actionType, actionValue, out bool _);
             }
             bool inHub = LevelManager.instance != null && LevelManager.instance.IsCurrentRoomHub();
             if (!playedCard.isInfinite && !inHub) playedCard.currentUses--;
@@ -313,10 +336,21 @@ public class DeckManager : MonoBehaviour
         DeselectCard();
         yield return new WaitForSeconds(0.2f);
 
-        discardPile.AddRange(hand);
+        // Blompo: "Clingy" cards are held back instead of being discarded, so they survive the
+        // Recall and are still in hand afterwards. They occupy their slot, so a hand full of
+        // Clingy cards simply doesn't refresh — that's the intended trade-off.
+        List<RuntimeCard> retained = new List<RuntimeCard>();
+        for (int i = 0; i < hand.Count; i++)
+        {
+            if (hand[i] != null && hand[i].enhancement == CardEnhancement.Clingy)
+                retained.Add(hand[i]);
+            else
+                discardPile.Add(hand[i]);
+        }
         hand.Clear();
+        hand.AddRange(retained);
 
-        for (int i = 0; i < handCapacity; i++)
+        for (int i = hand.Count; i < handCapacity; i++)
         {
             if (drawPile.Count == 0 && discardPile.Count > 0)
             {
