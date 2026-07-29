@@ -29,6 +29,7 @@ public class BlompoScreen : MonoBehaviour
     private TMP_FontAsset font;
 
     private Sprite portrait;
+    private Sprite hammerSprite;
     private List<CardEnhancement> offers;
     private System.Action onBlessed;
     private CardEnhancement chosenOffer = CardEnhancement.None;
@@ -45,11 +46,12 @@ public class BlompoScreen : MonoBehaviour
 
     // `fixedOffers` are THIS Blompo's three blessings, rolled once and owned by the NPC — the
     // screen must never re-roll, or leaving and re-entering would let the player reroll for free.
-    public static void Open(Sprite blompoPortrait, List<CardEnhancement> fixedOffers, System.Action blessedCallback = null)
+    public static void Open(Sprite blompoPortrait, Sprite hammer, List<CardEnhancement> fixedOffers, System.Action blessedCallback = null)
     {
         EnsureInstance();
         if (instance == null || instance.isOpen) return;
         instance.portrait = blompoPortrait;
+        instance.hammerSprite = hammer;
         instance.offers = fixedOffers;
         instance.onBlessed = blessedCallback;
         instance.Show();
@@ -331,23 +333,43 @@ public class BlompoScreen : MonoBehaviour
 
         Color gem = RelicUISprites.GemColor(CardEnhancements.RarityOf(chosenOffer));
 
-        // The enhancement is applied on the LAST hammer blow, and the card is re-skinned on that
-        // same frame so the badge appears exactly when the metal is struck.
-        yield return StartCoroutine(BlompoForgeFX.Play(this, forgeStage, chip, gem, () =>
+        // The enhancement lands on the LAST hammer blow, and the chip is updated on that same
+        // frame so the badge appears exactly when the metal is struck.
+        //
+        // CRITICAL: this must MUTATE the existing chip, never destroy and rebuild it. The FX
+        // coroutine holds a reference to `chip` and keeps animating it after this callback — if
+        // the object were destroyed here, the next line of the FX would throw on a dead
+        // RectTransform, abort the coroutine, and the screen would hang on the last frame with
+        // only the X button to escape. That was exactly the "gets stuck" bug.
+        yield return StartCoroutine(BlompoForgeFX.Play(this, forgeStage, chip, gem, hammerSprite, () =>
         {
             CardEnhancements.Apply(card, chosenOffer);
             if (DeckManager.instance != null) DeckManager.instance.RefreshHandUI();
-            Destroy(chipGo);
-            GameObject after = BuildCardChip(forgeStage, card, 1.55f);
-            RectTransform art = after.GetComponent<RectTransform>();
-            art.anchorMin = art.anchorMax = art.pivot = new Vector2(0.5f, 0.5f);
-            art.anchoredPosition = Vector2.zero;
-            art.SetAsFirstSibling();   // keep sparks/flash drawing in front
+            StampChip(chip, card);
         }));
 
         string cardName = card.cardData != null ? card.cardData.cardName : "It";
         promptText.text = $"<b>{cardName}</b> is now <b>{CardEnhancements.Name(chosenOffer)}</b>. Blompo is pleased.";
         yield return StartCoroutine(CloseAfter(1.4f));
+    }
+
+    // Updates an already-built card chip in place to show its new blessing (badge + charge count).
+    private void StampChip(RectTransform chip, RuntimeCard card)
+    {
+        if (chip == null || card == null) return;
+
+        Transform charges = chip.Find("Charges");
+        if (charges != null)
+        {
+            TMP_Text ct = charges.GetComponent<TMP_Text>();
+            if (ct != null) ct.text = card.isInfinite ? "∞" : card.currentUses.ToString();
+        }
+
+        if (card.enhancement == CardEnhancement.None || chip.Find("Badge") != null) return;
+
+        Color gem = RelicUISprites.GemColor(CardEnhancements.RarityOf(card.enhancement));
+        AddText(chip, "Badge", new Vector2(0.5f, 1f), new Vector2(0f, -10f), new Vector2(CARD_W - 16f, 28f),
+            CardEnhancements.Name(card.enhancement), 16f, FontStyles.Bold, gem, TextAlignmentOptions.Center);
     }
 
     private IEnumerator CloseAfter(float seconds)

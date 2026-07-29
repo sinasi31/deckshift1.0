@@ -149,6 +149,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   portrait: {fileID: 1319539617798216989, guid: 898650fb94348464a9bcbc6c2d0934b3, type: 3}
+  hammerSprite: {fileID: 21300012, guid: b217a154a8231e54bbb50405bdfafbaf, type: 3}
   vanishAfterBlessing: 1
   prompt: {fileID: 6754097561200946218}
 --- !u!1001 &229986992700857055
