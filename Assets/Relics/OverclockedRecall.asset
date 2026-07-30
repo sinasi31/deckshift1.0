@@ -15,5 +15,5 @@ MonoBehaviour:
   relicID: OverclockedRecall
   relicName: Offering
   description: Recall costs no Shift, but each Recall deals 5 damage to you.
-  relicArt: {fileID: 0}
+  relicArt: {fileID: 21300000, guid: 4408269a96438e84796304f4ac0ed623, type: 3}
   rarity: 2

@@ -173,13 +173,16 @@ public class CardAimIndicator : MonoBehaviour
         }
     }
 
-    // Mirrors DeckManager.PlayCard's affordability gate exactly (KineticDiscount, First One's
-    // Free). Note the gate applies even in the hub — only the SPEND is hub-exempt.
+    // Mirrors DeckManager.PlayCard's affordability gate exactly (KineticDiscount, Blompo's
+    // "On the House", First One's Free). Note the gate applies even in the hub — only the SPEND
+    // is hub-exempt. If you change the cost maths in PlayCard, change it here too or the
+    // indicator's affordability dimming becomes a lie.
     private bool CanAfford(DeckManager deck, RuntimeCard card)
     {
         int cost = card.cardData.shiftCost;
         if (SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.KineticDiscount))
             cost = Mathf.Max(0, cost - 1);
+        if (card.enhancement == CardEnhancement.OnTheHouse) cost = 0;
         if (deck.isNextCardFree) cost = 0;
         return player.GetCurrentShift() >= cost;
     }

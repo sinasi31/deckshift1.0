@@ -904,7 +904,11 @@ public class PlayerController : MonoBehaviour
             {
                 float enemyTopY = other.bounds.center.y + other.bounds.extents.y * 0.5f;
                 float enemyBottomY = other.bounds.center.y - other.bounds.extents.y * 0.5f;
+#if UNITY_EDITOR && DECKSHIFT_VERBOSE
+                // Verbose only: this fires on EVERY enemy trigger overlap and the interpolated
+                // string allocates each time. Define DECKSHIFT_VERBOSE to re-enable.
                 Debug.Log($"[HeadBounce Trigger] {other.gameObject.name}, playerY: {transform.position.y:F2}, enemyTopY: {enemyTopY:F2}, velocity.y: {rb.linearVelocity.y:F2}");
+#endif
 
                 bool positionOk = isGravityReversed ? transform.position.y < enemyBottomY : transform.position.y > enemyTopY;
                 if (positionOk)
@@ -1318,7 +1322,10 @@ public class PlayerController : MonoBehaviour
         if (eHealth != null)
         {
             ContactPoint2D contact = collision.GetContact(0);
+#if UNITY_EDITOR && DECKSHIFT_VERBOSE
+            // Verbose only: fires on EVERY enemy collision (see the trigger path above).
             Debug.Log($"[HeadBounce] Collision: {collision.gameObject.name}, normal.y: {contact.normal.y:F2}, velocity.y: {rb.linearVelocity.y:F2}, canBounce: {eHealth.canBeHeadBounced}");
+#endif
 
             bool normalFromBelow = isGravityReversed ? contact.normal.y < -0.7f : contact.normal.y > 0.7f;
             if (normalFromBelow)
@@ -1658,8 +1665,17 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator WarningFlashRoutine()
     {
-        // Flash the sprite rig (the SkinnedMeshRenderer path was dead after the rig swap).
-        // Capture each sprite's own color so the restore is honest even if they differ.
+        // The gravity-reversal warning must read on the WHOLE character. The Mage M rig is
+        // 16 SkinnedMeshRenderers (body + outfit) plus 1 SpriteRenderer (the staff). A prior
+        // version flashed only SpriteRenderers, so it tinted the staff alone and the body
+        // never reacted — the warning was effectively invisible. A red tint can't fix it
+        // either: the Cainos "Alpha Cut" shader on most outfit parts exposes no color
+        // property. But EVERY Cainos rig shader shares "_Alpha" (the same handle Phase
+        // strobes), so we blink the whole body's alpha — a blink reads as "effect expiring"
+        // — and still red-tint the staff, which does support color.
+        SkinnedMeshRenderer[] bodyParts = visualModel != null
+            ? visualModel.GetComponentsInChildren<SkinnedMeshRenderer>(true)
+            : new SkinnedMeshRenderer[0];
         SpriteRenderer[] sprites = visualModel != null
             ? visualModel.GetComponentsInChildren<SpriteRenderer>(true)
             : new SpriteRenderer[0];
@@ -1667,19 +1683,37 @@ public class PlayerController : MonoBehaviour
         for (int i = 0; i < sprites.Length; i++)
             originals[i] = sprites[i].color;
 
-        Color warnColor = new Color(1f, 0.3f, 0.3f);   // red danger tint
+        MaterialPropertyBlock block = new MaterialPropertyBlock();
+        Color warnColor = new Color(1f, 0.3f, 0.3f);   // red danger tint (staff only)
+        const float dimAlpha = 0.2f;                   // blinked-down body alpha
 
         // 3 rapid on/off cycles ≈ 0.5s total
         for (int c = 0; c < 3; c++)
         {
+            SetBodyAlpha(bodyParts, block, dimAlpha);
             SetSpriteColors(sprites, warnColor, null);
             yield return new WaitForSeconds(0.083f);
+            SetBodyAlpha(bodyParts, block, 1f);
             SetSpriteColors(sprites, default, originals);
             yield return new WaitForSeconds(0.083f);
         }
 
         // Guarantee restoration regardless of where the loop ended.
+        SetBodyAlpha(bodyParts, block, 1f);
         SetSpriteColors(sprites, default, originals);
+    }
+
+    // Strobe the "_Alpha" property every Cainos rig shader exposes. Mirrors
+    // PhaseVisualRoutine — MaterialPropertyBlocks apply cleanly to these SkinnedMeshRenderers,
+    // and _Alpha == 1 is the confirmed "normal" value (Phase restores to 1 the same way).
+    private void SetBodyAlpha(SkinnedMeshRenderer[] parts, MaterialPropertyBlock block, float alpha)
+    {
+        block.SetFloat("_Alpha", alpha);
+        for (int i = 0; i < parts.Length; i++)
+        {
+            if (parts[i] == null) continue;
+            parts[i].SetPropertyBlock(block);
+        }
     }
 
     // Tint all sprites to a single color, or restore each to its captured original

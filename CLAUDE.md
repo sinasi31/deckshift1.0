@@ -10,7 +10,9 @@ This file is loaded automatically into Claude Code at the start of every session
 
 **Core concept:** "Movement is a Resource." Jumping consumes **Shift**, which does not regenerate on its own — and **Shift CARRIES OVER between rooms** (designer-confirmed 2026-07-13: it is a run-long resource, and this persistence is "the whole identity of the game" — spending Shift now means having less for the rest of the run). Do NOT describe or implement Shift as a per-room resource. Most other actions (attacks, special movement, utility) are delivered via cards. Cards have **charges**; when charges deplete the card moves to the exhaust pile and must be recovered via scrap.
 
-**Current state:** Act 1 (Oxidation District) prototype. ~5 hand-crafted levels, ~10 cards in the game. Two acts (Vapor Stratum, Final Forge) planned but not started. Target: 45-50 minute run length, 60+ cards total at content-complete.
+**Current state:** Act 1 (Oxidation District) prototype. **7 combat levels in the run pool** (+ hub + boss room; ~15 more contract-valid rooms exist unused — see Room Pool), **16 CardData assets in `Assets/Cards/` and 18 relics** (re-verified 2026-07-26; note 2 of the 16 are not normal reward cards — `Stagger` is the fail-state card and `AnaKartVeritabanı` is the card *database* asset, so the real playable pool is ~14). Two acts (Vapor Stratum, Final Forge) planned but not started. Target: 45-50 minute run length, 60+ cards total at content-complete.
+
+⚠️ **Content is the project's real bottleneck, and it gates the two biggest planned systems.** The run map is explicitly blocked on level count (it's mediocre at ~7 rooms, sings at ~30), and card *enhancements* ("Blompo") are a multiplier on the card pool — both want more content underneath them before they pay off. When choosing between "build another system" and "author more cards/levels", the honest answer is usually the latter.
 
 The player character was recently swapped from the skeleton rig (`PF Skeleton - Mage`) to `PF Pixel Character - Mage M` from the Cainos Customizable Pixel Character pack. The wizard identity is now the canonical character. The skeleton remains in the Player prefab disabled, intended for future use as an enemy. **Renderer facts (verified in-editor 2026-07-17): the Mage M body is 16 `SkinnedMeshRenderer` parts (Body, Hair, Hat, Cloth… — Cainos "Alpha Cut"/Body/Hair shaders); only the magic staff is a `SpriteRenderer`.** Any code that snapshots/copies the player's look must handle SkinnedMeshRenderers (e.g. `SkinnedMeshRenderer.BakeMesh`, as `CardAimIndicator`'s dash trail does) — a SpriteRenderer-only pass silently produces a staff-only ghost.
 
@@ -75,7 +77,7 @@ This is a large script (~1,200 lines). It currently handles movement, jumping, c
 
 - **Active visual model:** `PF Pixel Character - Mage M` at `Assets/Cainos/Customizable Pixel Character/Prefab/Character Preset/PF Pixel Character - Mage M.prefab`. This is a child of the Player root and is assigned to `PlayerController.visualModel`.
 - **Disabled fallback:** `PF Skeleton - Mage` is still parented under Player but disabled (checkbox off). Kept as backup and for future reuse as an enemy.
-- **Physics collider:** `CapsuleCollider2D` on the Player root with **Offset (-0.0053, 0.8423) and Size (0.5075, 1.6848)**. Direction: Vertical. A `BoxCollider2D` was previously present but disabled and has been removed. Do not re-add it. **This capsule is the player's ONLY solid collider (2026-07-16):** the Cainos rig's leftover bone colliders (capsules on `Rig Spine1`/`Rig Spine2`, circle on `Rig Head`) and the magic staff's `Rigidbody2D` + trigger `PolygonCollider2D` were removed from the prefab — they made the hitbox animation-dependent and cost physics rebakes every frame. Do not re-add them.
+- **Physics collider:** `CapsuleCollider2D` on the Player root with **Offset (-0.0053, 0.8423) and Size (0.5075, 1.6848)**. Direction: Vertical. A `BoxCollider2D` was previously present but disabled and has been removed. Do not re-add it. **This capsule is the player's only ACTIVE solid collider (2026-07-16):** the Cainos rig's leftover bone colliders (capsules on `Rig Spine1`/`Rig Spine2`, circle on `Rig Head`) and the magic staff's `Rigidbody2D` + trigger `PolygonCollider2D` were removed from the prefab — they made the hitbox animation-dependent and cost physics rebakes every frame. Do not re-add them. **CAVEAT verified 2026-07-18:** a second solid (non-trigger, component-enabled) `BoxCollider2D` still exists on the **disabled** `PF Skeleton - Mage` child. It is inert only because that GameObject is inactive — **if you ever re-enable the skeleton (the doc below suggests reusing it as an enemy), the player instantly gains a second solid collider on its Rigidbody2D.** Delete that BoxCollider2D before re-enabling, or reuse the skeleton as a separate prefab rather than by re-activating this child. The root Rigidbody2D is confirmed the only Rigidbody2D in the prefab.
 - **Rigidbody2D:** Dynamic. Gravity scale flips sign during gravity reversal — do NOT modify `Physics2D.gravity` globally.
 - **Player root Transform:** Position (0, 0, 0), Rotation (0, 0, 0), **Scale (1, 1, 1)**. This is now a hard rule again — the prior non-(1,1,1) scale was an accidental drift that compounded into a real bug. Do not modify the root scale to adjust character size; scale `visualModel` instead.
 
@@ -130,7 +132,7 @@ The player has check Transforms parented to the player root (NOT to visualModel)
 
 `IsGroundedCheck()` switches probe based on `isGravityReversed`. The original implementation used a mirror-math formula (`2 * pivot - groundCheck.position`) but that was fragile (only 0.16 units of overlap margin); the dedicated `ceilingCheck` Transform replaced it.
 
-`groundLayer` mask is `2057` = layers 0 (Default), 3 (level geometry), 11. Level geometry pieces are on layer 3. Enemies are mixed: **AeroBat and MeleeEnemy are on the Default layer; RangedEnemy is on the Enemy layer.** This inconsistency is a known issue but currently load-bearing.
+`groundLayer` mask is **`2056` = layer 3 (`Ground`) + layer 11 (`Enemy`)** — verified against Player.prefab 2026-07-18. (An earlier version of this file claimed `2057` including layer 0 `Default`; that was WRONG — Default is NOT in the mask.) Consequences worth knowing: level geometry is on layer 3, and because layer 11 `Enemy` IS in the mask, the player can **stand on / ground-check against every Enemy-layer enemy**. See "Layer Convention Mismatch" under Enemy System for the verified per-enemy layer split — it is inconsistent and decides which enemies are walkable. This is a known issue but currently load-bearing.
 
 ### Gravity Reversal System
 
@@ -142,11 +144,11 @@ Key fields on PlayerController:
 - `gravityReversalCoroutine` — reference for stop-and-restart on re-play
 - **`visualFlipYOffset`** — serialized field, current value **1.6875** (tuned in Inspector after the scale refactor). Translates visualModel up so the 180° rotation pivots around the collider center instead of the feet.
 - `originalVisualLocalPos`, `originalVisualScaleX` — cached for restoration
-- `warningSoundClip` — AudioClip Inspector field, played at t=4.5s (assigned 2026-07-16: the breaker-switch clip in `Assets/Audio/SFX/` — designer may swap; it had been null in the scene, making the warning fully silent)
+- `warningSoundClip` — AudioClip Inspector field, played at t=4.5s (assigned 2026-07-16: the breaker-switch clip in `Assets/Audio/SFX/` — designer may swap; it had been null in the scene, making the warning fully silent). ⚠️ **This regressed once and was re-fixed 2026-07-22:** the SampleScene Player instance had re-acquired a `prefabOverride` setting this field back to NULL, silencing the warning again even though the prefab was correct. Reverted via `PrefabUtility.RevertPropertyOverride`. **If a player field mysteriously "stops working," check for a scene-instance override before touching the prefab or the code** — the prefab being right does not mean the scene is using it.
 
 `GravityReversalRoutine()` handles the full timeline. `LerpVisualTransform` uses a tracked Z-angle float (never reads back from `localEulerAngles`, which Unity normalizes unpredictably).
 
-The 0.5s **warning flash** is implemented against `SkinnedMeshRenderer` via `material.SetColor("_Color", ...)`. CORRECTION (2026-07-17): the Mage M body IS SkinnedMeshRenderers (an earlier version of this file claimed SpriteRenderers — wrong), so `GetComponentInChildren<SkinnedMeshRenderer>()` does find a renderer. Whether the flash actually shows is UNVERIFIED — the Cainos "Alpha Cut" shader may not expose a `_Color` property, in which case `SetColor` silently no-ops. **The expiration audio cue plays** (clip re-assigned 2026-07-16 after being found null), so the warning is audible. If the flash is still invisible in playtests, check the shader's tint property name first. Low priority.
+The 0.5s **warning flash** is `WarningFlashRoutine` (3 rapid on/off cycles ≈ 0.5s) — **FIXED and screenshot-verified 2026-07-26.** History: it originally tinted `SkinnedMeshRenderer._Color`, which silently no-ops because the Cainos **"Alpha Cut"** shader (most outfit parts) exposes no color property at all (only `_MainTex` + `_Alpha`); a later "fix" switched it to `GetComponentsInChildren<SpriteRenderer>()`, but the Mage M rig is **16 SkinnedMeshRenderers (body/outfit) + 1 SpriteRenderer (the staff ONLY)**, so that flashed just the staff and the body never reacted. Current implementation strobes **`_Alpha`** (the one handle EVERY Cainos rig shader shares — the same one Phase uses) across all SkinnedMeshRenderers via a `MaterialPropertyBlock`, blinking the WHOLE character (a blink reads as "effect expiring"), and additionally red-tints the staff (which does support color). `_Alpha == 1` is the confirmed "normal" value. **Audio cue also plays** (clip re-assigned 2026-07-16). If you ever swap the character rig, re-check that its shaders still expose `_Alpha`.
 
 ### Facing System
 
@@ -197,7 +199,7 @@ Discovered when hub mode allowed free card spamming: playing multiple state-modi
 **Current state (updated 2026-07-06): RESOLVED.** The CardActionExecutor extraction is done AND conflict-flag enforcement is live. Each `CardAction` declares a `ModifiedState` (`ConflictFlags`); the executor accumulates flags in `activeFlags` (via `ManagedCoroutine` for coroutine actions, via `SetManualFlag` for the manual-lifecycle ones) and **`TryExecute` now checks them: if an action's `ModifiedState` overlaps `activeFlags`, it is refused up front with `CardExecuteResult.Blocked` and none of its code runs.** A blocked play costs no Shift and no charge, and the card stays in hand (`DeckManager.PlayCard` only spends/consumes on `Success`). The state-corruption bug class (Floor is Lava + Adrenaline + Phase leaving the player flying/frozen) can no longer occur — the conflicting second card is refused instead of corrupting the baseline snapshot.
 
 Per-effect conversion status:
-- **Dash** ✅ converted — managed coroutine; flags `PlayerVelocity | Invincibility` held for the whole dash. **Reworked 2026-07-06 into a driven dash** (`PlayerController.DashRoutine`): enters `PlayerState.Dashing` and holds a flat horizontal velocity for `dashDuration` (re-asserted each FixedUpdate with y forced to 0), so it works on the ground too — the old one-shot `AddForce` impulse was erased the next frame by the grounded movement line (`rb.linearVelocity = moveInput * moveSpeed`). Never touches `gravityScale` (composes cleanly with Floor is Lava). Procedural afterimages via `DashAfterimage.cs`; tunables `dashSpeed`/`dashDuration`/`dashEndSpeed`/`dashIFrameDuration`/`dashAfterimages` on PlayerController.
+- **Dash** ✅ converted — managed coroutine; flags `PlayerVelocity | Invincibility` held for the whole dash. **Reworked 2026-07-06 into a driven dash** (`PlayerController.DashRoutine`): enters `PlayerState.Dashing` and holds a flat horizontal velocity for `dashDuration` (re-asserted each FixedUpdate with y forced to 0), so it works on the ground too — the old one-shot `AddForce` impulse was erased the next frame by the grounded movement line (`rb.linearVelocity = moveInput * moveSpeed`). Never touches `gravityScale` (composes cleanly with Floor is Lava). Procedural afterimages via `DashAfterimage.cs`; tunables `dashSpeed`/`dashDuration`/`dashEndSpeed`/`dashIFrameDuration`/`dashAfterimages` on PlayerController. **Live Player.prefab values (verified 2026-07-18): dashSpeed 26, dashDuration 0.16, dashEndSpeed 9, dashIFrameDuration `0.15`.** ⚠️ Note `dashIFrameDuration (0.15) < dashDuration (0.16)`, which violates the field's own inline invariant ("keep >= dashDuration to stay safe through the dash") — the player is damageable for the last ~0.01s of the dash. The script default is 0.22; the prefab overrides it to 0.15. Harmless in practice but unintended; raise it to ≥ 0.16 if i-frames should truly cover the whole dash.
 - **Phase** ✅ converted — managed coroutine; flags `GravityScale | LayerCollisionMatrix | PlayerVelocity`.
 - **Adrenaline** ✅ converted (manual-flag pattern) — `UseAdrenaline`'s two sub-coroutines are mutually exclusive (`if/else` on health %), and each calls `SetManualFlag(TimeScale | MoveSpeed, …)` at start/end. The old "not refcounted / overlapping plays clear flags early" caveat is now moot: a second Adrenaline play while one is active is Blocked (its flags overlap), so concurrent same-flag effects can't happen.
 - **Fireball** ✅ converted — managed coroutine; `AnimatorAttackState`.
@@ -276,12 +278,22 @@ There are 13+ singleton managers. This is a known architectural smell flagged in
 - **SkillManager**, **SkillRewardManager** — skill tree / skill selection
 - **QuestSystem** — quest tracking, board UI, accept/progress/complete events
 - **ShopManager** — in-game shop UI and purchases
-- **SlotMachineManager** / **SlotMachineUI** — gambling system (planned to be replaced with Dice Broker — see deferred work)
+- **SlotMachineUI** — gambling system (planned to be replaced with Dice Broker — see deferred work). ⚠️ **There is NO `SlotMachineManager` type** — verified 2026-07-18; an earlier version of this file listed one. Only `SlotMachineUI` exists.
 - **AchievementManager** — achievement tracking
-- **MenuManager** / **PauseMenu** / **MainMenuController** — menu systems
-- **EffectManager** — VFX spawning helper
+- **PauseMenu** / **MainMenuController** — menu systems. ⚠️ **There is NO `MenuManager` type** (verified 2026-07-18); it was listed here in error.
+- ⚠️ **`EffectManager` DOES NOT EXIST as a type** (verified 2026-07-18) — this entry was a phantom. Confusingly there IS a GameObject *named* "EffectManager" in SampleScene, but it carries **HitStop**, not an EffectManager component. VFX are spawned ad-hoc by the callers (e.g. `Instantiate` of a VFX prefab) and by house-pattern procedural classes (`DashAfterimage`, `ShockwaveVFX`, `SpitGlob`, `CardAimIndicator`).
 - **MusicManager** — background music
 - **CameraShake**, **HitStop** — game-feel singletons (camera shake + freeze frames)
+
+#### Scene presence in SampleScene — verified 2026-07-18
+
+Because "the system exists in code but isn't in the scene" is this project's #1 recurring bug (see Common Pitfalls), here is the audited truth:
+
+- **Present, component-enabled, active:** GameManager, DeckManager, LevelManager, RelicManager, SkillManager, SkillRewardManager, QuestSystem, ShopManager, AchievementManager, RewardManager, **CameraShake (on Main Camera — the 9-month "no shake" bug is genuinely fixed)**, CameraFollow (Main Camera), **CameraPeek (Main Camera ONLY — the Player duplicate is confirmed gone)**, HitStop (on the GameObject named "EffectManager").
+- **NOT in SampleScene:** `MusicManager` and `SfxManager`. Both exist as MonoBehaviours but live elsewhere (MainMenu boot flow). Consequence: **entering Play mode directly in SampleScene gives you no MusicManager**, so no BGM — that's expected, not a bug. `SfxManager`'s entry points are `static` and work fine without a scene instance, which is why SFX still play.
+- ⚠️ **Leftover `CinemachineCamera` GameObject still sits in SampleScene, INACTIVE, carrying a second `CameraShake` component.** Harmless while inactive (Awake never runs, so it can't hijack the singleton), but it is Cinemachine-era cruft and a trap if anyone activates it — that would create a duplicate CameraShake singleton. Part of the same pending Cinemachine cleanup as the dead `using Unity.Cinemachine;` directives.
+
+**Build settings (verified):** `MainMenu`(0), `Hub`(1, disabled), **`SampleScene`(2)**, `GameOverScene`(3), `GameScene`(4).
 
 ### Pause Counter System
 
@@ -317,10 +329,11 @@ The quest system is **functional**: data model, accept/progress/complete events,
 - **`QuestData`** (ScriptableObject) — quest templates. Fields: `questName`, `description`, `type` (QuestType enum), `targetAmount`, `rewardText`, `rewardType` (RewardType enum), `rewardAmount`.
 - **`QuestType` enum:** `GoldAccumulate`, `KillEnemy`, `AirKill`, `NoDamageRoom`, `UseCardCount`. **Of these, only `KillEnemy` and `AirKill` currently fire events** (from `EnemyHealth.Die()`). The others are defined but unwired.
 - **`RewardType` enum:** `Gold`, `ShiftCharge`, `Heal`. All three are wired in `QuestSystem.GiveReward`.
-- **Three quest assets currently exist** at `Assets/Quests/`:
+- **Four quest assets exist** at `Assets/Quests/` (re-verified 2026-07-18 — an earlier version of this file said three):
   - `New Quest 1` — "Invincible" — NoDamageRoom (1) → 300 Gold. **Objective type not wired, won't progress yet.**
-  - `New Quest 2` — "Hit a Clip" — AirKill (3) → +10 Shift. Fully functional.
+  - `New Quest 2` — "Hit a Clip" — AirKill (3) → +10 ShiftCharge. Fully functional.
   - `New Quest 3` — "Bounty Hunter" — KillEnemy (3) → 100 Gold. Fully functional.
+  - `Scrooge` — "Scrooge" — GoldAccumulate (800) → Gold **0**. ⚠️ Two problems: `GoldAccumulate` is still an unwired objective type (won't progress), AND its `rewardAmount` is 0, so it would pay nothing even if completed. Looks unfinished.
 
 ### QuestSystem Singleton
 
@@ -349,7 +362,7 @@ public event System.Action<ActiveQuest> OnQuestCompleted;  // fired after isComp
 
 Lives under `Canvas` as `QuestBoardOverlay` → `Panel` → (`QuestContainer`, `LeaveButton`). The board uses a hand-painted background sprite with three painted parchment slots and three painted ACCEPT buttons; the spawned `QuestItemTemplate` prefabs (one per quest) sit inside those painted slots with transparent backgrounds, and the invisible Accept buttons inside each QuestPaper are sized to overlay the painted ACCEPT graphics. The Leave button is also an invisible button over a painted graphic.
 
-The QuestBoard in `Assets/LevelEfeS/hub.prefab` has a `SimpleInteract` component on it (implements `IInteractable`) that calls `QuestSystem.ToggleBoard()` on player interact (press E within `interactionRange`). The board's Layer must be in PlayerController's `interactableLayer` mask. Currently the mask is set to "Interactable" only, and the QuestBoard is on Layer 12. **Verify in Inspector that Layer 12 corresponds to Interactable, or that interactableLayer includes both.**
+The QuestBoard in `Assets/LevelEfeS/hub.prefab` has a `SimpleInteract` component on it (implements `IInteractable`) that calls `QuestSystem.ToggleBoard()` on player interact (press E within `interactionRange`). The board's Layer must be in PlayerController's `interactableLayer` mask. ✅ **VERIFIED 2026-07-18** (this was previously an open "someone please check" item): `interactableLayer` = **4096 = layer 12**, layer 12 **is** named `Interactable`, and the hub's `QuestBoard` object is on layer 12 with a `SimpleInteract` component. The wiring is correct — no action needed.
 
 ### Live Tracker HUD (QuestTrackerHUD)
 
@@ -370,16 +383,26 @@ Because the tracker is parented under GameplayHUD, it inherits the auto-hide beh
 
 ## Relic System
 
-Currently a Slay-the-Spire-style additive system: every relic is a passive bonus, the player can own unlimited relics, no slot constraints. **This is slated for a major redesign — see "Future: Slot-Constrained Relic Redesign" in the deferred work section.** Do not invest heavily in new relic content or relic UX features until the redesign happens; that work will likely be reworked.
+**The Balatro-style slot-constrained system is BUILT and live (corrected 2026-07-26 — this section previously claimed it was an unbuilt "future direction", which was badly stale).** The player owns at most **`RelicManager.MaxSlots` = 5** relics; acquiring one while full forces a sell-or-decline decision. It is no longer an unlimited additive pile.
+
+What exists today:
+- **Slots + selling** — `MaxSlots`, `IsFull`, `SellValueFor(relic)` (fixed refund by rarity: Legendary 150 / Epic 90 / Rare 50 / Common 25), `SellRelic(relic)` which removes, credits gold, fires `OnRelicRemoved` and calls `RecomputePassives()`.
+- **Central grant entry point** — `TryGrantRelic(relic, onAcquired)`. Slot free → add immediately and run `onAcquired`. Slots full → open `RelicSwapScreen`; TAKE sells the chosen relic then adds the new one and runs `onAcquired`, LEAVE runs nothing. **`onAcquired` is where callers finalize side effects (e.g. the shop charges gold ONLY when the relic is actually taken), so a declined full-slot grant costs nothing.** New grant sources should route through `TryGrantRelic`, not `AddRelic`.
+- **UI** — `RelicHUD` (top-centre loadout bar), `RelicSlotHover` + `RelicTooltip` (hover info), `RelicManagePanel` (inspect/sell, `I` key), `RelicSwapScreen` (the forced full-slot decision). All procedural, all sharing `RelicUISprites`.
+
+**Passive recomputation rule (important):** `RecomputePassives()` recalculates stat relics from the player's BASE stats every time the loadout changes, so selling reverses exactly. **Never add/subtract stats incrementally** — that breaks the moment relics stack (Reinforced Plating + Glass Heart) or are sold out of order.
+
+Still open (see deferred work): rebalancing the 18 relics *for* a slot economy — they were authored as small always-on Slay-the-Spire bonuses, which is the wrong shape for a 5-slot loadout where each pick should be a real decision.
 
 ### RelicManager
 
 Singleton. Holds:
-- `ownedRelics` — private list of owned `RelicData`.
+- `ownedRelics` — private list of owned `RelicData`; **list index == slot index**.
 - Public `OwnedRelics` — `IReadOnlyList<RelicData>` accessor.
-- Public event `OnRelicAdded` — `System.Action<RelicData>`, fired after a successful add (not on duplicate-add).
+- Public events `OnRelicAdded` / `OnRelicRemoved` — `System.Action<RelicData>`, fired after a successful add/sell (not on duplicate-add). HUD and panels rebuild on both.
 
-Grant paths (only two are accessible in normal play):
+Grant paths:
+- `TryGrantRelic(relic, onAcquired)` — **the entry point everything should use** (handles the full-slot swap flow).
 - `ShopItemUI` — buying a shop item with a relic reference.
 - `SlotMachineUI` — slot machine payout.
 - `DebugTools.cs` F1 key — debug only.
@@ -390,23 +413,46 @@ Grant paths (only two are accessible in normal play):
 
 Fields: `relicID` (string, used for `HasRelic` polling), `relicName`, `description`, `relicArt` (Sprite, used by the HUD), `rarity` (enum).
 
-Current relic assets at `Assets/Relics/`:
-- `VampireTooth` — kills heal 5 HP. Wired in `RelicManager.OnEnemyKilled`.
-- `Kinetic` — kills grant +2 Shift. Wired.
-- `SpikedCarapac` — taking damage reflects 20 to nearby enemies. Wired.
-- `Pogo Boots` — head-bounce on enemies. Wired in `PlayerController` (see Enemy System).
-- `LavaBoots` — protects from hazard zones. Wired in `HazardZone.cs`.
-- `New Relic 1` ("Oops! All 7's", Legendary) — no behavior, placeholder.
-- `Helly` (Common) — no behavior, placeholder/junk.
+**Relic roster — re-audited 2026-07-18. There are 18 relics and ALL are wired.** (An earlier version of this file listed only 7, including `New Relic 1` / "Oops! All 7's" and `Helly` — those are gone, and the "only 5 are functional" claim was badly stale.) The roster was renamed to the playful house voice (see Tone & Voice), so **asset filename ≠ display name ≠ `relicID`** — always poll by `relicID`:
+
+| Asset file | `relicID` | Display name | Rarity |
+|---|---|---|---|
+| ExecutionersSeal | `ExecutionersSeal` | Executioner's Seal | Epic |
+| FluxRegulator | `FluxRegulator` | First One's Free | Common |
+| FoundryRights | `FoundryRights` | Melt It Down | Epic |
+| GlassHeart | `GlassHeart` | Glass Heart | Epic |
+| **Kinetic** | **`KineticCapacitor`** ⚠️ | Hot Streak | Common |
+| LavaBoots | `LavaBoots` | Hot Steppers | Common |
+| MeteorGreaves | `MeteorGreaves` | Meteor Greaves | Epic |
+| MidasRecoil | `MidasRecoil` | Blood Money | Rare |
+| OverclockedRecall | `OverclockedRecall` | Offering | Epic |
+| PhoenixCog | `PhoenixCog` | Phoenix Cog | Legendary |
+| PocketBattery | `PocketBattery` | Pocket Lightning | Common |
+| Pogo Boots | `PogoBoots` | Pogo Boots | Rare |
+| ReclaimersClamp | `ReclaimersClamp` | Sticky Fingers | Rare |
+| ReinforcedPlating | `ReinforcedPlating` | Bubble Wrap | Common |
+| ScrapMagnet | `ScrapMagnet` | Loot Goblin | Common |
+| **SpikedCarapac** | **`SpikedCarapace`** ⚠️ | Do Not Pet | Rare |
+| VampireTooth | `VampireTooth` | Snack Fangs | Common |
+| Whetstone | `Whetstone` | Whetstone | Common |
+
+⚠️ **Two filename/ID traps:** the asset named `Kinetic` has `relicID` **`KineticCapacitor`**, and `SpikedCarapac` (no trailing "e") has `relicID` **`SpikedCarapace`** (with "e"). Using the filename in `HasRelic()` will silently never match.
+
+**How each is wired** (verified): most via `RelicManager.HasRelic("<id>")` — including a damage-modifier path `RelicManager.ModifyPlayerDamage(...)` used by Fireball / Bite / Freefall that reads **Whetstone, MidasRecoil, GlassHeart**. Two are wired differently and will NOT show up if you grep for `HasRelic`: **LavaBoots** via `HazardZone.requiredRelicID` (default `"LavaBoots"`, also set by `AcidBlobProjectile`), and **ScrapMagnet** via the static `ScrapMagnet` class (`ScrapMagnet.Attract`, called from `GoldPickUp` and `Shift Crystal`).
 
 ### Relic HUD (RelicHUD.cs)
 
-`Assets/Scripts/RelicHUD.cs`, attached to a `RelicHUD` GameObject under `Canvas/GameplayHUD/`, anchored middle-left, vertical column.
+`Assets/Scripts/RelicHUD.cs`, attached to a `RelicHUD` GameObject under `Canvas/GameplayHUD/`. **It is a fixed TOP-CENTRE loadout bar of `MaxSlots` cells + an "N/5" count** (corrected 2026-07-26; it was previously a middle-left vertical column). The bar **self-positions in code**, so it needs no scene re-anchoring — the legacy left-column container is disabled on `Start()`. Note `iconContainer` in SampleScene points at the HUD's OWN transform, so `BuildBar()` deliberately never disables it when `iconContainer == transform` (that would switch off the object building the bar).
 
-- Subscribes to `RelicManager.OnRelicAdded` in `Start()`.
-- Also iterates existing `RelicManager.instance.OwnedRelics` at Start so it populates on late wake-up.
-- Each new relic instantiates `RelicIconPrefab.prefab` (unchanged 48×48 root) as a child, then `AddComponent<RelicIcon>().Build(relic)` styles it (2026-07-02). **`RelicIcon.cs`** disables the root Image and builds 4 procedural UGUI child Images back-to-front — rarity **glow** aura / dark rounded **plate** / **icon** art (`relicArt`, preserveAspect) / rarity **frame** border — with the SAME rarity colour language as the chest burst (Legendary gold / Epic purple / Rare blue / Common pale-grey). Pop-in is **Update-driven** (EaseOutBack, unscaled) so it survives being built while GameplayHUD is inactive (relics granted from a hidden shop/slot pop in when the HUD reshows); Epic/Legendary get an idle glow pulse.
-- Still visual-only: no tooltip, no activation flash, no interaction (deliberate — see the slot-constrained relic redesign caveat below; don't invest further in relic UX until that lands).
+- Subscribes to both `OnRelicAdded` and `OnRelicRemoved`; rebuilds all cells on either.
+- Filled cells instantiate `RelicIconPrefab.prefab` and call `RelicIcon.Build(relic)`; empty cells draw a dim, gemless stone socket so full and empty read as one crafted row.
+- Each cell carries a transparent `RelicSlotHover` hit-target (RelicIcon's own graphics are non-raycast) which drives the shared `RelicTooltip` and opens `RelicManagePanel` on click. `I` also opens it.
+
+**Relic chip visual language (rebuilt 2026-07-26):** `RelicIcon.cs` disables the prefab's root Image and builds the chip procedurally to match the game's OWN hand-painted HUD chrome (`Assets/Art/panel 1.png`, the top-left stat panel), rather than generic UI: rarity **glow** → mottled-**stone** socket → **icon** art (`relicArt`, + drop shadow) → ornate **gold border** → four corner **gem bosses**. **Rarity is carried by the GEM colour, not by recolouring the frame** (amber Legendary / amethyst Epic / sapphire Rare / ruby Common — ruby matches the HUD panel's own studs), so every relic reads as the same gold-on-stone object as the rest of the HUD. Pop-in is **Update-driven** (EaseOutBack, unscaled) so it survives being built while GameplayHUD is inactive (relics granted from a hidden shop/slot pop in when the HUD reshows); Epic/Legendary get an idle glow pulse.
+
+All the shared sprites live in **`RelicUISprites`** (`GoldBorder()`, `StonePanel()`, `GemSetting()`, `Gem()`, `GemColor(rarity)`, plus `AddGemStuds(...)` which studs a panel's border). Procedural + statically cached, no art files. `GoldBorder` carries a 9-slice border so panels use it too; the medallion draws it as **Simple** (a 9-sliced bevel would stretch). The Manage/Swap/tooltip panels all use this same chrome.
+
+⚠️ **When editing these panels, keep content inset clear of the border AND the gem studs** (~52px on the Manage panel). The ornate border is much thicker than the old flat frame, and the original insets left text visibly crowding it.
 
 ---
 
@@ -539,6 +585,19 @@ FAIL is "prove me wrong", not proof.
 
 `LevelManager.roomPrefabs` holds the pool of room prefabs. **Element 0 must be the hub;** elements 1..n are the run's combat levels. The boss room is NOT in this list — it has its own `bossRoomPrefab` slot.
 
+**Verified pool contents (2026-07-18):** `[0] hub, [1] efeslevel1, [2] efeslevel2, [3] efeslevel3, [4] EfeVrl4, [5] EfeVrl5, [6] EfeVrl6, [7] EfeVrl7` + `bossRoomPrefab = BossRoom`. So the run is **7 combat levels**, not the "~5" older text claimed. All 9 satisfy the room contract (CameraBounds / GirisNoktasi / ExitDoor), and only `hub` has a `HubMarker` — the contract is being honored everywhere.
+
+#### Room inventory — relevant to the planned map system (audited 2026-07-18)
+
+**24 prefabs in the project satisfy the FULL room contract, but only 9 are wired into LevelManager.** That means ~15 contract-valid rooms are sitting unused:
+- **`Assets/LevelGenerated/`** — `GenLevel1..6`, `TestRoom1`, `ToyboxTest`, `ToyboxTest 1` (9 rooms, importer output).
+- **`Assets/LevelSinasi/CainosLeveller/`** — `kuzeymap`, `Room_Easy_01`, `sinasiBigLevel` (3 rooms).
+- **Legacy/retired** — `Assets/LevelEfeS/old_levels/` (`-1`, `0`) and `Assets/LevelEfeVrl/Old Levels/EfeVrl2`. (`Old Levels/` also holds the six contract-INCOMPLETE retirees listed below; the folder was consolidated from a stray `Assets/LevelEfeVrl 1/` copy — don't be surprised by the git rename.)
+
+**Why this matters:** the map system's blocker was framed as "we need to build many more levels." The truer statement is **"a dozen contract-valid rooms already exist and need quality/correction passes, not creation from scratch."** That is a much cheaper path to the ~15-30 rooms a map needs.
+
+**Rooms that would BREAK if naively added to the pool** (incomplete contract — verified): `efeslevel4` has CameraBounds + GirisNoktasi but **no ExitDoor** (unfinishable). `EfeVrl1`, `EfeVrl3`, `EfeVrlLevel1..4` (all six now under `Assets/LevelEfeVrl/Old Levels/`), plus `kuzeymap2`, `kuzeymapv1`, `CainosLevel`, are **missing `CameraBounds`** (camera would not clamp). Always re-check the three-part contract before adding a room to `roomPrefabs`. (Note: `CameraBounds.prefab`, `GirisNoktasi.prefab`, `MainMenu`, `GameOverScreen` also match the scan but are shared components/UI, not rooms.)
+
 ### Run Order — finite run: hub → levels → boss (reworked 2026-07-02)
 
 `LevelManager` was changed from an endless-refill pool (which repeated the same level forever) into a **finite, structured run**. Driven by `PickNextRoomPrefab()`:
@@ -578,10 +637,16 @@ All card and enemy numbers derive from the anchor table in **`CardAnchors.md`** 
 
 ### Layer Convention Mismatch (Known Issue)
 
-- **AeroBat, MeleeEnemy:** on the **Default** layer (0).
-- **RangedEnemy:** on the **Enemy** layer.
+**Verified against every enemy prefab 2026-07-18** (an earlier version of this file wrongly claimed MeleeEnemy was on Default — it is on Enemy):
 
-Many systems check via `enemyLayer` mask, which misses Default-layer enemies. The workaround in PlayerController is to use `GetComponentInParent<EnemyHealth>()` instead of relying on layer masks for head-bounce detection. **Be aware of this when adding new enemies — pick a layer and stick with it, or use the EnemyHealth-component approach.**
+- **Default layer (0):** AeroBat, BatMan, ShieldEnemy, Mimic, **Shambler, Rotbrute, Spitter** (all three zombies).
+- **Enemy layer (11):** **MeleeEnemy**, RangedEnemy, SlimeEnemy, Taret, PatrolEnemy, MossKnightBoss.
+
+Two consequences, both load-bearing:
+1. Many systems check via the `enemyLayer` mask, which **misses every Default-layer enemy** (including all three zombies). The workaround in PlayerController is to use `GetComponentInParent<EnemyHealth>()` instead of relying on layer masks for head-bounce detection.
+2. **`groundLayer` (2056) includes layer 11**, so the player can **stand on** MeleeEnemy / RangedEnemy / SlimeEnemy / Taret / PatrolEnemy / MossKnightBoss — but **not** on the zombies, bats, Mimic or ShieldEnemy. That asymmetry is accidental, not designed.
+
+**Be aware of this when adding new enemies — pick a layer and stick with it, or use the EnemyHealth-component approach.** (Note: `PF Knight - Moss` is the raw Cainos prefab at 600 HP and is not the encounter; the real boss is `MossKnightBoss` at 300.)
 
 ### Head Bounce (Pogo Boots Relic)
 
@@ -590,7 +655,7 @@ Many systems check via `enemyLayer` mask, which misses Default-layer enemies. Th
 - Uses both `OnCollisionEnter2D` and `OnTriggerEnter2D` (AeroBat has trigger collider, others have solid).
 - Contact normal check: `contact.normal.y > 0.7`.
 
-**Known gap:** the velocity sign check (`rb.linearVelocity.y < -0.1f`) doesn't account for gravity reversal. Will silently fail during reversed-gravity head-bounce attempts. Low priority — gravity reversal duration is short and head-bouncing during it is an edge case.
+**Gravity reversal — HANDLED (verified in code 2026-07-26):** every branch of the head-bounce path now flips on `isGravityReversed` — the falling-direction check (`OnTriggerEnter2D`: `isGravityReversed ? velocity.y > 0.1f : velocity.y < -0.1f`), the position-vs-enemy check (top vs bottom), the collision-normal check (`normal.y < -0.7f` vs `> 0.7f`), and the bounce impulse direction. The old "velocity sign check doesn't account for gravity reversal" gap is closed; head-bouncing works upside-down.
 
 ### Enemy Healthbars (EnemyHealthBar.cs + EnemyHealthBar.prefab)
 
@@ -664,9 +729,27 @@ A Cinemachine `AmplitudeGain` of 0.15 looks very different from a direct `transf
 
 `AC Character.controller` lists `AttackAction` as `m_Type: 3` in YAML, which is **Int**, not Float. The mapping is: 1=Float, 3=Int, 4=Bool, 9=Trigger. When in doubt about an Animator parameter type, read the .controller YAML directly rather than guessing from the parameter's appearance in the Animator window.
 
+### "Setting a shader property that doesn't exist fails SILENTLY" (2026-07-26)
+
+**This is the project's most expensive bug shape: code that looks correct, runs without error, and does nothing.** `material.SetColor("_Color", …)` / `MaterialPropertyBlock.SetFloat(…)` on a shader that lacks that property is a **no-op with no warning**. The gravity-reversal warning flash was "fixed" TWICE this way and stayed invisible for months — first tinting `_Color` (the Cainos **"Alpha Cut"** shader exposes no colour property at all), then switching to `GetComponentsInChildren<SpriteRenderer>()` (the Mage M rig is 16 SkinnedMeshRenderers + ONE SpriteRenderer, the staff — so only the staff flashed).
+
+Known property support (verified by dumping `ShaderUtil.GetPropertyCount`):
+| Shader | Has `_Color`? | Has `_Alpha`? |
+|---|---|---|
+| Cainos `Customizable Pixel Character/Alpha Cut` (most player outfit parts) | ❌ **no colour property** | ✅ |
+| Cainos `Customizable Pixel Character/Body` | ❌ (has `_SkinTint`) | ✅ |
+| Cainos `Customizable Pixel Character/Hair` | ✅ | ✅ |
+| Cainos `Pixel Art Monster - Dungeon/Transparent` (**all enemies**) | ✅ | ✅ |
+
+**Rules:** on the PLAYER rig, tint via **`_Alpha`** — the one handle every Cainos rig shader shares. On ENEMIES, `_Color` is fine (verified across every enemy prefab). When writing any new material-property effect, **dump the shader's property list first** rather than assuming, and prefer `HasProperty` + an explicit fallback over `HasProperty` + silently skipping (a guarded skip still produces "nothing happens", which is the bug).
+
+Also beware the inverse: `BreakableWall.cs` checks `HasProperty("_Color")` when *caching* the original colour but not when *setting* it — an asymmetry worth copying nowhere.
+
 ### "First diagnostics can be wrong; always verify"
 
 During the character swap session, Claude Code's first diagnostic incorrectly described `AttackAction` as a Float. The error only surfaced at runtime as a type mismatch. **For Animator parameter types specifically, the YAML `m_Type` integer is the source of truth.**
+
+More generally: this file itself drifts. A 2026-07-26 pass found the entire Relic System section describing a slot redesign as an unbuilt "future direction" when it had already shipped, three "deferred bugs" that were already fixed, and a HUD described as a left-side vertical column when it is a top-centre bar. **Verify against the code before planning from this document** — and when you find drift, fix the doc in the same session.
 
 ### "Transform.Find is strict and silent"
 
@@ -675,6 +758,18 @@ The QuestTrackerHUD looks for children named exactly `Title` and `Progress` (cas
 ### "GetComponentInChildren can return null"
 
 `acceptButton.GetComponentInChildren<TextMeshProUGUI>().text = "ACCEPTED"` crashes if the button has no TMP descendant. This caused a silent quest-acceptance failure: the exception fired BEFORE the actual AcceptQuest logic ran, so the system looked like "nothing happened on click." Always null-guard before dereferencing GetComponentInChildren results.
+
+### "Cainos '3D Lit' props sort by Z-DEPTH, not sortingOrder" (2026-07-18)
+
+**A prop drawing on top of the player is almost always a Z-position problem, NOT a sorting-layer/order problem.** The Cainos "Pixel Art Platformer - Dungeon" props (doors, frames, etc.) and the Cainos player character both render with **opaque shaders in render queue 2000** (`Sprite 3D Lit …`, `Customizable Pixel Character/Body`, `.../Alpha Cut`). Opaque geometry sorts by **camera depth (Z distance)** — `SpriteRenderer.sortingOrder` is essentially ignored for them. Two opaque things at the same Z sort ambiguously and one arbitrarily wins.
+
+The fix is **Z position**, not sorting order: push the prop farther from the camera than the player. The camera looks along **+Z** (camera at negative Z), so "behind the player" = **larger Z**. Because the camera is orthographic, changing Z does NOT move the prop on screen — it only changes depth sort. (Setting the door's `sortingOrder` to -1 first did NOTHING — that was a misdiagnosis.) Note: a prop may mix queues (the door's `Door`/`Frame` are opaque 2000, its `Inside`/`Shadow` are transparent 3000); transparent parts do honor sortingOrder and always draw after all opaque.
+
+**The entry-door case is FIXED PROJECT-WIDE (2026-07-22) — at the source, in `Assets/Prefabs/GirisNoktasi.prefab`.** It was never a hub-only bug: `LevelManager` spawns the player with `playerTransform.position = entryPoint.position` (full Vector3, **Z included**), so the player always lands exactly coplanar with the entry door — and a scan found **38 of 39 rooms** with the door on or in front of the spawn plane, because every room nests this one shared prefab. Fix: the `PF Dungeon Props - Door Wood 01` child's local Z is now **0.5**, putting all four door sprites 0.45–0.51 **behind** the spawn plane. All 39 rooms inherited it from the single source change; the hub's earlier per-instance override (and 4 no-op `sortingOrder` overrides) were reverted so the hub tracks the source. **If you add a new room, do not override that door prop's local Z** — inherit it. If you ever place another prop near the entry point, remember the spawn plane is the Z the player occupies.
+
+### "camera.Render() to a RenderTexture can sort DIFFERENTLY than the real game view"
+
+When capturing a frame to inspect it (see Workflow Notes → Visual inspection), a throwaway `Camera.Render()` into a RenderTexture does NOT necessarily match what the URP pipeline actually draws — it gave a *false* "the door is behind the player" image while the real game still showed the door on top. **Trust only the real framebuffer** (`ScreenCapture.CaptureScreenshot(path)`), never a manual `camera.Render()`, when verifying sorting/lighting/pipeline-dependent visuals.
 
 ---
 
@@ -702,6 +797,49 @@ The user often consults a separate Claude instance (the conversational one in cl
 
 If the user is about to discard uncommitted Unity changes via GitHub Desktop, **Unity should be closed first with "Don't Save"** on the unsaved-changes prompt. Saving the broken state right before throwing it away is pointless and can interfere with the discard.
 
+### Prefab override auditor (2026-07-22) — run this when something "should work but doesn't"
+
+`Assets/Scripts/Editor/PrefabOverrideAuditor.cs`, menu **Deckshift → Audit Prefab Overrides**.
+Scans the active scene + every prefab asset (~2,000 prefab instances, ~9s) and reports **prefab-instance
+overrides that have silently diverged from their source prefab** — this project's most recurrent
+invisible bug class. Two categories, both deliberately high-signal (it finds ~1 hit in 31,000 overrides):
+
+- **NULLED** — the instance blanks an object reference the source prefab HAS. Almost always a bug,
+  and a nasty one: the prefab looks correct, so you debug the code instead. It further distinguishes
+  *"reference cleared"* (revert the property) from *"the instance DELETED the object it pointed at"*
+  (revert won't help — restore the child or remove the leftover).
+- **PINNED** — an override that merely repeats the source's CURRENT value. Harmless today, but the
+  instance is frozen and will not follow future prefab edits. Restricted to **our own scripts**:
+  Unity's built-ins (especially `RectTransform`) emit value-identical overrides constantly, which
+  buried the real findings ~500:1 before the filter.
+
+**Implementation caveat worth preserving:** the NULLED check does NOT read
+`PrefabUtility.GetPropertyModifications`. That record can contain **stale entries Unity no longer
+applies** — GenLevel3's AcidWater carries an `m_Materials.Array.data[0] = null` record while every
+material is in fact assigned, which produced a confident false positive. The auditor instead compares
+the **effective instance value** against `PrefabUtility.GetCorrespondingObjectFromSource(...)`. If you
+extend this tool, keep that principle: *trust live values, not modification records.*
+
+Verified by regression test: temporarily re-introducing the `warningSoundClip` null override made the
+auditor flag it immediately. Note that restoring a value by **assigning** it creates a PINNED override —
+always fix these with `PrefabUtility.RevertPropertyOverride`, not by re-typing the value.
+
+### Visual inspection via MCP screenshots (2026-07-18)
+
+Claude Code CAN see the running game — this is the fix for "I can't judge how it looks." The reliable recipe (via `execute_code`):
+1. Enter Play mode (`manage_editor play`) so levels/entities actually spawn; edit mode is sparse (rooms instantiate at runtime).
+2. `ScreenCapture.CaptureScreenshot("<abs path>")` — **async**, captures the REAL framebuffer (full URP render + all Screen-Space-Overlay UI/HUD) after the next frame renders.
+3. In a LATER tool call (a frame has passed), `Read` the PNG. Reading it in the SAME call fails — the file isn't written yet.
+4. Stop Play mode (`manage_editor stop`) to leave the editor clean.
+
+Gotchas learned the hard way:
+- `ScreenCapture.CaptureScreenshotAsTexture()` returns null/invalid from `execute_code` (it must run at end-of-frame, which `execute_code` can't hit). Use the async file method.
+- A manual `Camera.Render()` into a RenderTexture is synchronous and handy, but **can sort differently than the real pipeline** — do NOT trust it for sorting/lighting checks (see Common Pitfalls). It's fine only for a rough world grab.
+- To zoom on something (e.g. the spawn), move the REAL `Camera.main` onto the target and shrink `orthographicSize` **after disabling `CameraFollow.enabled`** (it re-clamps every LateUpdate), then use the async framebuffer capture. Play-mode changes revert on stop, so no restore needed.
+- `execute_code` safety checks block `System.IO.File.Delete` and `AssetDatabase.DeleteAsset` (pass `safety_checks:false` when a delete is truly intended); `using` directives are illegal in its method body (fully-qualify types); and there are **three `Projectile` types** so component-add by short name is ambiguous (see Enemy System).
+
+Use this liberally to verify visual changes, diagnose "it looks wrong" reports, and fact-check the docs against reality — it caught a wrong sorting fix this session before it shipped.
+
 ---
 
 ## Known Issues / Deferred Work
@@ -715,27 +853,18 @@ If the user is about to discard uncommitted Unity changes via GitHub Desktop, **
 
 ### Future: Slot-Constrained Relic Redesign (MAJOR DESIGN DIRECTION)
 
-The current relic system follows Slay-the-Spire conventions: strictly additive, free accumulation, every relic is a small passive bonus. **This is slated to be replaced with a Balatro-style slot-constrained system.**
+✅ **THE MECHANICAL REDESIGN IS DONE (corrected 2026-07-26).** This section spent months describing a "future direction" that had in fact already shipped. What actually exists now is documented under **Relic System** above: 5 slots, rarity-based sell values, `TryGrantRelic` + the forced full-slot swap screen, a manage panel, and hover tooltips. **Do not re-plan or re-build any of that.**
 
-**Design intent:**
-- Fixed number of relic slots (probably 5 to start, may tune).
-- To acquire a new relic when slots are full, the player must **sell** one of their current relics.
-- Each acquisition becomes a real decision (synergy, swap-out math, what to give up).
-- Existing relics will likely be rebalanced or redesigned — current SOTS-style relics (small passive bonuses) won't shine in a slot-constrained system; bigger, more interactive effects will.
+**What genuinely remains is BALANCE, not code:**
+- **Rebalance the 18 relics for a slot economy.** They were authored as small always-on Slay-the-Spire bonuses (+5 HP on kill, +2 Shift on kill). In a 5-slot loadout where every pick costs you another relic, small passive trickles are the wrong shape — slot-constrained systems want **bigger, more interactive, more build-defining** effects that change how you play, not just numbers that tick up. This is the real outstanding work and it is a **design pass, not an engineering one**.
+- **Economy tuning** — sell refunds are currently flat by rarity (150/90/50/25) and untuned against a 45-50 min run and the actual rate relics are offered.
+- **Possibly** distinguish acquisition sources (shop vs. pack vs. voucher).
 
-**Why this fits the game's DNA:** Deckshift's core philosophy is "Movement is a Resource" — resources matter. A slot-constrained relic system extends that principle to relics: they become a curated resource pool the player manages, not a pile that grows passively.
+**Why this fits the game's DNA:** Deckshift's core philosophy is "Movement is a Resource" — resources matter. Slot-constrained relics extend that principle: a curated pool the player manages, not a pile that grows passively.
 
-**Scope when undertaken (multi-session work):**
-- New data model (slots, sell prices, possibly slot states like "negative")
-- Rework of RelicManager and RelicHUD into a slot manager UI (display, sell button, drag/swap)
-- Rebalance or redesign of the 5 currently-functional relics
-- 15-25 new relics to make slot decisions meaningful
-- Economy tuning (sell refund %, relic offer frequency vs. 45-50 min run length)
-- Possibly new relic-acquisition events (shop vs. pack vs. voucher distinction)
+⚠️ **The old "don't invest in relic UX / don't add relics" freeze is LIFTED** — it was guarding against a rework that has now happened. Tooltips and the manage/swap UI exist. Adding relics is fine and in fact *needed* (a 5-slot system wants a deep pool to choose from); just author them at slot-worthy power, not as another +2 trickle.
 
-**Until the redesign happens: do not invest heavily in relic UX features (tooltips, activation flashes, etc.) or in adding many new SOTS-style relics.** That work will likely be reworked. Small fixes and one-off relic additions are fine; large investments are not.
-
-**Approach when starting:** paper design first, code second.
+**Approach for the balance pass:** paper design first, code second.
 
 ### Quest System Expansion (deferred)
 
@@ -758,12 +887,12 @@ The current relic system follows Slay-the-Spire conventions: strictly additive, 
 ### Bugs (deferred)
 
 - ~~Card effect conflict class of bug~~ — **RESOLVED (2026-07-06).** `TryExecute` now refuses (Blocked) any card whose `ModifiedState` overlaps a live effect's flags; blocked plays cost nothing and stay in hand. Stacking Floor is Lava + Adrenaline + Phase can no longer corrupt player state. See Card System for detail.
-- **Phase card wall-stuck:** if Phase ends while player is inside a wall, player gets stuck. Plan: prevent Phase expiration inside collider.
-- **Comet Dive identity loss:** does the same thing as head-bounce relic. Plan: redesign.
-- **Head bounce + gravity reversal:** velocity sign check doesn't account for reversed gravity. Low priority.
+- **Phase card wall-stuck:** ⚠️ **MITIGATED, not fully solved (audited 2026-07-26).** `PhaseRoutine` implements the planned "prevent expiration inside collider": after the base duration it EXTENDS Phase up to 1 extra second while `IsCollidingWithGround()` is true (giving the player time to move clear), then, if still embedded, nudges the player 0.5 units along the gravity axis (`ejectDir` handles reversal). Common cases are covered. Remaining edge cases: a player who deliberately stops deep inside a 2-thick wall won't clear it in 0.5 units, and the nudge is vertical-only (no horizontal escape). Harden with a nearest-safe-position search if it recurs.
+- ~~**Comet Dive identity loss**~~ — **RESOLVED (verified 2026-07-26).** Comet Dive was redesigned into an AoE **dive-blast** (`StartCometDive`/`LandCometDive`: fast downward slam → `Physics2D.OverlapCircleAll` damage at `cometRadius`/`cometDamage`, with a `CometDiveVFX` telegraph while falling). It is no longer the single-target head-bounce; the two are distinct.
+- ~~**Head bounce + gravity reversal**~~ — **RESOLVED (verified 2026-07-26).** All head-bounce branches now flip on `isGravityReversed` (see Head Bounce section). Head-bouncing works upside-down.
 - **Duplicate ExitDoor possible in some room prefabs:** defensive guards now in place but the scene-side duplicate (if any) hasn't been cleaned up.
 - **AnimationEventReceiver may resurrect on prefab reimport.** It is now fully REMOVED from the Mage M Animator child (was previously just disabled). If OnFootstep NullRefs reappear in the console, a pack reimport probably restored it — remove it again. (The "'OnFootstep' has no receiver!" *warning* spam is absorbed by `PlayerAnimEventSink` on that same GameObject, now serialized in Player.prefab; see Visual Model Internals.)
-- **Gravity reversal warning flash may be invisible** — the rig DOES have SkinnedMeshRenderers (fact corrected 2026-07-17; see Gravity Reversal System), but the Cainos shaders may not expose `_Color`, so the `SetColor` call may no-op. Audio cue fires. If invisible in playtests: check the shader's tint property name.
+- ~~**Gravity reversal warning flash may be invisible**~~ — **RESOLVED (screenshot-verified 2026-07-26).** `WarningFlashRoutine` now strobes `_Alpha` across all 16 SkinnedMeshRenderers (whole-body blink) + red-tints the staff. The prior versions no-op'd (`_Color` unsupported by the Alpha Cut shader) or flashed only the staff. See Gravity Reversal System.
 
 ### Resolved bugs (verified by code audit 2026-06-10 — do NOT re-fix)
 
@@ -798,10 +927,12 @@ The `CardTemplate` prefab has fundamental scale corruption: root scale is non-un
 
 ### Content (TODO)
 
-- Scale to 60+ cards (currently ~10).
+- Scale to 60+ cards (currently **16 assets in `Assets/Cards/`, ~14 genuinely playable** — `Stagger` is the fail-state card, `AnaKartVeritabanı` is the database asset). **This is the single biggest content gap and it gates both the map system and card enhancements.**
 - Glass archetype: cards exist in theory, not implemented.
 - Expand Vampiric archetype.
 - Three-act structure: Act 1 prototype exists; Acts 2-3 not started.
+- **Run map system (Slay-the-Spire-style) — designed 2026-07-18, NOT started.** Player sees and chooses the next room's difficulty (easy/medium/hard, with reward scaling), plus Elite rooms ("shift-infused" enemies), random Events, and a Campfire/rest room. Goal: make runs distinct and add real decision-making. Key design direction from that discussion: **use Shift as the map's risk currency** (StS spends HP to climb; Deckshift can also spend *movement*), two-axis difficulty (platforming vs combat), a platformer-native "Vault" node (loot behind a card/movement gate), and a campfire that *converts* resources rather than just healing. **Hard dependency: the level pool must grow first** — the map is mediocre at ~5 levels and only sings at ~30, so it is BLOCKED on making level generation more hands-off (the importer works but still needs manual correction passes). Consider level *modifiers* (density/hazards/elite-infusion on a shared pool) to stretch content while the pipeline catches up.
+- **Card enhancements via "Blompo" (SkillManager repurpose) — designed 2026-07-18, NOT started.** Pivot the existing global skill passives into **per-card enhancements** (e.g. +charges, infinite charges, free-to-play, generates Shift, Retain-on-Recall, scaling-on-discard, Bond). Open decisions flagged in that discussion: (1) the **stacking guardrail** — `does-not-cost-shift` + `gain-shift-when-played` + `infinite-charges` on one card is an unbounded Shift engine and must be rule-blocked; (2) **Bond** (auto-play a linked card) collides with the ConflictFlags system exactly like Echo Chamber's double-cast; (3) enhancements should be **filtered by card type** (a damage buff is meaningless on Portal); (4) decide whether an enhancement is permanent and what happens when the card exhausts.
 - Boss encounters per act (3 bosses per act, randomly selected from pool). **Act 1's Moss Knight is a playable encounter** (moveset, gated fight start, awaken cinematic, SFX, boss health bar, and a death celebration that drops real collectible gold + shift crystals). It's the run finale (`LevelManager.bossRoomPrefab`). Full doc: `BossDesign_MossKnight.md`. Still open there: the acid arena (flank pools + platforms) and an optional post-kill RewardManager card/relic screen. The other Act-1 bosses and the pool/random-select aren't built.
 - Chunk-based level system (currently hand-crafted levels).
 - **Starting relic system** + **Fireball relic** for the wizard identity (auto-fires fireball every 10s). Deferred when the broader relic redesign was prioritized — may be revisited as a small early demo polish.

@@ -92,10 +92,11 @@ public class RelicSwapScreen : MonoBehaviour
 
         window = AddPoint(transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(WIN_W, WIN_H));
         Image winBg = window.gameObject.AddComponent<Image>();
-        winBg.sprite = RelicUISprites.Panel(); winBg.type = Image.Type.Sliced;
-        winBg.color = new Color(0.11f, 0.12f, 0.15f, 0.99f); winBg.raycastTarget = true;
-        Image winFrame = AddImage(window, "Frame", RelicUISprites.Frame(), new Color(0.82f, 0.66f, 0.32f, 1f), false);
+        winBg.sprite = RelicUISprites.StonePanel(); winBg.type = Image.Type.Sliced;
+        winBg.color = new Color(0.8f, 0.78f, 0.82f, 1f); winBg.raycastTarget = true;
+        Image winFrame = AddImage(window, "Frame", RelicUISprites.GoldBorder(), Color.white, false);
         winFrame.type = Image.Type.Sliced; Stretch(winFrame.rectTransform);
+        RelicUISprites.AddGemStuds(window, WIN_W, WIN_H, RelicUISprites.GemColor(Rarity.Common));   // ruby studs like the HUD panel
 
         AddText(window, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -22f), new Vector2(640f, 40f),
             "LOADOUT FULL", 30f, FontStyles.Bold, new Color(0.95f, 0.86f, 0.6f), TextAlignmentOptions.Top);
@@ -107,14 +108,14 @@ public class RelicSwapScreen : MonoBehaviour
         RectTransform inc = AddPoint(window, "Incoming", new Vector2(0.5f, 1f), new Vector2(0f, -84f), new Vector2(640f, 132f));
         inc.pivot = new Vector2(0.5f, 1f);
         Image incBg = inc.gameObject.AddComponent<Image>();
-        incBg.sprite = RelicUISprites.Panel(); incBg.type = Image.Type.Sliced;
-        incBg.color = new Color(0.16f, 0.15f, 0.12f, 0.96f);
-        incomingFrame = AddImage(inc, "IncFrame", RelicUISprites.Frame(), Color.white, false);
+        incBg.sprite = RelicUISprites.StonePanel(); incBg.type = Image.Type.Sliced;
+        incBg.color = new Color(0.95f, 0.9f, 0.82f, 1f);   // warmer stone sets the incoming apart
+        incomingFrame = AddImage(inc, "IncFrame", RelicUISprites.GoldBorder(), Color.white, false);
         incomingFrame.type = Image.Type.Sliced; Stretch(incomingFrame.rectTransform);
 
-        newRelicLabel = AddText(inc, "NewLabel", new Vector2(0f, 1f), new Vector2(18f, -10f), new Vector2(260f, 22f),
+        newRelicLabel = AddText(inc, "NewLabel", new Vector2(0f, 1f), new Vector2(30f, -16f), new Vector2(260f, 22f),
             "NEW RELIC", 14f, FontStyles.Bold, new Color(0.95f, 0.86f, 0.6f), TextAlignmentOptions.TopLeft);
-        incomingChipHolder = AddPoint(inc, "Chip", new Vector2(0f, 0.5f), new Vector2(72f, -8f), new Vector2(96f, 96f));
+        incomingChipHolder = AddPoint(inc, "Chip", new Vector2(0f, 0.5f), new Vector2(78f, -8f), new Vector2(96f, 96f));
         // Name/description column starts well clear of the icon AND its glow aura (the glow
         // extends ~1.4x the icon, to ~x=140), so the name no longer blends into the symbol.
         incomingName = AddText(inc, "IncName", new Vector2(0f, 1f), new Vector2(196f, -30f), new Vector2(424f, 32f),
@@ -127,9 +128,9 @@ public class RelicSwapScreen : MonoBehaviour
         Image div = AddImage(window, "Divider", RelicUISprites.White(), new Color(1f, 1f, 1f, 0.12f), false);
         div.rectTransform.anchorMin = div.rectTransform.anchorMax = new Vector2(0.5f, 1f);
         div.rectTransform.pivot = new Vector2(0.5f, 1f);
-        div.rectTransform.sizeDelta = new Vector2(WIN_W - 64f, 2f);
+        div.rectTransform.sizeDelta = new Vector2(WIN_W - 108f, 2f);
         div.rectTransform.anchoredPosition = new Vector2(0f, -230f);
-        AddText(window, "LoadoutLabel", new Vector2(0f, 1f), new Vector2(40f, -244f), new Vector2(520f, 24f),
+        AddText(window, "LoadoutLabel", new Vector2(0f, 1f), new Vector2(52f, -244f), new Vector2(520f, 24f),
             "YOUR RELICS  (click one to sell)", 15f, FontStyles.Bold, new Color(0.78f, 0.8f, 0.88f), TextAlignmentOptions.TopLeft);
 
         // Slot row
@@ -144,10 +145,10 @@ public class RelicSwapScreen : MonoBehaviour
         sacrificeInfo = AddText(window, "SacrificeInfo", new Vector2(0.5f, 1f), new Vector2(0f, -384f), new Vector2(640f, 26f),
             "", 16f, FontStyles.Italic, new Color(0.85f, 0.7f, 0.4f), TextAlignmentOptions.Top);
 
-        // Buttons
-        BuildButton(window, "LeaveButton", new Vector2(0f, 0f), new Vector2(40f, 34f), new Vector2(220f, 54f),
+        // Buttons — inset off the border/studs.
+        BuildButton(window, "LeaveButton", new Vector2(0f, 0f), new Vector2(48f, 42f), new Vector2(216f, 54f),
             new Color(0.4f, 0.42f, 0.48f), "LEAVE IT", new Color(1f, 1f, 1f), DoLeave, out _);
-        takeButton = BuildButton(window, "TakeButton", new Vector2(1f, 0f), new Vector2(-40f, 34f), new Vector2(220f, 54f),
+        takeButton = BuildButton(window, "TakeButton", new Vector2(1f, 0f), new Vector2(-48f, 42f), new Vector2(216f, 54f),
             new Color(0.42f, 0.72f, 0.34f), "TAKE IT", new Color(0.08f, 0.12f, 0.06f), DoTake, out _);
 
         // Shared hover tooltip so the player can read what each sell candidate does.
@@ -236,8 +237,7 @@ public class RelicSwapScreen : MonoBehaviour
         chip.AddComponent<RelicIcon>().Build(incoming);
 
         Color rc = RelicUISprites.RarityColor(incoming.rarity);
-        incomingFrame.color = rc;
-        newRelicLabel.color = rc;
+        newRelicLabel.color = rc;   // frame stays gold; rarity reads through the label, name, and the chip's gems
         incomingName.text = string.IsNullOrEmpty(incoming.relicName) ? incoming.relicID : incoming.relicName;
         incomingName.color = rc;
         incomingDesc.text = string.IsNullOrEmpty(incoming.description) ? "-" : incoming.description;

@@ -207,17 +207,20 @@ public class RelicHUD : MonoBehaviour
 
     private void BuildEmptySlot(RectTransform cell)
     {
-        // Faint inner fill so the slot reads as a real (empty) socket, then a dim frame.
+        float inner = cellSize - 6f;
+
+        // An empty socket: dim stone inside a darkened gold border — same chrome as a filled slot
+        // (RelicIcon) but unlit and gemless, so full/empty slots read as one crafted row.
         GameObject fill = new GameObject("EmptyFill", typeof(RectTransform));
         RectTransform frt = fill.GetComponent<RectTransform>();
         frt.SetParent(cell, false);
         frt.anchorMin = frt.anchorMax = new Vector2(0.5f, 0.5f);
         frt.pivot = new Vector2(0.5f, 0.5f);
-        frt.sizeDelta = new Vector2(cellSize - 6f, cellSize - 6f);
+        frt.sizeDelta = new Vector2(inner * 0.80f, inner * 0.80f);
         Image fillImg = fill.AddComponent<Image>();
-        fillImg.sprite = RelicUISprites.Panel();
-        fillImg.type = Image.Type.Sliced;
-        fillImg.color = new Color(0.12f, 0.13f, 0.16f, 0.45f);
+        fillImg.sprite = RelicUISprites.StonePanel();
+        fillImg.type = Image.Type.Simple;
+        fillImg.color = new Color(0.5f, 0.5f, 0.5f, 0.85f);   // dimmed stone
         fillImg.raycastTarget = false;
 
         GameObject frame = new GameObject("EmptyFrame", typeof(RectTransform));
@@ -225,11 +228,11 @@ public class RelicHUD : MonoBehaviour
         fr2.SetParent(cell, false);
         fr2.anchorMin = fr2.anchorMax = new Vector2(0.5f, 0.5f);
         fr2.pivot = new Vector2(0.5f, 0.5f);
-        fr2.sizeDelta = new Vector2(cellSize - 6f, cellSize - 6f);
+        fr2.sizeDelta = new Vector2(inner, inner);
         Image frameImg = frame.AddComponent<Image>();
-        frameImg.sprite = RelicUISprites.Frame();
-        frameImg.type = Image.Type.Sliced;
-        frameImg.color = new Color(0.45f, 0.48f, 0.55f, 0.5f);
+        frameImg.sprite = RelicUISprites.GoldBorder();
+        frameImg.type = Image.Type.Simple;
+        frameImg.color = new Color(0.55f, 0.52f, 0.5f, 0.8f);   // darkened gold (empty)
         frameImg.raycastTarget = false;
     }
 
