@@ -23,11 +23,14 @@ public class BlompoScreen : MonoBehaviour
     private CanvasGroup group;
     private RectTransform window;
     private Transform offerRow, cardRow;
+    private RectTransform forgeStage;   // centred area the forging plays out in
     private TMP_Text titleText, promptText;
     private Image portraitImage;
     private TMP_FontAsset font;
 
     private Sprite portrait;
+    private Sprite hammerSprite;
+    private List<CardEnhancement> offers;
     private System.Action onBlessed;
     private CardEnhancement chosenOffer = CardEnhancement.None;
     private bool isOpen, blessingSpent;
@@ -41,13 +44,29 @@ public class BlompoScreen : MonoBehaviour
     private const float CARD_W = 200f, CARD_H = 286f;
     private const float OFFER_W = 380f, OFFER_H = 560f;
 
-    public static void Open(Sprite blompoPortrait = null, System.Action blessedCallback = null)
+    // `fixedOffers` are THIS Blompo's three blessings, rolled once and owned by the NPC — the
+    // screen must never re-roll, or leaving and re-entering would let the player reroll for free.
+    public static void Open(Sprite blompoPortrait, Sprite hammer, List<CardEnhancement> fixedOffers, System.Action blessedCallback = null)
     {
         EnsureInstance();
         if (instance == null || instance.isOpen) return;
         instance.portrait = blompoPortrait;
+        instance.hammerSprite = hammer;
+        instance.offers = fixedOffers;
         instance.onBlessed = blessedCallback;
         instance.Show();
+    }
+
+    // Lets BlompoNPC roll its offers against the same deck view the screen uses.
+    public static List<RuntimeCard> CollectDeckStatic()
+    {
+        List<RuntimeCard> all = new List<RuntimeCard>();
+        DeckManager d = DeckManager.instance;
+        if (d == null) return all;
+        all.AddRange(d.GetCurrentHand());
+        all.AddRange(d.GetDrawPile());
+        all.AddRange(d.GetDiscardPile());
+        return all;
     }
 
     private static void EnsureInstance()
@@ -128,6 +147,11 @@ public class BlompoScreen : MonoBehaviour
 
         offerRow = BuildRow("OfferRow", -230f, 44f);
         cardRow = BuildRow("CardRow", -250f, 26f);
+
+        // Forging stage: centred, no layout group (the FX drives positions directly). Sits a little
+        // below centre so the struck card doesn't collide with the title.
+        forgeStage = AddPoint(window, "ForgeStage", new Vector2(0.5f, 0.5f), new Vector2(0f, -60f), new Vector2(WIN_W - 200f, 560f));
+        forgeStage.gameObject.SetActive(false);
 
         gameObject.SetActive(false);
     }
@@ -221,11 +245,11 @@ public class BlompoScreen : MonoBehaviour
         ClearRow(cardRow); ClearRow(offerRow);
         offerRow.gameObject.SetActive(true);
         cardRow.gameObject.SetActive(false);
+        if (forgeStage != null) forgeStage.gameObject.SetActive(false);
 
         List<RuntimeCard> deck = CollectDeck();
-        List<CardEnhancement> offers = CardEnhancements.RollOffersForDeck(deck, 3);
 
-        if (offers.Count == 0)
+        if (offers == null || offers.Count == 0)
         {
             promptText.text = deck.Count == 0
                 ? "Your deck is empty. Blompo shrugs."
@@ -236,7 +260,13 @@ public class BlompoScreen : MonoBehaviour
         promptText.text = "Blompo offers three blessings. Take one.";
         foreach (CardEnhancement e in offers)
         {
-            GameObject chip = BuildOfferChip(offerRow, e);
+            // The offers are fixed, but the DECK can change between visits (cards played, exhausted,
+            // already blessed). An offer with no legal target is shown dimmed and inert rather than
+            // being swapped out — swapping would be a reroll by the back door.
+            bool playable = CardEnhancements.CardsFor(e, deck).Count > 0;
+            GameObject chip = BuildOfferChip(offerRow, e, playable);
+            if (!playable) continue;
+
             Button b = chip.AddComponent<Button>();
             b.transition = Selectable.Transition.None;
             CardEnhancement captured = e;
@@ -257,6 +287,7 @@ public class BlompoScreen : MonoBehaviour
         ClearRow(offerRow); ClearRow(cardRow);
         offerRow.gameObject.SetActive(false);
         cardRow.gameObject.SetActive(true);
+        if (forgeStage != null) forgeStage.gameObject.SetActive(false);
 
         List<RuntimeCard> valid = CardEnhancements.CardsFor(chosenOffer, CollectDeck());
         promptText.text = $"<b>{CardEnhancements.Name(chosenOffer)}</b> — {CardEnhancements.Description(chosenOffer)}  Choose a card.";
@@ -276,19 +307,69 @@ public class BlompoScreen : MonoBehaviour
     private void ChooseCard(RuntimeCard card)
     {
         if (blessingSpent || chosenOffer == CardEnhancement.None) return;
-        if (!CardEnhancements.Apply(card, chosenOffer)) return;
+        if (!CardEnhancements.CanApplyTo(chosenOffer, card)) return;
 
-        // The blessing mutates an existing card, so no normal hand event fires — ask the hand UI
-        // to redraw or the new badge won't appear until something else happens to refresh it.
-        if (DeckManager.instance != null) DeckManager.instance.RefreshHandUI();
+        blessingSpent = true;   // lock immediately so a double-click can't forge twice
+        StartCoroutine(ForgeRoutine(card));
+    }
 
-        blessingSpent = true;
+    // Blompo hammers the blessing into the card: the chosen card takes centre stage and gets
+    // struck three times, the enhancement landing on the final blow.
+    private IEnumerator ForgeRoutine(RuntimeCard card)
+    {
         ClearRow(cardRow);
-        BuildCardChip(cardRow, card);
+        cardRow.gameObject.SetActive(false);
+        offerRow.gameObject.SetActive(false);
+        forgeStage.gameObject.SetActive(true);
+        for (int i = forgeStage.childCount - 1; i >= 0; i--) Destroy(forgeStage.GetChild(i).gameObject);
+
+        promptText.text = "Blompo gets to work.";
+
+        // A single big copy of the card, centred on the stage.
+        GameObject chipGo = BuildCardChip(forgeStage, card, 1.55f);
+        RectTransform chip = chipGo.GetComponent<RectTransform>();
+        chip.anchorMin = chip.anchorMax = chip.pivot = new Vector2(0.5f, 0.5f);
+        chip.anchoredPosition = Vector2.zero;
+
+        Color gem = RelicUISprites.GemColor(CardEnhancements.RarityOf(chosenOffer));
+
+        // The enhancement lands on the LAST hammer blow, and the chip is updated on that same
+        // frame so the badge appears exactly when the metal is struck.
+        //
+        // CRITICAL: this must MUTATE the existing chip, never destroy and rebuild it. The FX
+        // coroutine holds a reference to `chip` and keeps animating it after this callback — if
+        // the object were destroyed here, the next line of the FX would throw on a dead
+        // RectTransform, abort the coroutine, and the screen would hang on the last frame with
+        // only the X button to escape. That was exactly the "gets stuck" bug.
+        yield return StartCoroutine(BlompoForgeFX.Play(this, forgeStage, chip, gem, hammerSprite, () =>
+        {
+            CardEnhancements.Apply(card, chosenOffer);
+            if (DeckManager.instance != null) DeckManager.instance.RefreshHandUI();
+            StampChip(chip, card);
+        }));
 
         string cardName = card.cardData != null ? card.cardData.cardName : "It";
         promptText.text = $"<b>{cardName}</b> is now <b>{CardEnhancements.Name(chosenOffer)}</b>. Blompo is pleased.";
-        StartCoroutine(CloseAfter(1.5f));
+        yield return StartCoroutine(CloseAfter(1.4f));
+    }
+
+    // Updates an already-built card chip in place to show its new blessing (badge + charge count).
+    private void StampChip(RectTransform chip, RuntimeCard card)
+    {
+        if (chip == null || card == null) return;
+
+        Transform charges = chip.Find("Charges");
+        if (charges != null)
+        {
+            TMP_Text ct = charges.GetComponent<TMP_Text>();
+            if (ct != null) ct.text = card.isInfinite ? "∞" : card.currentUses.ToString();
+        }
+
+        if (card.enhancement == CardEnhancement.None || chip.Find("Badge") != null) return;
+
+        Color gem = RelicUISprites.GemColor(CardEnhancements.RarityOf(card.enhancement));
+        AddText(chip, "Badge", new Vector2(0.5f, 1f), new Vector2(0f, -10f), new Vector2(CARD_W - 16f, 28f),
+            CardEnhancements.Name(card.enhancement), 16f, FontStyles.Bold, gem, TextAlignmentOptions.Center);
     }
 
     private IEnumerator CloseAfter(float seconds)
@@ -299,9 +380,10 @@ public class BlompoScreen : MonoBehaviour
     }
 
     // ---- chip builders ----
-    private GameObject BuildCardChip(Transform parent, RuntimeCard card)
+    private GameObject BuildCardChip(Transform parent, RuntimeCard card, float scale = 1f)
     {
         RectTransform rt = AddPoint(parent, "Card", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(CARD_W, CARD_H));
+        rt.localScale = Vector3.one * scale;
         LayoutElement le = rt.gameObject.AddComponent<LayoutElement>();
         le.preferredWidth = CARD_W; le.preferredHeight = CARD_H;
 
@@ -346,13 +428,19 @@ public class BlompoScreen : MonoBehaviour
         return rt.gameObject;
     }
 
-    private GameObject BuildOfferChip(Transform parent, CardEnhancement e)
+    private GameObject BuildOfferChip(Transform parent, CardEnhancement e, bool playable = true)
     {
         RectTransform rt = AddPoint(parent, "Offer", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(OFFER_W, OFFER_H));
         LayoutElement le = rt.gameObject.AddComponent<LayoutElement>();
         le.preferredWidth = OFFER_W; le.preferredHeight = OFFER_H;
 
         Color gem = RelicUISprites.GemColor(CardEnhancements.RarityOf(e));
+        if (!playable)
+        {
+            // Drained of colour so it reads as "offered, but nothing here can take it".
+            float grey = (gem.r + gem.g + gem.b) / 3f;
+            gem = Color.Lerp(new Color(grey, grey, grey), gem, 0.22f);
+        }
 
         Image bg = rt.gameObject.AddComponent<Image>();
         bg.sprite = RelicUISprites.StonePanel();
@@ -387,9 +475,11 @@ public class BlompoScreen : MonoBehaviour
             new Color(0.88f, 0.89f, 0.93f), TextAlignmentOptions.Top);
         desc.enableWordWrapping = true;
 
-        AddText(rt, "Rarity", new Vector2(0.5f, 0f), new Vector2(0f, 30f), new Vector2(OFFER_W - 40f, 34f),
-            CardEnhancements.RarityOf(e).ToString().ToUpper(), 19f, FontStyles.Bold,
+        AddText(rt, "Rarity", new Vector2(0.5f, 0f), new Vector2(0f, 30f),  new Vector2(OFFER_W - 40f, 34f),
+            playable ? CardEnhancements.RarityOf(e).ToString().ToUpper() : "NO VALID CARD", 19f, FontStyles.Bold,
             new Color(gem.r, gem.g, gem.b, 0.85f), TextAlignmentOptions.Center);
+
+        if (!playable) rt.gameObject.AddComponent<CanvasGroup>().alpha = 0.45f;
 
         return rt.gameObject;
     }
