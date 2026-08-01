@@ -1,11 +1,11 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-// Shared procedural UGUI sprites for the slot-relic UI (loadout bar, tooltip, Manage / Swap
-// panels, shop). House style — generated in code, cached statically so every panel draws from
-// one source.
+// Shared procedural UGUI sprites for Deckshift's crafted HUD chrome — the slot-relic UI (loadout
+// bar, tooltip, Manage / Swap panels, shop) and the health / Shift resource bars. House style —
+// generated in code, cached statically so every panel draws from one source.
 //
-// The relic chip is built to match Deckshift's OWN hand-painted HUD chrome (Assets/Art/panel 1.png,
+// Everything here is built to match Deckshift's OWN hand-painted HUD art (Assets/Art/panel 1.png,
 // the top-left stat panel): a dark MOTTLED-STONE interior inside an ornate GOLD border studded with
 // GEM BOSSES at the corners. Rarity is carried by the gem colour, not by recolouring the frame — so
 // every relic reads as the same crafted gold-on-stone object the rest of the HUD is made of.
@@ -19,6 +19,10 @@ public static class RelicUISprites
     private static Sprite stoneSprite;   // dark mottled-stone fill
     private static Sprite settingSprite; // gold diamond gem-setting (frame w/ hole)
     private static Sprite gemSprite;     // faceted gem cabochon (grayscale, tinted)
+    private static Sprite barFrameSprite; // thin gold bevel frame for HUD bars
+    private static Sprite barTrackSprite; // dark recessed channel behind a bar's fill
+    private static Sprite barFillSprite;  // glossy vertical gradient (grayscale, tinted)
+    private static Sprite shadowSprite;   // feathered rounded drop shadow
 
     // --- Deckshift chrome palette (sampled from Assets/Art/panel 1.png) ---
     static readonly Color GoldHi   = new Color(0.97f, 0.85f, 0.50f);
@@ -124,6 +128,137 @@ public static class RelicUISprites
         tex.SetPixels32(px); tex.Apply();
         stoneSprite = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s, 0, SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
         return stoneSprite;
+    }
+
+    // ======================= HUD resource bars (health / Shift) =======================
+    // These three are pinned to pixelsPerUnit 100 (the UGUI reference PPU) and carry small 9-slice
+    // borders, so a caller can render an EXACT pixel thickness on a bar of any size via
+    // ApplySliceThickness. GoldBorder above is the wrong tool here — its 26px border would swamp a
+    // 24px-tall bar.
+
+    private const float BAR_SLICE = 6f;  // 9-slice border of BarFrame / BarTrack, in sprite px
+
+    // ---- thin gold bevel frame: dark outer line, top-lit gold bevel, dark inner line, hollow
+    // centre so the track shows through. ----
+    public static Sprite BarFrame()
+    {
+        if (barFrameSprite != null) return barFrameSprite;
+        int s = 32; float half = s / 2f;
+        Texture2D tex = new Texture2D(s, s, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        Color32[] px = new Color32[s * s];
+        for (int y = 0; y < s; y++)
+            for (int x = 0; x < s; x++)
+            {
+                // Distance (px) to the nearest edge; the frame lives in the outer BAR_SLICE band.
+                float d = Mathf.Min(Mathf.Min(x + 0.5f, s - x - 0.5f), Mathf.Min(y + 0.5f, s - y - 0.5f));
+                if (d >= BAR_SLICE) { px[y * s + x] = new Color32(0, 0, 0, 0); continue; }
+
+                Color c;
+                if (d < 1f) c = GoldDark;                                   // crisp outer outline
+                else if (d > BAR_SLICE - 1f) c = GoldDark;                  // inner lip into the recess
+                else
+                {
+                    float t = (d - 1f) / (BAR_SLICE - 2f);                  // 0 outer .. 1 inner
+                    float ny = ((y + 0.5f) - half) / half;                  // +1 top .. -1 bottom
+                    float lit = 1f - t * 0.55f + 0.26f * ny;                // top-lit bevel
+                    c = Color.Lerp(GoldShad, GoldHi, Mathf.Clamp01(lit));
+                }
+                px[y * s + x] = new Color32((byte)(c.r * 255), (byte)(c.g * 255), (byte)(c.b * 255), 255);
+            }
+        tex.SetPixels32(px); tex.Apply();
+        barFrameSprite = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), 100f, 0,
+            SpriteMeshType.FullRect, new Vector4(BAR_SLICE, BAR_SLICE, BAR_SLICE, BAR_SLICE));
+        return barFrameSprite;
+    }
+
+    // ---- dark recessed channel the fill sits in. Near-black stone with an inner shadow along the
+    // top edge so the bar reads as carved INTO the panel rather than sitting on it. ----
+    public static Sprite BarTrack()
+    {
+        if (barTrackSprite != null) return barTrackSprite;
+        int s = 32;
+        Texture2D tex = new Texture2D(s, s, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        Color32[] px = new Color32[s * s];
+        Color baseCol = new Color(0.072f, 0.062f, 0.088f);
+        for (int y = 0; y < s; y++)
+            for (int x = 0; x < s; x++)
+            {
+                float fromTop = s - y - 0.5f;                               // 0 at top edge
+                Color c = baseCol;
+                c *= 1f - 0.55f * Mathf.Clamp01(1f - fromTop / 5f);         // inner shadow under the top lip
+                float n = (Mathf.PerlinNoise(x * 0.31f, y * 0.31f) - 0.5f) * 0.035f;
+                c = new Color(Mathf.Clamp01(c.r + n), Mathf.Clamp01(c.g + n), Mathf.Clamp01(c.b + n));
+                px[y * s + x] = new Color32((byte)(c.r * 255), (byte)(c.g * 255), (byte)(c.b * 255), 255);
+            }
+        tex.SetPixels32(px); tex.Apply();
+        barTrackSprite = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), 100f, 0,
+            SpriteMeshType.FullRect, new Vector4(BAR_SLICE, BAR_SLICE, BAR_SLICE, BAR_SLICE));
+        return barTrackSprite;
+    }
+
+    // ---- glossy fill: grayscale vertical gradient (tint it with the resource colour). Uniform
+    // horizontally, so stretching it across a segment of any width stays clean. ----
+    public static Sprite BarFill()
+    {
+        if (barFillSprite != null) return barFillSprite;
+        int w = 4, h = 32;
+        Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        Color32[] px = new Color32[w * h];
+        for (int y = 0; y < h; y++)
+        {
+            float ny = y / (h - 1f);                                        // 0 bottom .. 1 top
+            float v = Mathf.Lerp(0.58f, 1f, ny);
+            if (ny > 0.60f && ny < 0.84f) v += 0.20f;                       // gloss band
+            if (ny > 0.94f) v *= 0.78f;                                     // top rim
+            if (ny < 0.07f) v *= 0.66f;                                     // bottom rim
+            byte b = (byte)(Mathf.Clamp01(v) * 255f);
+            for (int x = 0; x < w; x++) px[y * w + x] = new Color32(b, b, b, 255);
+        }
+        tex.SetPixels32(px); tex.Apply();
+        barFillSprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
+        return barFillSprite;
+    }
+
+    // ---- soft drop shadow: a rounded rect with a feathered edge, 9-sliced. The HUD bars sit
+    // directly on the game world with no panel behind them, so they need their own separation from
+    // whatever is rendering underneath. ----
+    public static Sprite SoftShadow()
+    {
+        if (shadowSprite != null) return shadowSprite;
+        int s = 48; float pad = 14f, radius = 7f, feather = 12f;
+        Texture2D tex = new Texture2D(s, s, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        Color32[] px = new Color32[s * s];
+        for (int y = 0; y < s; y++)
+            for (int x = 0; x < s; x++)
+            {
+                // signed distance to a rounded rect inset by `pad`; >0 inside
+                float half = s / 2f;
+                float ax = Mathf.Abs(x + 0.5f - half) - (half - pad - radius);
+                float ay = Mathf.Abs(y + 0.5f - half) - (half - pad - radius);
+                float outside = Mathf.Sqrt(Mathf.Max(ax, 0f) * Mathf.Max(ax, 0f) + Mathf.Max(ay, 0f) * Mathf.Max(ay, 0f));
+                float d = radius - (outside + Mathf.Min(Mathf.Max(ax, ay), 0f));
+                float a = Mathf.Clamp01(d / feather + 0.5f);
+                a = a * a * (3f - 2f * a);                                  // smoothstep for a soft falloff
+                px[y * s + x] = new Color32(0, 0, 0, (byte)(a * 255f));
+            }
+        tex.SetPixels32(px); tex.Apply();
+        shadowSprite = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), 100f, 0,
+            SpriteMeshType.FullRect, new Vector4(22, 22, 22, 22));
+        return shadowSprite;
+    }
+
+    // Makes a 9-sliced BarFrame / BarTrack render its border at EXACTLY `thicknessPx` canvas pixels.
+    // The rendered border is spriteBorder / (spritePPU / canvasReferencePPU) / pixelsPerUnitMultiplier,
+    // so we solve for the multiplier instead of assuming the canvas uses the default reference PPU.
+    public static void ApplySliceThickness(Image img, float thicknessPx)
+    {
+        if (img == null || img.sprite == null || thicknessPx <= 0f) return;
+        // Graphic.canvas is null until the graphic registers, which hasn't happened yet if the HUD
+        // was built while hidden — walk the hierarchy (including inactive parents) as a fallback.
+        Canvas canvas = img.canvas != null ? img.canvas : img.GetComponentInParent<Canvas>(true);
+        float refPPU = canvas != null ? canvas.referencePixelsPerUnit : 100f;
+        float ppuRatio = img.sprite.pixelsPerUnit / Mathf.Max(1f, refPPU);
+        img.pixelsPerUnitMultiplier = Mathf.Max(0.01f, (BAR_SLICE / ppuRatio) / thicknessPx);
     }
 
     // ---- gold diamond gem-setting: a beveled gold frame with a hole the gem shows through ----
