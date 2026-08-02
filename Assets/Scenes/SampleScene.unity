@@ -11566,6 +11566,7 @@ GameObject:
   - component: {fileID: 1990000011}
   - component: {fileID: 1990000012}
   - component: {fileID: 1990000013}
+  - component: {fileID: 1990000014}
   m_Layer: 5
   m_Name: ResourcePanel
   m_TagString: Untagged
@@ -11633,6 +11634,69 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &1990000014
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1990000010}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43edeb697c4550b4fb14115d824b56bc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  playerController: {fileID: 8822436801064664179}
+  font: {fileID: 11400000, guid: 3ac13a9add857c243977de8d60555863, type: 2}
+  heartIcon: {fileID: -205270267638800340, guid: ba4ddf2b7efc51b4d8eb0fb5d81e0d71, type: 3}
+  shiftIcon: {fileID: 8878566123309801515, guid: 573b1ebc1b18d0b459b7f22ec5139506, type: 3}
+  hidePanelBackground: 1
+  legacyHealthDisplay: {fileID: 781678277}
+  legacyShiftText: {fileID: 755140693}
+  goldDisplay: {fileID: 1533516044}
+  iconX: 2
+  barX: 44
+  healthRowY: 2
+  shiftRowY: 42
+  goldRowY: 82
+  iconSize: 30
+  goldNumberSize: 23
+  barGeometry:
+    width: 262
+    height: 26
+    frameThickness: 4
+    numberPlacement: 1
+    numberSize: 23
+    maxNumberSize: 13
+    numberGap: 14
+  healthStyle:
+    segmented: 0
+    unitsPerSegment: 10
+    segmentGap: 3
+    pipMode: 0
+    fill: {r: 0.85, g: 0.16, b: 0.2, a: 1}
+    empty: {r: 0.21, g: 0.1, b: 0.12, a: 1}
+    chip: {r: 1, g: 0.62, b: 0.28, a: 1}
+    low: {r: 1, g: 0.3, b: 0.3, a: 1}
+    lowThreshold: 30
+    warnWhenLow: 1
+    showMax: 1
+    numberColor: {r: 1, g: 1, b: 1, a: 1}
+    maxNumberColor: {r: 0.8, g: 0.74, b: 0.74, a: 1}
+  shiftStyle:
+    segmented: 1
+    unitsPerSegment: 10
+    segmentGap: 3
+    pipMode: 1
+    fill: {r: 0.47, g: 0.42, b: 0.92, a: 1}
+    empty: {r: 0.17, g: 0.15, b: 0.26, a: 1}
+    chip: {r: 0.8, g: 0.77, b: 1, a: 1}
+    low: {r: 0.98, g: 0.44, b: 0.86, a: 1}
+    lowThreshold: 10
+    warnWhenLow: 1
+    showMax: 1
+    numberColor: {r: 0.86, g: 0.84, b: 1, a: 1}
+    maxNumberColor: {r: 0.62, g: 0.6, b: 0.78, a: 1}
 --- !u!1 &2028077292
 GameObject:
   m_ObjectHideFlags: 0
