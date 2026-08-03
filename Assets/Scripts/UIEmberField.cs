@@ -47,6 +47,20 @@ public class UIEmberField : MonoBehaviour
             sprite = null,
         };
 
+        // Lamplit dust in a shop. Barely moving, warm, no twinkle — this is air in a room, not an
+        // effect. It should never be the thing you notice; it just stops the panel feeling airless.
+        public static Settings Dust => new Settings
+        {
+            riseSpeed = new Vector2(-4f, 5f),   // straddles zero: some settles, some lifts
+            lateralMax = 5f,
+            sizeRange = new Vector2(1.2f, 2.6f),
+            lifeRange = new Vector2(8f, 16f),
+            swayAmpMax = 9f,
+            alphaScale = 0.55f,
+            twinkle = false,
+            sprite = null,
+        };
+
         // Settling motes of light. Slower, cooler, drifting DOWN, and they twinkle — magic coming
         // to rest on the cards rather than heat escaping upward.
         public static Settings Motes => new Settings

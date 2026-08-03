@@ -18,6 +18,13 @@ public class ShopScreenUI : MonoBehaviour
     private Transform cardsRow, relicsRow, servicesRow;
     private TMP_Text goldText, barkerText;
     private Image goldFlash;
+
+    // The keeper: portrait at the counter, speech bubble beside him.
+    private RectTransform keeperPortrait, bubble;
+    private Image portraitImage;
+    private CanvasGroup bubbleGroup;
+    private Coroutine talkCo, moodCo;
+    private string lastLine = "";
     private RectTransform tooltip;
     private TMP_Text tooltipText;
     private TMP_FontAsset font;
@@ -33,7 +40,9 @@ public class ShopScreenUI : MonoBehaviour
     private readonly List<Offer> offers = new List<Offer>();
     private readonly List<Tile> tiles = new List<Tile>();
 
-    private const float WIN_W = 1060f, WIN_H = 680f;
+    // Height grew from 680 to give the keeper his own band along the bottom — at 680 his portrait
+    // clipped the relic tiles above him by a few pixels.
+    private const float WIN_W = 1060f, WIN_H = 726f;
     private const float TILE_W = 186f, TILE_H = 190f;
     private const float SIDE_PAD = 28f;
     private const float ROW_SPACING = 18f;
@@ -51,14 +60,62 @@ public class ShopScreenUI : MonoBehaviour
     private static readonly Color Cream      = new Color(0.90f, 0.86f, 0.74f);
     private static readonly Color AwningBlue = new Color(0.52f, 0.60f, 0.66f, 1f);
 
-    private static readonly string[] Barks =
+    // THE KEEPER TALKS BACK.
+    //
+    // These used to be one array, with a single line picked when the stall opened — decoration
+    // that never changed no matter what you did. Splitting them by EVENT is what turns the shop
+    // from a menu with a joke on it into someone standing behind a counter: he greets you, he
+    // comments on what you're looking at, he thanks you, and he needles you when you can't pay.
+    //
+    // Keep them short. They're read in a speech bubble while the player's attention is on prices.
+    private static readonly string[] Greetings =
     {
         "Everything's a steal. Some of it literally.",
-        "No refunds. No refunds. No... refunds.",
         "Buy somethin' or admire the ambiance elsewhere.",
         "Prices set by a very reasonable goblin.",
-        "You break it, you bought it. You buy it? Also bought it.",
         "Fresh scrap, barely cursed.",
+        "Ah. A customer with money-shaped pockets.",
+    };
+    private static readonly string[] BrowseCard =
+    {
+        "Good eye. That one bites.",
+        "Cheap for what it does. Don't ask what it does.",
+        "Previous owner loved it. Right up 'til the end.",
+    };
+    private static readonly string[] BrowseRelic =
+    {
+        "Ohh, that one's got history.",
+        "Hold it up to the light. Go on.",
+        "Found it in a wall. Don't ask whose.",
+    };
+    private static readonly string[] BrowseService =
+    {
+        "Honest work, honest price. One of those is true.",
+        "You look like you could use a favour.",
+    };
+    private static readonly string[] TooPoor =
+    {
+        "Come back when your purse rattles louder.",
+        "That's a looking price. Buying price is the same.",
+        "No coin, no cargo.",
+    };
+    private static readonly string[] Bought =
+    {
+        "Pleasure doing business.",
+        "No refunds. No refunds. No... refunds.",
+        "You break it, you bought it. You bought it? Also bought it.",
+        "Spent well. Probably.",
+    };
+    private static readonly string[] AlreadySold =
+    {
+        "Gone. You snoozed.",
+        "Sold. To someone quicker.",
+    };
+    private static readonly string[] Farewells =
+    {
+        "Mind the step.",
+        "Don't die out there. Bad for repeat business.",
+        "Come back richer.",
     };
 
     private class Offer
@@ -130,6 +187,7 @@ public class ShopScreenUI : MonoBehaviour
             Hide();
         }
         if (isOpen) RefreshAffordability();
+        if (isOpen) TickKeeperIdle();
     }
 
     // ---- construction ----
@@ -160,11 +218,11 @@ public class ShopScreenUI : MonoBehaviour
         BuildAwning();
         BuildHeaderBand();
 
-        // Shop name + barker line (clear of the awning).
-        AddText(window, "Title", new Vector2(0f, 1f), new Vector2(SIDE_PAD + 6f, -56f), new Vector2(620f, 44f),
+        // Shop name. The barker line moved out of the header and down to the counter, next to the
+        // keeper's face — a line of italic text under a title is a caption; a line coming out of
+        // someone's mouth is a person.
+        AddText(window, "Title", new Vector2(0f, 1f), new Vector2(SIDE_PAD + 6f, -60f), new Vector2(620f, 44f),
             "THE MARKETPLACE", 32f, FontStyles.Bold, new Color(0.98f, 0.90f, 0.64f), TextAlignmentOptions.Left);
-        barkerText = AddText(window, "Barker", new Vector2(0f, 1f), new Vector2(SIDE_PAD + 8f, -94f), new Vector2(620f, 26f),
-            "", 17f, FontStyles.Italic, new Color(0.78f, 0.72f, 0.6f), TextAlignmentOptions.Left);
 
         BuildGoldBox();
 
@@ -190,19 +248,161 @@ public class ShopScreenUI : MonoBehaviour
         BuildShelf(new Vector2(1f, 1f), new Vector2(-SIDE_PAD, row2Y - TILE_H - 4f), servicesW, false);
 
         // Vertical divider between the two segments.
-        Image div = AddImage(window, "Divider", RelicUISprites.White(), new Color(1f, 1f, 1f, 0.10f), false);
+        Image div = AddImage(window, "Divider", FlatUI.Pixel(), new Color(1f, 1f, 1f, 0.10f), false);
         RectTransform drt = div.rectTransform;
         drt.anchorMin = drt.anchorMax = new Vector2(0.5f, 1f); drt.pivot = new Vector2(0.5f, 1f);
         drt.sizeDelta = new Vector2(2f, TILE_H + 40f);
         drt.anchoredPosition = new Vector2((SIDE_PAD + relicsW) - WIN_W * 0.5f + 10f, row2Y + 30f);
 
-        // Leave button.
-        BuildButton(window, "Leave", new Vector2(1f, 0f), new Vector2(-SIDE_PAD, 26f), new Vector2(210f, 52f),
-            new Color(0.80f, 0.60f, 0.28f), "LEAVE  (Esc)", Hide);
+        // The keeper leans on the counter along the bottom, where the stall already had dead space.
+        BuildKeeper();
+
+        // Leave button. Hovering it gets a farewell — said on the way out, where it's actually
+        // read, rather than on Hide() where the screen is already gone.
+        GameObject leave = BuildButton(window, "Leave", new Vector2(1f, 0f), new Vector2(-SIDE_PAD, 26f),
+            new Vector2(210f, 52f), new Color(0.80f, 0.60f, 0.28f), "LEAVE  (Esc)", Hide);
+        if (leave != null)
+        {
+            ShopTileHover bye = leave.AddComponent<ShopTileHover>();
+            bye.onEnter = () => Say(Farewells, Mood.Nod);
+        }
 
         BuildTooltip();
 
+        // Lamplit dust drifting through the stall. Warm, slow and very faint — a shop is a place
+        // with air in it, and stillness is what made the panel feel like a menu.
+        UIEmberField.Attach(window, 20, new Color(1f, 0.88f, 0.66f, 1f), UIEmberField.Settings.Dust);
+
         gameObject.SetActive(false);
+    }
+
+    // ---- the keeper ----------------------------------------------------------------------------
+
+    // Portrait + speech bubble along the bottom-left of the stall, the one area the tile grid
+    // never used. Reads as him leaning on the counter while you browse.
+    private void BuildKeeper()
+    {
+        const float PORTRAIT = 132f;
+
+        keeperPortrait = AddPoint(window, "Keeper", new Vector2(0f, 0f), new Vector2(SIDE_PAD + 6f, 18f),
+            new Vector2(PORTRAIT, PORTRAIT));
+        keeperPortrait.pivot = new Vector2(0f, 0f);
+
+        // Warm pool of lamplight behind him so he sits in the scene rather than on it.
+        Image lamp = AddImage(keeperPortrait, "Lamp", FlatUI.SoftGlow(), new Color(1f, 0.78f, 0.42f, 0.16f), false);
+        lamp.rectTransform.anchorMin = lamp.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        lamp.rectTransform.sizeDelta = new Vector2(PORTRAIT * 1.9f, PORTRAIT * 1.9f);
+
+        portraitImage = AddImage(keeperPortrait, "Face", null, Color.white, false);
+        Stretch(portraitImage.rectTransform);
+        portraitImage.preserveAspect = true;
+
+        // Speech bubble to his right.
+        bubble = AddPoint(window, "Bubble", new Vector2(0f, 0f), new Vector2(SIDE_PAD + PORTRAIT + 24f, 46f),
+            new Vector2(540f, 78f));
+        bubble.pivot = new Vector2(0f, 0f);
+
+        Image bg = bubble.gameObject.AddComponent<Image>();
+        bg.sprite = FlatUI.Panel(6);
+        bg.type = Image.Type.Sliced;
+        bg.color = new Color(0.09f, 0.075f, 0.06f, 0.96f);
+        bg.raycastTarget = false;
+
+        Image ol = AddImage(bubble, "Outline", FlatUI.Outline(6, 2), new Color(0.42f, 0.32f, 0.20f, 1f), false);
+        ol.type = Image.Type.Sliced;
+        Stretch(ol.rectTransform);
+        FlatUI.ApplySliceThickness(ol, 2f);
+
+        // Little tail pointing back at his mouth, so the words are clearly HIS.
+        Image tail = AddImage(bubble, "Tail", FlatUI.Pixel(), new Color(0.42f, 0.32f, 0.20f, 1f), false);
+        tail.rectTransform.anchorMin = tail.rectTransform.anchorMax = new Vector2(0f, 0.5f);
+        tail.rectTransform.pivot = new Vector2(1f, 0.5f);
+        tail.rectTransform.sizeDelta = new Vector2(18f, 3f);
+        tail.rectTransform.anchoredPosition = new Vector2(0f, -6f);
+
+        barkerText = AddText(bubble, "Barker", new Vector2(0f, 1f), new Vector2(16f, -14f), new Vector2(508f, 52f),
+            "", 17f, FontStyles.Italic, new Color(0.88f, 0.82f, 0.68f), TextAlignmentOptions.TopLeft);
+        barkerText.enableWordWrapping = true;
+
+        bubbleGroup = bubble.gameObject.AddComponent<CanvasGroup>();
+        bubbleGroup.alpha = 0f;
+    }
+
+    // What the keeper is doing with his body. Kept tiny on purpose — a portrait that lurches
+    // around pulls focus off the prices, which is what the player is actually here to read.
+    private enum Mood { Idle, Lean, Nod, Slump }
+
+    private void Say(string[] pool, Mood mood = Mood.Idle)
+    {
+        if (barkerText == null || pool == null || pool.Length == 0) return;
+
+        // Never repeat the previous line back-to-back — repetition is what makes barks read as
+        // canned. With small pools a plain Random.Range does it constantly.
+        string line = pool[Random.Range(0, pool.Length)];
+        if (pool.Length > 1 && line == lastLine)
+            line = pool[(System.Array.IndexOf(pool, line) + 1) % pool.Length];
+        lastLine = line;
+
+        if (talkCo != null) StopCoroutine(talkCo);
+        talkCo = StartCoroutine(TypeLine(line));
+
+        if (moodCo != null) StopCoroutine(moodCo);
+        moodCo = StartCoroutine(PlayMood(mood));
+    }
+
+    // Typewriter. Speech that appears a character at a time reads as SAID; a line that snaps in
+    // whole reads as a label that changed.
+    private IEnumerator TypeLine(string line)
+    {
+        if (bubbleGroup != null) bubbleGroup.alpha = 1f;
+        barkerText.text = "";
+
+        const float perChar = 0.018f;
+        for (int i = 1; i <= line.Length; i++)
+        {
+            barkerText.text = line.Substring(0, i);
+            float t = 0f;
+            while (t < perChar) { t += Time.unscaledDeltaTime; yield return null; }
+        }
+        talkCo = null;
+    }
+
+    private IEnumerator PlayMood(Mood mood)
+    {
+        if (keeperPortrait == null) yield break;
+
+        Vector2 home = new Vector2(SIDE_PAD + 6f, 18f);
+        float dur = 0.5f;
+        for (float t = 0f; t < dur; t += Time.unscaledDeltaTime)
+        {
+            float n = Mathf.Clamp01(t / dur);
+            float e = Mathf.Sin(n * Mathf.PI);          // out and back
+            Vector2 off = Vector2.zero;
+            float scale = 1f;
+
+            switch (mood)
+            {
+                case Mood.Lean:  off = new Vector2(10f * e, 4f * e); scale = 1f + 0.05f * e; break;
+                case Mood.Nod:   off = new Vector2(0f, -9f * e); break;
+                case Mood.Slump: off = new Vector2(0f, -6f * e); scale = 1f - 0.04f * e; break;
+            }
+
+            keeperPortrait.anchoredPosition = home + off;
+            keeperPortrait.localScale = Vector3.one * scale;
+            yield return null;
+        }
+        keeperPortrait.anchoredPosition = home;
+        keeperPortrait.localScale = Vector3.one;
+        moodCo = null;
+    }
+
+    // Slow idle breathing. Skipped while a mood reaction owns the transform, or the two would
+    // fight over anchoredPosition and the reaction would stutter.
+    private void TickKeeperIdle()
+    {
+        if (keeperPortrait == null || moodCo != null) return;
+        float bob = Mathf.Sin(Time.unscaledTime * 1.6f) * 2.2f;
+        keeperPortrait.anchoredPosition = new Vector2(SIDE_PAD + 6f, 18f + bob);
     }
 
     private void BuildAwning()
@@ -213,14 +413,14 @@ public class ShopScreenUI : MonoBehaviour
         float sw = (WIN_W - 14f) / stripes;
         for (int i = 0; i < stripes; i++)
         {
-            Image s = AddImage(awn, $"Stripe{i}", RelicUISprites.White(), (i % 2 == 0) ? AwningBlue : Cream, false);
+            Image s = AddImage(awn, $"Stripe{i}", FlatUI.Pixel(), (i % 2 == 0) ? AwningBlue : Cream, false);
             RectTransform rt = s.rectTransform;
             rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f); rt.pivot = new Vector2(0f, 1f);
             rt.sizeDelta = new Vector2(sw, 34f);
             rt.anchoredPosition = new Vector2(i * sw, 0f);
         }
         // Thin wood trim just under the canopy.
-        Image trim = AddImage(window, "AwningTrim", RelicUISprites.White(), ShelfWood, false);
+        Image trim = AddImage(window, "AwningTrim", FlatUI.Pixel(), ShelfWood, false);
         RectTransform trt = trim.rectTransform;
         trt.anchorMin = trt.anchorMax = new Vector2(0.5f, 1f); trt.pivot = new Vector2(0.5f, 1f);
         trt.sizeDelta = new Vector2(WIN_W - 14f, 4f);
@@ -236,7 +436,7 @@ public class ShopScreenUI : MonoBehaviour
         Image b = band.gameObject.AddComponent<Image>();
         b.sprite = PixelUI.Grain(); b.type = Image.Type.Tiled; b.color = WoodBand;
 
-        Image line = AddImage(window, "HeaderLine", RelicUISprites.White(), WoodFrame, false);
+        Image line = AddImage(window, "HeaderLine", FlatUI.Pixel(), WoodFrame, false);
         RectTransform lrt = line.rectTransform;
         lrt.anchorMin = lrt.anchorMax = new Vector2(0.5f, 1f); lrt.pivot = new Vector2(0.5f, 1f);
         lrt.sizeDelta = new Vector2(WIN_W - 14f, 3f);
@@ -318,7 +518,16 @@ public class ShopScreenUI : MonoBehaviour
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.None;
 
-        if (barkerText != null) barkerText.text = Barks[Random.Range(0, Barks.Length)];
+        // Put this shopkeeper's own face on the counter.
+        if (portraitImage != null)
+        {
+            Sprite face = shopkeeper != null ? shopkeeper.ResolvePortrait() : null;
+            portraitImage.sprite = face;
+            portraitImage.enabled = face != null;
+        }
+        if (barkerText != null) barkerText.text = "";
+        if (bubbleGroup != null) bubbleGroup.alpha = 0f;
+
         if (tooltip != null) tooltip.gameObject.SetActive(false);
         BuildOffers();
         Populate();
@@ -330,8 +539,12 @@ public class ShopScreenUI : MonoBehaviour
         if (cs.x > 1f && cs.y > 1f)
             fillScale = Mathf.Clamp(Mathf.Min(cs.x * 0.985f / WIN_W, cs.y * 0.965f / WIN_H), 0.5f, 4f);
 
+        // StopAllCoroutines kills the talk/mood routines, so clear their handles before greeting —
+        // a stale moodCo would make Update think a reaction is still playing and freeze the idle bob.
         StopAllCoroutines();
+        talkCo = null; moodCo = null;
         StartCoroutine(OpenAnim());
+        Say(Greetings, Mood.Lean);
     }
 
     private void Hide()
@@ -449,7 +662,7 @@ public class ShopScreenUI : MonoBehaviour
         bg.sprite = PixelUI.Grain(); bg.type = Image.Type.Tiled; bg.color = TileBg;
         tile.tileBg = bg;
 
-        Color frameCol = (o.type == ShopItemType.Relic) ? RelicUISprites.RarityColor(o.relic.rarity)
+        Color frameCol = (o.type == ShopItemType.Relic) ? FlatUI.RarityColor(o.relic.rarity)
                                                         : new Color(0.5f, 0.42f, 0.3f, 1f);
         Image fr = AddImage(root, "Frame", PixelUI.Frame(), frameCol, false);
         fr.type = Image.Type.Sliced; Stretch(fr.rectTransform);
@@ -461,7 +674,7 @@ public class ShopScreenUI : MonoBehaviour
             Image ic = iconRt.gameObject.AddComponent<Image>();
             ic.preserveAspect = true;
             if (o.relic.relicArt != null) ic.sprite = o.relic.relicArt;
-            else { ic.sprite = Gem(); ic.color = RelicUISprites.RarityColor(o.relic.rarity); }   // clean rarity gem until art exists
+            else { ic.sprite = Gem(); ic.color = FlatUI.RarityColor(o.relic.rarity); }   // clean rarity gem until art exists
         }
         else if (o.type == ShopItemType.Card && o.card.cardArt != null)
         {
@@ -508,7 +721,12 @@ public class ShopScreenUI : MonoBehaviour
         tile.buyBtn.onClick.AddListener(() => TryBuy(capturedTile));
 
         ShopTileHover hov = root.gameObject.AddComponent<ShopTileHover>();
-        hov.onEnter = () => { ShowTooltip(capturedTile, captured.desc); HoverScale(capturedTile, 1.05f); };
+        hov.onEnter = () =>
+        {
+            ShowTooltip(capturedTile, captured.desc);
+            HoverScale(capturedTile, 1.05f);
+            BarkOnBrowse(capturedTile);
+        };
         hov.onExit  = () => { HideTooltip(); HoverScale(capturedTile, 1f); };
 
         tile.soldStamp = BuildSoldStamp(root);
@@ -557,14 +775,33 @@ public class ShopScreenUI : MonoBehaviour
         if (tooltip != null) tooltip.gameObject.SetActive(false);
     }
 
+    // What he says when you look at something. Affordability wins over item type — being told you
+    // can't afford it is more useful than a joke about what it does, and it's the reaction a real
+    // shopkeeper would have to you eyeing something out of your league.
+    private void BarkOnBrowse(Tile tile)
+    {
+        Offer o = tile.offer;
+        if (o.Sold) { Say(AlreadySold, Mood.Slump); return; }
+
+        PlayerController player = GameManager.instance != null ? GameManager.instance.player : null;
+        if (player != null && player.currentGold < o.price) { Say(TooPoor, Mood.Slump); return; }
+
+        switch (o.type)
+        {
+            case ShopItemType.Card:    Say(BrowseCard, Mood.Lean); break;
+            case ShopItemType.Relic:   Say(BrowseRelic, Mood.Lean); break;
+            default:                   Say(BrowseService, Mood.Lean); break;
+        }
+    }
+
     // ---- buying ----
     private void TryBuy(Tile tile)
     {
         Offer o = tile.offer;
-        if (o.Sold) return;
+        if (o.Sold) { Say(AlreadySold, Mood.Slump); return; }
         PlayerController player = GameManager.instance != null ? GameManager.instance.player : null;
         if (player == null) return;
-        if (player.currentGold < o.price) { StartCoroutine(DenyShake(tile)); return; }
+        if (player.currentGold < o.price) { Say(TooPoor, Mood.Slump); StartCoroutine(DenyShake(tile)); return; }
 
         switch (o.type)
         {
@@ -590,6 +827,7 @@ public class ShopScreenUI : MonoBehaviour
                 if (player.TrySpendGold(o.price))
                 {
                     o.onService?.Invoke();
+                    Say(Bought, Mood.Nod);
                     StartCoroutine(PunchTile(tile));
                     StartCoroutine(GoldFlash());
                     RefreshGold();
@@ -602,6 +840,7 @@ public class ShopScreenUI : MonoBehaviour
     {
         RefreshGold();
         HideTooltip();
+        Say(Bought, Mood.Nod);
         StartCoroutine(GoldFlash());
         StartCoroutine(PunchTile(tile));
         StartCoroutine(SlamSold(tile));
@@ -854,7 +1093,7 @@ public class ShopScreenUI : MonoBehaviour
         return t;
     }
 
-    private void BuildButton(Transform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size,
+    private GameObject BuildButton(Transform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size,
         Color color, string text, UnityEngine.Events.UnityAction onClick)
     {
         RectTransform rt = AddPoint(parent, name, anchor, pos, size);
@@ -865,14 +1104,10 @@ public class ShopScreenUI : MonoBehaviour
         b.onClick.AddListener(onClick);
         AddText(rt, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, size,
             text, 20f, FontStyles.Bold, new Color(0.14f, 0.1f, 0.05f), TextAlignmentOptions.Center);
+        return rt.gameObject;
     }
 
-    private TMP_FontAsset ResolveFont()
-    {
-        TMP_Text any = FindAnyObjectByType<TMP_Text>();
-        if (any != null && any.font != null) return any.font;
-        return TMP_Settings.defaultFontAsset;
-    }
+    private TMP_FontAsset ResolveFont() => FlatUI.UIFont();
 
     private static float EaseOutBack(float t)
     {

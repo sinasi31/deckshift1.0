@@ -557,6 +557,8 @@ Lessons already paid for, don't re-learn them:
 
 **The inversions are the point.** Warm/cold, below/above, rising/falling, worn/clean. When adding a screen, pick a material and invert something — **do not just retint Iron**.
 
+**The Marketplace (`ShopScreenUI`) keeps its own material** — warm wood, striped canvas awning, lamplight — and was already bespoke rather than old chrome. What it needed wasn't a reskin but a PERSON; see "The keeper talks back" below.
+
 **Loadout inverts a different axis: it's the only theme where the chrome is NOT the subject.** The other two dress a place, so the material carries the character. The relic bar dresses your inventory, sits over gameplay permanently, and the relic art is colourful pixel work — so the sockets are deliberately near-colourless and the theme is the quietest by weight. **Do not add a hue to the relic bar.** A permanent HUD element cannot compete with the game behind it the way a modal panel can.
 
 `UIEmberField.Settings` carries the motion half (`Settings.Embers` / `Settings.Motes`): rise speed (negative = falling), lateral spread, size, life, sway, twinkle.
@@ -578,9 +580,22 @@ The settle originally used an *expanding* ring, which the designer called bland 
 
 **Sound design note:** magic is **harmonic** (bell/chime partials 1,2,3,4,5.1), metal is **inharmonic** (bar modes 1,2.76,5.40,8.93 — see `ProcSfx.ScrapPickup`). That ratio choice is the whole difference between "charm" and "clank"; keep the two families distinct so a blessing and a scrap pickup are never confusable.
 
-**Status: converted —** `ScrapForgeScreen`, `ScrapHUD`, `BlompoScreen`, `RelicHUD`, `RelicIcon`, `RelicTooltip`.
+### The keeper talks back (`ShopScreenUI`, 2026-08-03)
 
-**Still on the old `RelicUISprites` chrome** (audited 2026-08-03 — the old look reaches further than the relic screens): `RelicManagePanel`, `RelicSwapScreen`, `CardUI`, `ResourceBarUI`, `ResourcePanelHUD`, `ShopScreenUI`, `PixelUI`. Reuse `FlatUI` for those — don't invent a fourth look. `RelicManagePanel` / `RelicSwapScreen` should take the **Loadout** theme, since they're the same subject as the bar. The shop wants its own material (it's a *place*, so give it one and invert something).
+The designer's brief for the shop was **"make the player feel like they are talking to a person who is trying to sell them stuff."** The stall already looked like a stall; what was missing was a shopkeeper.
+
+- **He has a face.** `Shopkeeper.ResolvePortrait()` returns an assignable `portrait` sprite, falling back to the shopkeeper's own world sprite — so a placed stall gets a face with zero wiring. ⚠️ The fallback grabs the whole stall prop, not a head; **assign `portrait` for a proper close-up.**
+- **He reacts to what you do.** Barks used to be one array with a single line picked at open — decoration that never changed. They're now split by EVENT (`Greetings` / `BrowseCard` / `BrowseRelic` / `BrowseService` / `TooPoor` / `Bought` / `AlreadySold` / `Farewells`) and fired from hover, purchase, refusal and the Leave button. **Affordability outranks item type** on hover: being told you can't afford it is more useful than a joke about what it does, and it's what a real trader would say to you eyeing something out of your league.
+- **Speech is typed out a character at a time.** A line that snaps in whole reads as a label changing; typed, it reads as *said*.
+- **Small body language** — `Mood.Lean` on browse, `Nod` on a sale, `Slump` on a refusal, plus a constant idle bob. Deliberately tiny: a portrait that lurches around pulls focus off the prices, which is what the player is there to read.
+- **No line repeats back-to-back** (`lastLine`), because with pools this small plain randomness repeats constantly and repetition is what makes barks feel canned.
+- Lamplit **dust** drifts through the stall (`UIEmberField.Settings.Dust` — warm, very slow, no twinkle). A shop is a place with air in it; stillness is what made the panel feel like a menu.
+
+⚠️ `ShopScreenUI` already had an `Update()`. The keeper's idle bob is a `TickKeeperIdle()` called from it, **not a second `Update`** — and it skips while a mood coroutine owns the transform, or the two fight over `anchoredPosition`.
+
+**Status: converted —** `ScrapForgeScreen`, `ScrapHUD`, `BlompoScreen`, `RelicHUD`, `RelicIcon`, `RelicTooltip`, `RelicManagePanel`, `RelicSwapScreen`, `ResourceBarUI`/`ResourcePanelHUD`, `ShopScreenUI`.
+
+**Still on the old `RelicUISprites` chrome:** `CardUI` (and `PixelUI`, which the shop uses for grain/frames and is fine as-is). **`CardUI` is the last one and the most delicate** — card frames carry the Shift cost and charge pips, so it's live gameplay information, not decoration. Do it carefully and check the hand, the reward screen and the deck view, which all render cards.
 
 ### Never Scale UI Containers — Resize Them
 
