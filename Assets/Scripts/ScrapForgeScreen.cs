@@ -138,7 +138,7 @@ public class ScrapForgeScreen : MonoBehaviour
 
         // Embers drifting up and to the left — the forge breathing behind the work surface. Added
         // here so it sits above the glow but beneath every label, card and button added later.
-        UIEmberField.Attach(window, 18, new Color(1f, 0.62f, 0.30f, 1f));
+        UIEmberField.Attach(window, 18, new Color(1f, 0.62f, 0.30f, 1f), UIEmberField.Settings.Embers);
 
         Image winFrame = AddImage(window, "Frame", FlatUI.Outline(10, 2), FlatUI.Border, false);
         winFrame.type = Image.Type.Sliced;
@@ -663,7 +663,7 @@ public class ScrapForgeScreen : MonoBehaviour
         return t;
     }
 
-    private TMP_FontAsset ResolveFont() => ScrapEconomy.UIFont();
+    private TMP_FontAsset ResolveFont() => FlatUI.UIFont();
 
     private static float EaseOutBack(float t)
     {

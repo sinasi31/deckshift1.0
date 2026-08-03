@@ -44,16 +44,17 @@ public class ScrapHUD : MonoBehaviour
         rt.sizeDelta = new Vector2(CHIP_W, CHIP_H);
         PositionNearExhaustPile(rt);
 
-        // Stone chip + gold border, matching the game's own hand-painted HUD chrome.
+        // Flat iron chip, matching the Scrap Forge screen this currency is spent on. (It was
+        // originally gold-on-stone like the old chrome, which left it as the one piece of the
+        // scrap system still speaking the old visual language.)
         Image bg = gameObject.AddComponent<Image>();
-        bg.sprite = RelicUISprites.StonePanel();
+        bg.sprite = FlatUI.Panel(5);
         bg.type = Image.Type.Sliced;
-        bg.color = new Color(0.76f, 0.74f, 0.78f, 1f);
+        bg.color = FlatUI.Surface;
         bg.raycastTarget = false;
 
-        Image frame = AddImage(transform, "Frame", RelicUISprites.GoldBorder(), Color.white);
+        Image frame = AddImage(transform, "Frame", FlatUI.Outline(5, 1), FlatUI.Border);
         frame.type = Image.Type.Sliced;
-        frame.pixelsPerUnitMultiplier = 1.3f;
         Stretch(frame.rectTransform);
 
         // Shard icon, reusing the exact pickup sprite so the HUD number and the thing on the floor
@@ -72,7 +73,7 @@ public class ScrapHUD : MonoBehaviour
         trt.offsetMin = new Vector2(42f, 0f); trt.offsetMax = new Vector2(-12f, 0f);
 
         countText = textGO.AddComponent<TextMeshProUGUI>();
-        TMP_FontAsset f = ScrapEconomy.UIFont();
+        TMP_FontAsset f = FlatUI.UIFont();
         if (f != null) countText.font = f;
         countText.fontSize = 26f;
         countText.fontStyle = FontStyles.Bold;

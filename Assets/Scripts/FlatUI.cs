@@ -26,7 +26,7 @@ public static class FlatUI
 {
     private static Sprite plateLarge, plateSmall, outlineLarge, outlineSmall;
     private static Sprite softGlow, verticalFade, bottomGlow, fadedRule, rivet, pixel;
-    private static Sprite emberDot;
+    private static Sprite emberDot, fourPointStar;
 
     // Solid chamfered plate. chamfer 10 = windows, 5 = cards and buttons.
     public static Sprite Panel(int chamfer = 10)
@@ -165,6 +165,35 @@ public static class FlatUI
         return verticalFade;
     }
 
+    // A four-point sparkle. Blompo's answer to the Forge's rivet: where the workbench is held
+    // together by fasteners, the mythic panel is pinned by points of light.
+    public static Sprite FourPointStar()
+    {
+        if (fourPointStar != null) return fourPointStar;
+
+        const int S = 32;
+        Texture2D tex = NewTex(S);
+        float c = (S - 1) * 0.5f;
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+            {
+                float dx = (x - c) / c, dy = (y - c) / c;
+                float ax = Mathf.Abs(dx), ay = Mathf.Abs(dy);
+
+                // Two crossed tapered spikes, plus a bright core where they meet.
+                float horiz = Mathf.Clamp01(1f - ax) * Mathf.Clamp01(1f - ay / 0.16f);
+                float vert = Mathf.Clamp01(1f - ay) * Mathf.Clamp01(1f - ax / 0.16f);
+                float d = Mathf.Sqrt(dx * dx + dy * dy);
+                float core = Mathf.Clamp01(1f - d * 3.4f);
+
+                float a = Mathf.Clamp01(Mathf.Max(horiz, vert) * Mathf.Max(horiz, vert) + core);
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+            }
+        tex.Apply();
+        fourPointStar = Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), 100f);
+        return fourPointStar;
+    }
+
     // A single floating ember: a hot core with a soft halo. Deliberately not a hard dot — at the
     // 2-4px these are drawn at, a hard-edged square reads as a dead pixel rather than a spark.
     public static Sprite EmberDot()
@@ -276,4 +305,105 @@ public static class FlatUI
     // Charges are Shift-blue on purpose: with scrap costs in rust-orange, the only two colours on
     // the screen are the game's own two resources.
     public static readonly Color Charges = new Color(0.478f, 0.706f, 0.929f, 1f);
+
+    // ---- themes -------------------------------------------------------------------------------
+    // Screens share the IDEOLOGY (flat procedural plates, restraint, directional light, a subtle
+    // particle drift, one meaningful accent) but must NOT share a skin. Each place gets its own
+    // material, and the material should say what the place DOES:
+    //
+    //   IRON   — the Scrap Forge. A workbench. Warm charcoal, fire from BELOW, rivets, scuffs,
+    //            embers rising. Industrial, used, hot.
+    //   ARCANE — Blompo. A mythic creature granting a blessing. Cold indigo, light from ABOVE
+    //            (the blessing descending), four-point stars instead of rivets, motes settling
+    //            downward, and no wear at all — his space isn't a workshop that gets used, so
+    //            leaving it pristine is itself the contrast.
+    //
+    // The inversions are deliberate: warm/cold, lit from below/above, rising/falling, worn/clean.
+    // When adding a screen, pick a material and invert something — don't just retint Iron.
+    public struct Theme
+    {
+        public Color Backdrop, Surface, SurfaceRaised, Border, BorderSoft, EdgeLight, Accent;
+        public Color TextBright, TextBody, TextMuted, TextDisabled;
+    }
+
+    public static readonly Theme Iron = new Theme
+    {
+        Backdrop = Backdrop,
+        Surface = Surface,
+        SurfaceRaised = SurfaceRaised,
+        Border = Border,
+        BorderSoft = BorderSoft,
+        EdgeLight = EdgeLight,
+        Accent = Ember,
+        TextBright = TextBright,
+        TextBody = TextBody,
+        TextMuted = TextMuted,
+        TextDisabled = TextDisabled,
+    };
+
+    public static readonly Theme Arcane = new Theme
+    {
+        Backdrop = new Color(0.016f, 0.014f, 0.026f, 0.92f),
+        Surface = new Color(0.069f, 0.064f, 0.098f, 0.99f),
+        SurfaceRaised = new Color(0.110f, 0.102f, 0.149f, 1f),
+        Border = new Color(0.263f, 0.239f, 0.361f, 1f),
+        BorderSoft = new Color(0.216f, 0.196f, 0.298f, 1f),
+        EdgeLight = new Color(0.451f, 0.412f, 0.596f, 1f),
+        Accent = new Color(0.686f, 0.522f, 0.965f, 1f),   // arcane violet
+        TextBright = new Color(0.929f, 0.925f, 0.961f, 1f),
+        TextBody = new Color(0.769f, 0.761f, 0.831f, 1f),
+        TextMuted = new Color(0.522f, 0.510f, 0.612f, 1f),
+        TextDisabled = new Color(0.337f, 0.325f, 0.412f, 1f),
+    };
+
+    // The font procedural UI should use.
+    //
+    // Deliberately NOT `FindAnyObjectByType<TMP_Text>().font`, which several older screens use:
+    // that returns an ARBITRARY text object, so the font a procedural panel picks up changes
+    // between runs. It was caught by two screenshots of the same screen coming back in different
+    // typefaces, and again when Blompo rendered in generic sans while the Forge rendered in the
+    // pixel font. Count the fonts actually in use and take the most common — the project's real UI
+    // font, deterministically, whatever a stray debug label happens to use.
+    public static TMPro.TMP_FontAsset UIFont()
+    {
+        var counts = new System.Collections.Generic.Dictionary<TMPro.TMP_FontAsset, int>();
+        foreach (TMPro.TMP_Text t in Object.FindObjectsByType<TMPro.TMP_Text>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (t == null || t.font == null) continue;
+            counts.TryGetValue(t.font, out int n);
+            counts[t.font] = n + 1;
+        }
+
+        TMPro.TMP_FontAsset best = null;
+        int bestCount = 0;
+        foreach (var kv in counts)
+        {
+            // Ties break on instance ID so the result is stable across runs rather than
+            // dictionary-order dependent.
+            if (kv.Value > bestCount ||
+                (kv.Value == bestCount && best != null && kv.Key.GetInstanceID() < best.GetInstanceID()))
+            {
+                best = kv.Key;
+                bestCount = kv.Value;
+            }
+        }
+
+        return best != null ? best : TMPro.TMP_Settings.defaultFontAsset;
+    }
+
+    // Rarity colours tuned to read on a DARK surface. The old chrome carried rarity on a gem set
+    // in gold; without that frame the colour has to stand on its own, so these are brighter and
+    // more separated than jewel tones would be.
+    public static Color RarityColor(Rarity r)
+    {
+        switch (r)
+        {
+            case Rarity.Legendary: return new Color(0.980f, 0.757f, 0.361f, 1f);   // amber
+            case Rarity.Epic: return new Color(0.729f, 0.529f, 0.961f, 1f);        // violet
+            case Rarity.Rare: return new Color(0.416f, 0.702f, 0.980f, 1f);        // azure
+            // Common is muted on purpose. At a lighter slate it rendered near-white, and since the
+            // sigil is large that made the WEAKEST offer the brightest thing on the screen.
+            default: return new Color(0.510f, 0.549f, 0.635f, 1f);                 // cool slate
+        }
+    }
 }

@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
 
 // THE tuning file for the scrap economy. Every scrap number in the game is here — if a value
@@ -84,37 +82,7 @@ public static class ScrapEconomy
     // one consistent thing. Warm oxidised iron — deliberately distinct from gold's yellow.
     public static readonly Color ScrapColor = new Color(0.80f, 0.49f, 0.29f);
 
-    // The font procedural scrap UI should use.
-    //
-    // Deliberately NOT `FindAnyObjectByType<TMP_Text>().font`, which several existing screens use:
-    // that returns an ARBITRARY text object, so the font a procedural panel picks up changes
-    // between runs. It was caught by two screenshots of the same forge screen coming back in
-    // different typefaces. Instead, count the fonts actually in use and take the most common one —
-    // the project's real UI font, deterministically, whatever a stray debug label happens to use.
-    public static TMP_FontAsset UIFont()
-    {
-        var counts = new Dictionary<TMP_FontAsset, int>();
-        foreach (TMP_Text t in Object.FindObjectsByType<TMP_Text>(FindObjectsInactive.Include, FindObjectsSortMode.None))
-        {
-            if (t == null || t.font == null) continue;
-            counts.TryGetValue(t.font, out int n);
-            counts[t.font] = n + 1;
-        }
-
-        TMP_FontAsset best = null;
-        int bestCount = 0;
-        foreach (var kv in counts)
-        {
-            // Ties break on instance ID so the result is stable across runs rather than
-            // dictionary-order dependent.
-            if (kv.Value > bestCount ||
-                (kv.Value == bestCount && best != null && kv.Key.GetInstanceID() < best.GetInstanceID()))
-            {
-                best = kv.Key;
-                bestCount = kv.Value;
-            }
-        }
-
-        return best != null ? best : TMP_Settings.defaultFontAsset;
-    }
+    // NOTE: the shared UI font resolver used to live here. It moved to FlatUI.UIFont() once more
+    // than one screen needed it — the economy file is the wrong home for a UI concern, and two
+    // copies would eventually drift.
 }
