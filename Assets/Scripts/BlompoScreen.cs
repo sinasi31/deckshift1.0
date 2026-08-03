@@ -423,23 +423,33 @@ public class BlompoScreen : MonoBehaviour
         yield return StartCoroutine(CloseAfter(1.4f));
     }
 
-    // Updates an already-built card chip in place to show its new blessing (badge + charge count).
+    // Updates an already-built card chip in place to show its new blessing. Fires on the exact
+    // frame the charm binds, so BOTH stats are refreshed here — several blessings visibly change
+    // them (Overstuffed adds charges, On the House zeroes the Shift cost), and seeing the number
+    // move at the moment of the bind is most of the payoff.
     private void StampChip(RectTransform chip, RuntimeCard card)
     {
         if (chip == null || card == null) return;
 
-        Transform charges = chip.Find("Charges");
-        if (charges != null)
-        {
-            TMP_Text ct = charges.GetComponent<TMP_Text>();
-            if (ct != null) ct.text = card.isInfinite ? "∞" : card.currentUses.ToString();
-        }
+        int maxUses = card.cardData != null ? card.cardData.maxUses : 0;
+        SetChipText(chip, "Uses", card.isInfinite ? "∞" : $"{card.currentUses}/{maxUses}");
+
+        int cost = card.cardData != null ? card.cardData.shiftCost : 0;
+        SetChipText(chip, "Cost", card.enhancement == CardEnhancement.OnTheHouse ? "0" : cost.ToString());
 
         if (card.enhancement == CardEnhancement.None || chip.Find("Badge") != null) return;
 
         Color gem = FlatUI.RarityColor(CardEnhancements.RarityOf(card.enhancement));
         AddText(chip, "Badge", new Vector2(0.5f, 1f), new Vector2(0f, -10f), new Vector2(CARD_W - 16f, 28f),
             CardEnhancements.Name(card.enhancement), 16f, FontStyles.Bold, gem, TextAlignmentOptions.Center);
+    }
+
+    private void SetChipText(RectTransform chip, string childName, string value)
+    {
+        Transform t = chip.Find(childName);
+        if (t == null) return;
+        TMP_Text txt = t.GetComponent<TMP_Text>();
+        if (txt != null) txt.text = value;
     }
 
     private IEnumerator CloseAfter(float seconds)
@@ -479,16 +489,30 @@ public class BlompoScreen : MonoBehaviour
         }
 
         // Two lines of room so long names ("Create Platform") wrap clear of the art above.
-        TMP_Text nameText = AddText(rt, "Name", new Vector2(0.5f, 0f), new Vector2(0f, 46f), new Vector2(CARD_W - 20f, 52f),
+        TMP_Text nameText = AddText(rt, "Name", new Vector2(0.5f, 0f), new Vector2(0f, 62f), new Vector2(CARD_W - 20f, 52f),
             card.cardData != null ? card.cardData.cardName : "?", 19f, FontStyles.Bold,
             T.TextBody, TextAlignmentOptions.Bottom);
         nameText.enableWordWrapping = true;
         nameText.enableAutoSizing = true;
         nameText.fontSizeMin = 13f; nameText.fontSizeMax = 19f;
 
-        string charges = card.isInfinite ? "∞" : card.currentUses.ToString();
-        AddText(rt, "Charges", new Vector2(0.5f, 0f), new Vector2(0f, 16f), new Vector2(CARD_W - 22f, 32f),
-            charges, 21f, FontStyles.Bold, FlatUI.Charges, TextAlignmentOptions.Center);
+        // The card's actual stats. The chip used to show a bare charge count and no Shift cost at
+        // all, which made this step a guess — you were picking which card to permanently alter
+        // without being able to see what it currently costs or how much life it has left in it.
+        int maxUses = card.cardData != null ? card.cardData.maxUses : 0;
+        int cost = card.cardData != null ? card.cardData.shiftCost : 0;
+
+        Image rule = AddImage(rt, "StatRule", FlatUI.FadedRule(), T.BorderSoft, false);
+        rule.rectTransform.anchorMin = rule.rectTransform.anchorMax = new Vector2(0.5f, 0f);
+        rule.rectTransform.pivot = new Vector2(0.5f, 0f);
+        rule.rectTransform.anchoredPosition = new Vector2(0f, 52f);
+        rule.rectTransform.sizeDelta = new Vector2(CARD_W - 44f, 1f);
+
+        float half = (CARD_W - 20f) * 0.5f;
+        BuildStat(rt, "Cost", -half * 0.5f, "SHIFT",
+            card.enhancement == CardEnhancement.OnTheHouse ? "0" : cost.ToString(), FlatUI.Charges);
+        BuildStat(rt, "Uses", half * 0.5f, "CHARGES",
+            card.isInfinite ? "∞" : $"{card.currentUses}/{maxUses}", FlatUI.Charges);
 
         if (card.enhancement != CardEnhancement.None)
         {
@@ -497,6 +521,15 @@ public class BlompoScreen : MonoBehaviour
                 CardEnhancements.Name(card.enhancement), 15f, FontStyles.Bold, gem, TextAlignmentOptions.Center);
         }
         return rt.gameObject;
+    }
+
+    // One labelled stat under a card chip: a small muted caption over the value.
+    private void BuildStat(RectTransform card, string name, float x, string label, string value, Color valueColor)
+    {
+        AddText(card, name + "Label", new Vector2(0.5f, 0f), new Vector2(x, 30f), new Vector2(96f, 18f),
+            label, 11f, FontStyles.Bold, T.TextMuted, TextAlignmentOptions.Center);
+        AddText(card, name, new Vector2(0.5f, 0f), new Vector2(x, 8f), new Vector2(96f, 26f),
+            value, 19f, FontStyles.Bold, valueColor, TextAlignmentOptions.Center);
     }
 
     private GameObject BuildOfferChip(Transform parent, CardEnhancement e, bool playable = true)
@@ -526,16 +559,18 @@ public class BlompoScreen : MonoBehaviour
         frame.type = Image.Type.Sliced;
         Stretch(frame.rectTransform);
 
-        Image glow = AddImage(rt, "Glow", FlatUI.SoftGlow(), new Color(gem.r, gem.g, gem.b, 0.20f), false);
+        // Glow kept TIGHT and dim. The first version was a 220px soft blob at 0.20 alpha, and that
+        // haze — not the mark itself — was most of why the emblem read as a generic lens flare.
+        Image glow = AddImage(rt, "Glow", FlatUI.SoftGlow(), new Color(gem.r, gem.g, gem.b, 0.13f), false);
         glow.rectTransform.anchorMin = glow.rectTransform.anchorMax = new Vector2(0.5f, 1f);
         glow.rectTransform.anchoredPosition = new Vector2(0f, -112f);
-        glow.rectTransform.sizeDelta = new Vector2(220f, 220f);
+        glow.rectTransform.sizeDelta = new Vector2(150f, 150f);
 
-        // The sigil: a point of light where the gem used to sit.
-        Image star = AddImage(rt, "Sigil", FlatUI.FourPointStar(), gem, false);
+        // The sigil: an inscribed arcane mark where the gem used to sit.
+        Image star = AddImage(rt, "Sigil", FlatUI.ArcaneSigil(), gem, false);
         star.rectTransform.anchorMin = star.rectTransform.anchorMax = new Vector2(0.5f, 1f);
         star.rectTransform.anchoredPosition = new Vector2(0f, -112f);
-        star.rectTransform.sizeDelta = new Vector2(104f, 104f);
+        star.rectTransform.sizeDelta = new Vector2(112f, 112f);
 
         AddText(rt, "Name", new Vector2(0.5f, 1f), new Vector2(0f, -196f), new Vector2(OFFER_W - 34f, 52f),
             CardEnhancements.Name(e), 30f, FontStyles.Bold, gem, TextAlignmentOptions.Top);

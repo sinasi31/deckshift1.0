@@ -32,7 +32,7 @@ public static class BlompoForgeFX
     private const float RING_START = 280f;   // radius the runes form at
     private const float RING_BOUND = 135f;   // radius they collapse to at the bind
     private const float VERT_SQUASH = 0.58f; // Y scale for anything reaching past the ring
-    private const float HALO_MAX = 620f;     // halo diameter cap (310 radius, inside the 321 floor)
+    private const float SEAL_MAX = 620f;     // seal start diameter (310 radius, inside the 321 floor)
 
     /// Plays the full sequence against `card` (a chip already parented under `host`).
     /// `onSet` fires at the instant the charm binds, so the caller can apply the enhancement and
@@ -137,32 +137,42 @@ public static class BlompoForgeFX
         }
         Object.Destroy(ring.gameObject, 1.2f);
 
-        Image halo = MakeImage(host, "Halo", FlatUI.Ring(), new Color(gem.r, gem.g, gem.b, 0.95f), RING_BOUND, cardHome);
-        Image flash = MakeImage(host, "Flash", FlatUI.SoftGlow(), new Color(1f, 1f, 1f, 0.85f), 260f, cardHome);
+        // The seal: a binding circle that contracts INTO the card and sinks out of sight.
+        //
+        // This replaced an expanding ring, which was both bland and — reading it back — the one
+        // beat in the whole sequence that pushed OUTWARD while everything else converged. Pressing
+        // the seal in finishes the idea the rest of the animation sets up.
+        Image seal = MakeImage(host, "Seal", FlatUI.ArcaneSeal(), new Color(gem.r, gem.g, gem.b, 0f), SEAL_MAX, cardHome);
+        Image flash = MakeImage(host, "Flash", FlatUI.SoftGlow(), new Color(1f, 1f, 1f, 0f), 120f, cardHome);
 
         // --- BEAT 4: SETTLE ---------------------------------------------------------------------
-        const float settle = 1.05f;
+        const float settle = 1.15f;
         for (float t = 0f; t < settle; t += Time.unscaledDeltaTime)
         {
             float n = Mathf.Clamp01(t / settle);
 
-            // Halo expands outward and thins away — a wave leaving, not an impact arriving.
-            halo.rectTransform.sizeDelta = Vector2.one * Mathf.Lerp(RING_BOUND, HALO_MAX, EaseOut(n));
-            SetAlpha(halo, Mathf.Clamp01(1f - n * 1.35f));
+            // Seal drives inward over the first ~40%, accelerating and turning as it closes.
+            float sn = Mathf.Clamp01(n / 0.40f);
+            float drive = sn * sn;
+            seal.rectTransform.sizeDelta = Vector2.one * Mathf.Lerp(SEAL_MAX, 64f, drive);
+            seal.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(-28f, 118f, sn));
+            // Fades up quickly, then snuffs out right as it lands — it doesn't shrink to a dot and
+            // linger, it goes INTO the card.
+            SetAlpha(seal, Mathf.Min(sn / 0.22f, 1f) * (1f - Mathf.Pow(sn, 5f)));
 
-            // The white flash is brief; the rarity-coloured aura is what lingers.
-            float fn = Mathf.Clamp01(n * 4.5f);
-            flash.rectTransform.sizeDelta = Vector2.one * Mathf.Lerp(260f, 520f, fn);
-            SetAlpha(flash, Mathf.Lerp(0.85f, 0f, fn));
+            // The flash blooms as the seal lands, not at the instant of the bind.
+            float fn = Mathf.Clamp01((n - 0.30f) / 0.55f);
+            flash.rectTransform.sizeDelta = Vector2.one * Mathf.Lerp(120f, 470f, Mathf.Sqrt(fn));
+            SetAlpha(flash, Mathf.Sin(fn * Mathf.PI) * 0.8f);
 
             SetAlpha(aura, Mathf.Lerp(0.65f, 0.16f, n));
             aura.rectTransform.sizeDelta = Vector2.one * Mathf.Lerp(330f, 400f, n);
 
-            // Card breathes once and drifts back down to rest.
+            // Card takes the seal — a small recoil as it lands, then settles.
             if (card != null)
             {
-                float breath = Mathf.Sin(Mathf.Clamp01(n * 2.2f) * Mathf.PI) * 0.05f;
-                card.localScale = cardScale * (1f + 0.07f * (1f - EaseOut(n)) + breath);
+                float land = Mathf.Sin(Mathf.Clamp01((n - 0.30f) / 0.35f) * Mathf.PI) * 0.06f;
+                card.localScale = cardScale * (1f + 0.07f * (1f - EaseOut(n)) + land);
                 card.anchoredPosition = cardHome + Vector2.up * (36f * (1f - EaseOut(n)));
             }
             yield return null;
@@ -174,7 +184,7 @@ public static class BlompoForgeFX
             card.localScale = cardScale;
         }
 
-        Object.Destroy(halo.gameObject);
+        Object.Destroy(seal.gameObject);
         Object.Destroy(flash.gameObject);
         Object.Destroy(aura.gameObject);
     }

@@ -26,7 +26,7 @@ public static class FlatUI
 {
     private static Sprite plateLarge, plateSmall, outlineLarge, outlineSmall;
     private static Sprite softGlow, verticalFade, bottomGlow, fadedRule, rivet, pixel;
-    private static Sprite emberDot, fourPointStar, ring;
+    private static Sprite emberDot, fourPointStar, arcaneSigil, arcaneSeal;
 
     // Solid chamfered plate. chamfer 10 = windows, 5 = cards and buttons.
     public static Sprite Panel(int chamfer = 10)
@@ -216,24 +216,105 @@ public static class FlatUI
         return emberDot;
     }
 
-    // A soft hollow circle, for expanding shockwave / halo rings.
-    public static Sprite Ring()
+    // An arcane MARK — the emblem above each of Blompo's offers.
+    //
+    // Replaced a plain four-point sparkle, which read as a lens flare rather than as a symbol
+    // somebody drew. The difference is structure: a containing ring, rays of two different
+    // lengths, and tick marks outside the ring all say "this was inscribed". A soft blob with
+    // four points says "bloom effect".
+    public static Sprite ArcaneSigil()
     {
-        if (ring != null) return ring;
+        if (arcaneSigil != null) return arcaneSigil;
 
-        const int S = 128;
+        const int S = 192;
         Texture2D tex = NewTex(S);
-        float c = (S - 1) * 0.5f, rad = c * 0.84f, thick = c * 0.10f;
+        float c = (S - 1) * 0.5f;
+
         for (int y = 0; y < S; y++)
             for (int x = 0; x < S; x++)
             {
-                float d = Mathf.Sqrt((x - c) * (x - c) + (y - c) * (y - c));
-                float a = Mathf.Clamp01(1f - Mathf.Abs(d - rad) / thick);
-                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a * a));
+                float dx = (x - c) / c, dy = (y - c) / c;
+                float d = Mathf.Sqrt(dx * dx + dy * dy);
+                if (d > 1f) { tex.SetPixel(x, y, Clear); continue; }
+                float ang = Mathf.Atan2(dy, dx);
+
+                // Containing ring.
+                float ring = Mathf.Clamp01(1f - Mathf.Abs(d - 0.70f) / 0.030f);
+
+                // Eight rays: long ones on the axes, shorter on the diagonals.
+                float axis = Mathf.Pow(Mathf.Abs(Mathf.Cos(2f * ang)), 26f) * Falloff(d, 0.66f);
+                float diag = Mathf.Pow(Mathf.Abs(Mathf.Cos(2f * (ang - Mathf.PI * 0.25f))), 44f) * Falloff(d, 0.42f);
+
+                // Four ticks just outside the ring, on the diagonals.
+                float tickBand = Mathf.Clamp01(1f - Mathf.Abs(d - 0.86f) / 0.075f);
+                float tick = tickBand * Mathf.Pow(Mathf.Abs(Mathf.Cos(2f * (ang - Mathf.PI * 0.25f))), 90f);
+
+                float core = Mathf.Pow(Mathf.Clamp01(1f - d * 7f), 2f);
+
+                float a = Mathf.Clamp01(ring * 0.85f + axis + diag * 0.8f + tick * 0.9f + core);
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
             }
         tex.Apply();
-        ring = Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), 100f);
-        return ring;
+        arcaneSigil = Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), 100f);
+        return arcaneSigil;
+    }
+
+    // A binding circle: two concentric rings, radial ticks between them, and four diamond glyphs
+    // on the cardinals. Used for the moment a blessing is pressed into a card.
+    public static Sprite ArcaneSeal()
+    {
+        if (arcaneSeal != null) return arcaneSeal;
+
+        const int S = 256;
+        Texture2D tex = NewTex(S);
+        float c = (S - 1) * 0.5f;
+
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+            {
+                float dx = (x - c) / c, dy = (y - c) / c;
+                float d = Mathf.Sqrt(dx * dx + dy * dy);
+                if (d > 1f) { tex.SetPixel(x, y, Clear); continue; }
+                float ang = Mathf.Atan2(dy, dx);
+
+                float outer = Mathf.Clamp01(1f - Mathf.Abs(d - 0.94f) / 0.016f);
+                float inner = Mathf.Clamp01(1f - Mathf.Abs(d - 0.62f) / 0.030f);
+                float faint = Mathf.Clamp01(1f - Mathf.Abs(d - 0.32f) / 0.012f);
+
+                // Twelve radial ticks spanning the gap between the two main rings.
+                float gap = (d > 0.66f && d < 0.90f) ? 1f : 0f;
+                float ticks = gap * Mathf.Pow(Mathf.Abs(Mathf.Cos(6f * ang)), 60f);
+
+                // Four diamond glyphs punctuating the OUTER ring, on the diagonals.
+                //
+                // They were originally on the inner ring at the cardinals — at exactly that
+                // radius they merged into the ring itself and disappeared. On the outer ring they
+                // read, and the diagonals keep them clear of the twelve ticks (which land on
+                // multiples of 30 degrees).
+                float glyph = 0f;
+                for (int k = 0; k < 4; k++)
+                {
+                    float ga = Mathf.PI * 0.25f + k * Mathf.PI * 0.5f;
+                    float gx = dx - Mathf.Cos(ga) * 0.94f;
+                    float gy = dy - Mathf.Sin(ga) * 0.94f;
+                    float diamond = Mathf.Abs(gx) + Mathf.Abs(gy);
+                    glyph = Mathf.Max(glyph, Mathf.Clamp01(1f - diamond / 0.105f));
+                }
+
+                float a = Mathf.Clamp01(outer * 0.9f + inner + faint * 0.45f + ticks * 0.8f + glyph);
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+            }
+        tex.Apply();
+        arcaneSeal = Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), 100f);
+        return arcaneSeal;
+    }
+
+    private static readonly Color Clear = new Color(0f, 0f, 0f, 0f);
+
+    // Ray brightness: full near the centre, tapering to nothing at `reach`.
+    private static float Falloff(float d, float reach)
+    {
+        return Mathf.Pow(Mathf.Clamp01(1f - d / reach), 1.4f);
     }
 
     // 1x1 white — flat fills and hard edges.
