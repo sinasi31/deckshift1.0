@@ -40,7 +40,10 @@ public class RelicSwapScreen : MonoBehaviour
     private GameObject cachedHud;
     private bool hudWasActive;
 
-    private const float WIN_W = 720f, WIN_H = 540f, CELL = 92f;
+    // Height trimmed from 540 with the ornate border gone — the old insets existed to clear gem
+    // studs that no longer exist.
+    private const float WIN_W = 720f, WIN_H = 516f, CELL = 92f;
+    private const float PAD = 32f;
 
     public static void Open(RelicData incoming, System.Action onAcquired)
     {
@@ -87,54 +90,59 @@ public class RelicSwapScreen : MonoBehaviour
         Stretch(GetComponent<RectTransform>());
         group = gameObject.AddComponent<CanvasGroup>();
 
-        Image backdrop = AddImage(transform, "Backdrop", null, new Color(0f, 0f, 0f, 0.86f), true);
+        FlatUI.Theme T = FlatUI.Loadout;
+
+        Image backdrop = AddImage(transform, "Backdrop", null, T.Backdrop, true);
         Stretch(backdrop.rectTransform);   // no click-to-close: this is a forced decision
 
         window = AddPoint(transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(WIN_W, WIN_H));
         Image winBg = window.gameObject.AddComponent<Image>();
-        winBg.sprite = RelicUISprites.StonePanel(); winBg.type = Image.Type.Sliced;
-        winBg.color = new Color(0.8f, 0.78f, 0.82f, 1f); winBg.raycastTarget = true;
-        Image winFrame = AddImage(window, "Frame", RelicUISprites.GoldBorder(), Color.white, false);
+        winBg.sprite = FlatUI.Panel(8); winBg.type = Image.Type.Sliced;
+        winBg.color = new Color(0.063f, 0.061f, 0.058f, 0.99f); winBg.raycastTarget = true;
+        Image winFrame = AddImage(window, "Frame", FlatUI.Outline(8, 2), T.Border, false);
         winFrame.type = Image.Type.Sliced; Stretch(winFrame.rectTransform);
-        RelicUISprites.AddGemStuds(window, WIN_W, WIN_H, RelicUISprites.GemColor(Rarity.Common));   // ruby studs like the HUD panel
 
-        AddText(window, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -22f), new Vector2(640f, 40f),
-            "LOADOUT FULL", 30f, FontStyles.Bold, new Color(0.95f, 0.86f, 0.6f), TextAlignmentOptions.Top);
-        AddText(window, "Subtitle", new Vector2(0.5f, 1f), new Vector2(0f, -58f), new Vector2(660f, 26f),
-            "Sell a relic to make room, or leave the new one.", 16f, FontStyles.Normal,
-            new Color(0.78f, 0.8f, 0.88f), TextAlignmentOptions.Top);
+        AddText(window, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -24f), new Vector2(640f, 38f),
+            "LOADOUT FULL", 26f, FontStyles.Bold, T.TextBright, TextAlignmentOptions.Top)
+            .characterSpacing = 6f;
+        AddText(window, "Subtitle", new Vector2(0.5f, 1f), new Vector2(0f, -58f), new Vector2(660f, 24f),
+            "Sell a relic to make room, or leave the new one.", 15f, FontStyles.Normal,
+            T.TextMuted, TextAlignmentOptions.Top);
 
-        // Incoming relic sub-panel.
-        RectTransform inc = AddPoint(window, "Incoming", new Vector2(0.5f, 1f), new Vector2(0f, -84f), new Vector2(640f, 132f));
+        // Incoming relic sub-panel. Raised off the window rather than a warmer stone, and its
+        // outline is tinted by the incoming relic's RARITY in RebuildIncoming — with the gold
+        // chrome gone, that tint is what tells you at a glance how good the offer is.
+        RectTransform inc = AddPoint(window, "Incoming", new Vector2(0.5f, 1f), new Vector2(0f, -88f), new Vector2(WIN_W - PAD * 2f, 126f));
         inc.pivot = new Vector2(0.5f, 1f);
         Image incBg = inc.gameObject.AddComponent<Image>();
-        incBg.sprite = RelicUISprites.StonePanel(); incBg.type = Image.Type.Sliced;
-        incBg.color = new Color(0.95f, 0.9f, 0.82f, 1f);   // warmer stone sets the incoming apart
-        incomingFrame = AddImage(inc, "IncFrame", RelicUISprites.GoldBorder(), Color.white, false);
+        incBg.sprite = FlatUI.Panel(6); incBg.type = Image.Type.Sliced;
+        incBg.color = T.SurfaceRaised;
+        incomingFrame = AddImage(inc, "IncFrame", FlatUI.Outline(6, 1), T.Border, false);
         incomingFrame.type = Image.Type.Sliced; Stretch(incomingFrame.rectTransform);
 
-        newRelicLabel = AddText(inc, "NewLabel", new Vector2(0f, 1f), new Vector2(30f, -16f), new Vector2(260f, 22f),
-            "NEW RELIC", 14f, FontStyles.Bold, new Color(0.95f, 0.86f, 0.6f), TextAlignmentOptions.TopLeft);
+        newRelicLabel = AddText(inc, "NewLabel", new Vector2(0f, 1f), new Vector2(24f, -14f), new Vector2(260f, 20f),
+            "NEW RELIC", 13f, FontStyles.Bold, T.TextMuted, TextAlignmentOptions.TopLeft);
         incomingChipHolder = AddPoint(inc, "Chip", new Vector2(0f, 0.5f), new Vector2(78f, -8f), new Vector2(96f, 96f));
         // Name/description column starts well clear of the icon AND its glow aura (the glow
         // extends ~1.4x the icon, to ~x=140), so the name no longer blends into the symbol.
-        incomingName = AddText(inc, "IncName", new Vector2(0f, 1f), new Vector2(196f, -30f), new Vector2(424f, 32f),
-            "", 22f, FontStyles.Bold, Color.white, TextAlignmentOptions.TopLeft);
-        incomingDesc = AddText(inc, "IncDesc", new Vector2(0f, 1f), new Vector2(196f, -66f), new Vector2(424f, 60f),
-            "", 15f, FontStyles.Normal, new Color(0.82f, 0.84f, 0.9f), TextAlignmentOptions.TopLeft);
+        incomingName = AddText(inc, "IncName", new Vector2(0f, 1f), new Vector2(190f, -28f), new Vector2(424f, 30f),
+            "", 21f, FontStyles.Bold, T.TextBright, TextAlignmentOptions.TopLeft);
+        incomingDesc = AddText(inc, "IncDesc", new Vector2(0f, 1f), new Vector2(190f, -62f), new Vector2(424f, 56f),
+            "", 15f, FontStyles.Normal, T.TextBody, TextAlignmentOptions.TopLeft);
         incomingDesc.enableWordWrapping = true;
 
         // Divider + loadout label
-        Image div = AddImage(window, "Divider", RelicUISprites.White(), new Color(1f, 1f, 1f, 0.12f), false);
+        Image div = AddImage(window, "Rule", FlatUI.FadedRule(), T.BorderSoft, false);
         div.rectTransform.anchorMin = div.rectTransform.anchorMax = new Vector2(0.5f, 1f);
         div.rectTransform.pivot = new Vector2(0.5f, 1f);
-        div.rectTransform.sizeDelta = new Vector2(WIN_W - 108f, 2f);
-        div.rectTransform.anchoredPosition = new Vector2(0f, -230f);
-        AddText(window, "LoadoutLabel", new Vector2(0f, 1f), new Vector2(52f, -244f), new Vector2(520f, 24f),
-            "YOUR RELICS  (click one to sell)", 15f, FontStyles.Bold, new Color(0.78f, 0.8f, 0.88f), TextAlignmentOptions.TopLeft);
+        div.rectTransform.sizeDelta = new Vector2(WIN_W - PAD * 2f, 1f);
+        div.rectTransform.anchoredPosition = new Vector2(0f, -232f);
+        AddText(window, "LoadoutLabel", new Vector2(0f, 1f), new Vector2(PAD, -248f), new Vector2(520f, 22f),
+            "YOUR RELICS  —  CLICK ONE TO SELL", 14f, FontStyles.Bold, T.TextMuted, TextAlignmentOptions.TopLeft)
+            .characterSpacing = 3f;
 
         // Slot row
-        RectTransform rowRt = AddPoint(window, "SlotRow", new Vector2(0.5f, 1f), new Vector2(0f, -276f), new Vector2(WIN_W - 60f, CELL));
+        RectTransform rowRt = AddPoint(window, "SlotRow", new Vector2(0.5f, 1f), new Vector2(0f, -278f), new Vector2(WIN_W - 60f, CELL));
         rowRt.pivot = new Vector2(0.5f, 1f);
         HorizontalLayoutGroup hlg = rowRt.gameObject.AddComponent<HorizontalLayoutGroup>();
         hlg.spacing = 12f; hlg.childAlignment = TextAnchor.MiddleCenter;
@@ -142,14 +150,17 @@ public class RelicSwapScreen : MonoBehaviour
         hlg.childForceExpandWidth = hlg.childForceExpandHeight = false;
         slotRow = rowRt;
 
-        sacrificeInfo = AddText(window, "SacrificeInfo", new Vector2(0.5f, 1f), new Vector2(0f, -384f), new Vector2(640f, 26f),
-            "", 16f, FontStyles.Italic, new Color(0.85f, 0.7f, 0.4f), TextAlignmentOptions.Top);
+        sacrificeInfo = AddText(window, "SacrificeInfo", new Vector2(0.5f, 1f), new Vector2(0f, -382f), new Vector2(640f, 24f),
+            "", 15f, FontStyles.Italic, new Color(0.85f, 0.72f, 0.36f), TextAlignmentOptions.Top);
 
-        // Buttons — inset off the border/studs.
-        BuildButton(window, "LeaveButton", new Vector2(0f, 0f), new Vector2(48f, 42f), new Vector2(216f, 54f),
-            new Color(0.4f, 0.42f, 0.48f), "LEAVE IT", new Color(1f, 1f, 1f), DoLeave, out _);
-        takeButton = BuildButton(window, "TakeButton", new Vector2(1f, 0f), new Vector2(-48f, 42f), new Vector2(216f, 54f),
-            new Color(0.42f, 0.72f, 0.34f), "TAKE IT", new Color(0.08f, 0.12f, 0.06f), DoTake, out _);
+        // Two buttons, weighted. LEAVE stays neutral; TAKE is the committing action and is tinted
+        // by the INCOMING relic's rarity (set in RebuildIncoming) — you are taking that specific
+        // thing, so colouring the button by what you'd get reuses the rarity language rather than
+        // inventing a generic "confirm green".
+        BuildButton(window, "LeaveButton", new Vector2(0f, 0f), new Vector2(PAD, 36f), new Vector2(210f, 50f),
+            T.TextMuted, "LEAVE IT", DoLeave);
+        takeButton = BuildButton(window, "TakeButton", new Vector2(1f, 0f), new Vector2(-PAD, 36f), new Vector2(210f, 50f),
+            T.TextBright, "TAKE IT", DoTake);
 
         // Shared hover tooltip so the player can read what each sell candidate does.
         GameObject tipGo = new GameObject("RelicTooltip", typeof(RectTransform));
@@ -236,8 +247,11 @@ public class RelicSwapScreen : MonoBehaviour
         crt.sizeDelta = new Vector2(96f, 96f);
         chip.AddComponent<RelicIcon>().Build(incoming);
 
-        Color rc = RelicUISprites.RarityColor(incoming.rarity);
-        newRelicLabel.color = rc;   // frame stays gold; rarity reads through the label, name, and the chip's gems
+        // Rarity now drives the incoming panel's outline, its label and the TAKE button, since
+        // there's no gold chrome left to carry it.
+        Color rc = FlatUI.RarityColor(incoming.rarity);
+        newRelicLabel.color = rc;
+        if (incomingFrame != null) incomingFrame.color = Color.Lerp(FlatUI.Loadout.Border, rc, 0.6f);
         incomingName.text = string.IsNullOrEmpty(incoming.relicName) ? incoming.relicID : incoming.relicName;
         incomingName.color = rc;
         incomingDesc.text = string.IsNullOrEmpty(incoming.description) ? "-" : incoming.description;
@@ -259,7 +273,7 @@ public class RelicSwapScreen : MonoBehaviour
             LayoutElement le = cell.gameObject.AddComponent<LayoutElement>();
             le.preferredWidth = le.preferredHeight = CELL;
 
-            Image ring = AddImage(cell, "Ring", RelicUISprites.Frame(), Color.white, false);
+            Image ring = AddImage(cell, "Ring", FlatUI.Outline(6, 2), Color.white, false);
             ring.type = Image.Type.Sliced;
             ring.rectTransform.anchorMin = ring.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
             ring.rectTransform.sizeDelta = new Vector2(CELL + 6f, CELL + 6f);
@@ -303,14 +317,21 @@ public class RelicSwapScreen : MonoBehaviour
         {
             bool on = sacrifice != null && cellRelics[i] == sacrifice;
             selectRings[i].enabled = on;
-            if (on) selectRings[i].color = RelicUISprites.RarityColor(sacrifice.rarity);
+            if (on) selectRings[i].color = FlatUI.RarityColor(sacrifice.rarity);
         }
     }
 
     private void RefreshTake()
     {
         bool ready = sacrifice != null;
-        if (takeButton != null) takeButton.interactable = ready;   // disabled state auto-dims it
+        if (takeButton != null)
+        {
+            takeButton.interactable = ready;
+            // Tinted by the INCOMING relic — the button is "take that thing", so it wears that
+            // thing's rarity. Greyed out entirely until a sacrifice is chosen.
+            Color rc = incoming != null ? FlatUI.RarityColor(incoming.rarity) : FlatUI.Loadout.TextBright;
+            TintButton(takeButton, rc, ready);
+        }
         if (sacrificeInfo != null)
         {
             if (ready)
@@ -380,25 +401,48 @@ public class RelicSwapScreen : MonoBehaviour
     }
 
     private Button BuildButton(Transform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size,
-        Color color, string labelText, Color labelColor, UnityEngine.Events.UnityAction onClick, out TMP_Text label)
+        Color accent, string labelText, UnityEngine.Events.UnityAction onClick)
     {
         RectTransform rt = AddPoint(parent, name, anchor, pos, size);
         Image bg = rt.gameObject.AddComponent<Image>();
-        bg.sprite = RelicUISprites.Panel(); bg.type = Image.Type.Sliced; bg.color = color;
+        bg.sprite = FlatUI.Panel(5); bg.type = Image.Type.Sliced;
+        bg.color = FlatUI.Loadout.SurfaceRaised;
+
+        Image outline = AddImage(rt, "Outline", FlatUI.Outline(5, 2), FlatUI.Loadout.Border, false);
+        outline.type = Image.Type.Sliced; Stretch(outline.rectTransform);
+
         Button b = rt.gameObject.AddComponent<Button>();
+        b.transition = Selectable.Transition.None;
         b.targetGraphic = bg;
         b.onClick.AddListener(onClick);
-        label = AddText(rt, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, size,
-            labelText, 20f, FontStyles.Bold, labelColor, TextAlignmentOptions.Center);
+
+        AddText(rt, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, size,
+            labelText, 18f, FontStyles.Bold, accent, TextAlignmentOptions.Center);
         return b;
     }
 
-    private TMP_FontAsset ResolveFont()
+    // Repaints a button's outline/label/wash for its accent, and greys it out when disabled.
+    // Button.interactable alone only dims the target graphic, which on a flat plate is nearly
+    // invisible — the label and outline have to move too or a disabled TAKE still looks clickable.
+    private void TintButton(Button b, Color accent, bool enabled)
     {
-        TMP_Text any = FindAnyObjectByType<TMP_Text>();
-        if (any != null && any.font != null) return any.font;
-        return TMP_Settings.defaultFontAsset;
+        if (b == null) return;
+        Color use = enabled ? accent : FlatUI.Loadout.TextDisabled;
+
+        Image bg = b.GetComponent<Image>();
+        if (bg != null)
+            bg.color = enabled
+                ? new Color(use.r * 0.22f, use.g * 0.22f, use.b * 0.22f, 1f)
+                : FlatUI.Loadout.SurfaceRaised;
+
+        Transform ol = b.transform.Find("Outline");
+        if (ol != null) { Image i = ol.GetComponent<Image>(); if (i != null) i.color = use; }
+
+        Transform lb = b.transform.Find("Label");
+        if (lb != null) { TMP_Text t = lb.GetComponent<TMP_Text>(); if (t != null) t.color = use; }
     }
+
+    private TMP_FontAsset ResolveFont() => FlatUI.UIFont();
 
     private static float EaseOutBack(float t)
     {
