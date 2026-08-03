@@ -375,6 +375,16 @@ public static class FlatUI
         return Mathf.Max(box, diag);
     }
 
+    // Renders a 9-sliced FlatUI sprite's border at an exact on-screen thickness, whatever the
+    // sprite was baked at. Needed wherever a plate is small — a HUD bar is ~26px tall, and the
+    // sprite's native 8px border would eat two thirds of it.
+    public static void ApplySliceThickness(UnityEngine.UI.Image img, float pixels)
+    {
+        if (img == null || img.sprite == null || pixels <= 0f) return;
+        float border = img.sprite.border.x;      // uniform on every shape here
+        img.pixelsPerUnitMultiplier = border > 0f ? Mathf.Max(0.01f, border / pixels) : 1f;
+    }
+
     private static Texture2D NewTex(int w, int h = -1)
     {
         if (h < 0) h = w;

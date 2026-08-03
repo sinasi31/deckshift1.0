@@ -70,9 +70,16 @@ public class BarStyle
     public Color maxNumberColor = new Color(0.72f, 0.70f, 0.80f);
 }
 
-// One procedural HUD resource bar: a dark recessed track inside a thin gold frame, matching
-// Deckshift's hand-painted panel art (Assets/Art/panel 1.png). House pattern — every part is
-// generated in code from RelicUISprites, no prefabs and no art files.
+// One procedural HUD resource bar: a dark recessed track inside a thin outline, built from FlatUI
+// in the LOADOUT theme. House pattern — every part is generated in code, no prefabs, no art files.
+//
+// Loadout is deliberately shared with the relic bar rather than given its own material. Both are
+// PERMANENT overlays that are on screen at the same time, and two co-visible HUD elements in
+// different materials would read as a mistake. The "each screen gets its own material" rule is
+// about places you visit one at a time, not about the persistent HUD.
+//
+// Same governing principle as the relic sockets: the chrome recedes, because on a bar the COLOUR
+// is the information — red is health, blue is Shift.
 //
 // SEGMENTED MODE (Shift): the bar is a FIXED length divided into cells of `unitsPerSegment`.
 // Raising maxShift adds cells inside the same length instead of making the bar longer, so the HUD
@@ -216,10 +223,10 @@ public class ResourceBarUI
         shadow.transform.SetAsFirstSibling();
 
         // 1. recessed track (behind everything; visible through the segment gaps)
-        Image track = MakeImage(root, "Track", RelicUISprites.BarTrack(), Color.white);
+        Image track = MakeImage(root, "Track", FlatUI.Panel(5), FlatUI.Loadout.Surface);
         Stretch(track.rectTransform);
         track.type = Image.Type.Sliced;
-        RelicUISprites.ApplySliceThickness(track, Mathf.Max(2f, ft * 0.8f));
+        FlatUI.ApplySliceThickness(track, Mathf.Max(2f, ft * 0.8f));
         track.transform.SetSiblingIndex(1);
 
         // 2. the segment cells
@@ -252,16 +259,20 @@ public class ResourceBarUI
 
             var cell = new Cell { start = start, capacity = Mathf.Max(0.0001f, capacity) };
 
-            // Unlit socket: the same shaded cell shape as the fill, just dark. Without it a drained
+            // Unlit socket: the same cell shape as the fill, just dark. Without it a drained
             // segment is indistinguishable from the track and the bar stops showing your capacity.
-            Image socket = MakeImage(holder, "Socket", RelicUISprites.BarFill(), style.empty);
+            //
+            // Cells are FLAT colour blocks now (the old ones carried a baked bevel). On a bar the
+            // colour IS the information — red health, blue Shift — so any shading on top of it is
+            // noise competing with the one thing the bar has to communicate.
+            Image socket = MakeImage(holder, "Socket", FlatUI.Pixel(), style.empty);
             Stretch(socket.rectTransform);
 
-            cell.chip = MakeImage(holder, "Chip", RelicUISprites.BarFill(), style.chip);
+            cell.chip = MakeImage(holder, "Chip", FlatUI.Pixel(), style.chip);
             Stretch(cell.chip.rectTransform);
             AsFill(cell.chip);
 
-            cell.fill = MakeImage(holder, "Fill", RelicUISprites.BarFill(), style.fill);
+            cell.fill = MakeImage(holder, "Fill", FlatUI.Pixel(), style.fill);
             Stretch(cell.fill.rectTransform);
             AsFill(cell.fill);
 
@@ -271,12 +282,17 @@ public class ResourceBarUI
             x += w + gap;
         }
 
-        // 3. gold frame, drawn over the cells so they sit INSIDE it
-        Image frame = MakeImage(root, "Frame", RelicUISprites.BarFrame(), Color.white);
+        // 3. outline, drawn over the cells so they sit INSIDE it.
+        //
+        // Rendered at 2px regardless of geo.frameThickness, which stays the LAYOUT inset. The old
+        // gold frame was drawn at the full 4px, which on a 26px bar was a sixth of the whole thing
+        // in chrome. Decoupling them leaves a couple of pixels of dark track showing between the
+        // outline and the cells, which reads as recessed rather than as a heavy border.
+        Image frame = MakeImage(root, "Frame", FlatUI.Outline(5, 2), FlatUI.Loadout.Border);
         Stretch(frame.rectTransform);
         frame.type = Image.Type.Sliced;
         frame.fillCenter = false;
-        RelicUISprites.ApplySliceThickness(frame, ft);
+        FlatUI.ApplySliceThickness(frame, 2f);
         frame.transform.SetSiblingIndex(3);
 
         // keep the number on top of the chrome
@@ -301,7 +317,7 @@ public class ResourceBarUI
         {
             for (int k = 1; k < capacity; k++)
             {
-                Image line = MakeImage(rt, "Pip" + k, RelicUISprites.White(), new Color(0f, 0f, 0f, 0.42f));
+                Image line = MakeImage(rt, "Pip" + k, FlatUI.Pixel(), new Color(0f, 0f, 0f, 0.42f));
                 var lrt = line.rectTransform;
                 lrt.anchorMin = lrt.anchorMax = new Vector2(0f, 0.5f);
                 lrt.pivot = new Vector2(0.5f, 0.5f);
