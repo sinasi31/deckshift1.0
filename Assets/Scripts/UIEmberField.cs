@@ -1,0 +1,142 @@
+using UnityEngine;
+using UnityEngine.UI;
+
+// A drift of tiny embers across a UI panel — the forge breathing in the background.
+//
+// Attach to any RectTransform with UIEmberField.Attach(rect, count, colour). It builds its own
+// Image dots as children and animates them; there is nothing to wire and no particle system.
+//
+// TWO THINGS THAT WOULD BREAK THIS IF CHANGED:
+//   1. It runs on Time.unscaledDeltaTime. Every screen this belongs on pauses the game
+//      (GameManager.RequestPause sets timeScale to 0), so scaled time would freeze the embers
+//      solid the instant the panel opened.
+//   2. It re-reads the parent's rect every frame. The forge window's height changes with its
+//      content, so a bounds snapshot taken at build time would leave embers drifting outside a
+//      collapsed panel.
+//
+// Motion is up-and-to-the-left with a slow sideways sway, so it reads as rising heat catching a
+// draught rather than as dots on a conveyor. Each ember fades in, drifts, and fades out before
+// wrapping back to the bottom-right, so nothing ever visibly pops in or out.
+public class UIEmberField : MonoBehaviour
+{
+    private struct Ember
+    {
+        public RectTransform rt;
+        public Image img;
+        public Vector2 pos;
+        public Vector2 vel;
+        public float swayAmp, swaySpeed, phase;
+        public float age, life, peakAlpha, size;
+    }
+
+    private Ember[] embers;
+    private RectTransform host;
+    private Color tint;
+
+    // Kept inside the plate's border and clear of the cut corners.
+    private const float MARGIN = 18f;
+
+    public static UIEmberField Attach(RectTransform parent, int count, Color colour)
+    {
+        GameObject go = new GameObject("EmberField", typeof(RectTransform));
+        RectTransform rt = go.GetComponent<RectTransform>();
+        rt.SetParent(parent, false);
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+
+        UIEmberField f = go.AddComponent<UIEmberField>();
+        f.host = parent;
+        f.tint = colour;
+        f.Build(count);
+        return f;
+    }
+
+    private void Build(int count)
+    {
+        embers = new Ember[count];
+        for (int i = 0; i < count; i++)
+        {
+            GameObject go = new GameObject("Ember", typeof(RectTransform));
+            RectTransform rt = go.GetComponent<RectTransform>();
+            rt.SetParent(transform, false);
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+
+            Image img = go.AddComponent<Image>();
+            img.sprite = FlatUI.EmberDot();
+            img.raycastTarget = false;
+
+            embers[i].rt = rt;
+            embers[i].img = img;
+
+            Respawn(ref embers[i], true);
+        }
+    }
+
+    // `scatter` seeds an ember anywhere in the panel (used once at build time) so the field is
+    // already alive when the screen opens instead of visibly filling from the bottom.
+    private void Respawn(ref Ember e, bool scatter)
+    {
+        Rect r = host != null ? host.rect : new Rect(0, 0, 600f, 400f);
+        float halfW = Mathf.Max(40f, r.width * 0.5f - MARGIN);
+        float halfH = Mathf.Max(30f, r.height * 0.5f - MARGIN);
+
+        // Enter from the lower-right, since travel is up and to the left.
+        float x = Random.Range(-halfW * 0.35f, halfW);
+        float y = scatter ? Random.Range(-halfH, halfH) : Random.Range(-halfH, -halfH * 0.45f);
+        e.pos = new Vector2(x, y);
+
+        e.vel = new Vector2(Random.Range(-15f, -5f), Random.Range(9f, 24f));
+        e.swayAmp = Random.Range(2f, 7f);
+        e.swaySpeed = Random.Range(0.5f, 1.4f);
+        e.phase = Random.Range(0f, Mathf.PI * 2f);
+
+        e.life = Random.Range(4.5f, 9f);
+        e.age = scatter ? Random.Range(0f, e.life * 0.8f) : 0f;
+
+        // Smaller embers burn brighter — it keeps the field from looking like uniform dust.
+        e.size = Random.Range(1.6f, 3.6f);
+        e.peakAlpha = Mathf.Lerp(0.55f, 0.20f, Mathf.InverseLerp(1.6f, 3.6f, e.size));
+
+        e.rt.sizeDelta = new Vector2(e.size * 4f, e.size * 4f);   // sprite is mostly halo
+    }
+
+    private void Update()
+    {
+        if (embers == null) return;
+
+        float dt = Time.unscaledDeltaTime;   // the panel pauses the game; scaled time is frozen
+        if (dt <= 0f || dt > 0.25f) return;  // skip the huge first frame after a domain reload
+
+        Rect r = host != null ? host.rect : new Rect(0, 0, 600f, 400f);
+        float halfW = Mathf.Max(40f, r.width * 0.5f - MARGIN);
+        float halfH = Mathf.Max(30f, r.height * 0.5f - MARGIN);
+
+        for (int i = 0; i < embers.Length; i++)
+        {
+            embers[i].age += dt;
+
+            if (embers[i].age >= embers[i].life ||
+                embers[i].pos.y > halfH || embers[i].pos.x < -halfW)
+            {
+                Respawn(ref embers[i], false);
+                continue;
+            }
+
+            embers[i].pos += embers[i].vel * dt;
+
+            float sway = Mathf.Sin(embers[i].age * embers[i].swaySpeed + embers[i].phase) * embers[i].swayAmp;
+            embers[i].rt.anchoredPosition = new Vector2(embers[i].pos.x + sway, embers[i].pos.y);
+
+            // Fade in over the first fifth, hold, fade out over the last third.
+            float t = embers[i].age / embers[i].life;
+            float fade = Mathf.Min(Mathf.Clamp01(t / 0.2f), Mathf.Clamp01((1f - t) / 0.33f));
+
+            Color c = tint;
+            c.a = embers[i].peakAlpha * fade;
+            embers[i].img.color = c;
+        }
+    }
+}

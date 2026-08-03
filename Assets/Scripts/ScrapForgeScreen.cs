@@ -124,14 +124,21 @@ public class ScrapForgeScreen : MonoBehaviour
         // Y negative about a centred pivot, so the fade's opaque end sits at the bottom.
         // Kept low: at 0.085 over 140px this was an orange wash owning the bottom third of the
         // panel and reading as "glowing UI". It should be firelight you notice only if you look.
-        Image ember = AddImage(window, "Ember", FlatUI.VerticalFade(),
-            new Color(FlatUI.Ember.r, FlatUI.Ember.g, FlatUI.Ember.b, 0.042f), false);
+        //
+        // Uses BottomGlow, which falls off horizontally as well as vertically. The earlier version
+        // reused VerticalFade inset from the sides, and because that sprite has hard left/right
+        // ends it drew a visible vertical seam down both edges of the window.
+        Image ember = AddImage(window, "Ember", FlatUI.BottomGlow(),
+            new Color(FlatUI.Ember.r, FlatUI.Ember.g, FlatUI.Ember.b, 0.055f), false);
         ember.rectTransform.anchorMin = new Vector2(0f, 0f);
         ember.rectTransform.anchorMax = new Vector2(1f, 0f);
-        ember.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-        ember.rectTransform.anchoredPosition = new Vector2(0f, 52f);
-        ember.rectTransform.sizeDelta = new Vector2(-28f, 104f);
-        ember.rectTransform.localScale = new Vector3(1f, -1f, 1f);
+        ember.rectTransform.pivot = new Vector2(0.5f, 0f);
+        ember.rectTransform.anchoredPosition = new Vector2(0f, 2f);
+        ember.rectTransform.sizeDelta = new Vector2(-6f, 120f);
+
+        // Embers drifting up and to the left — the forge breathing behind the work surface. Added
+        // here so it sits above the glow but beneath every label, card and button added later.
+        UIEmberField.Attach(window, 18, new Color(1f, 0.62f, 0.30f, 1f));
 
         Image winFrame = AddImage(window, "Frame", FlatUI.Outline(10, 2), FlatUI.Border, false);
         winFrame.type = Image.Type.Sliced;

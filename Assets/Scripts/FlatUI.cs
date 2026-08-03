@@ -25,7 +25,8 @@ using UnityEngine;
 public static class FlatUI
 {
     private static Sprite plateLarge, plateSmall, outlineLarge, outlineSmall;
-    private static Sprite softGlow, verticalFade, fadedRule, rivet, pixel;
+    private static Sprite softGlow, verticalFade, bottomGlow, fadedRule, rivet, pixel;
+    private static Sprite emberDot;
 
     // Solid chamfered plate. chamfer 10 = windows, 5 = cards and buttons.
     public static Sprite Panel(int chamfer = 10)
@@ -117,8 +118,37 @@ public static class FlatUI
         return softGlow;
     }
 
-    // Opaque at the top fading to nothing downward. Used for the top-lip sheen, and rotated 180°
-    // for the ember glow rising off the bottom edge.
+    // Forge-fire wash: strongest along the BOTTOM edge, fading upward AND toward the left/right
+    // ends.
+    //
+    // The horizontal falloff is the whole point. The first version reused VerticalFade, which only
+    // falls off in Y — inset from the panel sides, it hard-cut vertically and left a visible seam
+    // down both edges of the window. Any glow that doesn't reach its container's edge must fade on
+    // that axis too, or it draws its own border.
+    public static Sprite BottomGlow()
+    {
+        if (bottomGlow != null) return bottomGlow;
+
+        const int W = 96, H = 48;
+        Texture2D tex = NewTex(W, H);
+        for (int y = 0; y < H; y++)
+        {
+            float v = 1f - (float)y / (H - 1);       // 1 at the bottom row
+            float vy = v * v;                         // squared: hugs the edge, no hard stop
+            for (int x = 0; x < W; x++)
+            {
+                float t = (float)x / (W - 1);
+                float hx = Mathf.Clamp01(Mathf.Min(t, 1f - t) / 0.28f);
+                hx = hx * hx * (3f - 2f * hx);        // smoothstep the ends
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, vy * hx));
+            }
+        }
+        tex.Apply();
+        bottomGlow = Sprite.Create(tex, new Rect(0, 0, W, H), new Vector2(0.5f, 0.5f), 100f);
+        return bottomGlow;
+    }
+
+    // Opaque at the top fading to nothing downward. Used for the top-lip sheen.
     public static Sprite VerticalFade()
     {
         if (verticalFade != null) return verticalFade;
@@ -133,6 +163,28 @@ public static class FlatUI
         tex.Apply();
         verticalFade = Sprite.Create(tex, new Rect(0, 0, 1, H), new Vector2(0.5f, 0.5f), 100f);
         return verticalFade;
+    }
+
+    // A single floating ember: a hot core with a soft halo. Deliberately not a hard dot — at the
+    // 2-4px these are drawn at, a hard-edged square reads as a dead pixel rather than a spark.
+    public static Sprite EmberDot()
+    {
+        if (emberDot != null) return emberDot;
+
+        const int S = 16;
+        Texture2D tex = NewTex(S);
+        float c = (S - 1) * 0.5f;
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+            {
+                float d = Mathf.Sqrt((x - c) * (x - c) + (y - c) * (y - c)) / c;
+                float halo = Mathf.Clamp01(1f - d);
+                float core = Mathf.Clamp01(1f - d * 2.6f);
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, Mathf.Clamp01(halo * halo * 0.55f + core)));
+            }
+        tex.Apply();
+        emberDot = Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), 100f);
+        return emberDot;
     }
 
     // 1x1 white — flat fills and hard edges.
