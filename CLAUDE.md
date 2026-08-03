@@ -558,6 +558,17 @@ Lessons already paid for, don't re-learn them:
 
 Rarity note: the old chrome carried rarity as a gem set in gold. Without that frame **colour has to carry rarity alone**, so `FlatUI.RarityColor` is brighter and more separated than jewel tones, and Blompo tints the sigil, border, name and label together — four quiet signals instead of one loud jewel. **Common is deliberately muted**: at a lighter slate it rendered near-white and made the *weakest* offer the brightest thing on screen.
 
+**Blompo's blessing animation (`BlompoForgeFX`) was rebuilt to match (2026-08-03).** It used to be a hammer-and-anvil forging: three blows, sparks, screen shake. Once his screen went arcane, a smithy sequence fought everything else on the panel — he grants a charm, he isn't a blacksmith. The motion vocabulary is inverted the same way the palette was:
+
+> forging → strikes, impacts, gravity, sparks flying **out**, the window rattling
+> binding → orbit, convergence, weightlessness, motes drawn **in**, nothing ever hit
+
+Four beats: GATHER (rune ring forms, motes stream in) → DRAW (ring contracts, everything accelerates) → BIND (`onSet` fires here) → SETTLE. Two procedural sounds accompany it (`ProcSfx.ArcaneGather`, `ArcaneBind`).
+
+⚠️ **UI children are NOT clipped, so FX geometry is bounded by the WINDOW, not the stage.** A first pass used a 520px ring radius and scattered runes across the whole screen, outside the panel, onto the backdrop. The stage sits 60px below centre in a 762-tall window, so there is only ~321px of room downward — anything that must travel further does so on an ellipse squashed in Y (`VERT_SQUASH`). Check this whenever you add UI FX.
+
+**Sound design note:** magic is **harmonic** (bell/chime partials 1,2,3,4,5.1), metal is **inharmonic** (bar modes 1,2.76,5.40,8.93 — see `ProcSfx.ScrapPickup`). That ratio choice is the whole difference between "charm" and "clank"; keep the two families distinct so a blessing and a scrap pickup are never confusable.
+
 **Status: `ScrapForgeScreen`, `ScrapHUD` and `BlompoScreen` are converted.** Still on the old `RelicUISprites` chrome: `RelicHUD`, `RelicIcon`, `RelicManagePanel`, `RelicSwapScreen`, `RelicTooltip`. Reuse `FlatUI` for those — don't invent a third look — and give the relic screens their own material rather than reusing Iron or Arcane. **Open design question for that rollout:** relic rarity is also carried by gem colour today, and `RelicIcon` builds a whole gold-on-stone medallion around it, so it needs a decision about what carries rarity, not just a swap.
 
 ### Never Scale UI Containers — Resize Them

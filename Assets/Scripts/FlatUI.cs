@@ -26,7 +26,7 @@ public static class FlatUI
 {
     private static Sprite plateLarge, plateSmall, outlineLarge, outlineSmall;
     private static Sprite softGlow, verticalFade, bottomGlow, fadedRule, rivet, pixel;
-    private static Sprite emberDot, fourPointStar;
+    private static Sprite emberDot, fourPointStar, ring;
 
     // Solid chamfered plate. chamfer 10 = windows, 5 = cards and buttons.
     public static Sprite Panel(int chamfer = 10)
@@ -214,6 +214,26 @@ public static class FlatUI
         tex.Apply();
         emberDot = Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), 100f);
         return emberDot;
+    }
+
+    // A soft hollow circle, for expanding shockwave / halo rings.
+    public static Sprite Ring()
+    {
+        if (ring != null) return ring;
+
+        const int S = 128;
+        Texture2D tex = NewTex(S);
+        float c = (S - 1) * 0.5f, rad = c * 0.84f, thick = c * 0.10f;
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+            {
+                float d = Mathf.Sqrt((x - c) * (x - c) + (y - c) * (y - c));
+                float a = Mathf.Clamp01(1f - Mathf.Abs(d - rad) / thick);
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a * a));
+            }
+        tex.Apply();
+        ring = Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), 100f);
+        return ring;
     }
 
     // 1x1 white — flat fills and hard edges.

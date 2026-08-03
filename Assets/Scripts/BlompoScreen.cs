@@ -31,7 +31,6 @@ public class BlompoScreen : MonoBehaviour
     private TMP_FontAsset font;
 
     private Sprite portrait;
-    private Sprite hammerSprite;
     private List<CardEnhancement> offers;
     private System.Action onBlessed;
     private CardEnhancement chosenOffer = CardEnhancement.None;
@@ -58,12 +57,11 @@ public class BlompoScreen : MonoBehaviour
 
     // `fixedOffers` are THIS Blompo's three blessings, rolled once and owned by the NPC — the
     // screen must never re-roll, or leaving and re-entering would let the player reroll for free.
-    public static void Open(Sprite blompoPortrait, Sprite hammer, List<CardEnhancement> fixedOffers, System.Action blessedCallback = null)
+    public static void Open(Sprite blompoPortrait, List<CardEnhancement> fixedOffers, System.Action blessedCallback = null)
     {
         EnsureInstance();
         if (instance == null || instance.isOpen) return;
         instance.portrait = blompoPortrait;
-        instance.hammerSprite = hammer;
         instance.offers = fixedOffers;
         instance.onBlessed = blessedCallback;
         instance.Show();
@@ -385,8 +383,8 @@ public class BlompoScreen : MonoBehaviour
         StartCoroutine(ForgeRoutine(card));
     }
 
-    // Blompo hammers the blessing into the card: the chosen card takes centre stage and gets
-    // struck three times, the enhancement landing on the final blow.
+    // Blompo binds the blessing to the card: it takes centre stage while a ring of runes gathers
+    // and closes around it, and the enhancement lands at the moment the charm sets.
     private IEnumerator ForgeRoutine(RuntimeCard card)
     {
         ClearRow(cardRow);
@@ -395,7 +393,7 @@ public class BlompoScreen : MonoBehaviour
         forgeStage.gameObject.SetActive(true);
         for (int i = forgeStage.childCount - 1; i >= 0; i--) Destroy(forgeStage.GetChild(i).gameObject);
 
-        promptText.text = "Blompo gets to work.";
+        promptText.text = "Blompo begins the binding.";
 
         // A single big copy of the card, centred on the stage.
         GameObject chipGo = BuildCardChip(forgeStage, card, 1.55f);
@@ -413,7 +411,7 @@ public class BlompoScreen : MonoBehaviour
         // the object were destroyed here, the next line of the FX would throw on a dead
         // RectTransform, abort the coroutine, and the screen would hang on the last frame with
         // only the X button to escape. That was exactly the "gets stuck" bug.
-        yield return StartCoroutine(BlompoForgeFX.Play(this, forgeStage, chip, gem, hammerSprite, () =>
+        yield return StartCoroutine(BlompoForgeFX.Play(this, forgeStage, chip, gem, () =>
         {
             CardEnhancements.Apply(card, chosenOffer);
             if (DeckManager.instance != null) DeckManager.instance.RefreshHandUI();

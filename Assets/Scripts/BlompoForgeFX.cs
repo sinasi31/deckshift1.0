@@ -1,218 +1,271 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-// The forging sequence that plays when Blompo blesses a card: a hammer swings in and strikes the
-// card three times, each blow landing harder — white flash, shockwave ring, spark shower, and a
-// kick that shoves the card down and shakes the whole window. The third blow sets the gem.
+// The BINDING: the sequence that plays when Blompo blesses a card.
 //
-// Runs entirely in UI space (Images under a supplied RectTransform), because the card being forged
-// is a screen element, not a world object. Everything is procedural (house pattern) — the hammer,
-// sparks, rings and flash are all generated textures, no art files.
+// This replaced a hammer-and-anvil forging animation (three blows, sparks, screen shake) once
+// Blompo's screen moved to the arcane theme. He is a mythic creature granting a charm, not a
+// blacksmith, and a percussive smithy sequence fought everything else on the panel. The whole
+// motion vocabulary is inverted to match:
 //
-// Uses UNSCALED time throughout: the blessing screen pauses the game (timeScale 0), so anything
-// driven by Time.deltaTime here would simply never advance.
+//   forging  ->  strikes, impacts, gravity, sparks flying OUT, the window rattling
+//   binding  ->  orbit, convergence, weightlessness, motes drawn IN, nothing ever hit
+//
+// Four beats: GATHER (ring forms, motes stream in) -> DRAW (ring contracts, everything
+// accelerates) -> BIND (the instant the charm sets; onSet fires here) -> SETTLE.
+//
+// Runs entirely in UI space under a supplied RectTransform, and on UNSCALED time throughout — the
+// blessing screen pauses the game, so Time.deltaTime would never advance.
 public static class BlompoForgeFX
 {
-    private static Sprite hammerSprite, sparkSprite, ringSprite, glowSprite, softSprite, burstSprite;
+    private const int RUNE_COUNT = 12;
 
-    // Three blows, each landing harder than the last.
-    private static readonly float[] StrikePower = { 0.55f, 0.78f, 1f };
-
-    // Swing geometry, in the hammer image's own normalised space.
+    // GEOMETRY IS BOUNDED BY THE WINDOW, NOT THE STAGE. UI children are not clipped, so anything
+    // that overruns the panel simply draws on the dark backdrop outside it — which is what a first
+    // pass at 520 did, scattering runes across the whole screen.
     //
-    // The Cainos "PF Weapon - Hammer" sprite lies HORIZONTALLY: wooden handle on the left, iron
-    // head on the right, gripped about a quarter along. So the head sits on the +X side of the
-    // grip. We put the RectTransform pivot ON THE GRIP and rotate about it, which makes the HEAD
-    // trace the arc and land on the card. Putting the pivot at the card is what previously made
-    // it strike with the handle's end instead.
-    const float GRIP_X = 0.25f;        // matches the sprite's own pivot
-    const float HAMMER_W = 430f;       // on-screen width of the hammer image
-    const float WINDUP_ANGLE = -192f;  // head raised high to the upper left
-    const float IMPACT_ANGLE = -118f;  // head down on the card
+    // The stage sits 60px below the window centre in a 762-tall window, leaving ~321px of room
+    // downward (the tighter of the two) and ~441px up. Everything below is sized against that,
+    // and anything that needs to travel FURTHER does so on an ellipse squashed in Y (VERT_SQUASH)
+    // so it can spread wide without dropping out of the bottom of the panel.
+    private const float RING_START = 280f;   // radius the runes form at
+    private const float RING_BOUND = 135f;   // radius they collapse to at the bind
+    private const float VERT_SQUASH = 0.58f; // Y scale for anything reaching past the ring
+    private const float HALO_MAX = 620f;     // halo diameter cap (310 radius, inside the 321 floor)
 
     /// Plays the full sequence against `card` (a chip already parented under `host`).
-    /// `onSet` fires at the instant the final blow lands, so the caller can apply the enhancement
-    /// and re-skin the card exactly on the impact frame.
-    // `runner` owns the spark coroutines — `host` is a plain RectTransform with no MonoBehaviour
-    // on it, so it cannot start them itself.
+    /// `onSet` fires at the instant the charm binds, so the caller can apply the enhancement and
+    /// re-skin the card on exactly that frame.
+    ///
+    /// `runner` owns the child coroutines — `host` is a plain RectTransform with no MonoBehaviour.
+    ///
+    /// CONTRACT: `onSet` must MUTATE the card chip, never destroy and rebuild it — this coroutine
+    /// keeps animating `card` afterwards. Every frame here null-checks it anyway, so a future
+    /// violation degrades into a shortened animation instead of the screen hanging forever with
+    /// only the X button to escape (which is exactly what the old "gets stuck" bug was).
     public static IEnumerator Play(MonoBehaviour runner, RectTransform host, RectTransform card,
-                                   Color gem, Sprite hammerArt, System.Action onSet)
+                                   Color gem, System.Action onSet)
     {
-        Vector2 cardHome = card.anchoredPosition;
-        Vector2 hostHome = host.anchoredPosition;   // shake around where the stage actually sits
-        // The card is usually shown enlarged for the forging, so squash MULTIPLIES its existing
-        // scale rather than replacing it (which would snap it back to 1x on the first blow).
-        Vector3 cardScale = card.localScale;
+        Vector2 cardHome = card != null ? card.anchoredPosition : Vector2.zero;
+        Vector3 cardScale = card != null ? card.localScale : Vector3.one;
 
-        // Layers, back to front: glow behind the card, then hammer/sparks/flash in front.
-        // Tight enough to read as heat coming off the card rather than washing out the panel.
-        Image backGlow = MakeImage(host, "ForgeGlow", GetGlowSprite(), new Color(1f, 0.62f, 0.18f, 0f), 380f, cardHome);
-        backGlow.transform.SetSiblingIndex(card.GetSiblingIndex());
+        AudioSource audio = EnsureSource(runner);
+        // The gather is a BED — it sits under the visuals and must not compete with the bind that
+        // pays it off, so it's mixed noticeably lower.
+        if (audio != null) SfxManager.PlayOn(audio, ProcSfx.ArcaneGather, 0.6f);
 
-        // Grip sits up-and-right of the card; the head swings down onto it from the upper left.
-        Vector2 grip = cardHome + new Vector2(175f, 190f);
-        Sprite art = hammerArt != null ? hammerArt : GetHammerSprite();
-        Image hammer = MakeImage(host, "Hammer", art, Color.white, HAMMER_W, grip);
-        hammer.rectTransform.sizeDelta = new Vector2(HAMMER_W, HAMMER_W * (art.rect.height / Mathf.Max(1f, art.rect.width)));
-        hammer.rectTransform.pivot = new Vector2(GRIP_X, 0.5f);   // swing about the GRIP, so the HEAD arcs
-        hammer.rectTransform.anchoredPosition = grip;
-        hammer.rectTransform.localRotation = Quaternion.Euler(0f, 0f, WINDUP_ANGLE);
-        hammer.enabled = false;
+        // --- build the cast: aura behind the card, a rotating ring of runes, and inbound motes ---
+        Image aura = MakeImage(host, "Aura", FlatUI.SoftGlow(), new Color(gem.r, gem.g, gem.b, 0f), 300f, cardHome);
+        aura.transform.SetSiblingIndex(card != null ? card.GetSiblingIndex() : 0);
 
-        // Impact flare: an 8-ray starburst rather than a soft white blob — it reads as a STRIKE.
-        Image flash = MakeImage(host, "Flash", GetBurstSprite(), new Color(1f, 0.97f, 0.86f, 0f), 700f, cardHome);
-        Image flashCore = MakeImage(host, "FlashCore", GetSoftSprite(), new Color(1f, 0.92f, 0.72f, 0f), 260f, cardHome);
-
-        for (int s = 0; s < StrikePower.Length; s++)
+        RectTransform ring = MakePoint(host, "RuneRing", cardHome, Vector2.one * 10f);
+        Image[] runes = new Image[RUNE_COUNT];
+        for (int i = 0; i < RUNE_COUNT; i++)
         {
-            float power = StrikePower[s];
+            runes[i] = MakeImage(ring, "Rune", FlatUI.FourPointStar(), new Color(gem.r, gem.g, gem.b, 0f), 34f, Vector2.zero);
+            float a = (i / (float)RUNE_COUNT) * Mathf.PI * 2f;
+            runes[i].rectTransform.anchoredPosition = new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * RING_START;
+        }
 
-            // --- wind up: the head rears back and up ---
-            hammer.enabled = true;
-            const float raise = 0.16f;
-            float recoil = IMPACT_ANGLE + 34f;   // where the previous blow bounced to
-            for (float t = 0f; t < raise; t += Time.unscaledDeltaTime)
+        // --- BEAT 1: GATHER ---------------------------------------------------------------------
+        const float gather = 0.95f;
+        for (float t = 0f; t < gather; t += Time.unscaledDeltaTime)
+        {
+            float n = Mathf.Clamp01(t / gather);
+
+            SetAlpha(aura, 0.30f * n);
+            aura.rectTransform.sizeDelta = Vector2.one * Mathf.Lerp(300f, 430f, n);
+
+            for (int i = 0; i < RUNE_COUNT; i++) SetAlpha(runes[i], 0.85f * n);
+            ring.localRotation = Quaternion.Euler(0f, 0f, n * 55f);
+
+            // The card drifts upward and swells a touch — lifted, not struck.
+            if (card != null)
             {
-                float n = t / raise;
-                hammer.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(recoil, WINDUP_ANGLE, n));
-                SetAlpha(backGlow, Mathf.Lerp(0.05f, 0.16f, n) * power);
-                yield return null;
+                card.anchoredPosition = cardHome + Vector2.up * (26f * EaseOut(n));
+                card.localScale = cardScale * (1f + 0.04f * EaseOut(n));
             }
 
-            // --- swing down: pure rotation about the grip, accelerating into the blow ---
-            float swing = Mathf.Lerp(0.10f, 0.07f, power);
-            for (float t = 0f; t < swing; t += Time.unscaledDeltaTime)
+            // Motes peel in from beyond the ring, a few per frame.
+            if (Random.value < 0.55f) runner.StartCoroutine(MoteLife(host, cardHome, gem, 0.75f));
+            yield return null;
+        }
+
+        // --- BEAT 2: DRAW IN --------------------------------------------------------------------
+        const float draw = 0.70f;
+        float spinAt = 55f;
+        for (float t = 0f; t < draw; t += Time.unscaledDeltaTime)
+        {
+            float n = Mathf.Clamp01(t / draw);
+            float e = n * n;                       // accelerate into the bind
+
+            float radius = Mathf.Lerp(RING_START, RING_BOUND, e);
+            for (int i = 0; i < RUNE_COUNT; i++)
             {
-                float n = Mathf.Clamp01(t / swing);
-                float e = n * n;
-                hammer.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(WINDUP_ANGLE, IMPACT_ANGLE, e));
-                yield return null;
+                float a = (i / (float)RUNE_COUNT) * Mathf.PI * 2f;
+                runes[i].rectTransform.anchoredPosition = new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * radius;
+                runes[i].rectTransform.sizeDelta = Vector2.one * Mathf.Lerp(34f, 20f, e);
+                SetAlpha(runes[i], Mathf.Lerp(0.85f, 1f, e));
             }
 
-            // --- IMPACT ---
-            if (onSet != null && s == StrikePower.Length - 1) onSet();
+            spinAt += Mathf.Lerp(120f, 900f, e) * Time.unscaledDeltaTime;
+            ring.localRotation = Quaternion.Euler(0f, 0f, spinAt);
 
-            Vector2 hit = cardHome + new Vector2(0f, 40f);
-            SpawnSparks(runner, host, hit, power, gem);
-            Image ring = MakeImage(host, "Ring", GetRingSprite(), new Color(1f, 0.88f, 0.55f, 0.95f), 120f, hit);
+            SetAlpha(aura, Mathf.Lerp(0.30f, 0.65f, e));
+            aura.rectTransform.sizeDelta = Vector2.one * Mathf.Lerp(430f, 330f, e);
 
-            // Flare snaps in at a random tilt each blow so repeated strikes never look identical.
-            flash.rectTransform.anchoredPosition = hit;
-            flash.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Random.Range(0f, 90f));
-            flashCore.rectTransform.anchoredPosition = hit;
-            SetAlpha(flash, 0.95f * power);
-            SetAlpha(flashCore, 0.85f * power);
-            if (CameraShake.instance != null) CameraShake.instance.Shake(0.12f * power, 0.28f * power);
-
-            float kick = 26f * power;
-            float shake = 16f * power;
-            const float settle = 0.34f;
-            for (float t = 0f; t < settle; t += Time.unscaledDeltaTime)
+            if (card != null)
             {
-                float n = Mathf.Clamp01(t / settle);
-
-                // Card takes the blow and springs back.
-                float squash = Mathf.Sin(n * Mathf.PI) * (1f - n);
-                card.anchoredPosition = cardHome + Vector2.down * (kick * (1f - n) * (1f - n));
-                card.localScale = new Vector3(cardScale.x * (1f + 0.10f * squash * power),
-                                              cardScale.y * (1f - 0.13f * squash * power), cardScale.z);
-
-                // Whole window rattles, decaying.
-                float dec = (1f - n) * (1f - n);
-                host.anchoredPosition = hostHome + new Vector2(Random.Range(-shake, shake) * dec, Random.Range(-shake, shake) * dec);
-
-                // Ring expands and fades; flash falls off fast.
-                ring.rectTransform.sizeDelta = Vector2.one * Mathf.Lerp(120f, 560f * power, Mathf.Sqrt(n));
-                SetAlpha(ring, Mathf.Clamp01(1f - n * 1.5f));
-
-                // The flare punches out fast and dies fast — a strike, not a fade.
-                float fn = Mathf.Clamp01(n * 3.2f);
-                flash.rectTransform.sizeDelta = Vector2.one * Mathf.Lerp(300f, 900f * power, Mathf.Sqrt(fn));
-                flash.rectTransform.localRotation = Quaternion.Euler(0f, 0f,
-                    flash.rectTransform.localEulerAngles.z + 90f * Time.unscaledDeltaTime);
-                SetAlpha(flash, Mathf.Lerp(0.95f * power, 0f, fn));
-                flashCore.rectTransform.sizeDelta = Vector2.one * Mathf.Lerp(260f, 90f, fn);
-                SetAlpha(flashCore, Mathf.Lerp(0.85f * power, 0f, fn * 1.4f));
-
-                SetAlpha(backGlow, Mathf.Lerp(0.42f * power, 0.12f, n));
-
-                // Hammer bounces back off the blow.
-                hammer.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(IMPACT_ANGLE, IMPACT_ANGLE + 34f, n));
-                yield return null;
+                card.anchoredPosition = cardHome + Vector2.up * (26f + 10f * e);
+                card.localScale = cardScale * (1f + 0.04f + 0.03f * e);
             }
 
-            Object.Destroy(ring.gameObject);
+            if (Random.value < 0.85f) runner.StartCoroutine(MoteLife(host, cardHome, gem, 0.42f));
+            yield return null;
+        }
+
+        // --- BEAT 3: BIND -----------------------------------------------------------------------
+        onSet?.Invoke();
+        if (audio != null) SfxManager.PlayOn(audio, ProcSfx.ArcaneBind, 1f);
+
+        // The runes stop orbiting and fly outward as loose sparks.
+        for (int i = 0; i < RUNE_COUNT; i++)
+        {
+            float a = (i / (float)RUNE_COUNT) * Mathf.PI * 2f;
+            runner.StartCoroutine(ScatterRune(runes[i], new Vector2(Mathf.Cos(a), Mathf.Sin(a))));
+        }
+        Object.Destroy(ring.gameObject, 1.2f);
+
+        Image halo = MakeImage(host, "Halo", FlatUI.Ring(), new Color(gem.r, gem.g, gem.b, 0.95f), RING_BOUND, cardHome);
+        Image flash = MakeImage(host, "Flash", FlatUI.SoftGlow(), new Color(1f, 1f, 1f, 0.85f), 260f, cardHome);
+
+        // --- BEAT 4: SETTLE ---------------------------------------------------------------------
+        const float settle = 1.05f;
+        for (float t = 0f; t < settle; t += Time.unscaledDeltaTime)
+        {
+            float n = Mathf.Clamp01(t / settle);
+
+            // Halo expands outward and thins away — a wave leaving, not an impact arriving.
+            halo.rectTransform.sizeDelta = Vector2.one * Mathf.Lerp(RING_BOUND, HALO_MAX, EaseOut(n));
+            SetAlpha(halo, Mathf.Clamp01(1f - n * 1.35f));
+
+            // The white flash is brief; the rarity-coloured aura is what lingers.
+            float fn = Mathf.Clamp01(n * 4.5f);
+            flash.rectTransform.sizeDelta = Vector2.one * Mathf.Lerp(260f, 520f, fn);
+            SetAlpha(flash, Mathf.Lerp(0.85f, 0f, fn));
+
+            SetAlpha(aura, Mathf.Lerp(0.65f, 0.16f, n));
+            aura.rectTransform.sizeDelta = Vector2.one * Mathf.Lerp(330f, 400f, n);
+
+            // Card breathes once and drifts back down to rest.
+            if (card != null)
+            {
+                float breath = Mathf.Sin(Mathf.Clamp01(n * 2.2f) * Mathf.PI) * 0.05f;
+                card.localScale = cardScale * (1f + 0.07f * (1f - EaseOut(n)) + breath);
+                card.anchoredPosition = cardHome + Vector2.up * (36f * (1f - EaseOut(n)));
+            }
+            yield return null;
+        }
+
+        if (card != null)
+        {
             card.anchoredPosition = cardHome;
             card.localScale = cardScale;
-            host.anchoredPosition = hostHome;
         }
 
-        // --- the gem sets: a last bloom in the rarity colour ---
-        hammer.enabled = false;
-        Image bloom = MakeImage(host, "Bloom", GetGlowSprite(), new Color(gem.r, gem.g, gem.b, 0.9f), 200f, cardHome);
-        const float bloomDur = 0.45f;
-        for (float t = 0f; t < bloomDur; t += Time.unscaledDeltaTime)
-        {
-            float n = t / bloomDur;
-            bloom.rectTransform.sizeDelta = Vector2.one * Mathf.Lerp(200f, 760f, Mathf.Sqrt(n));
-            SetAlpha(bloom, Mathf.Lerp(0.9f, 0f, n));
-            SetAlpha(backGlow, Mathf.Lerp(0.35f, 0f, n));
-            card.localScale = cardScale * (1f + 0.06f * Mathf.Sin(n * Mathf.PI));
-            yield return null;
-        }
-
-        card.localScale = cardScale;
-        host.anchoredPosition = hostHome;
-        Object.Destroy(bloom.gameObject);
+        Object.Destroy(halo.gameObject);
         Object.Destroy(flash.gameObject);
-        Object.Destroy(flashCore.gameObject);
-        Object.Destroy(backGlow.gameObject);
-        Object.Destroy(hammer.gameObject);
+        Object.Destroy(aura.gameObject);
     }
 
-    // Sparks fly out sideways-and-up from the strike, then fall under gravity.
-    private static void SpawnSparks(MonoBehaviour runner, RectTransform host, Vector2 origin, float power, Color gem)
+    // A single mote drawn in from beyond the ring, spiralling as it falls toward the card. The
+    // spiral is what sells "pulled in by something" — a straight line reads as a projectile.
+    private static IEnumerator MoteLife(RectTransform host, Vector2 target, Color gem, float duration)
     {
-        int count = Mathf.RoundToInt(Mathf.Lerp(14f, 30f, power));
-        for (int i = 0; i < count; i++)
-        {
-            Image spark = MakeImage(host, "Spark", GetSparkSprite(), Color.white, Random.Range(9f, 20f) * (0.7f + power), origin);
-            // Bias sideways so it reads as metal spitting off an anvil, not a firework.
-            float ang = Random.Range(0f, Mathf.PI * 2f);
-            Vector2 dir = new Vector2(Mathf.Cos(ang) * 1.5f, Mathf.Abs(Mathf.Sin(ang)) * 0.9f + 0.25f).normalized;
-            float speed = Random.Range(320f, 950f) * (0.6f + power * 0.7f);
-            Color c = Random.value < 0.28f ? gem : Color.Lerp(new Color(1f, 0.95f, 0.65f), new Color(1f, 0.55f, 0.12f), Random.value);
-            if (runner != null) runner.StartCoroutine(SparkLife(spark, dir * speed, c));
-        }
-    }
+        float angle = Random.Range(0f, Mathf.PI * 2f);
+        // Starts OUTSIDE the rune ring, on a squashed ellipse so a wide spread still clears the
+        // bottom of the panel.
+        float radius = Random.Range(RING_START * 1.25f, RING_START * 1.85f);
+        float spin = Random.Range(1.1f, 2.4f) * (Random.value < 0.5f ? -1f : 1f);
+        float size = Random.Range(6f, 13f);
 
-    private static IEnumerator SparkLife(Image spark, Vector2 vel, Color color)
-    {
-        float life = Random.Range(0.30f, 0.62f);
-        Vector2 pos = spark.rectTransform.anchoredPosition;
-        spark.color = color;
-        float baseW = spark.rectTransform.sizeDelta.x;
+        Color tint = Random.value < 0.35f ? Color.Lerp(gem, Color.white, 0.6f) : gem;
+        Image mote = MakeImage(host, "Mote", FlatUI.EmberDot(), tint, size, target);
+
+        float life = duration * Random.Range(0.8f, 1.25f);
         for (float t = 0f; t < life; t += Time.unscaledDeltaTime)
         {
-            float n = t / life;
-            vel.y -= 2400f * Time.unscaledDeltaTime;         // gravity
-            vel *= 1f - 2.2f * Time.unscaledDeltaTime;       // drag
-            pos += vel * Time.unscaledDeltaTime;
-            spark.rectTransform.anchoredPosition = pos;
-            // Stretch along travel so fast sparks read as streaks.
-            float sp = vel.magnitude;
-            spark.rectTransform.sizeDelta = new Vector2(baseW * (1f + sp / 900f), baseW * 0.5f);
-            spark.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(vel.y, vel.x) * Mathf.Rad2Deg);
-            Color c = color; c.a = 1f - n * n; spark.color = c;
+            if (mote == null) yield break;
+            float n = Mathf.Clamp01(t / life);
+
+            float r = Mathf.Lerp(radius, 12f, n * n);       // accelerates inward
+            angle += spin * Time.unscaledDeltaTime;
+            mote.rectTransform.anchoredPosition = target +
+                new Vector2(Mathf.Cos(angle) * r, Mathf.Sin(angle) * r * VERT_SQUASH);
+
+            // Fade in at the far end, out as it arrives — nothing pops into or out of existence.
+            SetAlpha(mote, Mathf.Min(Mathf.Clamp01(n / 0.2f), Mathf.Clamp01((1f - n) / 0.3f)) * 0.95f);
+            mote.rectTransform.sizeDelta = Vector2.one * Mathf.Lerp(size, size * 0.4f, n);
             yield return null;
         }
-        if (spark != null) Object.Destroy(spark.gameObject);
+        if (mote != null) Object.Destroy(mote.gameObject);
     }
 
-    // ---- helpers ----
-    private static Image MakeImage(RectTransform host, string name, Sprite sprite, Color color, float size, Vector2 pos)
+    // At the bind, each rune breaks orbit and drifts outward, spinning down.
+    private static IEnumerator ScatterRune(Image rune, Vector2 dir)
+    {
+        if (rune == null) yield break;
+        Vector2 from = rune.rectTransform.anchoredPosition;
+        float dist = Random.Range(140f, 260f);
+        float life = Random.Range(0.5f, 0.85f);
+        float spin = Random.Range(-220f, 220f);
+        // Squashed outward travel, same reason as the motes: keeps the burst inside the panel.
+        Vector2 travel = new Vector2(dir.x, dir.y * VERT_SQUASH);
+
+        for (float t = 0f; t < life; t += Time.unscaledDeltaTime)
+        {
+            if (rune == null) yield break;
+            float n = Mathf.Clamp01(t / life);
+            rune.rectTransform.anchoredPosition = from + travel * (dist * EaseOut(n));
+            rune.rectTransform.localRotation = Quaternion.Euler(0f, 0f, spin * n);
+            rune.rectTransform.sizeDelta = Vector2.one * Mathf.Lerp(28f, 4f, n);
+            SetAlpha(rune, 1f - n * n);
+            yield return null;
+        }
+        if (rune != null) Object.Destroy(rune.gameObject);
+    }
+
+    // ---- helpers ---------------------------------------------------------------------------
+
+    // A 2D source on the runner. UI sound must not be positional — SfxManager.PlayAtPoint is
+    // distance-attenuated, which would make the blessing quieter depending on where the player
+    // happened to be standing when they opened the screen.
+    private static AudioSource EnsureSource(MonoBehaviour runner)
+    {
+        if (runner == null) return null;
+        AudioSource src = runner.GetComponent<AudioSource>();
+        if (src == null)
+        {
+            src = runner.gameObject.AddComponent<AudioSource>();
+            src.playOnAwake = false;
+            src.spatialBlend = 0f;
+        }
+        return src;
+    }
+
+    private static RectTransform MakePoint(RectTransform host, string name, Vector2 pos, Vector2 size)
+    {
+        GameObject go = new GameObject(name, typeof(RectTransform));
+        RectTransform rt = go.GetComponent<RectTransform>();
+        rt.SetParent(host, false);
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = pos;
+        rt.sizeDelta = size;
+        return rt;
+    }
+
+    private static Image MakeImage(Transform host, string name, Sprite sprite, Color color, float size, Vector2 pos)
     {
         GameObject go = new GameObject(name, typeof(RectTransform));
         RectTransform rt = go.GetComponent<RectTransform>();
@@ -231,150 +284,5 @@ public static class BlompoForgeFX
         Color c = img.color; c.a = Mathf.Clamp01(a); img.color = c;
     }
 
-    // ---- procedural sprites ----
-
-    // Blocky pixel-art hammer: wooden haft, iron head with a lit top face and dark banding.
-    private static Sprite GetHammerSprite()
-    {
-        if (hammerSprite != null) return hammerSprite;
-        int s = 96;
-        Texture2D tex = new Texture2D(s, s, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Point };
-        Color32[] px = new Color32[s * s];
-        Color wood = new Color(0.44f, 0.28f, 0.14f);
-        Color woodHi = new Color(0.60f, 0.40f, 0.21f);
-        Color iron = new Color(0.55f, 0.57f, 0.62f);
-        Color ironHi = new Color(0.78f, 0.80f, 0.85f);
-        Color ironLo = new Color(0.28f, 0.29f, 0.33f);
-
-        for (int y = 0; y < s; y++)
-            for (int x = 0; x < s; x++)
-            {
-                Color c = new Color(0, 0, 0, 0);
-                // Haft: vertical bar up the middle, lower two-thirds.
-                if (x >= 42 && x <= 53 && y >= 4 && y < 64)
-                    c = (x <= 45) ? woodHi : wood;
-                // Head: wide block across the top.
-                if (y >= 62 && y <= 90 && x >= 14 && x <= 82)
-                {
-                    c = iron;
-                    if (y >= 84) c = ironHi;                       // lit top face
-                    if (y <= 66 || x <= 17 || x >= 79) c = ironLo;  // dark underside + ends
-                    if (x >= 30 && x <= 66 && y >= 70 && y <= 80) c = Color.Lerp(iron, ironHi, 0.35f);
-                }
-                px[y * s + x] = c.a > 0f ? (Color32)c : new Color32(0, 0, 0, 0);
-            }
-        tex.SetPixels32(px); tex.Apply();
-        hammerSprite = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.06f), s);
-        return hammerSprite;
-    }
-
-    // A single bright pixel-ish shard; stretched along travel by SparkLife.
-    private static Sprite GetSparkSprite()
-    {
-        if (sparkSprite != null) return sparkSprite;
-        int w = 16, h = 8;
-        Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
-        Color32[] px = new Color32[w * h];
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-            {
-                float nx = x / (float)(w - 1), ny = Mathf.Abs(y - (h - 1) * 0.5f) / ((h - 1) * 0.5f);
-                float a = Mathf.Clamp01((1f - ny) * (1f - Mathf.Abs(nx - 0.35f) * 1.4f));
-                a *= a;
-                px[y * w + x] = new Color32(255, 255, 255, (byte)(a * 255f));
-            }
-        tex.SetPixels32(px); tex.Apply();
-        sparkSprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 16);
-        return sparkSprite;
-    }
-
-    // Eight-ray impact flare: four long rays on the axes plus four shorter diagonals, over a hot
-    // core. Far more like a struck-metal flash than a plain radial blob.
-    private static Sprite GetBurstSprite()
-    {
-        if (burstSprite != null) return burstSprite;
-        int s = 256; float half = s / 2f;
-        Texture2D tex = new Texture2D(s, s, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
-        Color32[] px = new Color32[s * s];
-        for (int y = 0; y < s; y++)
-            for (int x = 0; x < s; x++)
-            {
-                float dx = (x + 0.5f - half) / half, dy = (y + 0.5f - half) / half;
-                float r = Mathf.Sqrt(dx * dx + dy * dy);
-                if (r > 1f) { px[y * s + x] = new Color32(0, 0, 0, 0); continue; }
-                float ang = Mathf.Atan2(dy, dx);
-
-                // cos(2a) peaks on the axes; the high power narrows each lobe into a ray.
-                float axis = Mathf.Pow(Mathf.Abs(Mathf.Cos(2f * ang)), 34f);
-                float diag = Mathf.Pow(Mathf.Abs(Mathf.Cos(2f * (ang - Mathf.PI * 0.25f))), 60f);
-
-                float rays = axis * Mathf.Pow(1f - r, 1.5f) + diag * 0.5f * Mathf.Pow(1f - r, 2.4f);
-                float core = Mathf.Pow(Mathf.Clamp01(1f - r * 3.4f), 2f);
-                float a = Mathf.Clamp01(rays * 1.4f + core);
-
-                // White-hot at the centre, cooling to gold along the rays.
-                float warm = Mathf.Clamp01(core + (1f - r) * 0.35f);
-                byte g = (byte)(255f * Mathf.Clamp01(0.80f + 0.20f * warm));
-                byte b = (byte)(255f * Mathf.Clamp01(0.35f + 0.65f * warm));
-                px[y * s + x] = new Color32(255, g, b, (byte)(a * 255f));
-            }
-        tex.SetPixels32(px); tex.Apply();
-        burstSprite = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
-        return burstSprite;
-    }
-
-    private static Sprite GetRingSprite()
-    {
-        if (ringSprite != null) return ringSprite;
-        int s = 128; float c = (s - 1) * 0.5f, rad = c * 0.84f, thick = c * 0.11f;
-        Texture2D tex = new Texture2D(s, s, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
-        Color32[] px = new Color32[s * s];
-        for (int y = 0; y < s; y++)
-            for (int x = 0; x < s; x++)
-            {
-                float d = Mathf.Sqrt((x - c) * (x - c) + (y - c) * (y - c));
-                float a = Mathf.Clamp01(1f - Mathf.Abs(d - rad) / thick); a *= a;
-                px[y * s + x] = new Color32(255, 255, 255, (byte)(a * 255f));
-            }
-        tex.SetPixels32(px); tex.Apply();
-        ringSprite = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
-        return ringSprite;
-    }
-
-    private static Sprite GetGlowSprite()
-    {
-        if (glowSprite != null) return glowSprite;
-        int s = 128; float c = (s - 1) * 0.5f, rad = c;
-        Texture2D tex = new Texture2D(s, s, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
-        Color32[] px = new Color32[s * s];
-        for (int y = 0; y < s; y++)
-            for (int x = 0; x < s; x++)
-            {
-                float d = Mathf.Sqrt((x - c) * (x - c) + (y - c) * (y - c)) / rad;
-                float a = Mathf.Clamp01(1f - d); a *= a * a;
-                px[y * s + x] = new Color32(255, 255, 255, (byte)(a * 255f));
-            }
-        tex.SetPixels32(px); tex.Apply();
-        glowSprite = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
-        return glowSprite;
-    }
-
-    // Broad soft falloff used for the impact flash.
-    private static Sprite GetSoftSprite()
-    {
-        if (softSprite != null) return softSprite;
-        int s = 128; float c = (s - 1) * 0.5f, rad = c;
-        Texture2D tex = new Texture2D(s, s, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
-        Color32[] px = new Color32[s * s];
-        for (int y = 0; y < s; y++)
-            for (int x = 0; x < s; x++)
-            {
-                float d = Mathf.Sqrt((x - c) * (x - c) + (y - c) * (y - c)) / rad;
-                float a = Mathf.Clamp01(1f - d);
-                px[y * s + x] = new Color32(255, 255, 255, (byte)(a * 255f));
-            }
-        tex.SetPixels32(px); tex.Apply();
-        softSprite = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
-        return softSprite;
-    }
+    private static float EaseOut(float t) => 1f - (1f - t) * (1f - t);
 }
