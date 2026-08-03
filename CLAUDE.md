@@ -509,22 +509,32 @@ SampleScene's main Canvas contains:
 
 **When adding new full-screen UI panels**, hide GameplayHUD when they open by adding a `[SerializeField] GameObject gameplayHUD;` reference and toggling SetActive. ShopManager, SlotMachineUI, and QuestSystem already follow this pattern.
 
-### Flat theme (`FlatUI.cs`) — the new UI direction (2026-08-03)
+### `FlatUI.cs` — the new UI direction (2026-08-03)
 
-**The designer has disliked the ornate stone-and-gold chrome "since the beginning"** and asked for something "soothing, simple, understandable, but also cool". `FlatUI.cs` is that direction, prototyped on the Scrap Forge screen.
+**The designer has disliked the ornate stone-and-gold chrome "since the beginning."** `FlatUI.cs` is the replacement, prototyped on the Scrap Forge screen.
 
-What it is: flat dark surfaces, ONE thin outline, no texture, no ornament, no gem studs. Depth comes from a barely-there top sheen (3% white) and a soft selection glow instead of bevels. A single accent colour carries meaning — on the forge that's `ScrapEconomy.ScrapColor`, used only for the currency, costs, and the actionable button.
+**It took two passes, and the first one's failure is the useful part.** Pass 1 delivered the literal brief ("soothing, simple, understandable, but also cool") as flat slate-blue panels, uniform rounded corners, neutral greys, one accent. The designer's verdict: **"it screams AI."** That was right — it was the house style of every dev dashboard, and crucially it had no *place* in it. Simple and generic are not the same thing.
 
-API: `Panel(radius)` and `Outline(radius, thickness)` are 9-sliced rounded rects, `SoftGlow()`, `VerticalFade()`, `Pixel()`. **All shapes are WHITE and meant to be tinted via `Image.color`**, so one cached sprite serves every panel in any colour. A shared palette (`Surface`, `Border`, `TextBright/Body/Muted/Disabled`, …) lives at the bottom of the file so panels built in different scripts match.
+**Pass 2 keeps the restraint but points every choice at the world: a sheet of iron on a workbench, lit by the forge.**
+- **Warm charcoal, not slate-blue.** Act 1 is the *Oxidation District* — rust, not brushed steel. This single palette shift did most of the work.
+- **Chamfered corners, not rounded.** Cut plate reads as a made object; a uniform corner radius reads as a web card. Biggest silhouette cue.
+- **Directional light.** A lit top lip plus an ember glow rising off the *bottom* edge (firelight under the bench), instead of a uniform glowing border. Uneven light = physical object in a place.
+- **Rivets and faint scuffs.** Small, dark, functional — fasteners, not jewels. Imperfection is what kills the "generated" feel.
+- **Rules score across and fade at the ends** rather than running edge to edge like a CSS border.
+- **The only two colours on screen are the game's own two resources:** charges in Shift-blue, costs in scrap-orange.
+
+API: `Panel(chamfer)` / `Outline(chamfer, thickness)` (9-sliced chamfered plates), `Rivet()`, `FadedRule()`, `SoftGlow()`, `VerticalFade()`, `Pixel()`. **All shapes are WHITE and tinted via `Image.color`**, so one cached sprite serves every panel. Shared palette at the bottom of the file.
 
 Lessons already paid for, don't re-learn them:
-- **Get the rounded-rect SDF right** (`inside + outside - radius`, the standard rounded-box formula). A naive version pinches the outline at the corners.
-- Textures need `FilterMode.Bilinear` — Point aliases the rounded corners badly.
-- **Hairline dividers need to be brighter than theory says.** At the "correct" subtlety they simply did not register against the dark surface on screen.
-- **Small icons inside dense text don't work.** A 17px scrap shard next to each cost read as a smudge fused to the first digit; the accent colour alone carries the meaning better.
-- **Empty states must collapse.** The forge lays itself out top-down in `LayoutSections` and resizes the window to its content — an empty section shrinks to one line of explanatory text. The first version was a fixed-height panel with two large voids, which is exactly what looked broken.
+- **Get the SDF right.** Rounded box is `inside + outside - radius`; the chamfer is that box distance `max`'d with a normalised diagonal half-plane. Naive versions pinch the outline at corners.
+- Textures need `FilterMode.Bilinear` — Point aliases the chamfer edges badly.
+- **Hairlines need to be brighter than theory says**, or they don't register on a dark surface.
+- **Atmosphere effects want roughly half the alpha you first reach for.** The ember at 0.085/140px was an orange wash owning the bottom third; 0.042/104px is firelight. Scuffs at 0.045 read as *rendering glitches*; 0.022 reads as wear.
+- **Keep wear out of content columns.** The first scuff pass ran a streak straight through the title. They belong in margins that are empty at any content count.
+- **Small icons inside dense text don't work.** A 17px scrap shard beside each cost read as a smudge fused to the first digit; the accent colour alone carries it.
+- **Empty states must collapse.** `LayoutSections` lays the screen out top-down and resizes the window to its content, so an empty section shrinks to one explanatory line. The fixed-height version had two large voids and looked broken — and that state is *common*, since early in a run nothing is damaged or exhausted.
 
-**Status: the Scrap Forge is the only screen converted.** `RelicHUD`, `RelicIcon`, `RelicManagePanel`, `RelicSwapScreen`, `RelicTooltip` and `BlompoScreen` still use the old `RelicUISprites` chrome, so the game is currently inconsistent. Rolling the flat theme out to those is a known, wanted follow-up — do it when asked, and reuse `FlatUI` rather than inventing a third look.
+**Status: the Scrap Forge is the only screen converted.** `RelicHUD`, `RelicIcon`, `RelicManagePanel`, `RelicSwapScreen`, `RelicTooltip` and `BlompoScreen` still use the old `RelicUISprites` chrome, so the game is knowingly inconsistent. Rolling this out is a wanted follow-up — reuse `FlatUI`, don't invent a third look. **Open question for that rollout:** relic rarity is currently carried by gem colour, a metaphor that doesn't survive losing the gold-on-stone frame; needs a design decision, not just a swap.
 
 ### Never Scale UI Containers — Resize Them
 

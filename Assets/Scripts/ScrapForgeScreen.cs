@@ -18,9 +18,9 @@ using TMPro;
 // Purchases are select-then-confirm rather than click-to-buy. At 30 scrap a salvage is roughly a
 // third of an act's income, which is too expensive to lose to a misclick.
 //
-// Built procedurally in the shared Deckshift chrome (RelicUISprites), self-instantiating under the
-// main Canvas — same pattern as BlompoScreen / RelicManagePanel, so there is nothing to wire in a
-// scene and nothing that can go missing from one.
+// Built procedurally in the FlatUI theme — an iron plate on a workbench, lit by the forge below.
+// Self-instantiating under the main Canvas, same pattern as BlompoScreen / RelicManagePanel, so
+// there is nothing to wire in a scene and nothing that can go missing from one.
 public class ScrapForgeScreen : MonoBehaviour
 {
     public static ScrapForgeScreen instance;
@@ -115,23 +115,39 @@ public class ScrapForgeScreen : MonoBehaviour
 
         window = AddPoint(transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(WIN_W, 600f));
         Image winBg = window.gameObject.AddComponent<Image>();
-        winBg.sprite = FlatUI.Panel(8);
+        winBg.sprite = FlatUI.Panel(10);
         winBg.type = Image.Type.Sliced;
         winBg.color = FlatUI.Surface;
         winBg.raycastTarget = true;
 
-        // Barely-there sheen down the top of the panel — the only depth cue. Any stronger and it
-        // turns back into a bevel, which is the look we're moving away from. Anchored
-        // proportionally so it follows the window as its height changes with content.
-        Image sheen = AddImage(window, "Sheen", FlatUI.VerticalFade(), new Color(1f, 1f, 1f, 0.030f), false);
-        sheen.rectTransform.anchorMin = new Vector2(0f, 0.55f);
-        sheen.rectTransform.anchorMax = new Vector2(1f, 1f);
-        sheen.rectTransform.offsetMin = Vector2.zero;
-        sheen.rectTransform.offsetMax = Vector2.zero;
+        // Forge fire under the bench: a warm wash rising off the BOTTOM edge. Flipped by scaling
+        // Y negative about a centred pivot, so the fade's opaque end sits at the bottom.
+        // Kept low: at 0.085 over 140px this was an orange wash owning the bottom third of the
+        // panel and reading as "glowing UI". It should be firelight you notice only if you look.
+        Image ember = AddImage(window, "Ember", FlatUI.VerticalFade(),
+            new Color(FlatUI.Ember.r, FlatUI.Ember.g, FlatUI.Ember.b, 0.042f), false);
+        ember.rectTransform.anchorMin = new Vector2(0f, 0f);
+        ember.rectTransform.anchorMax = new Vector2(1f, 0f);
+        ember.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        ember.rectTransform.anchoredPosition = new Vector2(0f, 52f);
+        ember.rectTransform.sizeDelta = new Vector2(-28f, 104f);
+        ember.rectTransform.localScale = new Vector3(1f, -1f, 1f);
 
-        Image winFrame = AddImage(window, "Frame", FlatUI.Outline(8, 2), FlatUI.Border, false);
+        Image winFrame = AddImage(window, "Frame", FlatUI.Outline(10, 2), FlatUI.Border, false);
         winFrame.type = Image.Type.Sliced;
         Stretch(winFrame.rectTransform);
+
+        // Light catches the TOP LIP only. A uniformly bright border reads as a UI widget; light
+        // coming from one direction reads as a physical plate sitting on a bench.
+        Image lip = AddImage(window, "TopLip", FlatUI.Pixel(), FlatUI.EdgeLight, false);
+        lip.rectTransform.anchorMin = new Vector2(0f, 1f);
+        lip.rectTransform.anchorMax = new Vector2(1f, 1f);
+        lip.rectTransform.pivot = new Vector2(0.5f, 1f);
+        lip.rectTransform.anchoredPosition = new Vector2(0f, -2f);
+        lip.rectTransform.sizeDelta = new Vector2(-26f, 1f);   // inset clear of the cut corners
+
+        AddWear();
+        AddRivets();
 
         titleText = AddText(window, "Title", new Vector2(0f, 1f), new Vector2(PAD, -34f), new Vector2(600f, 52f),
             "THE FORGE", 38f, FontStyles.Bold, FlatUI.TextBright, TextAlignmentOptions.TopLeft);
@@ -166,12 +182,64 @@ public class ScrapForgeScreen : MonoBehaviour
 
     private RectTransform AddDivider(float y)
     {
-        Image d = AddImage(window, "Divider", FlatUI.Pixel(), FlatUI.BorderSoft, false);
+        // Scored line that fades out at both ends, rather than a rule running edge to edge.
+        Image d = AddImage(window, "Divider", FlatUI.FadedRule(), FlatUI.BorderSoft, false);
         d.rectTransform.anchorMin = d.rectTransform.anchorMax = new Vector2(0.5f, 1f);
         d.rectTransform.pivot = new Vector2(0.5f, 1f);
         d.rectTransform.anchoredPosition = new Vector2(0f, y);
         d.rectTransform.sizeDelta = new Vector2(ROW_W, 1f);
         return d.rectTransform;
+    }
+
+    // Four fasteners holding the plate down. Small, dark and functional — the point is that the
+    // panel looks made, not decorated. Corner-anchored so they survive the dynamic height.
+    private void AddRivets()
+    {
+        Vector2[] anchors = { new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(1f, 0f) };
+        Vector2[] offsets = { new Vector2(19f, -19f), new Vector2(-19f, -19f), new Vector2(19f, 19f), new Vector2(-19f, 19f) };
+
+        for (int i = 0; i < 4; i++)
+        {
+            RectTransform rt = AddPoint(window, "Rivet", anchors[i], offsets[i], new Vector2(9f, 9f));
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            Image img = rt.gameObject.AddComponent<Image>();
+            img.sprite = FlatUI.Rivet();
+            img.color = new Color(0.34f, 0.30f, 0.25f, 1f);
+            img.raycastTarget = false;
+        }
+    }
+
+    // A handful of faint scuffs on the plate. Deliberately fixed rather than random — they must not
+    // shuffle every time the screen opens — and barely visible: imperfection is what stops a panel
+    // reading as generated, but the moment you consciously see it, it's noise.
+    //
+    // Two rules learned the hard way: keep them WELL under 0.03 alpha (at 0.045 they read as
+    // rendering glitches, not wear), and keep them out of the content columns — the first pass ran
+    // a streak straight through the title. They live in the right-hand margin, which is empty at
+    // any card count, and stay within the shortest possible window height.
+    private void AddWear()
+    {
+        // x, y (from top-left), length, angle
+        float[,] marks =
+        {
+            { 782f, -118f,  92f,  -6f },
+            { 934f, -206f,  64f,   8f },
+            { 712f, -286f, 112f,  -4f },
+            { 1004f, -78f,  70f,  11f },
+        };
+
+        for (int i = 0; i < marks.GetLength(0); i++)
+        {
+            RectTransform rt = AddPoint(window, "Scuff", new Vector2(0f, 1f),
+                new Vector2(marks[i, 0], marks[i, 1]), new Vector2(marks[i, 2], 1f));
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.localRotation = Quaternion.Euler(0f, 0f, marks[i, 3]);
+
+            Image img = rt.gameObject.AddComponent<Image>();
+            img.sprite = FlatUI.FadedRule();
+            img.color = new Color(1f, 0.93f, 0.85f, 0.022f);
+            img.raycastTarget = false;
+        }
     }
 
     // Places every section top-down and resizes the window to fit. Called after each Refresh, so
@@ -212,7 +280,7 @@ public class ScrapForgeScreen : MonoBehaviour
         RectTransform rt = AddPoint(window, "Close", new Vector2(1f, 1f), new Vector2(-PAD * 0.5f, -PAD * 0.5f), new Vector2(sz, sz));
         rt.pivot = new Vector2(1f, 1f);
 
-        Image hit = AddImage(rt, "Hit", FlatUI.Panel(6), new Color(1f, 1f, 1f, 0.05f), true);
+        Image hit = AddImage(rt, "Hit", FlatUI.Panel(5), new Color(1f, 1f, 1f, 0.05f), true);
         hit.type = Image.Type.Sliced;
         Stretch(hit.rectTransform);
 
@@ -252,12 +320,12 @@ public class ScrapForgeScreen : MonoBehaviour
         confirmBarRT = confirmBar;
 
         confirmBg = confirmBar.gameObject.AddComponent<Image>();
-        confirmBg.sprite = FlatUI.Panel(6);
+        confirmBg.sprite = FlatUI.Panel(5);
         confirmBg.type = Image.Type.Sliced;
         confirmBg.color = FlatUI.SurfaceRaised;
         confirmBg.raycastTarget = true;
 
-        confirmOutline = AddImage(confirmBar, "Outline", FlatUI.Outline(6, 2), FlatUI.BorderSoft, false);
+        confirmOutline = AddImage(confirmBar, "Outline", FlatUI.Outline(5, 2), FlatUI.BorderSoft, false);
         confirmOutline.type = Image.Type.Sliced;
         Stretch(confirmOutline.rectTransform);
 
@@ -413,12 +481,12 @@ public class ScrapForgeScreen : MonoBehaviour
         }
 
         Image bg = rt.gameObject.AddComponent<Image>();
-        bg.sprite = FlatUI.Panel(6);
+        bg.sprite = FlatUI.Panel(5);
         bg.type = Image.Type.Sliced;
         bg.color = isSelected ? new Color(0.165f, 0.180f, 0.204f, 1f) : FlatUI.SurfaceRaised;
         bg.raycastTarget = true;
 
-        Image frame = AddImage(rt, "Frame", FlatUI.Outline(6, isSelected ? 2 : 1), isSelected ? accent : FlatUI.Border, false);
+        Image frame = AddImage(rt, "Frame", FlatUI.Outline(5, isSelected ? 2 : 1), isSelected ? accent : FlatUI.Border, false);
         frame.type = Image.Type.Sliced;
         Stretch(frame.rectTransform);
 
