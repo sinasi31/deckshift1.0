@@ -546,20 +546,24 @@ Lessons already paid for, don't re-learn them:
 
 `FlatUI.Theme` is the mechanism — a colour set (`Surface`, `Border`, `EdgeLight`, `Accent`, text ramp) picked per screen:
 
-| | **Iron** (`ScrapForgeScreen`) | **Arcane** (`BlompoScreen`) |
-|---|---|---|
-| What it is | a workbench you repair cards at | a mythic creature granting a blessing |
-| Palette | warm charcoal (rust district) | cold indigo |
-| Light | fire from **below** | descends from **above** |
-| Particles | embers **rising**, fast | motes **settling**, slow, twinkling |
-| Corner marks | **rivets** (fasteners) | **four-point stars** (light) |
-| Surface | scuffed and worn | pristine — his space isn't a workshop that gets used |
+| | **Iron** (`ScrapForgeScreen`) | **Arcane** (`BlompoScreen`) | **Loadout** (`RelicHUD`, `RelicIcon`, `RelicTooltip`) |
+|---|---|---|---|
+| What it is | a workbench you repair cards at | a mythic creature granting a blessing | what you're **carrying** |
+| Palette | warm charcoal (rust district) | cold indigo | near-**colourless** |
+| Light | fire from **below** | descends from **above** | none — it's not a place |
+| Particles | embers **rising**, fast | motes **settling**, slow, twinkling | none |
+| Corner marks | **rivets** (fasteners) | **four-point stars** (light) | none |
+| Surface | scuffed and worn | pristine | plain, recessed sockets |
 
 **The inversions are the point.** Warm/cold, below/above, rising/falling, worn/clean. When adding a screen, pick a material and invert something — **do not just retint Iron**.
+
+**Loadout inverts a different axis: it's the only theme where the chrome is NOT the subject.** The other two dress a place, so the material carries the character. The relic bar dresses your inventory, sits over gameplay permanently, and the relic art is colourful pixel work — so the sockets are deliberately near-colourless and the theme is the quietest by weight. **Do not add a hue to the relic bar.** A permanent HUD element cannot compete with the game behind it the way a modal panel can.
 
 `UIEmberField.Settings` carries the motion half (`Settings.Embers` / `Settings.Motes`): rise speed (negative = falling), lateral spread, size, life, sway, twinkle.
 
 Rarity note: the old chrome carried rarity as a gem set in gold. Without that frame **colour has to carry rarity alone**, so `FlatUI.RarityColor` is brighter and more separated than jewel tones, and Blompo tints the sigil, border, name and label together — four quiet signals instead of one loud jewel. **Common is deliberately muted**: at a lighter slate it rendered near-white and made the *weakest* offer the brightest thing on screen.
+
+**On the relic bar, rarity is a coloured STRIP along the bottom of each socket**, plus a muted tint on the socket outline and (Epic/Legendary only) a slow glow pulse. The strip is the load-bearing signal: at 52px over moving gameplay a tinted hairline is not reliably readable, but a solid bar is legible at a glance. The tooltip repeats the rarity in its border and name, confirming what the strip meant. **Only the two rarities worth noticing animate** — that's what makes a Legendary catch your eye in a row of five.
 
 **Blompo's blessing animation (`BlompoForgeFX`) was rebuilt to match (2026-08-03).** It used to be a hammer-and-anvil forging: three blows, sparks, screen shake. Once his screen went arcane, a smithy sequence fought everything else on the panel — he grants a charm, he isn't a blacksmith. The motion vocabulary is inverted the same way the palette was:
 
@@ -574,7 +578,9 @@ The settle originally used an *expanding* ring, which the designer called bland 
 
 **Sound design note:** magic is **harmonic** (bell/chime partials 1,2,3,4,5.1), metal is **inharmonic** (bar modes 1,2.76,5.40,8.93 — see `ProcSfx.ScrapPickup`). That ratio choice is the whole difference between "charm" and "clank"; keep the two families distinct so a blessing and a scrap pickup are never confusable.
 
-**Status: `ScrapForgeScreen`, `ScrapHUD` and `BlompoScreen` are converted.** Still on the old `RelicUISprites` chrome: `RelicHUD`, `RelicIcon`, `RelicManagePanel`, `RelicSwapScreen`, `RelicTooltip`. Reuse `FlatUI` for those — don't invent a third look — and give the relic screens their own material rather than reusing Iron or Arcane. **Open design question for that rollout:** relic rarity is also carried by gem colour today, and `RelicIcon` builds a whole gold-on-stone medallion around it, so it needs a decision about what carries rarity, not just a swap.
+**Status: converted —** `ScrapForgeScreen`, `ScrapHUD`, `BlompoScreen`, `RelicHUD`, `RelicIcon`, `RelicTooltip`.
+
+**Still on the old `RelicUISprites` chrome** (audited 2026-08-03 — the old look reaches further than the relic screens): `RelicManagePanel`, `RelicSwapScreen`, `CardUI`, `ResourceBarUI`, `ResourcePanelHUD`, `ShopScreenUI`, `PixelUI`. Reuse `FlatUI` for those — don't invent a fourth look. `RelicManagePanel` / `RelicSwapScreen` should take the **Loadout** theme, since they're the same subject as the bar. The shop wants its own material (it's a *place*, so give it one and invert something).
 
 ### Never Scale UI Containers — Resize Them
 

@@ -3,8 +3,11 @@ using UnityEngine.UI;
 using TMPro;
 
 // A single shared tooltip for the relic loadout bar: name + description + sell value,
-// shown on hover under the hovered slot. Built procedurally (house style, RelicUISprites)
-// and reused across every slot — one instance, repositioned per hover.
+// shown on hover under the hovered slot. Built procedurally in the FlatUI LOADOUT theme and
+// reused across every slot — one instance, repositioned per hover.
+//
+// Its border is tinted by RARITY (see Show). With the gem gone from the bar, the tooltip's border
+// and name colour are what confirm the meaning of the coloured strip on the slot above it.
 public class RelicTooltip : MonoBehaviour
 {
     private CanvasGroup group;
@@ -26,11 +29,11 @@ public class RelicTooltip : MonoBehaviour
         group.blocksRaycasts = false;
         group.interactable = false;
 
-        // Dark stone background (this object's own Image).
+        // Flat chamfered plate, matching the loadout bar it hangs off.
         Image bg = gameObject.AddComponent<Image>();
-        bg.sprite = RelicUISprites.StonePanel();
+        bg.sprite = FlatUI.Panel(6);
         bg.type = Image.Type.Sliced;
-        bg.color = new Color(0.55f, 0.53f, 0.58f, 0.97f);   // dims the baked stone to a dark tooltip
+        bg.color = new Color(0.055f, 0.053f, 0.050f, 0.98f);   // darker than the bar so it sits on top
         bg.raycastTarget = false;
 
         // Vertical content layout, height driven by a ContentSizeFitter. Padding clears the gold border.
@@ -47,11 +50,13 @@ public class RelicTooltip : MonoBehaviour
         csf.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
         csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        nameText  = MakeText(font, 20f, FontStyles.Bold, Color.white);
-        descText  = MakeText(font, 15f, FontStyles.Normal, new Color(0.82f, 0.84f, 0.9f));
-        valueText = MakeText(font, 15f, FontStyles.Bold, new Color(1f, 0.84f, 0.34f));
+        nameText  = MakeText(font, 19f, FontStyles.Bold, FlatUI.Loadout.TextBright);
+        descText  = MakeText(font, 15f, FontStyles.Normal, FlatUI.Loadout.TextBody);
+        valueText = MakeText(font, 14f, FontStyles.Bold, new Color(0.85f, 0.72f, 0.36f));
 
-        // Rarity-tinted border on top (ignored by the layout, stretched to fill).
+        // Outline on top (ignored by the layout, stretched to fill). Unlike the old gold frame this
+        // one is TINTED BY RARITY in Show() — with the gem gone from the bar, the tooltip border and
+        // the name colour are what confirm what the slot's coloured strip was telling you.
         GameObject frameGo = new GameObject("Frame", typeof(RectTransform));
         RectTransform frt = frameGo.GetComponent<RectTransform>();
         frt.SetParent(transform, false);
@@ -60,10 +65,9 @@ public class RelicTooltip : MonoBehaviour
         LayoutElement le = frameGo.AddComponent<LayoutElement>();
         le.ignoreLayout = true;
         frame = frameGo.AddComponent<Image>();
-        frame.sprite = RelicUISprites.GoldBorder();
+        frame.sprite = FlatUI.Outline(6, 1);
         frame.type = Image.Type.Sliced;
-        frame.pixelsPerUnitMultiplier = 2.2f;   // thin the ornate border down for a small tooltip
-        frame.color = Color.white;
+        frame.color = FlatUI.Loadout.Border;
         frame.raycastTarget = false;
 
         gameObject.SetActive(false);
@@ -88,13 +92,17 @@ public class RelicTooltip : MonoBehaviour
     {
         if (relic == null || slot == null) { Hide(); return; }
 
+        Color rarityCol = FlatUI.RarityColor(relic.rarity);
+
         nameText.text = string.IsNullOrEmpty(relic.relicName) ? relic.relicID : relic.relicName;
-        nameText.color = RelicUISprites.RarityColor(relic.rarity);
+        nameText.color = rarityCol;
         descText.text = string.IsNullOrEmpty(relic.description) ? "-" : relic.description;
 
         int value = RelicManager.instance != null ? RelicManager.instance.SellValueFor(relic) : 0;
         valueText.text = $"Sell: {value} gold";
-        // Border stays gold (Deckshift chrome); rarity reads through the name colour above.
+
+        // Rarity carried by the name AND the border, matching the strip on the slot above.
+        if (frame != null) frame.color = Color.Lerp(FlatUI.Loadout.Border, rarityCol, 0.55f);
 
         gameObject.SetActive(true);
         transform.SetAsLastSibling();

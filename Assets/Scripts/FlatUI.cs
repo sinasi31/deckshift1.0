@@ -492,6 +492,29 @@ public static class FlatUI
         return best != null ? best : TMPro.TMP_Settings.defaultFontAsset;
     }
 
+    // LOADOUT — the relic bar and its tooltip.
+    //
+    // The other two themes dress a PLACE, where the material is the subject. This one dresses
+    // what you're CARRYING, and it lives over gameplay permanently rather than taking the screen.
+    // So its defining choice is the inverse: the chrome recedes to near-colourless, because the
+    // relic icons are the subject and they're the only colour that should be in the row. It's also
+    // the quietest theme by weight — a permanent HUD element must not compete with the game behind
+    // it the way a modal panel can afford to.
+    public static readonly Theme Loadout = new Theme
+    {
+        Backdrop = new Color(0.02f, 0.019f, 0.018f, 0.86f),
+        Surface = new Color(0.078f, 0.075f, 0.071f, 0.94f),
+        SurfaceRaised = new Color(0.110f, 0.106f, 0.100f, 0.96f),
+        Border = new Color(0.239f, 0.231f, 0.216f, 1f),
+        BorderSoft = new Color(0.180f, 0.173f, 0.161f, 1f),
+        EdgeLight = new Color(0.361f, 0.349f, 0.325f, 1f),
+        Accent = new Color(0.847f, 0.804f, 0.706f, 1f),   // pale bone, not a hue
+        TextBright = new Color(0.937f, 0.929f, 0.910f, 1f),
+        TextBody = new Color(0.788f, 0.776f, 0.749f, 1f),
+        TextMuted = new Color(0.529f, 0.518f, 0.494f, 1f),
+        TextDisabled = new Color(0.341f, 0.333f, 0.318f, 1f),
+    };
+
     // Rarity colours tuned to read on a DARK surface. The old chrome carried rarity on a gem set
     // in gold; without that frame the colour has to stand on its own, so these are brighter and
     // more separated than jewel tones would be.
