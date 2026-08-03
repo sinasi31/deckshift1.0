@@ -17,11 +17,6 @@ public class BlompoNPC : MonoBehaviour, IInteractable
     [Tooltip("Blompo's portrait, shown on the blessing screen. Assets/Art/blompo-removebg-preview (1).png")]
     public Sprite portrait;
 
-    [Tooltip("Hammer used in the forging animation. Assigned on the prefab from " +
-             "PF Weapon - Hammer (Cainos Customizable Pixel Character). Falls back to a " +
-             "generated hammer if left empty.")]
-    public Sprite hammerSprite;
-
     [Header("Behaviour")]
     [Tooltip("Blompo leaves after granting a blessing, so each one is a single use.")]
     public bool vanishAfterBlessing = true;
@@ -47,7 +42,7 @@ public class BlompoNPC : MonoBehaviour, IInteractable
 
         // The screen calls back only if a blessing was actually applied — closing without picking
         // leaves Blompo (and his offers) exactly as they were.
-        BlompoScreen.Open(portrait, hammerSprite, offers, OnBlessed);
+        BlompoScreen.Open(portrait, offers, OnBlessed);
     }
 
     public string GetInteractText() => "Bless a card";

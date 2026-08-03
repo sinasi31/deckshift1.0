@@ -9,6 +9,20 @@ public class Shopkeeper : MonoBehaviour
     [Header("G�rsel Referans")]
     public GameObject interactionPopup;
 
+    [Header("Shop Screen")]
+    [Tooltip("Portrait shown on the shop screen. Leave empty to use this shopkeeper's own world " +
+             "sprite, so a placed stall gets a face with no wiring.")]
+    public Sprite portrait;
+
+    // The face the shop screen puts on the counter. Falls back to whatever this shopkeeper looks
+    // like in the world, which is almost always the right answer and needs no Inspector step.
+    public Sprite ResolvePortrait()
+    {
+        if (portrait != null) return portrait;
+        SpriteRenderer sr = GetComponentInChildren<SpriteRenderer>();
+        return sr != null ? sr.sprite : null;
+    }
+
     [Header("Bu D�kkan�n ��eri�i")]
     public List<CardData> specificCardPool;
     public List<RelicData> specificRelicPool;

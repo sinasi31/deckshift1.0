@@ -192,6 +192,48 @@ The gravity reversal factor compensates for the 180° Z rotation inverting the v
 
 When Shift is 0 AND no playable cards exist, a Stagger card is auto-added to the hand. Three Stagger plays in one run = death.
 
+---
+
+## Scrap System (BUILT 2026-08-03)
+
+**Scrap is the card-maintenance currency.** Earned from kills and from your own cards wearing out; spent at a **Scrap Forge** to put charges back on cards and to drag cards out of the exhaust pile.
+
+### Why it exists
+
+Before this, **killing an enemy paid literally nothing** — `EnemyHealth` had no drop logic at all (an earlier version of this file wrongly claimed it "handles drops"), and gold comes only from piles placed in levels, never from enemies. So a kill cost you HP and card charges and returned zero, making "skip every fight and platform to the exit" the optimal play in a game built around a deck of attack cards. Scrap is the payment for engaging with combat.
+
+It is also load-bearing for the **planned difficulty tiers** (see Deferred Work → Run map): without a combat reward, a harder room is pure downside and no player would ever route into one.
+
+### The gold / scrap split (designer-set, do not blur)
+
+| | Gold | Scrap |
+|---|---|---|
+| **Comes from** | piles placed in levels (exploration; usually off the mandatory path, so reaching it costs Shift) | enemy kills + a small rebate when a card exhausts |
+| **Buys** | NEW power — cards, relics at the shop | SUSTAIN — charges on cards you already own |
+
+⚠️ **Never let these merge.** If the shop starts selling charges, or scrap starts buying cards, one of the two currencies is redundant and should be deleted. The reason recovery got its own currency at all is that **maintenance always loses to acquisition when they share a wallet** — given one pool, players buy the shiny relic over repairing a card every time, and the exhaust problem stays unsolved.
+
+### Files
+
+- **`ScrapEconomy.cs`** — **THE tuning file. Every scrap number lives here and nowhere else.** Drop tiers (derived from `maxHealth`, matching the `CardAnchors.md` §5 HP tiers), `RECHARGE_PER_CHARGE`, `SALVAGE_COST`, `EXHAUST_REBATE`, plus `ScrapColor` and `UIFont()`.
+- **`ScrapPickup.cs`** — the collectible. **Built entirely in code (no prefab)**, so there is nothing to wire and nothing to lose from a scene. Deliberately has **no Rigidbody2D**: the pop-out arc is hand-integrated against a ground raycast, because a solid collider would shove the player's capsule and a trigger-only rigidbody would fall through the floor. Carries `TemporaryObject`, so uncollected shards are wiped on room change.
+- **`ScrapForgeScreen.cs`** — the spend UI. Self-instantiating procedural screen, same pattern as `BlompoScreen`, but styled with **`FlatUI`, not `RelicUISprites`** (see UI System → Flat theme).
+- **`ScrapForge.cs`** — the `IInteractable` station that opens it. **Unlike Blompo it does NOT vanish after use** — it's a workbench, and the scrap cost is the limiter, not the visit.
+- **`ScrapHUD.cs`** — the counter. Self-bootstraps via `RuntimeInitializeOnLoadMethod` and **positions itself relative to the existing `ExhaustPile` button** rather than at fixed coordinates.
+
+### Design rules baked in
+
+- **Scrap sits with the deck/exhaust pile UI, NOT in the resource panel with HP/Shift/gold.** It's a deck-maintenance currency, not a survival one, and where a number lives teaches what it's for. This also keeps the survival panel at three values.
+- **Kills must out-earn the exhaust rebate by roughly 10:1.** Kills are the lever that changes behaviour; the rebate is only a consolation so losing a card isn't a total loss. If the rebate ever dominates, you've accidentally incentivised burning your own deck down.
+- **Salvage returns a card only HALF charged**, so a full recovery is salvage + repair. Exhaust must stay a real loss.
+- **Target: one act of income rescues ONE OR TWO cards, never the whole deck.** Scarcity is the point — charges depleting is what feeds Stagger, which is the run's only real death pressure. Make repair comfortable and that pressure quietly disappears.
+- **Scrap spending is NOT hub-exempt.** The umbrella "free in hub" rule covers resources the sandbox *drains* from you; a forge repair is a purchase that permanently improves the run, exactly like a shop buy (which the hub already charges for). Free repairs in the hub = infinite deck refills.
+- Both `DeckManager.TryRechargeCard` / `TrySalvageCard` are **all-or-nothing** — verified by test that a refused operation never charges the player.
+
+### Setup still needed in Unity (designer step)
+
+The scrap *system* is live and needs no wiring — enemies drop it, the HUD appears, exhausting a card pays the rebate. **What doesn't exist yet is a placed `ScrapForge` object**, so there's currently nowhere to spend it. To add one: put the `ScrapForge` component on a prop, set its layer to **Interactable (12)**, give it a trigger `Collider2D` slightly wider than `PlayerController.interactionRange`, and optionally assign an `InteractPrompt` instance to `prompt`. Same recipe as `BlompoNPC`.
+
 ### Card Effect Conflict Class of Bug (KNOWN)
 
 Discovered when hub mode allowed free card spamming: playing multiple state-modifying cards in close succession (e.g., Floor is Lava + Adrenaline + Phase) can leave the player in a permanently broken state (flying, frozen gravity, etc.). Each card's effect captures "original" state at start and restores it at end, but **none of them know about each other**. Card A captures the current state (already modified by still-active Card B), then later restores to that mid-effect snapshot — corrupting baseline.
@@ -327,7 +369,7 @@ The quest system is **functional**: data model, accept/progress/complete events,
 ### Data
 
 - **`QuestData`** (ScriptableObject) — quest templates. Fields: `questName`, `description`, `type` (QuestType enum), `targetAmount`, `rewardText`, `rewardType` (RewardType enum), `rewardAmount`.
-- **`QuestType` enum:** `GoldAccumulate`, `KillEnemy`, `AirKill`, `NoDamageRoom`, `UseCardCount`. **Of these, only `KillEnemy` and `AirKill` currently fire events** (from `EnemyHealth.Die()`). The others are defined but unwired.
+- **`QuestType` enum:** `GoldAccumulate`, `KillEnemy`, `AirKill`, `NoDamageRoom`, `UseCardCount`. **Re-verified 2026-08-03: FOUR of the five now fire** — `KillEnemy` + `AirKill` (`EnemyHealth.Die()`), `NoDamageRoom` (`ExitDoor.PerformExit`), `GoldAccumulate` (`PlayerController.AddGold`). **Only `UseCardCount` is still unwired.** (An earlier version of this file claimed only the first two worked — that was stale and understated the state.)
 - **`RewardType` enum:** `Gold`, `ShiftCharge`, `Heal`. All three are wired in `QuestSystem.GiveReward`.
 - **Four quest assets exist** at `Assets/Quests/` (re-verified 2026-07-18 — an earlier version of this file said three):
   - `New Quest 1` — "Invincible" — NoDamageRoom (1) → 300 Gold. **Objective type not wired, won't progress yet.**
@@ -466,6 +508,94 @@ SampleScene's main Canvas contains:
 - Various menu panels (PauseMenu, ShopUI, SlotMachineUI, RewardScreen, etc.) as direct children of Canvas.
 
 **When adding new full-screen UI panels**, hide GameplayHUD when they open by adding a `[SerializeField] GameObject gameplayHUD;` reference and toggling SetActive. ShopManager, SlotMachineUI, and QuestSystem already follow this pattern.
+
+### `FlatUI.cs` — the new UI direction (2026-08-03)
+
+**The designer has disliked the ornate stone-and-gold chrome "since the beginning."** `FlatUI.cs` is the replacement, prototyped on the Scrap Forge screen.
+
+**It took two passes, and the first one's failure is the useful part.** Pass 1 delivered the literal brief ("soothing, simple, understandable, but also cool") as flat slate-blue panels, uniform rounded corners, neutral greys, one accent. The designer's verdict: **"it screams AI."** That was right — it was the house style of every dev dashboard, and crucially it had no *place* in it. Simple and generic are not the same thing.
+
+**Pass 2 keeps the restraint but points every choice at the world: a sheet of iron on a workbench, lit by the forge.**
+- **Warm charcoal, not slate-blue.** Act 1 is the *Oxidation District* — rust, not brushed steel. This single palette shift did most of the work.
+- **Chamfered corners, not rounded.** Cut plate reads as a made object; a uniform corner radius reads as a web card. Biggest silhouette cue.
+- **Directional light.** A lit top lip plus an ember glow rising off the *bottom* edge (firelight under the bench), instead of a uniform glowing border. Uneven light = physical object in a place.
+- **Rivets and faint scuffs.** Small, dark, functional — fasteners, not jewels. Imperfection is what kills the "generated" feel.
+- **Rules score across and fade at the ends** rather than running edge to edge like a CSS border.
+- **The only two colours on screen are the game's own two resources:** charges in Shift-blue, costs in scrap-orange.
+
+API: `Panel(chamfer)` / `Outline(chamfer, thickness)` (9-sliced chamfered plates), `Rivet()`, `FadedRule()`, `SoftGlow()`, `BottomGlow()`, `VerticalFade()`, `EmberDot()`, `Pixel()`. **All shapes are WHITE and tinted via `Image.color`**, so one cached sprite serves every panel. Shared palette at the bottom of the file.
+
+**`UIEmberField.cs`** — drifting embers for a panel background (`UIEmberField.Attach(rect, count, colour)`); builds and animates its own Image dots, no particle system. Two things that would break it: it must use **`Time.unscaledDeltaTime`** (every screen it belongs on pauses the game, so scaled time freezes the embers solid), and it must **re-read the parent rect every frame** (the forge window's height is dynamic, so a bounds snapshot would leave embers outside a collapsed panel).
+
+Lessons already paid for, don't re-learn them:
+- **Get the SDF right.** Rounded box is `inside + outside - radius`; the chamfer is that box distance `max`'d with a normalised diagonal half-plane. Naive versions pinch the outline at corners.
+- Textures need `FilterMode.Bilinear` — Point aliases the chamfer edges badly.
+- **Hairlines need to be brighter than theory says**, or they don't register on a dark surface.
+- **Atmosphere effects want roughly half the alpha you first reach for.** The ember at 0.085/140px was an orange wash owning the bottom third; ~0.05 over 120px is firelight. Scuffs at 0.045 read as *rendering glitches*; 0.022 reads as wear.
+- ⚠️ **A glow that doesn't reach its container's edge must fade on that axis too, or it draws its own border.** The bottom glow originally reused `VerticalFade` (which only falls off in Y) inset 14px from the window sides — the sprite's hard left/right ends produced a visible vertical seam down BOTH edges of the panel. That's what `BottomGlow()` exists for: falloff in both axes.
+- **Keep wear out of content columns.** The first scuff pass ran a streak straight through the title. They belong in margins that are empty at any content count.
+- **Small icons inside dense text don't work.** A 17px scrap shard beside each cost read as a smudge fused to the first digit; the accent colour alone carries it.
+- **An emblem needs STRUCTURE, or it reads as a lens flare.** Blompo's offer marks were a plain four-point sparkle behind a big soft glow and looked cheap. `ArcaneSigil` fixed it with a containing ring, rays of two lengths, and ticks outside the ring — plus a much tighter, dimmer glow, since the haze was doing most of the damage.
+- **Detail placed exactly on another element disappears.** `ArcaneSeal`'s four diamond glyphs originally sat at the inner ring's radius and merged into it invisibly; they now punctuate the outer ring on the diagonals, clear of the twelve ticks.
+- **Show the numbers a decision depends on.** Blompo's card-pick step listed only a bare charge count — no Shift cost, no maximum — so you chose which card to permanently alter without seeing what it cost or how much life it had. Chips now carry labelled SHIFT / CHARGES stats, and `StampChip` refreshes *both* on the bind frame because several blessings visibly change them.
+- **Empty states must collapse.** `LayoutSections` lays the screen out top-down and resizes the window to its content, so an empty section shrinks to one explanatory line. The fixed-height version had two large voids and looked broken — and that state is *common*, since early in a run nothing is damaged or exhausted.
+
+### Themes — same ideology, never the same skin (2026-08-03)
+
+**Screens must NOT all look alike.** Designer's rule: share the ideology (flat procedural plates, restraint, directional light, a subtle particle drift, one meaningful accent), but each place gets its own material, and **the material should say what the place DOES**.
+
+`FlatUI.Theme` is the mechanism — a colour set (`Surface`, `Border`, `EdgeLight`, `Accent`, text ramp) picked per screen:
+
+| | **Iron** (`ScrapForgeScreen`) | **Arcane** (`BlompoScreen`) | **Loadout** (`RelicHUD`, `RelicIcon`, `RelicTooltip`) |
+|---|---|---|---|
+| What it is | a workbench you repair cards at | a mythic creature granting a blessing | what you're **carrying** |
+| Palette | warm charcoal (rust district) | cold indigo | near-**colourless** |
+| Light | fire from **below** | descends from **above** | none — it's not a place |
+| Particles | embers **rising**, fast | motes **settling**, slow, twinkling | none |
+| Corner marks | **rivets** (fasteners) | **four-point stars** (light) | none |
+| Surface | scuffed and worn | pristine | plain, recessed sockets |
+
+**The inversions are the point.** Warm/cold, below/above, rising/falling, worn/clean. When adding a screen, pick a material and invert something — **do not just retint Iron**.
+
+**The Marketplace (`ShopScreenUI`) keeps its own material** — warm wood, striped canvas awning, lamplight — and was already bespoke rather than old chrome. What it needed wasn't a reskin but a PERSON; see "The keeper talks back" below.
+
+**Loadout inverts a different axis: it's the only theme where the chrome is NOT the subject.** The other two dress a place, so the material carries the character. The relic bar dresses your inventory, sits over gameplay permanently, and the relic art is colourful pixel work — so the sockets are deliberately near-colourless and the theme is the quietest by weight. **Do not add a hue to the relic bar.** A permanent HUD element cannot compete with the game behind it the way a modal panel can.
+
+`UIEmberField.Settings` carries the motion half (`Settings.Embers` / `Settings.Motes`): rise speed (negative = falling), lateral spread, size, life, sway, twinkle.
+
+Rarity note: the old chrome carried rarity as a gem set in gold. Without that frame **colour has to carry rarity alone**, so `FlatUI.RarityColor` is brighter and more separated than jewel tones, and Blompo tints the sigil, border, name and label together — four quiet signals instead of one loud jewel. **Common is deliberately muted**: at a lighter slate it rendered near-white and made the *weakest* offer the brightest thing on screen.
+
+**On the relic bar, rarity is a coloured STRIP along the bottom of each socket**, plus a muted tint on the socket outline and (Epic/Legendary only) a slow glow pulse. The strip is the load-bearing signal: at 52px over moving gameplay a tinted hairline is not reliably readable, but a solid bar is legible at a glance. The tooltip repeats the rarity in its border and name, confirming what the strip meant. **Only the two rarities worth noticing animate** — that's what makes a Legendary catch your eye in a row of five.
+
+**Blompo's blessing animation (`BlompoForgeFX`) was rebuilt to match (2026-08-03).** It used to be a hammer-and-anvil forging: three blows, sparks, screen shake. Once his screen went arcane, a smithy sequence fought everything else on the panel — he grants a charm, he isn't a blacksmith. The motion vocabulary is inverted the same way the palette was:
+
+> forging → strikes, impacts, gravity, sparks flying **out**, the window rattling
+> binding → orbit, convergence, weightlessness, motes drawn **in**, nothing ever hit
+
+Four beats: GATHER (rune ring forms, motes stream in) → DRAW (ring contracts, everything accelerates) → BIND (`onSet` fires here) → SETTLE, where an `ArcaneSeal` contracts **into** the card and snuffs out. Two procedural sounds accompany it (`ProcSfx.ArcaneGather`, `ArcaneBind`).
+
+The settle originally used an *expanding* ring, which the designer called bland — and re-reading it, that was the one beat in the sequence pushing **outward** while everything else converged. Pressing a seal inward finishes the idea the rest of the animation sets up. **When a beat feels weak, check whether it contradicts the sequence's own vocabulary before reaching for more particles.**
+
+⚠️ **UI children are NOT clipped, so FX geometry is bounded by the WINDOW, not the stage.** A first pass used a 520px ring radius and scattered runes across the whole screen, outside the panel, onto the backdrop. The stage sits 60px below centre in a 762-tall window, so there is only ~321px of room downward — anything that must travel further does so on an ellipse squashed in Y (`VERT_SQUASH`). Check this whenever you add UI FX.
+
+**Sound design note:** magic is **harmonic** (bell/chime partials 1,2,3,4,5.1), metal is **inharmonic** (bar modes 1,2.76,5.40,8.93 — see `ProcSfx.ScrapPickup`). That ratio choice is the whole difference between "charm" and "clank"; keep the two families distinct so a blessing and a scrap pickup are never confusable.
+
+### The keeper talks back (`ShopScreenUI`, 2026-08-03)
+
+The designer's brief for the shop was **"make the player feel like they are talking to a person who is trying to sell them stuff."** The stall already looked like a stall; what was missing was a shopkeeper.
+
+- **He has a face.** `Shopkeeper.ResolvePortrait()` returns an assignable `portrait` sprite, falling back to the shopkeeper's own world sprite — so a placed stall gets a face with zero wiring. ⚠️ The fallback grabs the whole stall prop, not a head; **assign `portrait` for a proper close-up.**
+- **He reacts to what you do.** Barks used to be one array with a single line picked at open — decoration that never changed. They're now split by EVENT (`Greetings` / `BrowseCard` / `BrowseRelic` / `BrowseService` / `TooPoor` / `Bought` / `AlreadySold` / `Farewells`) and fired from hover, purchase, refusal and the Leave button. **Affordability outranks item type** on hover: being told you can't afford it is more useful than a joke about what it does, and it's what a real trader would say to you eyeing something out of your league.
+- **Speech is typed out a character at a time.** A line that snaps in whole reads as a label changing; typed, it reads as *said*.
+- **Small body language** — `Mood.Lean` on browse, `Nod` on a sale, `Slump` on a refusal, plus a constant idle bob. Deliberately tiny: a portrait that lurches around pulls focus off the prices, which is what the player is there to read.
+- **No line repeats back-to-back** (`lastLine`), because with pools this small plain randomness repeats constantly and repetition is what makes barks feel canned.
+- Lamplit **dust** drifts through the stall (`UIEmberField.Settings.Dust` — warm, very slow, no twinkle). A shop is a place with air in it; stillness is what made the panel feel like a menu.
+
+⚠️ `ShopScreenUI` already had an `Update()`. The keeper's idle bob is a `TickKeeperIdle()` called from it, **not a second `Update`** — and it skips while a mood coroutine owns the transform, or the two fight over `anchoredPosition`.
+
+**Status: converted —** `ScrapForgeScreen`, `ScrapHUD`, `BlompoScreen`, `RelicHUD`, `RelicIcon`, `RelicTooltip`, `RelicManagePanel`, `RelicSwapScreen`, `ResourceBarUI`/`ResourcePanelHUD`, `ShopScreenUI`.
+
+**Still on the old `RelicUISprites` chrome:** `CardUI` (and `PixelUI`, which the shop uses for grain/frames and is fine as-is). **`CardUI` is the last one and the most delicate** — card frames carry the Shift cost and charge pips, so it's live gameplay information, not decoration. Do it carefully and check the hand, the reward screen and the deck view, which all render cards.
 
 ### Never Scale UI Containers — Resize Them
 
@@ -629,7 +759,7 @@ All card and enemy numbers derive from the anchor table in **`CardAnchors.md`** 
 
 ### Pattern
 
-- **`EnemyHealth`** base script — handles damage, flash, death, drops. **Currently the only callsite that reports KillEnemy/AirKill to QuestSystem.** `Die()` calls `RelicManager.OnEnemyKilled()`, `QuestSystem.ReportEvent(QuestType.KillEnemy, 1)`, and (if airborne) `QuestSystem.ReportEvent(QuestType.AirKill, 1)`. It now also exposes C# events: **`OnDamaged`**, **`OnDamagedAmount(float)`** (carries the hit size — the boss flinches on big hits), and **`OnDied`** (fired inside `Die()` right before the GameObject is destroyed — the boss uses it to hand music back and to spawn its death VFX). **CRITICAL: `Die()` fires `OnDied` and then `Destroy(gameObject)` in the SAME frame**, so an `OnDied` handler must NOT rely on the enemy surviving — anything that needs to outlive the death (VFX, loot) has to run on its own separate object (see `BossDeathVFX`). Non-event death consequences are still direct calls inside `Die()`.
+- **`EnemyHealth`** base script — handles damage, flash, death, and (since 2026-08-03) **scrap drops**. ⚠️ Before that date this file claimed it "handles drops" and it did not — there was no drop logic of any kind, which is exactly why kills paid nothing. Drops now go through `scrapDropOverride` (−1 = auto-tier from `maxHealth`); the override is the hook for shift-infused elites. **Currently the only callsite that reports KillEnemy/AirKill to QuestSystem.** `Die()` calls `RelicManager.OnEnemyKilled()`, `QuestSystem.ReportEvent(QuestType.KillEnemy, 1)`, and (if airborne) `QuestSystem.ReportEvent(QuestType.AirKill, 1)`. It now also exposes C# events: **`OnDamaged`**, **`OnDamagedAmount(float)`** (carries the hit size — the boss flinches on big hits), and **`OnDied`** (fired inside `Die()` right before the GameObject is destroyed — the boss uses it to hand music back and to spawn its death VFX). **CRITICAL: `Die()` fires `OnDied` and then `Destroy(gameObject)` in the SAME frame**, so an `OnDied` handler must NOT rely on the enemy surviving — anything that needs to outlive the death (VFX, loot) has to run on its own separate object (see `BossDeathVFX`). Non-event death consequences are still direct calls inside `Die()`.
 - **AeroBat (BatMan)** — uses Cainos pack visual + custom `AeroBatAI`. Parent has Kinematic Rigidbody2D + Polygon trigger collider. Raycast LOS aimed at player chest (+0.5 Y), shortened by 0.3 to avoid hitting tile at player's feet. State machine: Idle → Preparing → Diving → Returning.
 - **MeleeEnemy**, **RangedEnemy** — based on Cainos pack patterns.
 
@@ -931,7 +1061,21 @@ The `CardTemplate` prefab has fundamental scale corruption: root scale is non-un
 - Glass archetype: cards exist in theory, not implemented.
 - Expand Vampiric archetype.
 - Three-act structure: Act 1 prototype exists; Acts 2-3 not started.
-- **Run map system (Slay-the-Spire-style) — designed 2026-07-18, NOT started.** Player sees and chooses the next room's difficulty (easy/medium/hard, with reward scaling), plus Elite rooms ("shift-infused" enemies), random Events, and a Campfire/rest room. Goal: make runs distinct and add real decision-making. Key design direction from that discussion: **use Shift as the map's risk currency** (StS spends HP to climb; Deckshift can also spend *movement*), two-axis difficulty (platforming vs combat), a platformer-native "Vault" node (loot behind a card/movement gate), and a campfire that *converts* resources rather than just healing. **Hard dependency: the level pool must grow first** — the map is mediocre at ~5 levels and only sings at ~30, so it is BLOCKED on making level generation more hands-off (the importer works but still needs manual correction passes). Consider level *modifiers* (density/hazards/elite-infusion on a shared pool) to stretch content while the pipeline catches up.
+- **Run map system (Slay-the-Spire-style) — DESIGN SETTLED 2026-08-03, not yet built.** The scrap system was built first because the map depends on it (see below). Decisions now locked:
+  - **Shape: a Slay-the-Spire branching graph, whole act visible**, so the player plans a route rather than picking one door at a time. **Opened with the `M` key** — meaning it's also viewable in the hub, for quest planning.
+  - **Difficulty IS the node type, not a second axis on top of it.** Three combat nodes — **Skirmish / Fight / Elite** — ascending cost and reward. Layering easy/med/hard *onto* Fight/Shop/Event would give ~15 icon combinations and an unreadable map; one node = one icon = one promise.
+  - **Per-tier content rules (designer-specified):**
+    - **Skirmish** — simple layouts, low-HP enemies, thin loot. At most 1 chest. **No shop, no Blompo, no NPCs at all.** Gold and Shift crystals scaled to how much the layout drains.
+    - **Fight** — harder layout, mid-tier enemies with some fodder. **At least 1 chest.** Shop appears sometimes; Blompo rarely (shop more common than Blompo).
+    - **Elite** — genuinely uncomfortable to pick. Hardest layouts. Some enemies carry **more HP than the same enemy in a Fight room**, plus **shift-infused enemies** (faster, hit harder, drop Shift on death).
+  - **The governing law: a room's loot scales to the Shift it costs to cross.** Drainy layout ⇒ bigger payout. Self-balancing; write new rooms to it.
+  - **Two axes, two sources:** platforming difficulty is **authored into the room prefab** (geometry can't change at runtime without violating Level Design Law #1); combat difficulty is a **runtime spawn table**. Cheapest extra lever: author *optional* enemy/hazard groups in a prefab and have the tier switch them on.
+  - **No Shift cost on map paths** (decided against, for now). It isn't needed: **the danger is the cost.** Skirmish routes are cheap to survive but never resupply; Elite routes are expensive but are the only path to recharge rooms. That loop is the economy.
+  - **Recharge rooms** — extra rooms hanging off a route, **not counted as floors**, and **only ever reachable from Fight/Elite nodes, never Skirmish** (that restriction IS the economy above). **Each is specialised, never a do-everything room** — one room that fixes every problem is never a decision. Design them by *which player problem they solve*: a Foundry (scrap → repair/salvage, Blompo), a Market (shop), a Well (Shift + healing). **The map must show which one is on which branch before the player commits**, or it's a coin flip instead of a choice.
+  - ⚠️ **Two things that must be visible, not silent:** (1) if an enemy is buffed, **it must LOOK different** — a Shambler that quietly has 20 HP instead of 12 reads to the player as "my Fireball is broken", and corrodes the `CardAnchors.md` anchor that fodder dies to one Fireball. (2) The single most sensitive number in the system is how much Shift a shift-infused enemy drops: too generous and Elite is always correct, too stingy and it's never taken. **Target: an Elite room should be net-negative Shift for an average player and net-positive only for a good one.** Keep it a single tunable value, not baked across prefabs.
+  - **Dependency status:** the old "BLOCKED on level count" framing is softer than it looked. Shop/Blompo/quest board are **NPCs placed in rooms**, not dedicated room prefabs, so those node types are near-free. ~15 contract-valid rooms already exist unused (see Room Pool) and need correction passes, not authoring from scratch. Still, tiers are baked into layout, so each room serves ONE tier — roughly 4 Skirmish / 4 Fight / 3 Elite are needed for one repeat-free act.
+
+- **Quest banking — designed 2026-08-03, not built.** Quest rewards should stop paying out instantly and instead **accumulate**, to be collected at a quest board **at the start of the next act** (post-boss). Quests are taken at run start, so they act as *route-shaping objectives* — "kill 3 elites" pushes you onto dangerous paths, "collect 500 gold" into exploration detours. The existing run loop already does this shape (`LevelManager` goes hub → levels → boss → back to hub, and the hub already has the board), so the structural work is small. **The board does NOT need its own map node yet** — only four quest assets exist (one pays zero), which is too thin to carry a node; put it inside the Market or Well for now. When the map exists, show it *while* the player picks quests, so quest selection isn't a blind bet.
 - **Card enhancements via "Blompo" (SkillManager repurpose) — designed 2026-07-18, NOT started.** Pivot the existing global skill passives into **per-card enhancements** (e.g. +charges, infinite charges, free-to-play, generates Shift, Retain-on-Recall, scaling-on-discard, Bond). Open decisions flagged in that discussion: (1) the **stacking guardrail** — `does-not-cost-shift` + `gain-shift-when-played` + `infinite-charges` on one card is an unbounded Shift engine and must be rule-blocked; (2) **Bond** (auto-play a linked card) collides with the ConflictFlags system exactly like Echo Chamber's double-cast; (3) enhancements should be **filtered by card type** (a damage buff is meaningless on Portal); (4) decide whether an enhancement is permanent and what happens when the card exhausts.
 - Boss encounters per act (3 bosses per act, randomly selected from pool). **Act 1's Moss Knight is a playable encounter** (moveset, gated fight start, awaken cinematic, SFX, boss health bar, and a death celebration that drops real collectible gold + shift crystals). It's the run finale (`LevelManager.bossRoomPrefab`). Full doc: `BossDesign_MossKnight.md`. Still open there: the acid arena (flank pools + platforms) and an optional post-kill RewardManager card/relic screen. The other Act-1 bosses and the pool/random-select aren't built.
 - Chunk-based level system (currently hand-crafted levels).

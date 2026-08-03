@@ -140,10 +140,10 @@ public class RelicHUD : MonoBehaviour
         countLe.preferredHeight = cellSize;
         countText = countGo.AddComponent<TextMeshProUGUI>();
         if (font != null) countText.font = font;
-        countText.fontSize = 22f;
+        countText.fontSize = 20f;
         countText.fontStyle = FontStyles.Bold;
         countText.alignment = TextAlignmentOptions.Left;
-        countText.color = new Color(0.85f, 0.88f, 0.95f);
+        countText.color = FlatUI.Loadout.TextMuted;   // a label, not a stat — stays quiet
         countText.raycastTarget = false;
 
         // Shared tooltip (child of the bar so it hides with the HUD; positioned in world space).
@@ -205,42 +205,40 @@ public class RelicHUD : MonoBehaviour
         styler.Build(relic);
     }
 
+    // An empty socket: the same chamfered plate as a filled slot but recessed and unlit, with no
+    // rarity strip. Read against a filled neighbour the difference is immediate — something is
+    // seated here, or nothing is — without the row losing its shape.
     private void BuildEmptySlot(RectTransform cell)
     {
         float inner = cellSize - 6f;
+        FlatUI.Theme T = FlatUI.Loadout;
 
-        // An empty socket: dim stone inside a darkened gold border — same chrome as a filled slot
-        // (RelicIcon) but unlit and gemless, so full/empty slots read as one crafted row.
         GameObject fill = new GameObject("EmptyFill", typeof(RectTransform));
         RectTransform frt = fill.GetComponent<RectTransform>();
         frt.SetParent(cell, false);
-        frt.anchorMin = frt.anchorMax = new Vector2(0.5f, 0.5f);
-        frt.pivot = new Vector2(0.5f, 0.5f);
-        frt.sizeDelta = new Vector2(inner * 0.80f, inner * 0.80f);
+        frt.anchorMin = frt.anchorMax = frt.pivot = new Vector2(0.5f, 0.5f);
+        frt.sizeDelta = new Vector2(inner, inner);
         Image fillImg = fill.AddComponent<Image>();
-        fillImg.sprite = RelicUISprites.StonePanel();
-        fillImg.type = Image.Type.Simple;
-        fillImg.color = new Color(0.5f, 0.5f, 0.5f, 0.85f);   // dimmed stone
+        fillImg.sprite = FlatUI.Panel(5);
+        fillImg.type = Image.Type.Sliced;
+        fillImg.color = T.Surface;
         fillImg.raycastTarget = false;
 
         GameObject frame = new GameObject("EmptyFrame", typeof(RectTransform));
         RectTransform fr2 = frame.GetComponent<RectTransform>();
         fr2.SetParent(cell, false);
-        fr2.anchorMin = fr2.anchorMax = new Vector2(0.5f, 0.5f);
-        fr2.pivot = new Vector2(0.5f, 0.5f);
+        fr2.anchorMin = fr2.anchorMax = fr2.pivot = new Vector2(0.5f, 0.5f);
         fr2.sizeDelta = new Vector2(inner, inner);
         Image frameImg = frame.AddComponent<Image>();
-        frameImg.sprite = RelicUISprites.GoldBorder();
-        frameImg.type = Image.Type.Simple;
-        frameImg.color = new Color(0.55f, 0.52f, 0.5f, 0.8f);   // darkened gold (empty)
+        frameImg.sprite = FlatUI.Outline(5, 1);
+        frameImg.type = Image.Type.Sliced;
+        frameImg.color = T.BorderSoft;
         frameImg.raycastTarget = false;
     }
 
     private TMP_FontAsset ResolveFont()
     {
-        if (uiFont != null) return uiFont;
-        TMP_Text any = FindAnyObjectByType<TMP_Text>();
-        if (any != null && any.font != null) return any.font;
-        return TMP_Settings.defaultFontAsset;
+        if (uiFont != null) return uiFont;      // Inspector override wins
+        return FlatUI.UIFont();
     }
 }

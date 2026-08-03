@@ -161,6 +161,171 @@ public static class ProcSfx
         return Finalize(dry, 0.14f, 2600f);
     }
 
+    private static AudioClip scrapPickup;
+    // Collecting a scrap shard. Procedural because ScrapPickup builds its GameObject entirely in
+    // code (no prefab), so there is nowhere to hang an AudioClip in the Inspector.
+    public static AudioClip ScrapPickup
+    {
+        get
+        {
+            if (scrapPickup == null) scrapPickup = BuildScrapPickup();
+            return scrapPickup;
+        }
+    }
+
+    // A small bright metal "tink" — a struck iron offcut, not a coin. Built from INHARMONIC
+    // partials (the 1 : 2.76 : 5.40 : 8.93 ideal-bar mode ratios), which is what makes metal read
+    // as metal rather than as a pitched chime; harmonic ratios here would sound like a bell and
+    // collide with the gold pickup. Short and dry so a five-shard burst layers into a satisfying
+    // rattle instead of a wash.
+    private static AudioClip BuildScrapPickup()
+    {
+        const float dur = 0.22f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(4471);
+
+        float f0 = 920f;                                    // small shard = high fundamental
+        float[] ratio = { 1f, 2.76f, 5.40f, 8.93f };        // ideal free-bar modes
+        float[] pAmp = { 1f, 0.55f, 0.28f, 0.12f };
+        float[] pDec = { 22f, 30f, 42f, 58f };              // brighter modes die faster
+
+        float clickLp = 0f;
+        float clickCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 5200f / SampleRate);
+
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+
+            // Struck partials.
+            float body = 0f;
+            for (int p = 0; p < ratio.Length; p++)
+                body += Mathf.Sin(2f * Mathf.PI * f0 * ratio[p] * ts) * pAmp[p] * Mathf.Exp(-pDec[p] * ts);
+
+            // Contact transient: a very short filtered noise tick that sells the "hit".
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+            clickLp += clickCoef * (noise - clickLp);
+            float clickEnv = Mathf.Exp(-190f * ts);
+
+            dry[i] = body * 0.13f + clickLp * clickEnv * 0.20f;
+        }
+
+        return Finalize(dry, 0.07f, 9000f);   // dry and bright — metal, close-miked
+    }
+
+    private static AudioClip arcaneGather, arcaneBind;
+
+    // Blompo's blessing, part one: power gathering. A rising shimmer under the ring-and-motes
+    // sequence, ending just as the blessing sets.
+    public static AudioClip ArcaneGather
+    {
+        get { if (arcaneGather == null) arcaneGather = BuildArcaneGather(); return arcaneGather; }
+    }
+
+    // Blompo's blessing, part two: the bind. A struck chime that blooms.
+    public static AudioClip ArcaneBind
+    {
+        get { if (arcaneBind == null) arcaneBind = BuildArcaneBind(); return arcaneBind; }
+    }
+
+    // Rising shimmer. Band-passed noise whose cutoff GLIDES upward, plus two sine partials sliding
+    // up a fifth — the pitch rise is what makes it read as "something is building" rather than as
+    // ambience. Swells to ~85% of its length so it peaks into the bind rather than after it.
+    private static AudioClip BuildArcaneGather()
+    {
+        const float dur = 1.5f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(7717);
+
+        float svfLow = 0f, svfBand = 0f;
+        double p1 = 0.0, p2 = 0.0;
+
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+            float t01 = ts / dur;
+
+            // Resonant band-pass climbing 400 -> 2600 Hz.
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+            float cutoff = Mathf.Lerp(400f, 2600f, t01 * t01);
+            float f = 2f * Mathf.Sin(Mathf.PI * Mathf.Min(cutoff, SampleRate * 0.45f) / SampleRate);
+            svfLow += f * svfBand;
+            float high = noise - svfLow - 0.22f * svfBand;
+            svfBand += f * high;
+
+            // Two partials gliding up a fifth. Phase is integrated (not sin(2*pi*f*t)) so the
+            // frequency can change without the waveform tearing.
+            float g1 = Mathf.Lerp(392f, 587f, t01);
+            float g2 = Mathf.Lerp(587f, 880f, t01);
+            p1 += 2.0 * Mathf.PI * g1 / SampleRate;
+            p2 += 2.0 * Mathf.PI * g2 / SampleRate;
+
+            float swell = Mathf.Pow(Mathf.Clamp01(t01 / 0.85f), 1.6f);
+            float tail = 1f - Mathf.Clamp01((t01 - 0.85f) / 0.15f) * 0.4f;
+            float env = swell * tail;
+
+            dry[i] = svfBand * env * 0.13f
+                   + (float)System.Math.Sin(p1) * env * 0.045f
+                   + (float)System.Math.Sin(p2) * env * 0.030f;
+        }
+
+        return Finalize(dry, 0.22f, 6000f);
+    }
+
+    // The bind: a struck chime that blooms open.
+    //
+    // HARMONIC partials on purpose (1, 2, 3, 4, 5.1) — that's what makes it read as a bell, i.e.
+    // as magic. The scrap pickup deliberately uses INHARMONIC bar modes so it reads as metal; the
+    // two sounds should never be confusable, and the partial ratios are the whole difference.
+    private static AudioClip BuildArcaneBind()
+    {
+        const float dur = 1.8f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(2286);
+
+        float f0 = 587.33f;                                    // D5
+        float[] ratio = { 1f, 2f, 3f, 4f, 5.1f };              // 5.1 is stretched for shimmer
+        float[] pAmp = { 1f, 0.50f, 0.30f, 0.16f, 0.09f };
+        float[] pDec = { 2.6f, 3.6f, 5.0f, 7.0f, 9.0f };
+
+        // A few high sparkles scattered through the first 250ms.
+        int sparkCount = 7;
+        float[] sparkAt = new float[sparkCount];
+        float[] sparkHz = new float[sparkCount];
+        for (int k = 0; k < sparkCount; k++)
+        {
+            sparkAt[k] = (float)rng.NextDouble() * 0.25f;
+            sparkHz[k] = 1800f + (float)rng.NextDouble() * 2600f;
+        }
+
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+
+            float body = 0f;
+            for (int p = 0; p < ratio.Length; p++)
+                body += Mathf.Sin(2f * Mathf.PI * f0 * ratio[p] * ts) * pAmp[p] * Mathf.Exp(-pDec[p] * ts);
+
+            // Sub bloom an octave down, swelling in rather than striking — the "opening" feeling.
+            float sub = Mathf.Sin(2f * Mathf.PI * (f0 * 0.5f) * ts)
+                      * Mathf.Clamp01(ts / 0.12f) * Mathf.Exp(-2.2f * ts);
+
+            float spark = 0f;
+            for (int k = 0; k < sparkCount; k++)
+            {
+                float st = ts - sparkAt[k];
+                if (st <= 0f) continue;
+                spark += Mathf.Sin(2f * Mathf.PI * sparkHz[k] * st) * Mathf.Exp(-26f * st);
+            }
+
+            dry[i] = body * 0.115f + sub * 0.055f + spark * 0.020f;
+        }
+
+        return Finalize(dry, 0.30f, 9000f);   // wetter than the forge sounds — this one has space
+    }
+
     // Shared tail: small warm reverb + master low-pass + anti-click fades -> AudioClip.
     private static AudioClip Finalize(float[] dry, float reverbWet, float masterLpHz)
     {

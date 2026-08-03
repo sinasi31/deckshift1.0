@@ -1,17 +1,21 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
-// Procedural styling + pop-in for one relic icon in the RelicHUD. Added to each instantiated
-// RelicIconPrefab. Builds a crafted medallion in Deckshift's own HUD language (Assets/Art/panel 1.png):
+// One relic slot in the loadout bar. Added to each instantiated RelicIconPrefab.
 //
-//   rarity glow  ->  mottled-STONE socket  ->  relic icon (+ drop shadow)  ->  ornate GOLD border
-//   ->  four GEM BOSSES in the corners (gold setting + a rarity-coloured gem)
+// Built in the FlatUI LOADOUT theme: a dark chamfered socket, the relic's icon, and a rarity
+// strip. Replaced a gold-on-stone medallion (ornate border + four gem bosses in the corners),
+// which the designer had disliked since it was introduced.
 //
-// The relic's pixel-art icon comes from RelicData.relicArt (wired to the Cainos RPG icon pack).
-// Rarity is read from the gem colour, not by recolouring the gold — so every relic looks like the
-// same gold-on-stone object the rest of the HUD is built from. If a relic has no art yet, a rarity
-// gem fills the socket so it never looks empty. EaseOutBack pop-in on first show; Epic/Legendary get
-// a gentle idle glow pulse. Update-driven so it survives being built while the HUD is hidden.
+// WHAT CARRIES RARITY, now that there is no gem: a coloured STRIP along the bottom of the socket,
+// plus a matching tint on the socket's outline. The strip is the load-bearing signal — at 52px,
+// over moving gameplay, a tinted hairline alone is not reliably readable, whereas a solid bar is
+// legible at a glance. Epic and Legendary additionally get a slow glow pulse, so the two rarities
+// worth noticing are the only ones that move.
+//
+// THE GOVERNING RULE FOR THIS BAR: the chrome recedes. Relic art is colourful pixel work and it is
+// the subject; the socket around it is near-colourless on purpose. Do not add a hue here.
 public class RelicIcon : MonoBehaviour
 {
     private Image glow;
@@ -25,8 +29,8 @@ public class RelicIcon : MonoBehaviour
     public void Build(RelicData relic)
     {
         rarity = relic != null ? relic.rarity : Rarity.Common;
-        Color rarityCol = RelicUISprites.RarityColor(rarity);
-        Color gemCol = RelicUISprites.GemColor(rarity);
+        Color rarityCol = FlatUI.RarityColor(rarity);
+        FlatUI.Theme T = FlatUI.Loadout;
 
         // The prefab's plain root Image becomes an inert container; we draw everything as children.
         Image rootImg = GetComponent<Image>();
@@ -35,39 +39,37 @@ public class RelicIcon : MonoBehaviour
         RectTransform root = GetComponent<RectTransform>();
         float size = root.rect.width > 1f ? root.rect.width : 48f;
 
-        // 1. Soft rarity aura behind the medallion.
-        glow = MakeChild("Glow", RelicUISprites.Glow(), rarityCol, size * 1.34f, Vector2.zero);
+        // 1. Rarity aura behind the socket — only really visible on Epic/Legendary, which pulse.
+        glow = MakeChild("Glow", FlatUI.SoftGlow(), rarityCol, size * 1.30f, Vector2.zero);
         glowBase = rarityCol;
-        SetGlowAlpha(rarity >= Rarity.Epic ? 0.5f : 0.28f);
+        SetGlowAlpha(rarity >= Rarity.Epic ? 0.34f : 0.10f);
 
-        // 2. Mottled-stone socket the relic sits inside.
-        Image stone = MakeChild("Stone", RelicUISprites.StonePanel(), Color.white, size * 0.80f, Vector2.zero);
-        stone.type = Image.Type.Simple;
+        // 2. The socket itself.
+        Image socket = MakeChild("Socket", FlatUI.Panel(5), T.SurfaceRaised, size, Vector2.zero);
+        socket.type = Image.Type.Sliced;
 
-        // 3. Relic icon (+ drop shadow), or a rarity gem stand-in if art is missing.
+        Image outline = MakeChild("Outline", FlatUI.Outline(5, 1), RarityOutline(rarityCol), size, Vector2.zero);
+        outline.type = Image.Type.Sliced;
+
+        // 3. Relic art, nudged up to leave the rarity strip its own band at the bottom.
         if (relic != null && relic.relicArt != null)
         {
-            Image shadow = MakeChild("IconShadow", relic.relicArt, new Color(0f, 0f, 0f, 0.5f), size * 0.52f, new Vector2(1.5f, -1.5f));
-            shadow.preserveAspect = true;
-            Image icon = MakeChild("Icon", relic.relicArt, Color.white, size * 0.52f, Vector2.zero);
+            Image icon = MakeChild("Icon", relic.relicArt, Color.white, size * 0.60f, new Vector2(0f, size * 0.06f));
             icon.preserveAspect = true;
         }
         else
         {
-            MakeChild("GemPlaceholderSet", RelicUISprites.GemSetting(), Color.white, size * 0.42f, Vector2.zero);
-            MakeChild("GemPlaceholder", RelicUISprites.Gem(), gemCol, size * 0.42f, Vector2.zero);
+            // No art yet: the relic's initial, in its rarity colour. More use than a blank socket,
+            // and unlike the old gem stand-in it doesn't reintroduce the jewel language.
+            string label = relic != null && !string.IsNullOrEmpty(relic.relicName)
+                ? relic.relicName.Substring(0, 1).ToUpper()
+                : "?";
+            MakeLabel("Initial", label, size * 0.46f, rarityCol, new Vector2(0f, size * 0.06f));
         }
 
-        // 4. Ornate gold border framing the socket.
-        Image border = MakeChild("GoldBorder", RelicUISprites.GoldBorder(), Color.white, size, Vector2.zero);
-        border.type = Image.Type.Simple;
-
-        // 5. Gem bosses in the four corners (gold setting + rarity gem) — the signature Deckshift detail.
-        float off = size * 0.335f, boss = size * 0.32f;
-        AddGemBoss(new Vector2(-off, off), boss, gemCol);
-        AddGemBoss(new Vector2(off, off), boss, gemCol);
-        AddGemBoss(new Vector2(-off, -off), boss, gemCol);
-        AddGemBoss(new Vector2(off, -off), boss, gemCol);
+        // 4. Rarity strip along the bottom — the primary rarity read.
+        Image strip = MakeChild("RarityStrip", FlatUI.Pixel(), rarityCol, size, new Vector2(0f, -size * 0.5f + 6f));
+        strip.rectTransform.sizeDelta = new Vector2(size * 0.52f, 3f);
 
         // Start hidden and pop in via Update (works whether or not the HUD is currently visible).
         transform.localScale = Vector3.zero;
@@ -75,10 +77,11 @@ public class RelicIcon : MonoBehaviour
         popT = 0f;
     }
 
-    private void AddGemBoss(Vector2 pos, float size, Color gemCol)
+    // Outline sits between the theme border and the full rarity colour: present enough to tie the
+    // socket to its strip, muted enough that five filled slots don't read as five coloured boxes.
+    private static Color RarityOutline(Color rarityCol)
     {
-        MakeChild("Setting", RelicUISprites.GemSetting(), Color.white, size, pos);
-        MakeChild("Gem", RelicUISprites.Gem(), gemCol, size * 0.62f, pos);
+        return Color.Lerp(FlatUI.Loadout.Border, rarityCol, 0.45f);
     }
 
     private void Update()
@@ -92,11 +95,12 @@ public class RelicIcon : MonoBehaviour
         }
 
         if (glow != null && rarity >= Rarity.Epic)
-            SetGlowAlpha(0.40f + 0.20f * Mathf.Sin(Time.unscaledTime * 2.5f));
+            SetGlowAlpha(0.26f + 0.14f * Mathf.Sin(Time.unscaledTime * 2.5f));
     }
 
     private void SetGlowAlpha(float a)
     {
+        if (glow == null) return;
         Color c = glowBase; c.a = a; glow.color = c;
     }
 
@@ -114,6 +118,27 @@ public class RelicIcon : MonoBehaviour
         img.color = color;
         img.raycastTarget = false;
         return img;
+    }
+
+    private void MakeLabel(string n, string text, float fontSize, Color color, Vector2 offset)
+    {
+        GameObject go = new GameObject(n, typeof(RectTransform));
+        RectTransform rt = go.GetComponent<RectTransform>();
+        rt.SetParent(transform, false);
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = offset;
+        rt.sizeDelta = new Vector2(fontSize * 2f, fontSize * 2f);
+
+        TextMeshProUGUI t = go.AddComponent<TextMeshProUGUI>();
+        TMP_FontAsset f = FlatUI.UIFont();
+        if (f != null) t.font = f;
+        t.text = text;
+        t.fontSize = fontSize;
+        t.fontStyle = FontStyles.Bold;
+        t.color = color;
+        t.alignment = TextAlignmentOptions.Center;
+        t.raycastTarget = false;
     }
 
     private static float EaseOutBack(float t)

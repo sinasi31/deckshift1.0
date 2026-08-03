@@ -61,6 +61,13 @@ public class PlayerController : MonoBehaviour
     public int currentGold = 0;
     public event System.Action<int> OnGoldChanged;
 
+    [Header("Scrap Settings")]
+    [Tooltip("Card-maintenance currency. Earned from kills and from cards exhausting; " +
+             "spent at a Scrap Forge to recharge cards and salvage them out of exhaust. " +
+             "Tuning lives in ScrapEconomy.cs.")]
+    public int currentScrap = 0;
+    public event System.Action<int> OnScrapChanged;
+
     [Header("Audio Settings")]
     public AudioSource audioSource;
     public AudioClip dashSound;
@@ -479,6 +486,37 @@ public class PlayerController : MonoBehaviour
         {
             currentGold -= amount;
             OnGoldChanged?.Invoke(currentGold);
+            SfxManager.PlayOn(audioSource, spendSound, soundVolume);
+            return true;
+        }
+        return false;
+    }
+
+    // --- Scrap ---------------------------------------------------------------------------------
+    // Scrap is the CARD-MAINTENANCE currency, deliberately separate from gold. The split
+    // (designer-set 2026-08-03): gold comes from piles placed in levels (exploration) and buys NEW
+    // power at the shop; scrap comes from kills and from your own cards wearing out, and only ever
+    // SUSTAINS what you already own. They must never become interchangeable — if the shop ever
+    // sells charges, or scrap ever buys cards, the two have merged and one of them is redundant.
+    //
+    // Scrap spending is NOT hub-exempt. The umbrella "free in hub" rule covers resources the
+    // sandbox drains from you (jump Shift, card charges); a forge recharge is a purchase that
+    // permanently improves the run, exactly like a shop buy, which the hub already charges for.
+    // Making it free would let the player stand in the hub and refill their whole deck.
+
+    public void AddScrap(int amount)
+    {
+        if (amount <= 0) return;
+        currentScrap += amount;
+        OnScrapChanged?.Invoke(currentScrap);
+    }
+
+    public bool TrySpendScrap(int amount)
+    {
+        if (currentScrap >= amount)
+        {
+            currentScrap -= amount;
+            OnScrapChanged?.Invoke(currentScrap);
             SfxManager.PlayOn(audioSource, spendSound, soundVolume);
             return true;
         }

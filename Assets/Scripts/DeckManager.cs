@@ -190,6 +190,12 @@ public class DeckManager : MonoBehaviour
             else
             {
                 exhaustPile.Add(playedCard);
+
+                // A card burning out leaves scrap behind — a small consolation so losing a card
+                // isn't a total loss, deliberately far below what it costs to salvage one back
+                // (see ScrapEconomy). No hub guard needed: charges don't decrement in the hub,
+                // so this branch is unreachable there.
+                if (player != null) player.AddScrap(ScrapEconomy.EXHAUST_REBATE);
             }
             OnHandChanged?.Invoke(false);
         }
@@ -239,6 +245,46 @@ public class DeckManager : MonoBehaviour
         if (exhaustPile.Remove(card))
             discardPile.Add(card);
         OnHandChanged?.Invoke(false);
+    }
+
+    // --- Scrap forge operations ----------------------------------------------------------------
+    // Both are all-or-nothing: the scrap is only spent if the operation actually applies, so a
+    // failed call leaves the player's wallet and the piles untouched. The UI (ScrapForgeScreen)
+    // gates on the same conditions, but these re-check independently — never trust the caller.
+
+    // Tops a card the player still owns back up to full charges.
+    public bool TryRechargeCard(RuntimeCard card)
+    {
+        if (card == null || player == null) return false;
+        if (exhaustPile.Contains(card)) return false;   // must be Salvaged first, not recharged
+
+        int missing = ScrapEconomy.MissingCharges(card);
+        if (missing <= 0) return false;                 // already full, or infinite
+
+        int cost = ScrapEconomy.RechargeCost(card);
+        if (!player.TrySpendScrap(cost)) return false;
+
+        card.currentUses = card.cardData.maxUses;
+        OnHandChanged?.Invoke(false);
+        return true;
+    }
+
+    // Pulls a card back out of the exhaust pile. It returns to the DISCARD pile (not the hand) so
+    // it re-enters the deck through the normal shuffle, and comes back only half charged — exhaust
+    // is meant to stay a real loss, so a full recovery costs the salvage plus a recharge on top.
+    public bool TrySalvageCard(RuntimeCard card)
+    {
+        if (card == null || player == null) return false;
+        if (!exhaustPile.Contains(card)) return false;
+
+        if (!player.TrySpendScrap(ScrapEconomy.SALVAGE_COST)) return false;
+
+        exhaustPile.Remove(card);
+        card.currentUses = ScrapEconomy.SalvageCharges(card);
+        card.isSelected = false;
+        discardPile.Add(card);
+        OnHandChanged?.Invoke(false);
+        return true;
     }
 
     // Called by LevelManager.SpawnNextRoom at the moment a COMBAT room ends, while the

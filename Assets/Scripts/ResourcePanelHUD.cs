@@ -57,6 +57,8 @@ public class ResourcePanelHUD : MonoBehaviour
     public float goldRowY = 82f;
     [Tooltip("Font size of the gold number, so row 3 matches the two bar numbers.")]
     public float goldNumberSize = 23f;
+    [Tooltip("Colour of the gold number. Matches the palette gold used for sell values elsewhere.")]
+    public Color goldNumberColor = new Color(0.85f, 0.72f, 0.36f);
 
     // The three sprites are very different shapes — the heart is square while the crystal is a
     // narrow spike — so a single box size makes them centred but visibly uneven (in a 30px box the
@@ -214,6 +216,10 @@ public class ResourcePanelHUD : MonoBehaviour
             trt.anchoredPosition = new Vector2(barX, -h * 0.5f);
             text.alignment = TextAlignmentOptions.Left;
             text.fontSize = goldNumberSize;
+            // Match the palette gold used elsewhere (sell button, sell values). The scene object
+            // carried a saturated yellow that read as a different UI from the two bar numbers
+            // sitting directly above it.
+            text.color = goldNumberColor;
         }
     }
 

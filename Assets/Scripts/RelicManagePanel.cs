@@ -4,10 +4,14 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-// Stage 2 of the slot-relic redesign (RelicRedesign.md): a calm, paused screen to inspect
-// the loadout and SELL a relic for gold. Built procedurally (house style, RelicUISprites),
-// self-instantiated under the main Canvas — no scene/prefab wiring. Opens from a loadout-bar
-// click (RelicSlotHover) or the toggle hotkey (default I, set by RelicHUD).
+// A calm, paused screen to inspect the loadout and SELL a relic for gold. Self-instantiated under
+// the main Canvas — no scene/prefab wiring. Opens from a loadout-bar click (RelicSlotHover) or the
+// toggle hotkey (default I, set by RelicHUD).
+//
+// Runs the FlatUI LOADOUT theme, deliberately the SAME theme as the bar rather than its own: this
+// panel is the bar opened up, not a different place. It reuses RelicIcon for filled slots, so a
+// relic looks identical here and in the HUD, and rarity reads the same way (coloured strip under
+// the socket) in both.
 public class RelicManagePanel : MonoBehaviour
 {
     public static RelicManagePanel instance;
@@ -31,8 +35,11 @@ public class RelicManagePanel : MonoBehaviour
     private bool isOpen;
     private GameObject cachedHud;   // cached while active in Show(); Find() can't see it once hidden
 
-    private const float WIN_W = 680f, WIN_H = 470f;
+    // Height came down from 470: with the ornate border gone the detail area was mostly empty
+    // panel, and a relic description is only ever a line or two.
+    private const float WIN_W = 680f, WIN_H = 418f;
     private const float CELL = 104f;
+    private const float PAD = 32f;
 
     public static void SetToggleKey(KeyCode k) => toggleKey = k;
 
@@ -82,8 +89,10 @@ public class RelicManagePanel : MonoBehaviour
         Stretch(root);
         group = gameObject.AddComponent<CanvasGroup>();
 
+        FlatUI.Theme T = FlatUI.Loadout;
+
         // Full-screen dim; clicking it (outside the window) closes.
-        Image backdrop = AddImage(transform, "Backdrop", null, new Color(0f, 0f, 0f, 0.82f), true);
+        Image backdrop = AddImage(transform, "Backdrop", null, T.Backdrop, true);
         Stretch(backdrop.rectTransform);
         Button backBtn = backdrop.gameObject.AddComponent<Button>();
         backBtn.transition = Selectable.Transition.None;
@@ -92,43 +101,28 @@ public class RelicManagePanel : MonoBehaviour
         // Window
         window = AddPoint(transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(WIN_W, WIN_H));
         Image winBg = window.gameObject.AddComponent<Image>();
-        winBg.sprite = RelicUISprites.StonePanel();
+        winBg.sprite = FlatUI.Panel(8);
         winBg.type = Image.Type.Sliced;
-        winBg.color = new Color(0.8f, 0.78f, 0.82f, 1f);   // shows the baked dark stone
+        winBg.color = new Color(0.063f, 0.061f, 0.058f, 0.99f);
         winBg.raycastTarget = true;   // blocks the backdrop-close behind it
-        Image winFrame = AddImage(window, "Frame", RelicUISprites.GoldBorder(), Color.white, false);
+        Image winFrame = AddImage(window, "Frame", FlatUI.Outline(8, 2), T.Border, false);
         winFrame.type = Image.Type.Sliced;
         Stretch(winFrame.rectTransform);
-        RelicUISprites.AddGemStuds(window, WIN_W, WIN_H, RelicUISprites.GemColor(Rarity.Common), topRight: false);   // ruby studs; top-right left open for the close button
 
-        // Header — inset clear of the ornate gold border + corner/edge gem studs.
-        AddText(window, "Title", new Vector2(0f, 1f), new Vector2(52f, -34f), new Vector2(300f, 44f),
-            "RELICS", 32f, FontStyles.Bold, new Color(0.95f, 0.86f, 0.6f), TextAlignmentOptions.TopLeft);
-        countText = AddText(window, "Count", new Vector2(1f, 1f), new Vector2(-96f, -36f), new Vector2(120f, 32f),
-            "0 / 5", 22f, FontStyles.Bold, new Color(0.8f, 0.83f, 0.9f), TextAlignmentOptions.TopRight);
+        // Header. Insets are much tighter than the old ones, which existed only to clear the
+        // ornate border and its gem studs — with a 2px outline that padding is just dead space.
+        AddText(window, "Title", new Vector2(0f, 1f), new Vector2(PAD, -26f), new Vector2(300f, 40f),
+            "RELICS", 27f, FontStyles.Bold, T.TextBright, TextAlignmentOptions.TopLeft)
+            .characterSpacing = 6f;
+        countText = AddText(window, "Count", new Vector2(1f, 1f), new Vector2(-PAD - 34f, -28f), new Vector2(120f, 30f),
+            "0 / 5", 19f, FontStyles.Bold, T.TextMuted, TextAlignmentOptions.TopRight);
 
-        // Close button — occupies the top-right corner where a gem stud would sit (AddGemStuds skips
-        // it), styled as a red gem in a gold setting so it matches the studs but reads as "close".
-        const float closeSz = 62f;                 // larger than a plain stud so the X fits inside the gem
-        float closeInset = 46f * 0.45f;            // keep the corner alignment of the other studs
-        RectTransform closeRt = AddPoint(window, "Close", new Vector2(1f, 1f), new Vector2(-closeInset, -closeInset), new Vector2(closeSz, closeSz));
-        Image closeSet = AddImage(closeRt, "Setting", RelicUISprites.GemSetting(), Color.white, false);
-        Stretch(closeSet.rectTransform);
-        Image closeGem = AddImage(closeRt, "Gem", RelicUISprites.Gem(), new Color(0.80f, 0.20f, 0.22f), false);
-        closeGem.rectTransform.anchorMin = closeGem.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-        closeGem.rectTransform.sizeDelta = new Vector2(closeSz * 0.78f, closeSz * 0.78f);
-        Image closeHit = AddImage(closeRt, "Hit", null, new Color(0f, 0f, 0f, 0f), true);
-        Stretch(closeHit.rectTransform);
-        Button closeBtn = closeRt.gameObject.AddComponent<Button>();
-        closeBtn.transition = Selectable.Transition.None;
-        closeBtn.targetGraphic = closeHit;
-        closeBtn.onClick.AddListener(Hide);
-        // Small X centred in the gem face; drawn last so it sits on top.
-        AddText(closeRt, "X", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(closeSz, closeSz),
-            "X", 15f, FontStyles.Bold, new Color(1f, 0.93f, 0.9f), TextAlignmentOptions.Center);
+        BuildCloseButton(T);
+
+        AddRule(-70f);
 
         // Slot row (horizontal, centred under the header)
-        RectTransform rowRt = AddPoint(window, "SlotRow", new Vector2(0.5f, 1f), new Vector2(0f, -76f),
+        RectTransform rowRt = AddPoint(window, "SlotRow", new Vector2(0.5f, 1f), new Vector2(0f, -86f),
             new Vector2(WIN_W - 40f, CELL));
         rowRt.pivot = new Vector2(0.5f, 1f);
         HorizontalLayoutGroup hlg = rowRt.gameObject.AddComponent<HorizontalLayoutGroup>();
@@ -138,27 +132,52 @@ public class RelicManagePanel : MonoBehaviour
         hlg.childForceExpandWidth = hlg.childForceExpandHeight = false;
         slotRow = rowRt;
 
-        // Divider under the slots — inset so it clears the side gem studs.
-        Image div = AddImage(window, "Divider", RelicUISprites.White(), new Color(1f, 1f, 1f, 0.12f), false);
+        AddRule(-206f);
+
+        // Detail area (lower).
+        detailName = AddText(window, "DetailName", new Vector2(0f, 1f), new Vector2(PAD, -224f), new Vector2(WIN_W - PAD * 2f, 32f),
+            "", 22f, FontStyles.Bold, T.TextBright, TextAlignmentOptions.TopLeft);
+        // Narrow column on the left so a long description never runs under the sell button.
+        detailDesc = AddText(window, "DetailDesc", new Vector2(0f, 1f), new Vector2(PAD, -256f), new Vector2(WIN_W - 300f, 84f),
+            "", 16f, FontStyles.Normal, T.TextBody, TextAlignmentOptions.TopLeft);
+        detailDesc.enableWordWrapping = true;
+
+        // Sell button (bottom-right).
+        sellButtonGo = BuildButton(window, "SellButton", new Vector2(1f, 0f), new Vector2(-PAD, 26f),
+            new Vector2(224f, 46f), out sellLabel, DoSell);
+
+        gameObject.SetActive(false);
+    }
+
+    // A plain X, matching the Forge and Blompo. The old one was a red gem in a gold setting,
+    // which drew more attention than the relics the panel exists to show.
+    private void BuildCloseButton(FlatUI.Theme T)
+    {
+        const float sz = 30f;
+        RectTransform rt = AddPoint(window, "Close", new Vector2(1f, 1f), new Vector2(-16f, -16f), new Vector2(sz, sz));
+        rt.pivot = new Vector2(1f, 1f);
+
+        Image hit = AddImage(rt, "Hit", FlatUI.Panel(5), new Color(1f, 1f, 1f, 0.05f), true);
+        hit.type = Image.Type.Sliced;
+        Stretch(hit.rectTransform);
+
+        Button btn = rt.gameObject.AddComponent<Button>();
+        btn.transition = Selectable.Transition.None;
+        btn.targetGraphic = hit;
+        btn.onClick.AddListener(Hide);
+
+        AddText(rt, "X", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(sz, sz),
+            "X", 17f, FontStyles.Bold, T.TextMuted, TextAlignmentOptions.Center);
+    }
+
+    private void AddRule(float y)
+    {
+        Image div = AddImage(window, "Rule", FlatUI.FadedRule(), FlatUI.Loadout.BorderSoft, false);
         RectTransform drt = div.rectTransform;
         drt.anchorMin = drt.anchorMax = new Vector2(0.5f, 1f);
         drt.pivot = new Vector2(0.5f, 1f);
-        drt.sizeDelta = new Vector2(WIN_W - 108f, 2f);
-        drt.anchoredPosition = new Vector2(0f, -208f);
-
-        // Detail area (lower) — left inset clears the border + left-edge stud.
-        detailName = AddText(window, "DetailName", new Vector2(0f, 1f), new Vector2(52f, -224f), new Vector2(WIN_W - 104f, 34f),
-            "", 24f, FontStyles.Bold, Color.white, TextAlignmentOptions.TopLeft);
-        // Narrow column on the left so a long description never runs under the sell button.
-        detailDesc = AddText(window, "DetailDesc", new Vector2(0f, 1f), new Vector2(52f, -262f), new Vector2(WIN_W - 320f, 150f),
-            "", 17f, FontStyles.Normal, new Color(0.82f, 0.84f, 0.9f), TextAlignmentOptions.TopLeft);
-        detailDesc.enableWordWrapping = true;
-
-        // Sell button (bottom-right) — inset off the border/studs.
-        sellButtonGo = BuildButton(window, "SellButton", new Vector2(1f, 0f), new Vector2(-46f, 44f),
-            new Vector2(244f, 54f), new Color(0.86f, 0.68f, 0.28f), out sellLabel, DoSell);
-
-        gameObject.SetActive(false);
+        drt.sizeDelta = new Vector2(WIN_W - PAD * 2f, 1f);
+        drt.anchoredPosition = new Vector2(0f, y);
     }
 
     // ---- open / close ----
@@ -238,7 +257,7 @@ public class RelicManagePanel : MonoBehaviour
             le.preferredWidth = le.preferredHeight = CELL;
 
             // Selection ring (hidden until selected).
-            Image ring = AddImage(cell, "Ring", RelicUISprites.Frame(), new Color(1f, 1f, 1f, 0.95f), false);
+            Image ring = AddImage(cell, "Ring", FlatUI.Outline(6, 2), Color.white, false);
             ring.type = Image.Type.Sliced;
             RectTransform ringRt = ring.rectTransform;
             ringRt.anchorMin = ringRt.anchorMax = new Vector2(0.5f, 0.5f);
@@ -269,12 +288,13 @@ public class RelicManagePanel : MonoBehaviour
             }
             else
             {
-                Image fill = AddImage(cell, "EmptyFill", RelicUISprites.StonePanel(), new Color(0.5f, 0.5f, 0.5f, 0.85f), false);
-                fill.type = Image.Type.Simple;
+                // Same recessed socket as an empty slot in the HUD bar, just larger.
+                Image fill = AddImage(cell, "EmptyFill", FlatUI.Panel(5), FlatUI.Loadout.Surface, false);
+                fill.type = Image.Type.Sliced;
                 fill.rectTransform.anchorMin = fill.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-                fill.rectTransform.sizeDelta = new Vector2((CELL - 8f) * 0.86f, (CELL - 8f) * 0.86f);
-                Image frame = AddImage(cell, "EmptyFrame", RelicUISprites.GoldBorder(), new Color(0.55f, 0.52f, 0.5f, 0.8f), false);
-                frame.type = Image.Type.Simple;
+                fill.rectTransform.sizeDelta = new Vector2(CELL - 8f, CELL - 8f);
+                Image frame = AddImage(cell, "EmptyFrame", FlatUI.Outline(5, 1), FlatUI.Loadout.BorderSoft, false);
+                frame.type = Image.Type.Sliced;
                 frame.rectTransform.anchorMin = frame.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
                 frame.rectTransform.sizeDelta = new Vector2(CELL - 8f, CELL - 8f);
             }
@@ -297,7 +317,7 @@ public class RelicManagePanel : MonoBehaviour
         {
             bool on = selected != null && cellRelics[i] == selected;
             selectRings[i].enabled = on;
-            if (on) selectRings[i].color = RelicUISprites.RarityColor(selected.rarity);
+            if (on) selectRings[i].color = FlatUI.RarityColor(selected.rarity);
         }
     }
 
@@ -312,7 +332,7 @@ public class RelicManagePanel : MonoBehaviour
         }
 
         detailName.text = string.IsNullOrEmpty(selected.relicName) ? selected.relicID : selected.relicName;
-        detailName.color = RelicUISprites.RarityColor(selected.rarity);
+        detailName.color = FlatUI.RarityColor(selected.rarity);
         detailDesc.text = string.IsNullOrEmpty(selected.description) ? "-" : selected.description;
 
         int value = RelicManager.instance != null ? RelicManager.instance.SellValueFor(selected) : 0;
@@ -375,34 +395,35 @@ public class RelicManagePanel : MonoBehaviour
         return t;
     }
 
+    // Selling is destructive and irreversible, so the button is the one place on this panel that
+    // carries colour — a gold-tinted outline and label over the flat plate, matching the "sell for
+    // gold" it performs.
     private GameObject BuildButton(Transform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size,
-        Color color, out TMP_Text label, UnityEngine.Events.UnityAction onClick)
+        out TMP_Text label, UnityEngine.Events.UnityAction onClick)
     {
+        Color gold = new Color(0.85f, 0.72f, 0.36f);
+
         RectTransform rt = AddPoint(parent, name, anchor, pos, size);
         Image bg = rt.gameObject.AddComponent<Image>();
-        bg.sprite = RelicUISprites.Panel();
+        bg.sprite = FlatUI.Panel(5);
         bg.type = Image.Type.Sliced;
-        bg.color = color;
+        bg.color = new Color(gold.r * 0.20f, gold.g * 0.17f, gold.b * 0.10f, 1f);
+
+        Image outline = AddImage(rt, "Outline", FlatUI.Outline(5, 2), gold, false);
+        outline.type = Image.Type.Sliced;
+        Stretch(outline.rectTransform);
+
         Button b = rt.gameObject.AddComponent<Button>();
+        b.transition = Selectable.Transition.None;
         b.targetGraphic = bg;
-        ColorBlock cb = b.colors;
-        cb.highlightedColor = new Color(1f, 1f, 1f, 1f);
-        cb.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
-        cb.normalColor = Color.white;
-        b.colors = cb;
         b.onClick.AddListener(onClick);
 
         label = AddText(rt, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, size,
-            name, 20f, FontStyles.Bold, new Color(0.12f, 0.1f, 0.05f), TextAlignmentOptions.Center);
+            name, 18f, FontStyles.Bold, gold, TextAlignmentOptions.Center);
         return rt.gameObject;
     }
 
-    private TMP_FontAsset ResolveFont()
-    {
-        TMP_Text any = FindAnyObjectByType<TMP_Text>();
-        if (any != null && any.font != null) return any.font;
-        return TMP_Settings.defaultFontAsset;
-    }
+    private TMP_FontAsset ResolveFont() => FlatUI.UIFont();
 
     private static float EaseOutBack(float t)
     {
