@@ -23,6 +23,13 @@ public class EnemyHealth : MonoBehaviour, IDamageable
     [Header("Efektler")]
     public GameObject damagePopupPrefab;
 
+    [Header("Drops")]
+    [Tooltip("Scrap dropped on death. Leave at -1 to derive it automatically from maxHealth " +
+             "(ScrapEconomy.ScrapForEnemy), which tiers new enemies correctly with no wiring. " +
+             "Set a positive number to override — this is the hook for 'shift-infused' elites, " +
+             "which should pay noticeably more than their base version. 0 means drops nothing.")]
+    public int scrapDropOverride = -1;
+
     private float currentHealth;
 
     // Read-only accessor so external HUDs (e.g. the boss health bar) can poll current HP.
@@ -190,6 +197,13 @@ public class EnemyHealth : MonoBehaviour, IDamageable
                 Debug.Log("OVERCLOCK AKTİF: Sonraki kart bedava!");
             }
         }
+
+        // Scrap payout. This is the ONLY intrinsic reward for killing anything — before it,
+        // a kill paid nothing at all and skipping every fight was the optimal play.
+        // Spawned before OnDied/Destroy because the shards must outlive this GameObject
+        // (SpawnBurst builds free-standing objects, so they do).
+        int scrap = scrapDropOverride >= 0 ? scrapDropOverride : ScrapEconomy.ScrapForEnemy(maxHealth);
+        if (scrap > 0) ScrapPickup.SpawnBurst(transform.position, scrap);
 
         // Notify listeners (e.g. the boss) before the object is destroyed.
         OnDied?.Invoke();

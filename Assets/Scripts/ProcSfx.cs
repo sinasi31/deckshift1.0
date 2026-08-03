@@ -161,6 +161,58 @@ public static class ProcSfx
         return Finalize(dry, 0.14f, 2600f);
     }
 
+    private static AudioClip scrapPickup;
+    // Collecting a scrap shard. Procedural because ScrapPickup builds its GameObject entirely in
+    // code (no prefab), so there is nowhere to hang an AudioClip in the Inspector.
+    public static AudioClip ScrapPickup
+    {
+        get
+        {
+            if (scrapPickup == null) scrapPickup = BuildScrapPickup();
+            return scrapPickup;
+        }
+    }
+
+    // A small bright metal "tink" — a struck iron offcut, not a coin. Built from INHARMONIC
+    // partials (the 1 : 2.76 : 5.40 : 8.93 ideal-bar mode ratios), which is what makes metal read
+    // as metal rather than as a pitched chime; harmonic ratios here would sound like a bell and
+    // collide with the gold pickup. Short and dry so a five-shard burst layers into a satisfying
+    // rattle instead of a wash.
+    private static AudioClip BuildScrapPickup()
+    {
+        const float dur = 0.22f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(4471);
+
+        float f0 = 920f;                                    // small shard = high fundamental
+        float[] ratio = { 1f, 2.76f, 5.40f, 8.93f };        // ideal free-bar modes
+        float[] pAmp = { 1f, 0.55f, 0.28f, 0.12f };
+        float[] pDec = { 22f, 30f, 42f, 58f };              // brighter modes die faster
+
+        float clickLp = 0f;
+        float clickCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 5200f / SampleRate);
+
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+
+            // Struck partials.
+            float body = 0f;
+            for (int p = 0; p < ratio.Length; p++)
+                body += Mathf.Sin(2f * Mathf.PI * f0 * ratio[p] * ts) * pAmp[p] * Mathf.Exp(-pDec[p] * ts);
+
+            // Contact transient: a very short filtered noise tick that sells the "hit".
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+            clickLp += clickCoef * (noise - clickLp);
+            float clickEnv = Mathf.Exp(-190f * ts);
+
+            dry[i] = body * 0.13f + clickLp * clickEnv * 0.20f;
+        }
+
+        return Finalize(dry, 0.07f, 9000f);   // dry and bright — metal, close-miked
+    }
+
     // Shared tail: small warm reverb + master low-pass + anti-click fades -> AudioClip.
     private static AudioClip Finalize(float[] dry, float reverbWet, float masterLpHz)
     {
