@@ -217,7 +217,7 @@ It is also load-bearing for the **planned difficulty tiers** (see Deferred Work 
 
 - **`ScrapEconomy.cs`** — **THE tuning file. Every scrap number lives here and nowhere else.** Drop tiers (derived from `maxHealth`, matching the `CardAnchors.md` §5 HP tiers), `RECHARGE_PER_CHARGE`, `SALVAGE_COST`, `EXHAUST_REBATE`, plus `ScrapColor` and `UIFont()`.
 - **`ScrapPickup.cs`** — the collectible. **Built entirely in code (no prefab)**, so there is nothing to wire and nothing to lose from a scene. Deliberately has **no Rigidbody2D**: the pop-out arc is hand-integrated against a ground raycast, because a solid collider would shove the player's capsule and a trigger-only rigidbody would fall through the floor. Carries `TemporaryObject`, so uncollected shards are wiped on room change.
-- **`ScrapForgeScreen.cs`** — the spend UI. Self-instantiating procedural screen in the shared `RelicUISprites` chrome, same pattern as `BlompoScreen`.
+- **`ScrapForgeScreen.cs`** — the spend UI. Self-instantiating procedural screen, same pattern as `BlompoScreen`, but styled with **`FlatUI`, not `RelicUISprites`** (see UI System → Flat theme).
 - **`ScrapForge.cs`** — the `IInteractable` station that opens it. **Unlike Blompo it does NOT vanish after use** — it's a workbench, and the scrap cost is the limiter, not the visit.
 - **`ScrapHUD.cs`** — the counter. Self-bootstraps via `RuntimeInitializeOnLoadMethod` and **positions itself relative to the existing `ExhaustPile` button** rather than at fixed coordinates.
 
@@ -508,6 +508,23 @@ SampleScene's main Canvas contains:
 - Various menu panels (PauseMenu, ShopUI, SlotMachineUI, RewardScreen, etc.) as direct children of Canvas.
 
 **When adding new full-screen UI panels**, hide GameplayHUD when they open by adding a `[SerializeField] GameObject gameplayHUD;` reference and toggling SetActive. ShopManager, SlotMachineUI, and QuestSystem already follow this pattern.
+
+### Flat theme (`FlatUI.cs`) — the new UI direction (2026-08-03)
+
+**The designer has disliked the ornate stone-and-gold chrome "since the beginning"** and asked for something "soothing, simple, understandable, but also cool". `FlatUI.cs` is that direction, prototyped on the Scrap Forge screen.
+
+What it is: flat dark surfaces, ONE thin outline, no texture, no ornament, no gem studs. Depth comes from a barely-there top sheen (3% white) and a soft selection glow instead of bevels. A single accent colour carries meaning — on the forge that's `ScrapEconomy.ScrapColor`, used only for the currency, costs, and the actionable button.
+
+API: `Panel(radius)` and `Outline(radius, thickness)` are 9-sliced rounded rects, `SoftGlow()`, `VerticalFade()`, `Pixel()`. **All shapes are WHITE and meant to be tinted via `Image.color`**, so one cached sprite serves every panel in any colour. A shared palette (`Surface`, `Border`, `TextBright/Body/Muted/Disabled`, …) lives at the bottom of the file so panels built in different scripts match.
+
+Lessons already paid for, don't re-learn them:
+- **Get the rounded-rect SDF right** (`inside + outside - radius`, the standard rounded-box formula). A naive version pinches the outline at the corners.
+- Textures need `FilterMode.Bilinear` — Point aliases the rounded corners badly.
+- **Hairline dividers need to be brighter than theory says.** At the "correct" subtlety they simply did not register against the dark surface on screen.
+- **Small icons inside dense text don't work.** A 17px scrap shard next to each cost read as a smudge fused to the first digit; the accent colour alone carries the meaning better.
+- **Empty states must collapse.** The forge lays itself out top-down in `LayoutSections` and resizes the window to its content — an empty section shrinks to one line of explanatory text. The first version was a fixed-height panel with two large voids, which is exactly what looked broken.
+
+**Status: the Scrap Forge is the only screen converted.** `RelicHUD`, `RelicIcon`, `RelicManagePanel`, `RelicSwapScreen`, `RelicTooltip` and `BlompoScreen` still use the old `RelicUISprites` chrome, so the game is currently inconsistent. Rolling the flat theme out to those is a known, wanted follow-up — do it when asked, and reuse `FlatUI` rather than inventing a third look.
 
 ### Never Scale UI Containers — Resize Them
 

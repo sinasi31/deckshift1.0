@@ -33,7 +33,7 @@ public class ScrapForgeScreen : MonoBehaviour
     private TMP_Text titleText, scrapText, repairLabel, salvageLabel, confirmLabel;
     private RectTransform confirmBar;
     private Button confirmButton;
-    private Image confirmBg;
+    private Image confirmBg, confirmOutline;
     private TMP_FontAsset font;
 
     private RuntimeCard selected;
@@ -44,9 +44,27 @@ public class ScrapForgeScreen : MonoBehaviour
     private GameObject cachedHud;
     private bool hudWasActive;
 
-    private const float WIN_W = 1600f, WIN_H = 900f;
-    private const float ROW_W = WIN_W - 120f, ROW_H = 250f;
-    private const float CARD_W_MAX = 170f, CARD_H_MAX = 250f, CARD_GAP = 20f;
+    // Deliberately smaller than the old 1600x900. At that size four cards floated in a huge empty
+    // field, which is most of why the screen felt unfinished; a tighter window reads as a focused
+    // dialog instead.
+    //
+    // HEIGHT IS DYNAMIC (see LayoutSections): a section with no cards collapses to a single line
+    // of explanatory text, and the window shrinks to match. Early in a run nothing is damaged and
+    // nothing is exhausted, so the all-empty state is common and must not be a tall grey void.
+    private const float WIN_W = 1180f;
+    private const float PAD = 44f;
+    private const float ROW_W = WIN_W - PAD * 2f, ROW_H = 205f, EMPTY_ROW_H = 38f;
+    private const float CARD_W_MAX = 140f, CARD_H_MAX = 205f, CARD_GAP = 16f;
+
+    // Vertical rhythm, all measured downward from the window's top edge.
+    private const float HEADER_RULE_Y = 96f;   // hairline under the title
+    private const float LABEL_GAP = 22f;       // rule -> section label
+    private const float ROW_GAP = 36f;         // label -> cards
+    private const float SECTION_GAP = 26f;     // cards -> next hairline
+    private const float BAR_GAP = 34f;         // last cards -> confirm bar
+    private const float BAR_H = 58f, BOTTOM_PAD = 30f;
+
+    private RectTransform sectionRule, confirmBarRT, repairRowRT, salvageRowRT;
 
     // ---- entry point --------------------------------------------------------------------------
 
@@ -89,69 +107,127 @@ public class ScrapForgeScreen : MonoBehaviour
         Stretch(GetComponent<RectTransform>());
         group = gameObject.AddComponent<CanvasGroup>();
 
-        Image backdrop = AddImage(transform, "Backdrop", null, new Color(0f, 0f, 0f, 0.88f), true);
+        Image backdrop = AddImage(transform, "Backdrop", null, FlatUI.Backdrop, true);
         Stretch(backdrop.rectTransform);
         Button backBtn = backdrop.gameObject.AddComponent<Button>();
         backBtn.transition = Selectable.Transition.None;
         backBtn.onClick.AddListener(Hide);
 
-        window = AddPoint(transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(WIN_W, WIN_H));
+        window = AddPoint(transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(WIN_W, 600f));
         Image winBg = window.gameObject.AddComponent<Image>();
-        winBg.sprite = RelicUISprites.StonePanel();
+        winBg.sprite = FlatUI.Panel(8);
         winBg.type = Image.Type.Sliced;
-        winBg.color = new Color(0.8f, 0.78f, 0.82f, 1f);
+        winBg.color = FlatUI.Surface;
         winBg.raycastTarget = true;
-        Image winFrame = AddImage(window, "Frame", RelicUISprites.GoldBorder(), Color.white, false);
+
+        // Barely-there sheen down the top of the panel — the only depth cue. Any stronger and it
+        // turns back into a bevel, which is the look we're moving away from. Anchored
+        // proportionally so it follows the window as its height changes with content.
+        Image sheen = AddImage(window, "Sheen", FlatUI.VerticalFade(), new Color(1f, 1f, 1f, 0.030f), false);
+        sheen.rectTransform.anchorMin = new Vector2(0f, 0.55f);
+        sheen.rectTransform.anchorMax = new Vector2(1f, 1f);
+        sheen.rectTransform.offsetMin = Vector2.zero;
+        sheen.rectTransform.offsetMax = Vector2.zero;
+
+        Image winFrame = AddImage(window, "Frame", FlatUI.Outline(8, 2), FlatUI.Border, false);
         winFrame.type = Image.Type.Sliced;
         Stretch(winFrame.rectTransform);
-        RelicUISprites.AddGemStuds(window, WIN_W, WIN_H, ScrapEconomy.ScrapColor, 60f, true, false);
 
-        titleText = AddText(window, "Title", new Vector2(0f, 1f), new Vector2(56f, -38f), new Vector2(760f, 76f),
-            "THE FORGE", 60f, FontStyles.Bold, new Color(0.98f, 0.86f, 0.55f), TextAlignmentOptions.TopLeft);
+        titleText = AddText(window, "Title", new Vector2(0f, 1f), new Vector2(PAD, -34f), new Vector2(600f, 52f),
+            "THE FORGE", 38f, FontStyles.Bold, FlatUI.TextBright, TextAlignmentOptions.TopLeft);
+        titleText.characterSpacing = 6f;
 
-        // Right edge sits clear of the close button's 62px gem (which occupies the top-right stud
-        // slot) — at -56 the counter's last digit was drawn underneath it.
-        scrapText = AddText(window, "Scrap", new Vector2(1f, 1f), new Vector2(-106f, -44f), new Vector2(560f, 64f),
-            "", 42f, FontStyles.Bold, ScrapEconomy.ScrapColor, TextAlignmentOptions.TopRight);
+        scrapText = AddText(window, "Scrap", new Vector2(1f, 1f), new Vector2(-PAD - 40f, -36f), new Vector2(420f, 46f),
+            "", 30f, FontStyles.Bold, ScrapEconomy.ScrapColor, TextAlignmentOptions.TopRight);
 
-        // Close button occupies the top-right gem-stud position (AddGemStuds skips it).
         BuildCloseButton();
 
-        repairLabel = AddText(window, "RepairLabel", new Vector2(0f, 1f), new Vector2(60f, -130f), new Vector2(1200f, 38f),
-            "", 27f, FontStyles.Bold, new Color(0.88f, 0.89f, 0.93f), TextAlignmentOptions.TopLeft);
-        repairRow = BuildRow("RepairRow", -170f);
+        // Hairline under the header, so the title reads as a header rather than floating text.
+        AddDivider(-HEADER_RULE_Y);
 
-        salvageLabel = AddText(window, "SalvageLabel", new Vector2(0f, 1f), new Vector2(60f, -442f), new Vector2(1200f, 38f),
-            "", 27f, FontStyles.Bold, new Color(0.88f, 0.89f, 0.93f), TextAlignmentOptions.TopLeft);
-        salvageRow = BuildRow("SalvageRow", -482f);
+        repairLabel = AddText(window, "RepairLabel", new Vector2(0f, 1f), new Vector2(PAD, 0f), new Vector2(ROW_W, 30f),
+            "", 19f, FontStyles.Bold, FlatUI.TextMuted, TextAlignmentOptions.TopLeft);
+        repairLabel.characterSpacing = 4f;
+        repairRowRT = BuildRow("RepairRow", 0f);
+        repairRow = repairRowRT;
+
+        sectionRule = AddDivider(0f);
+
+        salvageLabel = AddText(window, "SalvageLabel", new Vector2(0f, 1f), new Vector2(PAD, 0f), new Vector2(ROW_W, 30f),
+            "", 19f, FontStyles.Bold, FlatUI.TextMuted, TextAlignmentOptions.TopLeft);
+        salvageLabel.characterSpacing = 4f;
+        salvageRowRT = BuildRow("SalvageRow", 0f);
+        salvageRow = salvageRowRT;
 
         BuildConfirmBar();
 
         gameObject.SetActive(false);
     }
 
+    private RectTransform AddDivider(float y)
+    {
+        Image d = AddImage(window, "Divider", FlatUI.Pixel(), FlatUI.BorderSoft, false);
+        d.rectTransform.anchorMin = d.rectTransform.anchorMax = new Vector2(0.5f, 1f);
+        d.rectTransform.pivot = new Vector2(0.5f, 1f);
+        d.rectTransform.anchoredPosition = new Vector2(0f, y);
+        d.rectTransform.sizeDelta = new Vector2(ROW_W, 1f);
+        return d.rectTransform;
+    }
+
+    // Places every section top-down and resizes the window to fit. Called after each Refresh, so
+    // collapsing an empty section actually shrinks the dialog instead of leaving a hole.
+    private void LayoutSections(bool repairHasCards, bool salvageHasCards)
+    {
+        float repairH = repairHasCards ? ROW_H : EMPTY_ROW_H;
+        float salvageH = salvageHasCards ? ROW_H : EMPTY_ROW_H;
+
+        float y = HEADER_RULE_Y + LABEL_GAP;
+        repairLabel.rectTransform.anchoredPosition = new Vector2(PAD, -y);
+
+        y += ROW_GAP;
+        repairRowRT.anchoredPosition = new Vector2(0f, -y);
+        repairRowRT.sizeDelta = new Vector2(ROW_W, repairH);
+
+        y += repairH + SECTION_GAP;
+        sectionRule.anchoredPosition = new Vector2(0f, -y);
+
+        y += LABEL_GAP;
+        salvageLabel.rectTransform.anchoredPosition = new Vector2(PAD, -y);
+
+        y += ROW_GAP;
+        salvageRowRT.anchoredPosition = new Vector2(0f, -y);
+        salvageRowRT.sizeDelta = new Vector2(ROW_W, salvageH);
+
+        y += salvageH + BAR_GAP;
+        confirmBarRT.anchoredPosition = new Vector2(0f, -y);
+
+        window.sizeDelta = new Vector2(WIN_W, y + BAR_H + BOTTOM_PAD);
+    }
+
+    // A plain X in the corner. The old version was a red gem in an ornate setting, which drew more
+    // attention than the actual content.
     private void BuildCloseButton()
     {
-        const float sz = 62f;
-        RectTransform rt = AddPoint(window, "Close", new Vector2(1f, 1f), new Vector2(-sz * 0.45f, -sz * 0.45f), new Vector2(sz, sz));
-        Image set = AddImage(rt, "Setting", RelicUISprites.GemSetting(), Color.white, false);
-        Stretch(set.rectTransform);
-        Image gem = AddImage(rt, "Gem", RelicUISprites.Gem(), new Color(0.86f, 0.24f, 0.26f), false);
-        gem.rectTransform.anchorMin = gem.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-        gem.rectTransform.sizeDelta = new Vector2(sz * 0.60f, sz * 0.60f);
-        Image hit = AddImage(rt, "Hit", null, new Color(0f, 0f, 0f, 0f), true);
+        const float sz = 34f;
+        RectTransform rt = AddPoint(window, "Close", new Vector2(1f, 1f), new Vector2(-PAD * 0.5f, -PAD * 0.5f), new Vector2(sz, sz));
+        rt.pivot = new Vector2(1f, 1f);
+
+        Image hit = AddImage(rt, "Hit", FlatUI.Panel(6), new Color(1f, 1f, 1f, 0.05f), true);
+        hit.type = Image.Type.Sliced;
         Stretch(hit.rectTransform);
+
         Button btn = rt.gameObject.AddComponent<Button>();
         btn.transition = Selectable.Transition.None;
         btn.targetGraphic = hit;
         btn.onClick.AddListener(Hide);
+
         AddText(rt, "X", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(sz, sz),
-            "X", 26f, FontStyles.Bold, Color.white, TextAlignmentOptions.Center);
+            "X", 20f, FontStyles.Bold, FlatUI.TextMuted, TextAlignmentOptions.Center);
     }
 
     // Rows use a centred HorizontalLayoutGroup and size their cards to fit, so any number of
     // entries stays centred and on-screen without a scroll view.
-    private Transform BuildRow(string name, float y)
+    private RectTransform BuildRow(string name, float y)
     {
         RectTransform rt = AddPoint(window, name, new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(ROW_W, ROW_H));
         rt.pivot = new Vector2(0.5f, 1f);
@@ -169,22 +245,24 @@ public class ScrapForgeScreen : MonoBehaviour
 
     private void BuildConfirmBar()
     {
-        confirmBar = AddPoint(window, "ConfirmBar", new Vector2(0.5f, 0f), new Vector2(0f, 42f), new Vector2(900f, 76f));
-        confirmBar.pivot = new Vector2(0.5f, 0f);
+        // Anchored to the window TOP like everything else, so LayoutSections can place it by the
+        // same downward cursor rather than fighting a bottom anchor as the window resizes.
+        confirmBar = AddPoint(window, "ConfirmBar", new Vector2(0.5f, 1f), Vector2.zero, new Vector2(620f, BAR_H));
+        confirmBar.pivot = new Vector2(0.5f, 1f);
+        confirmBarRT = confirmBar;
 
         confirmBg = confirmBar.gameObject.AddComponent<Image>();
-        confirmBg.sprite = RelicUISprites.StonePanel();
+        confirmBg.sprite = FlatUI.Panel(6);
         confirmBg.type = Image.Type.Sliced;
-        confirmBg.color = new Color(0.72f, 0.70f, 0.74f, 1f);
+        confirmBg.color = FlatUI.SurfaceRaised;
         confirmBg.raycastTarget = true;
 
-        Image frame = AddImage(confirmBar, "Frame", RelicUISprites.GoldBorder(), Color.white, false);
-        frame.type = Image.Type.Sliced;
-        frame.pixelsPerUnitMultiplier = 1.1f;
-        Stretch(frame.rectTransform);
+        confirmOutline = AddImage(confirmBar, "Outline", FlatUI.Outline(6, 2), FlatUI.BorderSoft, false);
+        confirmOutline.type = Image.Type.Sliced;
+        Stretch(confirmOutline.rectTransform);
 
-        confirmLabel = AddText(confirmBar, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(860f, 70f),
-            "", 30f, FontStyles.Bold, new Color(0.97f, 0.93f, 0.85f), TextAlignmentOptions.Center);
+        confirmLabel = AddText(confirmBar, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(596f, 54f),
+            "", 21f, FontStyles.Bold, FlatUI.TextDisabled, TextAlignmentOptions.Center);
 
         confirmButton = confirmBar.gameObject.AddComponent<Button>();
         confirmButton.transition = Selectable.Transition.None;
@@ -271,17 +349,32 @@ public class ScrapForgeScreen : MonoBehaviour
         List<RuntimeCard> damaged = CollectDamaged();
         List<RuntimeCard> exhausted = CollectExhausted();
 
-        repairLabel.text = damaged.Count > 0
-            ? $"REPAIR  —  {ScrapEconomy.RECHARGE_PER_CHARGE} scrap per charge"
-            : "REPAIR  —  every card you own is at full charges";
-        salvageLabel.text = exhausted.Count > 0
-            ? $"SALVAGE  —  {ScrapEconomy.SALVAGE_COST} scrap, returns half charged"
-            : "SALVAGE  —  nothing has burned out yet";
+        repairLabel.text = $"REPAIR   ·   {ScrapEconomy.RECHARGE_PER_CHARGE} SCRAP PER CHARGE";
+        salvageLabel.text = $"SALVAGE   ·   {ScrapEconomy.SALVAGE_COST} SCRAP, RETURNS HALF CHARGED";
 
         BuildCards(repairRow, damaged, Mode.Repair, scrap);
         BuildCards(salvageRow, exhausted, Mode.Salvage, scrap);
 
+        // Empty rows get an explicit line rather than nothing. With both sections empty the old
+        // screen was a blank field with two headings floating in it and no explanation.
+        if (damaged.Count == 0) AddEmptyNote(repairRow, "Every card is at full charges.");
+        if (exhausted.Count == 0) AddEmptyNote(salvageRow, "Nothing has burned out yet.");
+
+        LayoutSections(damaged.Count > 0, exhausted.Count > 0);
+
         UpdateConfirmBar(scrap);
+    }
+
+    // A quiet placeholder so an empty section still reads as "nothing to do here" rather than as a
+    // rendering failure. Sits inside the row's layout group, so it lines up with where cards would.
+    private void AddEmptyNote(Transform row, string message)
+    {
+        RectTransform rt = AddPoint(row, "Empty", new Vector2(0f, 1f), Vector2.zero, new Vector2(ROW_W - 8f, EMPTY_ROW_H));
+        LayoutElement le = rt.gameObject.AddComponent<LayoutElement>();
+        le.preferredWidth = ROW_W - 8f; le.preferredHeight = EMPTY_ROW_H;
+
+        TMP_Text t = AddText(rt, "Text", new Vector2(0f, 1f), new Vector2(2f, -4f), new Vector2(ROW_W - 12f, 28f),
+            message, 16f, FontStyles.Italic, FlatUI.TextDisabled, TextAlignmentOptions.TopLeft);
     }
 
     private void BuildCards(Transform row, List<RuntimeCard> cards, Mode mode, int scrap)
@@ -307,54 +400,59 @@ public class ScrapForgeScreen : MonoBehaviour
         le.preferredWidth = w; le.preferredHeight = h;
 
         bool isSelected = card == selected;
+        Color accent = ScrapEconomy.ScrapColor;
 
-        Image bg = rt.gameObject.AddComponent<Image>();
-        bg.sprite = RelicUISprites.StonePanel();
-        bg.type = Image.Type.Sliced;
-        bg.color = new Color(0.9f, 0.87f, 0.82f, 1f);
-        bg.raycastTarget = true;
-
-        Image frame = AddImage(rt, "Frame", RelicUISprites.GoldBorder(), isSelected ? Color.white : new Color(0.78f, 0.76f, 0.72f), false);
-        frame.type = Image.Type.Sliced;
-        frame.pixelsPerUnitMultiplier = 1.1f;
-        Stretch(frame.rectTransform);
-
+        // Selection glow sits behind the chip and bleeds outward — the highlight is light, not a
+        // heavier frame, so a picked card brightens rather than gaining ornament.
         if (isSelected)
         {
-            Image glow = AddImage(rt, "Glow", RelicUISprites.Glow(), new Color(ScrapEconomy.ScrapColor.r, ScrapEconomy.ScrapColor.g, ScrapEconomy.ScrapColor.b, 0.5f), false);
+            Image glow = AddImage(rt, "Glow", FlatUI.SoftGlow(), new Color(accent.r, accent.g, accent.b, 0.30f), false);
             Stretch(glow.rectTransform);
-            glow.rectTransform.offsetMin = new Vector2(-18f, -18f);
-            glow.rectTransform.offsetMax = new Vector2(18f, 18f);
-            glow.transform.SetAsFirstSibling();
+            glow.rectTransform.offsetMin = new Vector2(-26f, -26f);
+            glow.rectTransform.offsetMax = new Vector2(26f, 26f);
         }
+
+        Image bg = rt.gameObject.AddComponent<Image>();
+        bg.sprite = FlatUI.Panel(6);
+        bg.type = Image.Type.Sliced;
+        bg.color = isSelected ? new Color(0.165f, 0.180f, 0.204f, 1f) : FlatUI.SurfaceRaised;
+        bg.raycastTarget = true;
+
+        Image frame = AddImage(rt, "Frame", FlatUI.Outline(6, isSelected ? 2 : 1), isSelected ? accent : FlatUI.Border, false);
+        frame.type = Image.Type.Sliced;
+        Stretch(frame.rectTransform);
 
         if (card.cardData != null && card.cardData.cardArt != null)
         {
             Image art = AddImage(rt, "Art", card.cardData.cardArt, Color.white, false);
             art.preserveAspect = true;
             art.rectTransform.anchorMin = art.rectTransform.anchorMax = new Vector2(0.5f, 1f);
-            art.rectTransform.anchoredPosition = new Vector2(0f, -h * 0.24f);
-            art.rectTransform.sizeDelta = new Vector2(w - 46f, w - 46f);
+            art.rectTransform.anchoredPosition = new Vector2(0f, -14f);
+            art.rectTransform.sizeDelta = new Vector2(w - 34f, w - 34f);
+            art.rectTransform.pivot = new Vector2(0.5f, 1f);
         }
 
-        TMP_Text nameText = AddText(rt, "Name", new Vector2(0.5f, 0f), new Vector2(0f, h * 0.30f), new Vector2(w - 18f, 50f),
-            card.cardData != null ? card.cardData.cardName : "?", 20f, FontStyles.Bold,
-            new Color(0.97f, 0.93f, 0.85f), TextAlignmentOptions.Bottom);
+        TMP_Text nameText = AddText(rt, "Name", new Vector2(0.5f, 0f), new Vector2(0f, 62f), new Vector2(w - 16f, 42f),
+            card.cardData != null ? card.cardData.cardName : "?", 15f, FontStyles.Bold,
+            FlatUI.TextBody, TextAlignmentOptions.Bottom);
         nameText.enableWordWrapping = true;
         nameText.enableAutoSizing = true;
-        nameText.fontSizeMin = 13f; nameText.fontSizeMax = 20f;
+        nameText.fontSizeMin = 11f; nameText.fontSizeMax = 15f;
 
         // Charges: current out of max, so the player can see exactly what they're buying back.
         int max = card.cardData != null ? card.cardData.maxUses : 0;
         string charges = card.isInfinite ? "∞" : $"{card.currentUses}/{max}";
-        AddText(rt, "Charges", new Vector2(0.5f, 0f), new Vector2(0f, h * 0.16f), new Vector2(w - 18f, 32f),
-            charges, 22f, FontStyles.Bold, new Color(0.65f, 0.86f, 1f), TextAlignmentOptions.Center);
+        AddText(rt, "Charges", new Vector2(0.5f, 0f), new Vector2(0f, 40f), new Vector2(w - 16f, 24f),
+            charges, 16f, FontStyles.Bold, FlatUI.Charges, TextAlignmentOptions.Center);
 
-        AddText(rt, "Cost", new Vector2(0.5f, 0f), new Vector2(0f, 12f), new Vector2(w - 18f, 34f),
-            $"{cost}", 26f, FontStyles.Bold,
-            affordable ? ScrapEconomy.ScrapColor : new Color(0.55f, 0.34f, 0.30f), TextAlignmentOptions.Center);
+        // Cost as plain accent-coloured text. A shard icon was tried here at 17px and read as a
+        // smudge fused to the first digit — at this size the accent colour alone carries "scrap",
+        // and the section header already states the unit.
+        Color costCol = affordable ? accent : new Color(0.50f, 0.33f, 0.30f);
+        AddText(rt, "Cost", new Vector2(0.5f, 0f), new Vector2(0f, 12f), new Vector2(w - 16f, 26f),
+            $"{cost}", 20f, FontStyles.Bold, costCol, TextAlignmentOptions.Center);
 
-        if (!affordable) rt.gameObject.AddComponent<CanvasGroup>().alpha = 0.45f;
+        if (!affordable) rt.gameObject.AddComponent<CanvasGroup>().alpha = 0.40f;
 
         Button btn = rt.gameObject.AddComponent<Button>();
         btn.transition = Selectable.Transition.None;
@@ -377,9 +475,10 @@ public class ScrapForgeScreen : MonoBehaviour
     {
         if (selected == null)
         {
-            confirmLabel.text = "Pick a card to work on";
-            confirmLabel.color = new Color(0.72f, 0.72f, 0.76f);
-            confirmBg.color = new Color(0.55f, 0.53f, 0.57f, 1f);
+            confirmLabel.text = "SELECT A CARD";
+            confirmLabel.color = FlatUI.TextDisabled;
+            confirmBg.color = FlatUI.SurfaceRaised;
+            confirmOutline.color = FlatUI.BorderSoft;
             confirmButton.interactable = false;
             return;
         }
@@ -388,19 +487,18 @@ public class ScrapForgeScreen : MonoBehaviour
         int cost = selectedMode == Mode.Repair ? ScrapEconomy.RechargeCost(selected) : ScrapEconomy.SALVAGE_COST;
         bool canAfford = scrap >= cost;
 
+        int maxUses = selected.cardData != null ? selected.cardData.maxUses : 0;
         if (selectedMode == Mode.Repair)
-        {
-            int max = selected.cardData != null ? selected.cardData.maxUses : 0;
-            confirmLabel.text = $"REPAIR  {cardName}  →  {max}/{max} charges     —     {cost} scrap";
-        }
+            confirmLabel.text = $"REPAIR {cardName} TO {maxUses}/{maxUses}   ·   {cost} SCRAP";
         else
-        {
-            confirmLabel.text = $"SALVAGE  {cardName}  →  back in your deck at " +
-                                $"{ScrapEconomy.SalvageCharges(selected)}/{(selected.cardData != null ? selected.cardData.maxUses : 0)}     —     {cost} scrap";
-        }
+            confirmLabel.text = $"SALVAGE {cardName} AT {ScrapEconomy.SalvageCharges(selected)}/{maxUses}   ·   {cost} SCRAP";
 
-        confirmLabel.color = canAfford ? new Color(0.97f, 0.93f, 0.85f) : new Color(0.75f, 0.55f, 0.52f);
-        confirmBg.color = canAfford ? new Color(0.72f, 0.70f, 0.74f, 1f) : new Color(0.5f, 0.46f, 0.46f, 1f);
+        Color accent = ScrapEconomy.ScrapColor;
+        confirmLabel.color = canAfford ? accent : new Color(0.55f, 0.38f, 0.35f);
+        // Actionable state is carried by an accent outline and a faint accent wash rather than a
+        // loud filled button — reads as clearly clickable without shouting.
+        confirmBg.color = canAfford ? new Color(accent.r * 0.22f, accent.g * 0.18f, accent.b * 0.16f, 1f) : FlatUI.SurfaceRaised;
+        confirmOutline.color = canAfford ? accent : new Color(0.34f, 0.26f, 0.25f, 1f);
         confirmButton.interactable = canAfford;
     }
 
