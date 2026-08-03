@@ -14,9 +14,10 @@ using UnityEngine.UI;
 //      content, so a bounds snapshot taken at build time would leave embers drifting outside a
 //      collapsed panel.
 //
-// Motion is up-and-to-the-left with a slow sideways sway, so it reads as rising heat catching a
-// draught rather than as dots on a conveyor. Each ember fades in, drifts, and fades out before
-// wrapping back to the bottom-right, so nothing ever visibly pops in or out.
+// Embers rise from along the bottom edge and drift EITHER way as they climb, with a slow sideways
+// sway on top. The lateral speed is biased toward zero so most travel near-vertically and only a
+// few peel off to a side — when every ember slid the same direction it read as wind rather than as
+// rising heat. Each one fades in, drifts, and fades out before wrapping, so nothing visibly pops.
 public class UIEmberField : MonoBehaviour
 {
     private struct Ember
@@ -83,12 +84,17 @@ public class UIEmberField : MonoBehaviour
         float halfW = Mathf.Max(40f, r.width * 0.5f - MARGIN);
         float halfH = Mathf.Max(30f, r.height * 0.5f - MARGIN);
 
-        // Enter from the lower-right, since travel is up and to the left.
-        float x = Random.Range(-halfW * 0.35f, halfW);
-        float y = scatter ? Random.Range(-halfH, halfH) : Random.Range(-halfH, -halfH * 0.45f);
+        // Rise from along the bottom edge, anywhere across the width.
+        float x = Random.Range(-halfW, halfW);
+        float y = scatter ? Random.Range(-halfH, halfH) : Random.Range(-halfH, -halfH * 0.72f);
         e.pos = new Vector2(x, y);
 
-        e.vel = new Vector2(Random.Range(-15f, -5f), Random.Range(9f, 24f));
+        // Mostly upward, with a lateral drift that can go EITHER way. Squaring a signed random
+        // keeps the bulk near-vertical while letting a few peel off to one side — every ember
+        // sliding the same direction read as wind rather than as rising heat.
+        float lateral = Random.Range(-1f, 1f);
+        lateral *= Mathf.Abs(lateral);
+        e.vel = new Vector2(lateral * 14f, Random.Range(10f, 26f));
         e.swayAmp = Random.Range(2f, 7f);
         e.swaySpeed = Random.Range(0.5f, 1.4f);
         e.phase = Random.Range(0f, Mathf.PI * 2f);
@@ -118,8 +124,9 @@ public class UIEmberField : MonoBehaviour
         {
             embers[i].age += dt;
 
+            // Drift is two-directional now, so retire on either side, not just the left.
             if (embers[i].age >= embers[i].life ||
-                embers[i].pos.y > halfH || embers[i].pos.x < -halfW)
+                embers[i].pos.y > halfH || Mathf.Abs(embers[i].pos.x) > halfW)
             {
                 Respawn(ref embers[i], false);
                 continue;
