@@ -120,14 +120,22 @@ public class RelicSwapScreen : MonoBehaviour
         incomingFrame = AddImage(inc, "IncFrame", FlatUI.Outline(6, 1), T.Border, false);
         incomingFrame.type = Image.Type.Sliced; Stretch(incomingFrame.rectTransform);
 
-        newRelicLabel = AddText(inc, "NewLabel", new Vector2(0f, 1f), new Vector2(24f, -14f), new Vector2(260f, 20f),
-            "NEW RELIC", 13f, FontStyles.Bold, T.TextMuted, TextAlignmentOptions.TopLeft);
-        incomingChipHolder = AddPoint(inc, "Chip", new Vector2(0f, 0.5f), new Vector2(78f, -8f), new Vector2(96f, 96f));
-        // Name/description column starts well clear of the icon AND its glow aura (the glow
-        // extends ~1.4x the icon, to ~x=140), so the name no longer blends into the symbol.
-        incomingName = AddText(inc, "IncName", new Vector2(0f, 1f), new Vector2(190f, -28f), new Vector2(424f, 30f),
+        // Icon on the left, then ONE text column: caption, name, description.
+        //
+        // "NEW RELIC" used to be pinned to the panel's top-left corner, which put it directly over
+        // the icon socket. A caption belongs with the text it captions, not floating above the
+        // artwork — moving it into the column fixes the overlap and gives a proper reading order.
+        incomingChipHolder = AddPoint(inc, "Chip", new Vector2(0f, 0.5f), new Vector2(26f, 0f), new Vector2(96f, 96f));
+
+        // Column clears the icon AND its glow aura (RelicIcon's glow is 1.3x the icon, reaching
+        // to ~x=135), so nothing blends into the symbol.
+        const float COL_X = 190f;
+        newRelicLabel = AddText(inc, "NewLabel", new Vector2(0f, 1f), new Vector2(COL_X, -16f), new Vector2(260f, 18f),
+            "NEW RELIC", 12f, FontStyles.Bold, T.TextMuted, TextAlignmentOptions.TopLeft);
+        newRelicLabel.characterSpacing = 4f;
+        incomingName = AddText(inc, "IncName", new Vector2(0f, 1f), new Vector2(COL_X, -38f), new Vector2(424f, 28f),
             "", 21f, FontStyles.Bold, T.TextBright, TextAlignmentOptions.TopLeft);
-        incomingDesc = AddText(inc, "IncDesc", new Vector2(0f, 1f), new Vector2(190f, -62f), new Vector2(424f, 56f),
+        incomingDesc = AddText(inc, "IncDesc", new Vector2(0f, 1f), new Vector2(COL_X, -70f), new Vector2(424f, 50f),
             "", 15f, FontStyles.Normal, T.TextBody, TextAlignmentOptions.TopLeft);
         incomingDesc.enableWordWrapping = true;
 
@@ -250,7 +258,8 @@ public class RelicSwapScreen : MonoBehaviour
         // Rarity now drives the incoming panel's outline, its label and the TAKE button, since
         // there's no gold chrome left to carry it.
         Color rc = FlatUI.RarityColor(incoming.rarity);
-        newRelicLabel.color = rc;
+        // The caption stays MUTED and the name carries the rarity. Colouring both put two
+        // same-coloured lines directly on top of each other and flattened the hierarchy.
         if (incomingFrame != null) incomingFrame.color = Color.Lerp(FlatUI.Loadout.Border, rc, 0.6f);
         incomingName.text = string.IsNullOrEmpty(incoming.relicName) ? incoming.relicID : incoming.relicName;
         incomingName.color = rc;
