@@ -142,7 +142,7 @@ public class EnemyHealth : MonoBehaviour, IDamageable
 
         StartCoroutine(FlashRoutine());
 
-        if (damagePopupPrefab != null)
+        if (damagePopupPrefab != null && GameSettings.DamageNumbers)
         {
             GameObject popup = Instantiate(damagePopupPrefab, transform.position + Vector3.up * 0.5f, Quaternion.identity);
             popup.GetComponent<DamagePopup>().Setup(Mathf.RoundToInt(damage));

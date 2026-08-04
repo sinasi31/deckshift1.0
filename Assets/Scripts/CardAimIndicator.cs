@@ -150,6 +150,7 @@ public class CardAimIndicator : MonoBehaviour
     {
         DeckManager deck = DeckManager.instance;
         if (deck == null || player == null) { SetKind(Kind.None); return; }
+        if (!GameSettings.CardAimPreview) { SetKind(Kind.None); return; }               // player turned previews off
         if (Time.timeScale == 0f) { SetKind(Kind.None); return; }                       // paused / full-screen UI open
         if (playerHealth != null && playerHealth.IsDead) { SetKind(Kind.None); return; }
 

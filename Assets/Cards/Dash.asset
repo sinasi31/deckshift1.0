@@ -13,8 +13,9 @@ MonoBehaviour:
   m_Name: Dash
   m_EditorClassIdentifier: 
   cardName: Dash
-  description: Launch forward.
+  description: Rush forward. Nothing can hurt you while you are dashing.
   cardArt: {fileID: 7110878671101974141, guid: 4a13edcab03a8344895f1c7678dc156b, type: 3}
+  nameIsPaintedIntoArt: 1
   actionType: 1
   actionValue: 10
   singleUse: 0

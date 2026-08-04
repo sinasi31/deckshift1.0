@@ -4,38 +4,41 @@ using UnityEngine.SceneManagement;
 public class MainMenuController : MonoBehaviour
 {
     [Header("Paneller")]
-    public GameObject settingsPanel;
+    // âš ï¸ `settingsPanel` is gone (2026-08-09). The main menu and the pause menu now open the SAME
+    // SettingsScreen, which is the only sane arrangement: with two copies, every new setting had to
+    // be added twice and the two would drift apart the first time one was missed. The old
+    // SettingsPanel prefab and its SettingsMenu script were deleted with it.
     public GameObject tutorialPanel;
 
-    // PLAY butonu için
+    // PLAY butonu iï¿½in
     public void PlayGame()
     {
-        // Build Settings'deki sıradaki sahneyi yükle
+        // Build Settings'deki sï¿½radaki sahneyi yï¿½kle
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
     }
 
-    // SETTINGS butonu için
+    // SETTINGS butonu iï¿½in
     public void OpenSettings()
     {
-        settingsPanel.SetActive(true);
+        SettingsScreen.Open();
     }
 
-    // HOW TO PLAY butonu için
+    // HOW TO PLAY butonu iï¿½in
     public void OpenTutorial()
     {
         tutorialPanel.SetActive(true);
     }
 
-    // QUIT butonu için
+    // QUIT butonu iï¿½in
     public void QuitGame()
     {
-        Debug.Log("Çıkış yapıldı.");
+        Debug.Log("ï¿½ï¿½kï¿½ï¿½ yapï¿½ldï¿½.");
         Application.Quit();
     }
 
-    // Tutorial panelinin içindeki "Back" butonuna bunu bağlayabilirsin
-    // Ya da direkt Button'ın OnClick olayına TutorialPanel objesini sürükleyip
-    // GameObject.SetActive (false) yapabilirsin. Kodsuz çözüm :)
+    // Tutorial panelinin iï¿½indeki "Back" butonuna bunu baï¿½layabilirsin
+    // Ya da direkt Button'ï¿½n OnClick olayï¿½na TutorialPanel objesini sï¿½rï¿½kleyip
+    // GameObject.SetActive (false) yapabilirsin. Kodsuz ï¿½ï¿½zï¿½m :)
     public void CloseTutorial()
     {
         tutorialPanel.SetActive(false);

@@ -50,7 +50,8 @@ public class BlompoScreen : MonoBehaviour
     // shrank — at 900 there was ~200px of dead panel under them. Still tall enough for the forging
     // stage, which needs room for a 1.55x card struck at the centre.
     private const float WIN_W = 1600f, WIN_H = 762f;
-    private const float CARD_W = 200f, CARD_H = 286f;
+    // 2:3, the card art's real aspect (1024x1536), so a chip IS a card face with nothing letterboxed.
+    private const float CARD_W = 200f, CARD_H = 300f;
     // Shorter than the original 560: the ornate chrome used to fill the lower third, and without
     // it the chip was mostly empty space under the description.
     private const float OFFER_W = 380f, OFFER_H = 470f;
@@ -352,21 +353,53 @@ public class BlompoScreen : MonoBehaviour
         List<RuntimeCard> valid = CardEnhancements.CardsFor(chosenOffer, CollectDeck());
         promptText.text = $"<b>{CardEnhancements.Name(chosenOffer)}</b> — {CardEnhancements.Description(chosenOffer)}  Choose a card.";
 
-        int max = Mathf.Min(valid.Count, 8);
-
-        // Shrink to fit. Eight cards at full size need ~1780px against a 1440px row, so a full
-        // spread used to run off both ends of the window — only invisible today because decks are
-        // small. Scale is applied to the LayoutElement too, or the layout group keeps reserving
-        // the unscaled width.
+        // ⚠️ THIS USED TO CAP AT EIGHT CARDS AND SILENTLY DROP THE REST. With a deck of fifteen you
+        // simply could not bless anything after the eighth valid card, and nothing on screen said
+        // so — the same "content hidden with no indication" shape as the forge overflowing.
+        //
+        // Cards now WRAP onto rows at full size, exactly like the forge, and only shrink once the
+        // spread would need more than MAX_ROWS. The row's height is set from the result so the
+        // window still frames it.
         const float ROW_SPACING = 26f;
+        const int MAX_ROWS = 2;
         float rowW = WIN_W - 160f;
-        float needed = max * CARD_W + Mathf.Max(0, max - 1) * ROW_SPACING;
-        float fit = needed > rowW ? rowW / needed : 1f;
 
-        for (int i = 0; i < max; i++)
+        int columns = Mathf.Max(1, Mathf.FloorToInt((rowW + ROW_SPACING) / (CARD_W + ROW_SPACING)));
+        float fit = 1f;
+        if (Mathf.CeilToInt((float)valid.Count / columns) > MAX_ROWS)
+        {
+            int needed = Mathf.CeilToInt((float)valid.Count / MAX_ROWS);
+            float w = Mathf.Max(96f, (rowW - ROW_SPACING * (needed - 1)) / needed);
+            fit = w / CARD_W;
+            columns = Mathf.Max(1, Mathf.FloorToInt((rowW + ROW_SPACING) / (w + ROW_SPACING)));
+        }
+
+        // ⚠️ PLACED BY HAND, NOT BY A LAYOUT GROUP. BuildCardChip shrinks a chip with localScale
+        // (its children sit at fixed offsets derived from CARD_W, so scaling the rect alone would
+        // scatter them). A GridLayoutGroup drives the child's RECT, which would then fight that
+        // scale and shrink everything twice. The row's own HorizontalLayoutGroup is switched off
+        // here for the same reason.
+        HorizontalLayoutGroup hlg = cardRow.GetComponent<HorizontalLayoutGroup>();
+        if (hlg != null) hlg.enabled = false;
+
+        float cellW = CARD_W * fit + ROW_SPACING;
+        float cellH = CARD_H * fit + ROW_SPACING;
+        int rows = Mathf.CeilToInt((float)valid.Count / columns);
+        ((RectTransform)cardRow).sizeDelta = new Vector2(rowW, rows * cellH - ROW_SPACING);
+
+        for (int i = 0; i < valid.Count; i++)
         {
             RuntimeCard card = valid[i];
             GameObject chip = BuildCardChip(cardRow, card, fit);
+
+            int col = i % columns, row = i / columns;
+            // Last row is centred on whatever it holds rather than left-aligned under a full row.
+            int inThisRow = Mathf.Min(columns, valid.Count - row * columns);
+            RectTransform crt = (RectTransform)chip.transform;
+            crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 1f);
+            crt.pivot = new Vector2(0.5f, 1f);
+            crt.anchoredPosition = new Vector2((col - (inThisRow - 1) * 0.5f) * cellW, -row * cellH);
+
             Button b = chip.AddComponent<Button>();
             b.transition = Selectable.Transition.None;
             RuntimeCard captured = card;
@@ -468,51 +501,21 @@ public class BlompoScreen : MonoBehaviour
         // Scaled, so a shrunk card actually reserves less room in the layout group.
         le.preferredWidth = CARD_W * scale; le.preferredHeight = CARD_H * scale;
 
+        // ⚠️ THE CHIP IS THE CARD. It used to be a FlatUI plate with the art squeezed into a SQUARE
+        // box — which letterboxed the whole 2:3 painted face down small enough that its own cost and
+        // charge medallions were unreadable, which is why this screen re-printed the name, SHIFT and
+        // CHARGES underneath. They are all on the card already. The face is drawn at true aspect and
+        // the duplicates are gone; hovering turns it over for the effect text.
+        //
+        // A transparent hit plate keeps the whole chip clickable — an Image only raycasts within its
+        // RECT, and the card art carries its own transparent margins.
         Image bg = rt.gameObject.AddComponent<Image>();
-        bg.sprite = FlatUI.Panel(5);
-        bg.type = Image.Type.Sliced;
-        bg.color = T.SurfaceRaised;
+        bg.color = new Color(0f, 0f, 0f, 0f);
         bg.raycastTarget = true;
 
-        Image frame = AddImage(rt, "Frame", FlatUI.Outline(5, 1), T.Border, false);
-        frame.type = Image.Type.Sliced;
-        Stretch(frame.rectTransform);
-
-        if (card.cardData != null && card.cardData.cardArt != null)
-        {
-            Image art = AddImage(rt, "Art", card.cardData.cardArt, Color.white, false);
-            art.preserveAspect = true;
-            art.rectTransform.anchorMin = art.rectTransform.anchorMax = new Vector2(0.5f, 1f);
-            art.rectTransform.pivot = new Vector2(0.5f, 1f);
-            art.rectTransform.anchoredPosition = new Vector2(0f, -16f);
-            art.rectTransform.sizeDelta = new Vector2(CARD_W - 46f, CARD_W - 46f);
-        }
-
-        // Two lines of room so long names ("Create Platform") wrap clear of the art above.
-        TMP_Text nameText = AddText(rt, "Name", new Vector2(0.5f, 0f), new Vector2(0f, 62f), new Vector2(CARD_W - 20f, 52f),
-            card.cardData != null ? card.cardData.cardName : "?", 19f, FontStyles.Bold,
-            T.TextBody, TextAlignmentOptions.Bottom);
-        nameText.enableWordWrapping = true;
-        nameText.enableAutoSizing = true;
-        nameText.fontSizeMin = 13f; nameText.fontSizeMax = 19f;
-
-        // The card's actual stats. The chip used to show a bare charge count and no Shift cost at
-        // all, which made this step a guess — you were picking which card to permanently alter
-        // without being able to see what it currently costs or how much life it has left in it.
-        int maxUses = card.cardData != null ? card.cardData.maxUses : 0;
-        int cost = card.cardData != null ? card.cardData.shiftCost : 0;
-
-        Image rule = AddImage(rt, "StatRule", FlatUI.FadedRule(), T.BorderSoft, false);
-        rule.rectTransform.anchorMin = rule.rectTransform.anchorMax = new Vector2(0.5f, 0f);
-        rule.rectTransform.pivot = new Vector2(0.5f, 0f);
-        rule.rectTransform.anchoredPosition = new Vector2(0f, 52f);
-        rule.rectTransform.sizeDelta = new Vector2(CARD_W - 44f, 1f);
-
-        float half = (CARD_W - 20f) * 0.5f;
-        BuildStat(rt, "Cost", -half * 0.5f, "SHIFT",
-            card.enhancement == CardEnhancement.OnTheHouse ? "0" : cost.ToString(), FlatUI.Charges);
-        BuildStat(rt, "Uses", half * 0.5f, "CHARGES",
-            card.isInfinite ? "∞" : $"{card.currentUses}/{maxUses}", FlatUI.Charges);
+        // Face plus its medallion numbers — drawing cardArt alone leaves the cost and charge circles
+        // empty, because those digits are TMP fields on the card prefab rather than painted art.
+        CardFace.Build(rt, card);
 
         if (card.enhancement != CardEnhancement.None)
         {
@@ -520,16 +523,12 @@ public class BlompoScreen : MonoBehaviour
             AddText(rt, "Badge", new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(CARD_W - 16f, 26f),
                 CardEnhancements.Name(card.enhancement), 15f, FontStyles.Bold, gem, TextAlignmentOptions.Center);
         }
-        return rt.gameObject;
-    }
 
-    // One labelled stat under a card chip: a small muted caption over the value.
-    private void BuildStat(RectTransform card, string name, float x, string label, string value, Color valueColor)
-    {
-        AddText(card, name + "Label", new Vector2(0.5f, 0f), new Vector2(x, 30f), new Vector2(96f, 18f),
-            label, 11f, FontStyles.Bold, T.TextMuted, TextAlignmentOptions.Center);
-        AddText(card, name, new Vector2(0.5f, 0f), new Vector2(x, 8f), new Vector2(96f, 26f),
-            value, 19f, FontStyles.Bold, valueColor, TextAlignmentOptions.Center);
+        // Hovering turns the chip over, exactly as in the hand. You are choosing which card to
+        // PERMANENTLY alter, so being able to read what it does first is the whole point.
+        CardHoverFlip.Attach(rt).Bind(card);
+
+        return rt.gameObject;
     }
 
     private GameObject BuildOfferChip(Transform parent, CardEnhancement e, bool playable = true)
@@ -567,7 +566,13 @@ public class BlompoScreen : MonoBehaviour
         glow.rectTransform.sizeDelta = new Vector2(150f, 150f);
 
         // The sigil: an inscribed arcane mark where the gem used to sit.
-        Image star = AddImage(rt, "Sigil", FlatUI.ArcaneSigil(), gem, false);
+        //
+        // ⚠️ A DIFFERENT GLYPH PER RARITY, not one shared mark recoloured. Every offer used the
+        // same sigil, so colour was carrying the tier alone — and the designer reported being
+        // unable to tell the tiers apart at a glance (2026-08-09). Shape is read faster than hue,
+        // and it survives greyscale and colour-blindness: bare ring (Common) -> 4 rays (Rare) ->
+        // 6 rays + inner ring (Epic) -> the full ornate sigil (Legendary).
+        Image star = AddImage(rt, "Sigil", FlatUI.RaritySigil(CardEnhancements.RarityOf(e)), gem, false);
         star.rectTransform.anchorMin = star.rectTransform.anchorMax = new Vector2(0.5f, 1f);
         star.rectTransform.anchoredPosition = new Vector2(0f, -112f);
         star.rectTransform.sizeDelta = new Vector2(112f, 112f);

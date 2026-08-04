@@ -5,7 +5,13 @@ public class CameraPeek : MonoBehaviour
     public static CameraPeek instance;
 
     [Header("Peek Settings")]
-    [SerializeField] float maxOffset = 3f;
+    // Peeking exists so the player can SCOUT before spending Shift — see what is down a shaft or
+    // past a gap and decide whether the route is worth it. At 3 units it barely cleared the
+    // player's own body and showed nothing they could not already see, so it did not answer any
+    // question worth pressing a key for. 9 reaches roughly a screen out, which is far enough to
+    // read the next chamber. The camera still clamps to the room's CameraBounds, so this can never
+    // show the outside of the level however far it is pushed.
+    [SerializeField] float maxOffset = 9f;
     [SerializeField] float lerpDuration = 0.3f;
     [SerializeField] KeyCode peekKey = KeyCode.LeftControl;
 

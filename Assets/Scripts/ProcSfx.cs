@@ -213,6 +213,82 @@ public static class ProcSfx
         return Finalize(dry, 0.07f, 9000f);   // dry and bright — metal, close-miked
     }
 
+    private static AudioClip meteorImpact;
+
+    // Meteor Greaves landing. A heavy stone impact, and deliberately a THIRD sound family from the
+    // two already here: magic is harmonic (bell partials), metal is inharmonic-but-pitched (bar
+    // modes), and this is barely pitched at all — mostly noise and sub. Stone shatters; it does not
+    // ring. Keeping the families distinct is what stops a boulder landing and a scrap pickup
+    // reading as the same event.
+    public static AudioClip MeteorImpact
+    {
+        get { if (meteorImpact == null) meteorImpact = BuildMeteorImpact(); return meteorImpact; }
+    }
+
+    // Four layers, because a big impact is a sequence and not a single hit:
+    //   CRACK   ~8 ms of bright noise — the fracture. Without this the hit has no attack and
+    //           reads as distant rather than underfoot.
+    //   SUB     a sine swept 110 -> 34 Hz. The downward sweep is what makes it feel like MASS
+    //           arriving; a static low sine just sounds like a hum.
+    //   BODY    three inharmonic low partials for the stone slab itself.
+    //   DEBRIS  band-passed noise with a slow decay and a little flutter — rubble settling after,
+    //           which is what sells the scale and stops the sound ending abruptly.
+    private static AudioClip BuildMeteorImpact()
+    {
+        const float dur = 1.15f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(90210);
+
+        // Body: inharmonic, low, and fast-decaying — a struck slab, not a bell.
+        float b0 = 132f;
+        float[] ratio = { 1f, 1.71f, 2.43f };
+        float[] pAmp = { 1f, 0.42f, 0.20f };
+        float[] pDec = { 11f, 17f, 26f };
+
+        float crackLp = 0f;
+        float crackCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 7000f / SampleRate);
+
+        // Two one-pole stages in series make a crude band-pass for the debris.
+        float debLp = 0f, debHp = 0f;
+        float debLpCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 1800f / SampleRate);
+        float debHpCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 260f / SampleRate);
+
+        float subPhase = 0f;
+
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+
+            // CRACK
+            crackLp += crackCoef * (noise - crackLp);
+            float crack = crackLp * Mathf.Exp(-320f * ts);
+
+            // SUB — sweep the frequency, integrating phase so there are no discontinuities.
+            float subF = Mathf.Lerp(110f, 34f, Mathf.Clamp01(ts / 0.30f));
+            subPhase += 2f * Mathf.PI * subF / SampleRate;
+            float sub = Mathf.Sin(subPhase) * Mathf.Exp(-5.5f * ts);
+
+            // BODY
+            float body = 0f;
+            for (int p = 0; p < ratio.Length; p++)
+                body += Mathf.Sin(2f * Mathf.PI * b0 * ratio[p] * ts) * pAmp[p] * Mathf.Exp(-pDec[p] * ts);
+
+            // DEBRIS — rubble skittering, gated so it starts just after the hit.
+            debLp += debLpCoef * (noise - debLp);
+            debHp += debHpCoef * (debLp - debHp);
+            float band = debLp - debHp;
+            float flutter = 0.75f + 0.25f * Mathf.Sin(2f * Mathf.PI * 27f * ts);
+            float debrisEnv = Mathf.Exp(-4.2f * ts) * Mathf.Clamp01(ts / 0.02f);
+            float debris = band * debrisEnv * flutter;
+
+            dry[i] = crack * 0.30f + sub * 0.52f + body * 0.16f + debris * 0.22f;
+        }
+
+        return Finalize(dry, 0.26f, 5200f);   // wet and dark — a big room, heard from inside it
+    }
+
     private static AudioClip arcaneGather, arcaneBind;
 
     // Blompo's blessing, part one: power gathering. A rising shimmer under the ring-and-motes
@@ -327,6 +403,150 @@ public static class ProcSfx
     }
 
     // Shared tail: small warm reverb + master low-pass + anti-click fades -> AudioClip.
+    private static AudioClip pauseHalt, pauseRelease, pauseTick;
+
+    // Opening the pause screen: the moment everything stops.
+    public static AudioClip PauseHalt
+    {
+        get { if (pauseHalt == null) pauseHalt = BuildPauseHalt(); return pauseHalt; }
+    }
+
+    // Closing it: the clock let go.
+    public static AudioClip PauseRelease
+    {
+        get { if (pauseRelease == null) pauseRelease = BuildPauseRelease(); return pauseRelease; }
+    }
+
+    // Moving the selection. Tiny, dry, and quiet enough to hold a key down through.
+    public static AudioClip PauseTick
+    {
+        get { if (pauseTick == null) pauseTick = BuildPauseTick(); return pauseTick; }
+    }
+
+    // A FOURTH sound family, kept distinct from the three already here on purpose: magic is
+    // harmonic (bell partials), metal is inharmonic-but-pitched (bar modes), stone is barely
+    // pitched at all. This one is defined by what happens to its ENVELOPE rather than its
+    // spectrum — it is the only sound in the game that gets CHOKED.
+    //
+    // Three beats, and the middle one is the whole idea:
+    //   INHALE  ~130ms of noise whose band-pass climbs. Reads as something winding up.
+    //   STOP    a struck glass cluster plus a low sub, on the beat the inhale cuts dead.
+    //   CHOKE   the ring is damped away over ~180ms instead of being allowed to decay naturally.
+    //           A sound that fades out says "ending"; a sound that is cut short says "held".
+    private static AudioClip BuildPauseHalt()
+    {
+        const float dur = 1.10f;
+        const float hit = 0.13f;                 // when the inhale stops and the strike lands
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(9042);
+
+        float svfLow = 0f, svfBand = 0f;
+
+        // Cold glass, not a warm bell: a stretched, slightly inharmonic cluster.
+        float f0 = 494f;                                    // B4
+        float[] ratio = { 1f, 2.02f, 3.09f, 4.21f, 6.05f };
+        float[] pAmp = { 1f, 0.46f, 0.26f, 0.14f, 0.07f };
+
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+
+            // INHALE — band-passed noise climbing 300 -> 3400 Hz, silenced the instant the hit lands.
+            float inhale = 0f;
+            if (ts < hit)
+            {
+                float t01 = ts / hit;
+                float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+                float cutoff = Mathf.Lerp(300f, 3400f, t01 * t01);
+                float f = 2f * Mathf.Sin(Mathf.PI * Mathf.Min(cutoff, SampleRate * 0.45f) / SampleRate);
+                svfLow += f * svfBand;
+                float high = noise - svfLow - 0.30f * svfBand;
+                svfBand += f * high;
+                inhale = svfBand * Mathf.Pow(t01, 1.8f) * 0.16f;
+            }
+
+            float st = ts - hit;
+            if (st < 0f) { dry[i] = inhale; continue; }
+
+            // THE CHOKE. Two envelopes multiplied: the partials' own decay, and a damper that
+            // clamps down over 180ms and holds everything at a trickle afterwards. Without the
+            // damper this is just a chime and reads as a menu ping.
+            float damp = Mathf.Lerp(1f, 0.06f, Mathf.Clamp01(st / 0.18f));
+
+            float body = 0f;
+            for (int p = 0; p < ratio.Length; p++)
+                body += Mathf.Sin(2f * Mathf.PI * f0 * ratio[p] * st) * pAmp[p] * Mathf.Exp(-6f * st);
+
+            // Sub thump under the strike — the weight of the thing coming to rest.
+            float sub = Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(96f, 58f, Mathf.Clamp01(st / 0.25f)) * st)
+                      * Mathf.Exp(-9f * st);
+
+            dry[i] = inhale + body * damp * 0.105f + sub * 0.075f;
+        }
+
+        return Finalize(dry, 0.20f, 7000f);
+    }
+
+    // The inverse: short, and it OPENS. The halt's ring is choked; this one is released and allowed
+    // to run out on its own, which is what makes the pair read as a lid closing and lifting.
+    private static AudioClip BuildPauseRelease()
+    {
+        const float dur = 0.55f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(3311);
+
+        float lp = 0f;
+        double ph = 0.0;
+
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+            float t01 = ts / dur;
+
+            // A breath opening outward: noise whose low-pass sweeps UP, brief.
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+            float cutoff = Mathf.Lerp(700f, 5200f, Mathf.Clamp01(t01 / 0.35f));
+            lp += (1f - Mathf.Exp(-2f * Mathf.PI * cutoff / SampleRate)) * (noise - lp);
+            float air = lp * Mathf.Exp(-11f * ts) * 0.13f;
+
+            // A glass partial rising a fourth. Phase is integrated so the glide doesn't tear.
+            float g = Mathf.Lerp(494f, 659f, Mathf.Clamp01(t01 / 0.4f));
+            ph += 2.0 * Mathf.PI * g / SampleRate;
+            float tone = (float)System.Math.Sin(ph) * Mathf.Exp(-7f * ts) * 0.075f;
+
+            dry[i] = air + tone;
+        }
+
+        return Finalize(dry, 0.14f, 8000f);
+    }
+
+    // Selection tick. 35ms, no reverb, no pitch to speak of — a fingernail on glass. Anything with
+    // a discernible NOTE turns a held arrow key into a melody.
+    private static AudioClip BuildPauseTick()
+    {
+        const float dur = 0.035f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(1187);
+
+        float hp = 0f, prev = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+
+            // One-pole high-pass, so the click has no body at all.
+            hp = 0.92f * (hp + noise - prev);
+            prev = noise;
+
+            dry[i] = (hp * 0.5f + Mathf.Sin(2f * Mathf.PI * 2300f * ts) * 0.35f) * Mathf.Exp(-180f * ts) * 0.22f;
+        }
+
+        return Finalize(dry, 0f, 11000f);
+    }
+
     private static AudioClip Finalize(float[] dry, float reverbWet, float masterLpHz)
     {
         float[] s = ApplyReverbAndWarmth(dry, reverbWet, masterLpHz);

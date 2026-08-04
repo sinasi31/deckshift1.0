@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// 'GameEnums.cs' dosyamızda olduğu için bu satıra gerek yok
+// 'GameEnums.cs' dosyamï¿½zda olduï¿½u iï¿½in bu satï¿½ra gerek yok
 // public enum CardActionType { ... } 
 
 [CreateAssetMenu(fileName = "New CardData", menuName = "Deckshift/Card Data")]
@@ -12,6 +12,18 @@ public class CardData : ScriptableObject
     public string description;
     public Sprite cardArt;
 
+    // Whether the card's TITLE is already drawn into cardArt.
+    //
+    // Going forward the answer is NO and CardUI types the name into the plate itself (designer,
+    // 2026-08-09) â€” which is why the default is false. New art should ship with an EMPTY plate; the
+    // name then comes from cardName, so renaming a card no longer means repainting a texture.
+    //
+    // âš ï¸ The 14 pre-2026-08-09 cards have their names PAINTED IN and therefore set this to true.
+    // Clear the flag on each one as its art is replaced â€” leaving it set just means the plate keeps
+    // showing the old painted title, and clearing it too early prints the name on top of itself.
+    [Tooltip("ON for legacy art with the title painted into the texture. OFF (the default) lets the UI type cardName into the plate.")]
+    public bool nameIsPaintedIntoArt = false;
+
     [Header("Card Action")]
     public CardActionType actionType;
     public float actionValue;
@@ -19,13 +31,13 @@ public class CardData : ScriptableObject
     [Header("Card Behavior")]
     public bool singleUse = false;
 
-    // --- YENİ EKLENEN KISIM ---
+    // --- YENï¿½ EKLENEN KISIM ---
     [Header("Game Mechanics")]
 
-    [Tooltip("Bu kartı oynamanın 'Shift' maliyeti")]
-    public int shiftCost = 0; // Varsayılan maliyet 0 (yani bedava)
+    [Tooltip("Bu kartï¿½ oynamanï¿½n 'Shift' maliyeti")]
+    public int shiftCost = 0; // Varsayï¿½lan maliyet 0 (yani bedava)
 
-    [Tooltip("Bu kartın desteye eklendiğinde sahip olacağı maks. kullanım hakkı")]
-    public int maxUses = 3; // Varsayılan kullanım hakkı 3
-    // --- BİTİŞ ---
+    [Tooltip("Bu kartï¿½n desteye eklendiï¿½inde sahip olacaï¿½ï¿½ maks. kullanï¿½m hakkï¿½")]
+    public int maxUses = 3; // Varsayï¿½lan kullanï¿½m hakkï¿½ 3
+    // --- Bï¿½Tï¿½ï¿½ ---
 }

@@ -240,14 +240,25 @@ public class PlayerController : MonoBehaviour
     public float parryRiposteRange = 2.5f;    // shard burst radius on a successful Glass Parry
 
     [Header("Meteor Greaves (relic)")]
-    [Tooltip("Minimum fall (world units, apex→landing) before the landing shockwave triggers.")]
-    public float meteorMinFall = 4f;
+    // ⚠️ THIS MUST STAY ABOVE THE JUMP APEX. A max-height jump rises ~4.9 units (measured, see
+    // LevelValidator), so at the old 4.0 the shockwave fired on EVERY full jump — the relic was
+    // free, constant, and stopped being a decision. 6.5 clears the apex with margin, so it takes a
+    // real DROP (a ledge, a shaft) to trigger, which is what the item is about.
+    [Tooltip("Minimum fall (world units, apex→landing) before the landing shockwave triggers. " +
+             "Keep ABOVE the ~4.9-unit jump apex or it procs on every jump.")]
+    public float meteorMinFall = 6.5f;
     [Tooltip("Fall height at which the shockwave's size/damage max out.")]
     public float meteorMaxFall = 14f;
+    [Tooltip("Seconds before it can trigger again — stops a repeated hop off the same ledge from " +
+             "chaining shockwaves into a stun-lock.")]
+    public float meteorCooldown = 1.5f;
     public float meteorMinRadius = 2.5f;
     public float meteorMaxRadius = 5.5f;
     public float meteorMinDamage = 12f;
     public float meteorMaxDamage = 55f;
+    [Tooltip("Impact volume at the biggest fall. Scales down with drop height.")]
+    [Range(0f, 2f)] public float meteorSfxVolume = 1.0f;
+    private float meteorReadyAt;   // Time.time before which the greaves stay quiet
 
     // Fall tracking for Meteor Greaves: record the highest point reached while airborne,
     // so the landing knows how far the player dropped. Reset on teleports (respawn / room
@@ -259,13 +270,27 @@ public class PlayerController : MonoBehaviour
     public float interactionRange = 2f;
     public LayerMask interactableLayer;
 
+    // --- Stagger: buy Shift with blood --------------------------------------------------------
+    // Stagger is no longer a three-strikes death sentence. It is the pump of last resort: it hands
+    // back a little Shift and charges HP for it, and the price goes UP every single time, for the
+    // whole run. There is no cap and no reset — the run ends when you can no longer afford the next
+    // one. That escalation is what keeps it a last resort instead of a Shift printer.
     [Header("Stagger Settings")]
+    [Tooltip("How many times Stagger has been played this RUN. The price is derived from it, so it must not reset per room.")]
     public int staggerCount = 0;
-    public int maxStaggerUses = 3;
+    [Tooltip("HP the FIRST Stagger costs. Every play adds another step on top: 8, 16, 24, 32...")]
+    public float staggerHealthStep = 8f;
+    [Tooltip("Shift handed back per play. This is what the HP is buying.")]
+    public int staggerShiftGain = 2;
     public float staggerJumpForce = 5f;
+    [Tooltip("Incidental damage to enemies caught in the flail. Unrelated to what Stagger costs YOU.")]
     public float staggerDamage = 5f;
     public float staggerRadius = 2f;
     public GameObject staggerEffect;
+
+    // What the NEXT Stagger will cost. The card face and its hover text both read this, so the
+    // player is never surprised by the price — see CardUI.
+    public float NextStaggerCost => staggerHealthStep * (staggerCount + 1);
 
     // Gravity reversal state
     internal bool isGravityReversed = false;
@@ -853,6 +878,8 @@ public class PlayerController : MonoBehaviour
     {
         if (RelicManager.instance == null || !RelicManager.instance.HasRelic("MeteorGreaves")) return;
         if (fallDist < meteorMinFall) return;
+        if (Time.time < meteorReadyAt) return;
+        meteorReadyAt = Time.time + meteorCooldown;
 
         float denom = Mathf.Max(0.01f, meteorMaxFall - meteorMinFall);
         float power01 = Mathf.Clamp01((fallDist - meteorMinFall) / denom);
@@ -871,6 +898,11 @@ public class PlayerController : MonoBehaviour
         MeteorGreavesVFX.Play(transform.position, radius, power01);
         if (CameraShake.instance != null)
             CameraShake.instance.Shake(Mathf.Lerp(0.12f, 0.4f, power01), Mathf.Lerp(0.25f, 0.6f, power01));
+
+        // Impact sound, louder the further you fell. 2D one-shot rather than positional: the player
+        // IS the listener here, and a landing this heavy should hit at full weight every time.
+        if (audioSource != null)
+            SfxManager.PlayOn(audioSource, ProcSfx.MeteorImpact, Mathf.Lerp(0.55f, 1f, power01) * meteorSfxVolume);
     }
 
     public bool IsGroundedCheck()
@@ -1088,6 +1120,10 @@ public class PlayerController : MonoBehaviour
     }
 
     public void Heal(float amount) => playerHealth.Heal(amount);
+
+    // Snap back to where this room started. Used by the DeathZone trigger and by LevelManager's
+    // out-of-bounds net, which is what catches a player who has Phased clean out of the level.
+    public void ReturnToEntryPoint() => playerHealth.FallAndRespawn();
 
     internal void PerformGlassWail(float stunDuration)
     {
@@ -1554,9 +1590,8 @@ public class PlayerController : MonoBehaviour
 
     internal void PerformStagger()
     {
-        staggerCount++;
-        Debug.Log($"STAGGER KULLANILDI! ({staggerCount}/{maxStaggerUses})");
-
+        // The flail: a free scrap of height plus a shove at anything standing on top of you, so
+        // Stagger also unsticks a player who has jumped themselves into a corner.
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
         float jumpDir = isGravityReversed ? -1f : 1f;
         rb.AddForce(Vector2.up * staggerJumpForce * jumpDir, ForceMode2D.Impulse);
@@ -1573,11 +1608,20 @@ public class PlayerController : MonoBehaviour
 
         if (staggerEffect != null) Instantiate(staggerEffect, transform.position, Quaternion.identity);
 
-        if (staggerCount >= maxStaggerUses)
-        {
-            Debug.Log("KALBİN DAYANAMADI! ÖLÜYORSUN...");
-            playerHealth.Kill();
-        }
+        // The trade itself is a resource change, so the umbrella hub rule covers it: in the sandbox
+        // the flail happens, nothing is bought and nothing is paid — including the escalation, which
+        // is permanent run state and so must not advance there either.
+        if (LevelManager.instance != null && LevelManager.instance.IsCurrentRoomHub()) return;
+
+        float cost = NextStaggerCost;
+        staggerCount++;
+
+        // Pay out BEFORE charging: PayHealthCost can kill, and a lethal Stagger that silently
+        // skipped its own payout would make the last one in a run behave differently from the rest.
+        AddShift(staggerShiftGain);
+        playerHealth.PayHealthCost(cost);
+
+        Debug.Log($"STAGGER #{staggerCount}: +{staggerShiftGain} Shift for {cost} HP. Next one costs {NextStaggerCost}.");
     }
 
     private void CheckInteraction()

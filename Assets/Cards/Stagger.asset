@@ -13,10 +13,12 @@ MonoBehaviour:
   m_Name: Stagger
   m_EditorClassIdentifier: 
   cardName: Stagger
-  description: 
-  cardArt: {fileID: 0}
+  description: Pay health to get Shift back. The price goes up every time you use
+    it, and you cannot discard it.
+  cardArt: {fileID: -3248299822247759194, guid: 8c6322ffe39e5cc4386d324a6a8eabba, type: 3}
+  nameIsPaintedIntoArt: 0
   actionType: 14
   actionValue: 0
   singleUse: 0
   shiftCost: 0
-  maxUses: 3
+  maxUses: 1

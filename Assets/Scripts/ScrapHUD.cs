@@ -21,11 +21,18 @@ public class ScrapHUD : MonoBehaviour
     private TMP_Text countText;
     private PlayerController player;
 
-    private const float CHIP_W = 132f, CHIP_H = 44f;
-    private const float ABOVE_EXHAUST = 56f;   // vertical gap above the ExhaustPile button
+    // Chip size and plate now come from HudChip, shared with the gold counter above it.
 
+    // ⚠️ Registered through SceneBootstrap, NOT called directly — RuntimeInitializeOnLoadMethod
+    // fires once per play session, so the counter disappeared permanently the first time the player
+    // died and restarted (two scene loads). See SceneBootstrap.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
+    {
+        SceneBootstrap.Register(Create);
+    }
+
+    private static void Create()
     {
         // The HUD only belongs in gameplay scenes. GameplayHUD is the marker for those — menus
         // and the game-over scene don't have one, so the counter simply doesn't appear there.
@@ -41,21 +48,12 @@ public class ScrapHUD : MonoBehaviour
     private void Build()
     {
         RectTransform rt = GetComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(CHIP_W, CHIP_H);
-        PositionNearExhaustPile(rt);
+        rt.sizeDelta = new Vector2(HudChip.Width, HudChip.Height);
+        PositionUnderGold(rt);
 
-        // Flat iron chip, matching the Scrap Forge screen this currency is spent on. (It was
-        // originally gold-on-stone like the old chrome, which left it as the one piece of the
-        // scrap system still speaking the old visual language.)
-        Image bg = gameObject.AddComponent<Image>();
-        bg.sprite = FlatUI.Panel(5);
-        bg.type = Image.Type.Sliced;
-        bg.color = FlatUI.Surface;
-        bg.raycastTarget = false;
-
-        Image frame = AddImage(transform, "Frame", FlatUI.Outline(5, 1), FlatUI.Border);
-        frame.type = Image.Type.Sliced;
-        Stretch(frame.rectTransform);
+        // The plate is built by HudChip so this counter and the gold counter above it are the same
+        // object in two colours — they cannot drift apart the way they had.
+        HudChip.Build(rt);
 
         // Shard icon, reusing the exact pickup sprite so the HUD number and the thing on the floor
         // are visibly the same currency.
@@ -83,35 +81,70 @@ public class ScrapHUD : MonoBehaviour
         countText.text = "0";
     }
 
-    private void PositionNearExhaustPile(RectTransform rt)
+    // Sits DIRECTLY BELOW THE GOLD COUNTER, as the fourth row of the resource panel.
+    //
+    // ⚠️ It used to live bottom-right, above the ExhaustPile button, on the reasoning that scrap is
+    // a deck-maintenance currency and belongs with the deck UI rather than with the survival stats.
+    // The designer overruled that (2026-08-09): in play it read as a stray widget in a corner, and
+    // the two CURRENCIES being in opposite corners of the screen made neither easy to check. Gold
+    // and scrap are both "how much do I have to spend", so they stack.
+    private void PositionUnderGold(RectTransform rt)
     {
-        RectTransform pile = FindExhaustPile();
-        if (pile != null)
+        RectTransform gold = FindGoldDisplay();
+        if (gold != null)
         {
-            // Sibling of the pile button (not a child — a child would inherit its Button raycast
-            // area and its active state), sharing its anchors so it tracks the same HUD corner.
-            rt.SetParent(pile.parent, false);
-            rt.anchorMin = pile.anchorMin;
-            rt.anchorMax = pile.anchorMax;
-            rt.pivot = pile.pivot;
-            rt.anchoredPosition = pile.anchoredPosition + new Vector2(0f, pile.rect.height * 0.5f + ABOVE_EXHAUST);
-            rt.sizeDelta = new Vector2(CHIP_W, CHIP_H);
+            // Sibling of the gold readout, sharing its anchors so both track the same panel corner.
+            rt.SetParent(gold.parent, false);
+            rt.anchorMin = gold.anchorMin;
+            rt.anchorMax = gold.anchorMax;
+            rt.pivot = gold.pivot;
+            // Gold's pivot is top-left in a top-anchored panel, so "below" is -Y.
+            rt.anchoredPosition = gold.anchoredPosition + new Vector2(0f, -(HudChip.Height + HudChip.RowGap));
+            rt.sizeDelta = new Vector2(HudChip.Width, HudChip.Height);
             return;
         }
 
-        // Fallback: bottom-left, clear of the centre hand drawer.
-        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0f, 0f);
-        rt.anchoredPosition = new Vector2(28f, 150f);
+        // Fallback: top-left under where the panel would be, rather than a far corner — a missing
+        // gold display should not exile the counter to the other side of the screen.
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0f, 1f);
+        rt.anchoredPosition = new Vector2(18f, -170f);
+        rt.sizeDelta = new Vector2(HudChip.Width, HudChip.Height);
     }
 
-    private RectTransform FindExhaustPile()
+    private RectTransform FindGoldDisplay()
     {
+        // Ask the panel that owns the layout, so the two stay together if gold is ever moved.
+        var panel = Object.FindFirstObjectByType<ResourcePanelHUD>(FindObjectsInactive.Include);
+        if (panel != null && panel.goldDisplay != null)
+            return panel.goldDisplay.GetComponent<RectTransform>();
+
         foreach (RectTransform t in transform.root.GetComponentsInChildren<RectTransform>(true))
-            if (t != null && t.name == "ExhaustPile") return t;
+            if (t != null && t.name == "GoldDisplay") return t;
         return null;
     }
 
     private void Start() => Resolve();
+
+    // ⚠️ RE-ANCHOR IN LateUpdate, DON'T SNAPSHOT ONCE IN Build().
+    //
+    // The chip is created from a sceneLoaded bootstrap, which runs BEFORE any Start(). At that
+    // moment ResourcePanelHUD has not laid the gold row out yet, so Build() read the gold rect's
+    // pre-layout position and parked the counter in the wrong place. Script execution order between
+    // two Start()s is undefined, so "just do it in Start" would be a coin flip.
+    //
+    // Following the gold rect every frame instead is exact whenever the layout runs, and keeps the
+    // pair locked together if the panel is ever re-laid out at runtime. It is two Vector2 compares.
+    private Vector2 lastGoldPos = new Vector2(float.NaN, float.NaN);
+
+    private void LateUpdate()
+    {
+        RectTransform gold = FindGoldDisplay();
+        if (gold == null) return;
+        if (gold.anchoredPosition == lastGoldPos) return;
+
+        lastGoldPos = gold.anchoredPosition;
+        PositionUnderGold(GetComponent<RectTransform>());
+    }
 
     private void Update()
     {
@@ -139,12 +172,6 @@ public class ScrapHUD : MonoBehaviour
     private void SetCount(int amount)
     {
         if (countText != null) countText.text = amount.ToString();
-    }
-
-    private static void Stretch(RectTransform rt)
-    {
-        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
-        rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
     }
 
     private Image AddImage(Transform parent, string name, Sprite sprite, Color color)

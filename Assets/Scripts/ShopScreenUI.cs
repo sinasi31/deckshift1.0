@@ -181,11 +181,7 @@ public class ShopScreenUI : MonoBehaviour
 
     private void Update()
     {
-        if (isOpen && Input.GetKeyDown(KeyCode.Escape))
-        {
-            ShopManager.escapeConsumedFrame = Time.frameCount;
-            Hide();
-        }
+        if (isOpen && Input.GetKeyDown(KeyCode.Escape)) Hide();
         if (isOpen) RefreshAffordability();
         if (isOpen) TickKeeperIdle();
     }
@@ -651,59 +647,80 @@ public class ShopScreenUI : MonoBehaviour
     {
         Tile tile = new Tile { offer = o, topRow = topRow };
 
-        RectTransform root = AddPoint(row, o.name, new Vector2(0.5f, 1f), Vector2.zero, new Vector2(TILE_W, TILE_H));
+        // ⚠️ A CARD TILE IS CARD-SHAPED. Relics and services keep the square-ish shelf tile, but a
+        // card is drawn as the real 2:3 face (see below), so its tile is sized to that aspect at the
+        // same height — otherwise the card floats in a wide box with dead space either side. The
+        // row centres them, so a narrower tile just reads as more shelf between the cards.
+        bool isCard = o.type == ShopItemType.Card && o.card != null;
+        float tileW = isCard ? TILE_H / CardFace.ASPECT : TILE_W;
+
+        RectTransform root = AddPoint(row, o.name, new Vector2(0.5f, 1f), Vector2.zero, new Vector2(tileW, TILE_H));
         LayoutElement le = root.gameObject.AddComponent<LayoutElement>();
-        le.preferredWidth = TILE_W; le.preferredHeight = TILE_H;
+        le.preferredWidth = tileW; le.preferredHeight = TILE_H;
         tile.root = root;
         tile.cg = root.gameObject.AddComponent<CanvasGroup>();
         tile.cg.alpha = 0f;   // invisible until PopTile fades it in (prevents a pre-anim flash)
 
-        Image bg = root.gameObject.AddComponent<Image>();
-        bg.sprite = PixelUI.Grain(); bg.type = Image.Type.Tiled; bg.color = TileBg;
-        tile.tileBg = bg;
-
-        Color frameCol = (o.type == ShopItemType.Relic) ? FlatUI.RarityColor(o.relic.rarity)
-                                                        : new Color(0.5f, 0.42f, 0.3f, 1f);
-        Image fr = AddImage(root, "Frame", PixelUI.Frame(), frameCol, false);
-        fr.type = Image.Type.Sliced; Stretch(fr.rectTransform);
-
-        // Icon.
-        RectTransform iconRt = AddPoint(root, "Icon", new Vector2(0.5f, 1f), new Vector2(0f, -10f), new Vector2(68f, 68f));
-        if (o.type == ShopItemType.Relic)
+        if (isCard)
         {
-            Image ic = iconRt.gameObject.AddComponent<Image>();
-            ic.preserveAspect = true;
-            if (o.relic.relicArt != null) ic.sprite = o.relic.relicArt;
-            else { ic.sprite = Gem(); ic.color = FlatUI.RarityColor(o.relic.rarity); }   // clean rarity gem until art exists
-        }
-        else if (o.type == ShopItemType.Card && o.card.cardArt != null)
-        {
-            Image ic = iconRt.gameObject.AddComponent<Image>();
-            ic.sprite = o.card.cardArt; ic.preserveAspect = true;
+            // ⚠️ THE REAL CARD FACE, same as the Scrap Forge and Blompo. The shop used to draw the
+            // art into a 68x68 SQUARE icon, which letterboxed the whole 2:3 card down to about
+            // 45x68 — unreadable — and then re-printed the name and "N SHIFT  N CHARGES" as text
+            // underneath to compensate. All of that is painted on the card. CardFace also stamps
+            // the medallion digits, which are NOT in the art.
+            //
+            // No grain plate and no PixelUI frame here: the card carries its own painted border,
+            // and a second frame around it read as a card inside a card.
+            Image hit = root.gameObject.AddComponent<Image>();
+            hit.color = new Color(0f, 0f, 0f, 0f);   // keeps the whole tile clickable
+            tile.tileBg = hit;
+
+            CardFace.Build(root, new RuntimeCard(o.card));
+
+            // Hovering turns it over for the effect text, exactly as in the forge and Blompo.
+            CardHoverFlip.Attach(root).Bind(new RuntimeCard(o.card));
         }
         else
         {
+            Image bg = root.gameObject.AddComponent<Image>();
+            bg.sprite = PixelUI.Grain(); bg.type = Image.Type.Tiled; bg.color = TileBg;
+            tile.tileBg = bg;
+
+            Color frameCol = (o.type == ShopItemType.Relic) ? FlatUI.RarityColor(o.relic.rarity)
+                                                            : new Color(0.5f, 0.42f, 0.3f, 1f);
+            Image fr = AddImage(root, "Frame", PixelUI.Frame(), frameCol, false);
+            fr.type = Image.Type.Sliced; Stretch(fr.rectTransform);
+
+            // Icon.
+            RectTransform iconRt = AddPoint(root, "Icon", new Vector2(0.5f, 1f), new Vector2(0f, -10f), new Vector2(68f, 68f));
             Image ic = iconRt.gameObject.AddComponent<Image>();
-            ic.sprite = (o.type == ShopItemType.Service) ? ServiceIcon(o.name) : PixelUI.Panel();
-            ic.color = (o.type == ShopItemType.Service) ? Color.white : new Color(0.35f, 0.3f, 0.24f, 1f);
-            if (o.type != ShopItemType.Service) ic.type = Image.Type.Sliced;
-        }
+            if (o.type == ShopItemType.Relic)
+            {
+                ic.preserveAspect = true;
+                if (o.relic.relicArt != null) ic.sprite = o.relic.relicArt;
+                else { ic.sprite = Gem(); ic.color = FlatUI.RarityColor(o.relic.rarity); }   // clean rarity gem until art exists
+            }
+            else
+            {
+                ic.sprite = (o.type == ShopItemType.Service) ? ServiceIcon(o.name) : PixelUI.Panel();
+                ic.color = (o.type == ShopItemType.Service) ? Color.white : new Color(0.35f, 0.3f, 0.24f, 1f);
+                if (o.type != ShopItemType.Service) ic.type = Image.Type.Sliced;
+            }
 
-        // Name (wraps to 2 lines).
-        TMP_Text nm = AddText(root, "Name", new Vector2(0.5f, 1f), new Vector2(0f, -82f), new Vector2(TILE_W - 14f, 38f),
-            o.name, 17f, FontStyles.Bold, Color.white, TextAlignmentOptions.Top);
-        nm.enableWordWrapping = true;
-
-        // Card mini-stats.
-        if (o.type == ShopItemType.Card)
-        {
-            AddText(root, "Stats", new Vector2(0.5f, 1f), new Vector2(0f, -124f), new Vector2(TILE_W - 12f, 20f),
-                $"<color=#7CC8FF>{o.card.shiftCost} SHIFT</color>   <color=#E6C877>{o.card.maxUses} CHARGES</color>",
-                13f, FontStyles.Normal, new Color(0.8f, 0.82f, 0.86f), TextAlignmentOptions.Top);
+            // Name (wraps to 2 lines).
+            TMP_Text nm = AddText(root, "Name", new Vector2(0.5f, 1f), new Vector2(0f, -82f), new Vector2(TILE_W - 14f, 38f),
+                o.name, 17f, FontStyles.Bold, Color.white, TextAlignmentOptions.Top);
+            nm.enableWordWrapping = true;
         }
 
         // Clean price plaque along the bottom (no overlap, no tilt).
-        RectTransform plaque = AddPoint(root, "Plaque", new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(TILE_W - 24f, 32f));
+        //
+        // ⚠️ On a card it is lifted clear of the card's own NAME PLATE, which occupies roughly the
+        // bottom 10% of the face. Sitting it at the usual height covered the title, so every card in
+        // the row was an unlabelled picture — the one thing a shopper scans by. It now reads as a
+        // price sticker slapped across the lower artwork with the name still showing beneath.
+        RectTransform plaque = AddPoint(root, "Plaque", new Vector2(0.5f, 0f),
+            new Vector2(0f, isCard ? 24f : 10f), new Vector2(tileW - 24f, isCard ? 28f : 32f));
         Image pbg = plaque.gameObject.AddComponent<Image>();
         pbg.sprite = PixelUI.Panel(); pbg.type = Image.Type.Sliced; pbg.color = PlaqueBg;
         Image pcoin = AddImage(plaque, "PCoin", Disc(), Color.white, false);
@@ -711,7 +728,7 @@ public class ShopScreenUI : MonoBehaviour
         pcoin.rectTransform.pivot = new Vector2(0f, 0.5f);
         pcoin.rectTransform.anchoredPosition = new Vector2(14f, 0f);
         pcoin.rectTransform.sizeDelta = new Vector2(20f, 20f);
-        tile.priceLabel = AddText(plaque, "Price", new Vector2(0f, 0.5f), new Vector2(40f, 0f), new Vector2(TILE_W - 74f, 30f),
+        tile.priceLabel = AddText(plaque, "Price", new Vector2(0f, 0.5f), new Vector2(40f, 0f), new Vector2(tileW - 74f, 30f),
             o.price.ToString(), 21f, FontStyles.Bold, GoldCoin, TextAlignmentOptions.Left);
 
         // Whole tile buys (no default colour tint — we do our own hover).
@@ -720,14 +737,25 @@ public class ShopScreenUI : MonoBehaviour
         Offer captured = o; Tile capturedTile = tile;
         tile.buyBtn.onClick.AddListener(() => TryBuy(capturedTile));
 
+        // ⚠️ CARDS GET NO TOOLTIP. Hovering a card now turns it over, and its back already carries
+        // the name, the effect text and the cost/charges — the tooltip was saying the same thing a
+        // second time, in a box beside the card that was showing it. Relics and services keep it:
+        // they have no back to turn to. The keeper's browse bark stays on both, because that is
+        // flavour rather than information.
+        bool tileIsCard = isCard;
+
         ShopTileHover hov = root.gameObject.AddComponent<ShopTileHover>();
         hov.onEnter = () =>
         {
-            ShowTooltip(capturedTile, captured.desc);
+            if (!tileIsCard) ShowTooltip(capturedTile, captured.desc);
             HoverScale(capturedTile, 1.05f);
             BarkOnBrowse(capturedTile);
         };
-        hov.onExit  = () => { HideTooltip(); HoverScale(capturedTile, 1f); };
+        hov.onExit  = () =>
+        {
+            if (!tileIsCard) HideTooltip();
+            HoverScale(capturedTile, 1f);
+        };
 
         tile.soldStamp = BuildSoldStamp(root);
         ApplySold(tile);

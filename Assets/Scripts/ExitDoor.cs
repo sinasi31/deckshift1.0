@@ -73,9 +73,10 @@ public class ExitDoor : MonoBehaviour
                 if (QuestSystem.instance != null) QuestSystem.instance.ReportEvent(QuestType.NoDamageRoom, 1);
             }
 
-            if (RewardManager.instance != null)
+            // Straight to the map. No card reward screen — see LevelManager.AdvanceToNextRoom.
+            if (LevelManager.instance != null)
             {
-                RewardManager.instance.ShowRewardScreen();
+                LevelManager.instance.AdvanceToNextRoom();
             }
         }
     }

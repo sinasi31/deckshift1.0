@@ -13,8 +13,9 @@ MonoBehaviour:
   m_Name: Portal
   m_EditorClassIdentifier: 
   cardName: Portal
-  description: Create two linked portals within range.
+  description: Place two linked portals. Step into one to come out of the other.
   cardArt: {fileID: -5816642994671486895, guid: 8c21a6b86ca92a6488daa504d8eb0160, type: 3}
+  nameIsPaintedIntoArt: 1
   actionType: 8
   actionValue: 2
   singleUse: 0

@@ -61,7 +61,13 @@ public class RewardManager : MonoBehaviour
         offeredCards.Clear();
         bonusCardIndex = -1;
 
-        List<CardData> cardPool = AchievementManager.instance.GetAvailableCardPool();
+        // ⚠️ Was AchievementManager.GetAvailableCardPool(), which returned only the cards listed in
+        // `defaultUnlockedCards` plus the reward cards of COMPLETED challenges. With one challenge
+        // authored, DeadWeight / FreefallBlade / GlassParry could never be offered by anything —
+        // they existed and were simply not in the game, with nothing to indicate it. Achievement
+        // gating on cards is removed (designer 2026-08-09); AchievementManager still tracks and
+        // saves challenges, it just no longer decides what exists.
+        List<CardData> cardPool = CardPool.Offerable();
         GameManager.instance.SetGameState(GameState.Paused);
 
         // 3 Kart Se�
@@ -166,6 +172,14 @@ public class RewardManager : MonoBehaviour
 
         if (GameManager.instance != null) GameManager.instance.ReleasePause();
         GameManager.instance.SetGameState(GameState.Playing);
-        LevelManager.instance.SpawnNextRoom();
+
+        // The run map goes here, between taking the reward and the next room existing. If the
+        // player already planned a branch with M, or the act offers only one way on, this is
+        // skipped entirely and the room spawns as before — a forced screen with a single button is
+        // ceremony, not a decision.
+        if (RunMapManager.instance != null && RunMapManager.instance.NeedsRouteChoice)
+            RunMapScreen.OpenForChoice(() => LevelManager.instance.SpawnNextRoom());
+        else
+            LevelManager.instance.SpawnNextRoom();
     }
 }

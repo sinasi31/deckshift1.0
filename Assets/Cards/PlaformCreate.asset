@@ -13,8 +13,9 @@ MonoBehaviour:
   m_Name: PlaformCreate
   m_EditorClassIdentifier: 
   cardName: Create Platform
-  description: Spawns a small platform at your cursor's location for 5 seconds
+  description: Put a platform on your cursor. It stays for 5 seconds, then vanishes.
   cardArt: {fileID: 6454027854207398463, guid: 425454d0d9c74d04b81f19b4e45bfe40, type: 3}
+  nameIsPaintedIntoArt: 1
   actionType: 6
   actionValue: 0
   singleUse: 0

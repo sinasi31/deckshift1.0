@@ -29,6 +29,9 @@ public static class LevelTextImporter
     private const string OutputFolder = "Assets/LevelGenerated";
     private const string InputFolder = "Assets/LevelTexts";
 
+    // Summary of the most recent Build(), shown by the interactive menu path only.
+    private static string lastReport = "";
+
     // Level geometry layer index (matches PlayerController.groundLayer mask, see CLAUDE.md).
     private const int GroundLayer = 3;
     private const int GroundSortingOrder = 1;   // hand-built rooms use 1 for ground
@@ -62,15 +65,20 @@ public static class LevelTextImporter
         { 'W', "Assets/YeniLeveller/BreakableWall_Bookshelf.prefab" },
         { '+', "Assets/Prefabs/ShiftCrystal.prefab" },
         { 'g', "Assets/YeniLeveller/Gold New.prefab" },
-        { 'C', "Assets/YeniLeveller/Chest.prefab" },
+        { 'C', "Assets/YeniLeveller/RelicChest.prefab" },   // renamed from Chest.prefab now that card chests exist
+        // Card chest — the ONLY source of cards in a level now that the between-rooms reward screen
+        // is gone. Counts as loot exactly like 'C' does, so mind the per-tier chest budget.
+        { 'D', "Assets/YeniLeveller/CardChest.prefab" },
         // mechanics (added for GenLevel3):
-        { 'E', "Assets/Cainos/Pixel Art Platformer - Dungeon/Prefab/Props/PF Dungeon Props - Elevator.prefab" }, // moving platform; tune travel in Inspector
+        // Village elevator (designer's pick 2026-08-07) — reads better than the dungeon one.
+        { 'E', "Assets/Cainos/Pixel Art Platformer - Village Props/Prefab/PF Village Props - Elevator.prefab" }, // moving platform; tune travel in Inspector
         { 'F', "Assets/Prefabs/UpdraftFan.prefab" },        // updraft zone ~3 tall, liftForce 20 (~5-7 tiles of lift)
         { 'w', "Assets/Prefabs/AcidWater.prefab" },         // acid pool ~6 wide; damages + slows
         { 'K', "Assets/Prefabs/WreckingBall.prefab" },      // swinging hazard; placed at cell center, tune anchor
         { 'c', "Assets/Prefabs/CrumblingPlatform.prefab" }, // platform that crumbles underfoot
         { 't', "Assets/Prefabs/Taret.prefab" },             // stationary turret enemy
         { '$', "Assets/YeniLeveller/Shopkeeper_NPC.prefab" }, // shop NPC (its 'missing' scripts are TMP/UI package scripts — fine)
+        { 'B', "Assets/Prefabs/Blompo.prefab" },              // Blompo — card-blessing NPC; a way to SPEND loot, so he counts as loot
         { 'L', "Assets/YeniLeveller/Lever.prefab" },          // lever; importer wires it to the NEAREST gate (On=Open, Off=Close)
     };
 
@@ -92,36 +100,202 @@ public static class LevelTextImporter
     // by hand in the Inspector.
     private static readonly HashSet<char> GroundedMarkers = new HashSet<char>
     {
-        'X', 'm', 'r', 'l', 'M', 'z', 'Z', 's', 'C', '^', 'W', 'T', 'F', 'w', 'c', 't', '$', 'L',
+        'X', 'm', 'r', 'l', 'M', 'z', 'Z', 's', 'C', 'D', '^', 'W', 'T', 'F', 'w', 'c', 't', '$', 'B', 'L',
     };
 
-    // ---- Tile roles (the biseyler copies are the ones hand-made levels reference) ----
+    // ---- Tile roles ---------------------------------------------------------------------------
+    //
+    // MEASURED, NOT GUESSED (2026-08-07). Every set below is the real frequency distribution from
+    // the six hand-made rooms — efeslevel2/3, EfeVrl4/5/6/7 — counted by classifying each painted
+    // cell by its neighbours. Entries are REPEATED to weight them, so the deterministic picker
+    // reproduces roughly the same mix the designer paints by hand.
+    //
+    // WHY THIS WAS REWRITTEN. The previous table was a guess and it was wrong in three ways that
+    // together made generated rooms read as flat grey wallpaper:
+    //
+    //   1. ⚠️ PLATFORMS WERE PAINTED WITH CEILING TILES. Extra_112/113/114 were used as the
+    //      free-standing platform strip set. In the hand-made rooms those three tiles appear 18
+    //      times each and are CEILING in 100% of cases — never once a platform. Every floating
+    //      ledge in a generated room was wearing ceiling trim, complete with the toothy underside.
+    //
+    //   2. ⚠️ PLATFORMS COME FROM A DIFFERENT PALETTE ENTIRELY. The designer paints mid-air
+    //      platforms from the Cainos "TP Dungeon Ground" palette (Dirt_* and Ground_*), NOT from
+    //      the biseyler "Ground Extra_*" sheet that the masses use. Note Ground_* exists ONLY in
+    //      the Cainos folder. This is the single biggest visual difference.
+    //
+    //   3. ⚠️ LEFT AND RIGHT WALL FACES WERE INVERTED. Extra_156 was used for "air to the right";
+    //      it is the designer's most common tile for "air to the LEFT" (57 uses).
+    //
+    // Also: the hand-made rooms use 46-58 DISTINCT ground tiles each. Picking one fixed tile per
+    // role is most of why generated rooms look like wallpaper, hence weighted sets everywhere.
     private const string TileDir = "Assets/LevelSinasi/biseyler/";
-    private const string TileTopOuter = TileDir + "TX Tileset - Dungeon Ground Extra_153.asset"; // top border, outer row
-    private const string TileTopInner = TileDir + "TX Tileset - Dungeon Ground Extra_154.asset"; // top border, row under outer
-    private const string TileCeilFace = TileDir + "TX Tileset - Dungeon Ground Extra_96.asset";  // ceiling face (bricks on bottom edge)
-    private const string TileLeftOuter = TileDir + "TX Tileset - Dungeon Ground Extra_156.asset";
-    private const string TileLeftInner = TileDir + "TX Tileset - Dungeon Ground Extra_157.asset"; // bricks face the interior
-    private const string TileRightInner = TileDir + "TX Tileset - Dungeon Ground Extra_188.asset";
-    private const string TileRightOuter = TileDir + "TX Tileset - Dungeon Ground Extra_189.asset";
-    private const string TileFloorTop = TileDir + "TX Tileset - Dungeon Ground Extra_144.asset";  // walkable surface
-    private const string TileFloorMid = TileDir + "TX Tileset - Dungeon Ground Extra_186.asset";
-    private const string TileFloorDeep = TileDir + "TX Tileset - Dungeon Ground Extra_185.asset";
+    private const string CainosDir = "Assets/Cainos/Pixel Art Platformer - Dungeon/Tileset Pallete/TP Dungeon Ground/";
 
-    // Free-standing platform STRIPS (2+ cells wide): left cap / middle / right cap.
-    // Learned from EfeVrl6's interior platforms (Extra_112/113/114 painted as runs).
-    private const string TilePlatCapL = TileDir + "TX Tileset - Dungeon Ground Extra_112.asset";
-    private const string TilePlatMid = TileDir + "TX Tileset - Dungeon Ground Extra_113.asset";
-    private const string TilePlatCapR = TileDir + "TX Tileset - Dungeon Ground Extra_114.asset";
-
-    // Lone free-standing blocks / pillars: chunky block tiles (what the hand-made
-    // rooms use as spaced stepping stones, e.g. '#..#..#').
-    private static readonly string[] DirtTiles =
+    // Darkened copies of the interior tiles, used for rock more than 2 cells from air.
+    // Generated by Deckshift -> Generate Tile Variants; see the note at the call site.
+    // Indexed by recession step: [0] = depth 3, [1] = depth 4, [2] = depth 5+.
+    private static readonly string[][] DeepFillTiles =
     {
-        TileDir + "TX Tileset - Dungeon Ground Dirt_14.asset",
-        TileDir + "TX Tileset - Dungeon Ground Dirt_12.asset",
-        TileDir + "TX Tileset - Dungeon Ground Dirt_4.asset",
-        TileDir + "TX Tileset - Dungeon Ground Dirt_0.asset",
+        new[] { "Ground Extra_153 Deep1", "Ground Extra_185 Deep1", "Ground Extra_101 Deep1", "Ground Extra_49 Deep1" },
+        new[] { "Ground Extra_153 Deep2", "Ground Extra_185 Deep2", "Ground Extra_101 Deep2", "Ground Extra_49 Deep2" },
+        new[] { "Ground Extra_153 Deep3", "Ground Extra_185 Deep3", "Ground Extra_101 Deep3", "Ground Extra_49 Deep3" },
+    };
+
+    // Every tile name the importer can paint. TileVariantGenerator uses this to build a
+    // Grid-collision copy of each — see the note on Resolve.
+    public static IEnumerable<string> AllPaintedTileNames()
+    {
+        var seen = new HashSet<string>();
+        foreach (var kv in MaskTiles) if (seen.Add(kv.Value)) yield return kv.Value;
+        foreach (string n in Mask4Tiles) if (seen.Add(n)) yield return n;
+        foreach (string p in PlatformSingleTiles) { string n = ShortNameOf(p); if (seen.Add(n)) yield return n; }
+    }
+
+    // "…/TX Tileset - Dungeon Ground Dirt_0.asset" -> "Ground Dirt_0"
+    private static string ShortNameOf(string assetPath) =>
+        Path.GetFileNameWithoutExtension(assetPath).Replace("TX Tileset - Dungeon ", "");
+
+    private static string Bis(string n) => TileDir + "TX Tileset - Dungeon Ground Extra_" + n + ".asset";
+    private static string Dirt(string n) => CainosDir + "TX Tileset - Dungeon Ground Dirt_" + n + ".asset";
+    private static string Grnd(string n) => CainosDir + "TX Tileset - Dungeon Ground_" + n + ".asset";
+
+    // ---- neighbour-mask tile selection ---------------------------------------------------------
+    //
+    // ⚠️ THIS TILESET IS DIRECTIONAL, NOT A BAG OF TEXTURES. Each tile means a POSITION — top edge,
+    // inner corner, west face, ceiling underside. Picking one at random from a role bucket scatters
+    // edge and corner art through the middle of a solid mass, which is exactly what made the walls
+    // read as noise and made neighbouring platform cells fail to line up ("platforms inside one
+    // another" — their surfaces are drawn at different heights, so mixing tiles along a run breaks
+    // the silhouette).
+    //
+    // There are no Rule Tiles in this project (1225 plain Tile assets, zero rule-based), so nothing
+    // does this automatically. The table below IS the auto-tiling: it was measured by classifying
+    // every painted cell in the six hand-made rooms by its 8-neighbour configuration and taking the
+    // tile the designer used most for that configuration. 55 configurations, 3482 cells.
+    //
+    // Bits: N=1 NE=2 E=4 SE=8 S=16 SW=32 W=64 NW=128, set when that neighbour is SOLID.
+    //
+    // THE RULE THAT MATTERS: one tile per configuration, deterministically. Variety is safe only on
+    // ISOLATED tiles (mask 0), which have no neighbours to disagree with — see PlatformSingleTiles.
+    // ⚠️ ONLY CONFIGURATIONS WITH n >= 10 SAMPLES ARE LISTED HERE (trimmed 2026-08-08).
+    //
+    // The table originally kept all 55 measured configurations, including ones decided by a
+    // handful of cells. Those were not measurements, they were coin flips — and the coin flips are
+    // exactly the OUTER-CORNER configurations, because a room has hundreds of buried and wall-face
+    // cells and only a few of any given corner. The visible symptom the designer reported: mask 193
+    // (a wall's bottom-right outer corner) resolved to "Ground Extra_205" on **2 votes out of 8**,
+    // and Extra_205 is a brown interior-looking block, so every wall in every generated room had a
+    // brown nub sticking out of that corner.
+    //
+    // Judge these entries by SAMPLE COUNT, never by winner share. Share is low almost everywhere
+    // (mask 255 has n=1231 and its winner takes only 12%) because the designer deliberately varies
+    // tiles across a mass — that is variety, not uncertainty, and trimming on share would gut the
+    // table. Low n is the only honest signal of "we don't actually know".
+    //
+    // Dropped configurations now fall through to Mask4Tiles, which is hand-written and internally
+    // consistent. Mask 193 collapses to cardinals N+W -> "Ground Extra_114" — corroborated by mask
+    // 195 (the same corner plus one diagonal), which has n=27 and picks Extra_114 seventeen times.
+    private static readonly Dictionary<int, string> MaskTiles = new Dictionary<int, string>
+    {
+        {14,"Ground Dirt_11"}, {16,"Ground_11"}, {28,"Ground Dirt_13"},
+        {31,"Ground Extra_156"}, {60,"Ground Extra_148"}, {63,"Ground Extra_188"},
+        {68,"Ground_11"}, {95,"Ground Dirt_11"}, {112,"Ground Dirt_13"},
+        {120,"Ground Extra_146"}, {124,"Ground Extra_162"}, {125,"Ground Extra_144"},
+        {126,"Ground Extra_162"}, {127,"Ground Extra_164"}, {135,"Ground Extra_112"},
+        {159,"Ground Extra_172"}, {195,"Ground Extra_114"}, {199,"Ground Extra_96"},
+        {207,"Ground Extra_98"}, {223,"Ground Extra_96"}, {224,"Ground Dirt_11"},
+        {231,"Ground Extra_96"}, {241,"Ground Extra_154"}, {243,"Ground Extra_138"},
+        {245,"Ground Extra_186"}, {247,"Ground Extra_98"}, {249,"Ground Extra_170"},
+        {252,"Ground Extra_162"}, {253,"Ground Extra_162"}, {255,"Ground Extra_153"},
+    };
+
+    // Fallback when an 8-bit configuration wasn't seen in the hand-made rooms: collapse to the four
+    // cardinals only. Complete for all 16, so selection can never fall through to nothing.
+    private static readonly string[] Mask4Tiles =
+    {
+        /* 0 ----  */ "Ground Dirt_0",     /* 1  N--- */ "Ground Dirt_4",
+        /* 2 -E--  */ "Ground_11",         /* 3  NE-- */ "Ground Extra_112",
+        /* 4 --S-  */ "Ground_11",         /* 5  N-S- */ "Ground_11",
+        /* 6 -ES-  */ "Ground_11",         /* 7  NES- */ "Ground Extra_156",   // air to the WEST
+        /* 8 ---W  */ "Ground_11",         /* 9  N--W */ "Ground Extra_114",
+        /*10 -E-W  */ "Ground_11",         /*11  NE-W */ "Ground Extra_96",    // air BELOW: ceiling
+        /*12 --SW  */ "Ground_11",         /*13  N-SW */ "Ground Extra_154",   // air to the EAST
+        /*14 -ESW  */ "Ground Extra_162",  /*15  NESW */ "Ground Extra_153",   // air ABOVE: surface
+    };
+
+    // LONE free-standing block — a single stepping stone with air on all four sides (mask 0). This
+    // is the dominant mid-air idiom: 104 of the 217 platform cells in the hand-made rooms are
+    // 1-wide singles. Variety is SAFE here precisely because an isolated tile has no neighbour to
+    // misalign with.
+    private static readonly string[] PlatformSingleTiles =
+    {
+        Dirt("0"), Dirt("0"), Dirt("0"), Dirt("0"),
+        Dirt("14"), Dirt("14"), Dirt("14"), Dirt("14"),
+        Dirt("4"), Dirt("4"), Dirt("4"),
+        Grnd("3"), Grnd("3"),
+        Grnd("11"), Grnd("11"),
+        Dirt("12"), Dirt("3"), Grnd("1"), Grnd("0"),
+    };
+
+    // Platform RUNS of 2+ cells, and wall-attached shelves. Overwhelmingly Ground_13 repeated
+    // (50 of 113), which is why runs read as one continuous ledge rather than cap/middle/cap.
+    private static readonly string[] PlatformRunTiles =
+    {
+        Grnd("13"), Grnd("13"), Grnd("13"), Grnd("13"), Grnd("13"), Grnd("13"), Grnd("13"), Grnd("13"),
+        Dirt("11"), Dirt("11"),
+        Grnd("11"), Dirt("14"), Grnd("10"),
+    };
+
+    // Walkable top of a thick mass. Extra_162 is the designer's primary (147 uses); the old table
+    // led with Extra_144, which is only their third choice.
+    private static readonly string[] SurfaceTiles =
+    {
+        Bis("162"), Bis("162"), Bis("162"), Bis("162"), Bis("162"), Bis("162"),
+        Bis("101"), Bis("101"), Bis("101"),
+        Bis("144"), Bis("144"), Bis("144"),
+        Grnd("13"), Grnd("13"),
+        Bis("154"), Bis("154"),
+        Bis("166"), Bis("166"),
+        Bis("97"), Bis("49"),
+    };
+
+    // Underside of an overhang.
+    private static readonly string[] CeilingTiles =
+    {
+        Bis("96"), Bis("96"), Bis("96"), Bis("96"),
+        Bis("189"), Bis("189"), Bis("97"), Bis("97"),
+        Bis("3"), Bis("3"), Bis("186"), Bis("186"),
+        Bis("98"), Bis("98"), Bis("160"), Bis("160"), Bis("49"),
+    };
+
+    // Vertical face with open air to the LEFT (a west-facing wall).
+    private static readonly string[] FaceWestTiles =
+    {
+        Bis("156"), Bis("156"), Bis("156"), Bis("156"),
+        Bis("172"), Bis("172"), Bis("172"),
+        Bis("188"), Bis("188"), Bis("137"), Bis("137"),
+        Bis("153"), Bis("140"),
+    };
+
+    // Vertical face with open air to the RIGHT (an east-facing wall).
+    private static readonly string[] FaceEastTiles =
+    {
+        Bis("154"), Bis("154"), Bis("154"),
+        Bis("170"), Bis("170"), Bis("170"),
+        Bis("157"), Bis("157"), Bis("173"), Bis("173"),
+        Bis("189"), Bis("189"), Bis("188"), Bis("186"),
+    };
+
+    // Buried rock with solid neighbours all round — the bulk of any thick mass.
+    private static readonly string[] InteriorTiles =
+    {
+        Bis("153"), Bis("153"), Bis("153"), Bis("153"), Bis("153"),
+        Bis("185"), Bis("185"), Bis("185"), Bis("185"),
+        Bis("101"), Bis("101"), Bis("101"), Bis("101"),
+        Bis("49"), Bis("49"), Bis("49"),
+        Bis("157"), Bis("157"), Bis("157"),
+        Bis("169"), Bis("169"), Bis("169"),
+        Bis("97"), Bis("97"), Bis("189"), Bis("189"), Bis("173"), Bis("173"), Bis("100"),
     };
 
     // Backdrop: the same wall tiles BGPalette's pre-painted background uses.
@@ -135,6 +309,72 @@ public static class LevelTextImporter
         WallDir + "TX Tileable - Dungeon Wall_33.asset",
         WallDir + "TX Tileable - Dungeon Wall_35.asset",
     };
+
+    // Chebyshev distance from a solid cell to the nearest open one, capped at `cap`.
+    // Used to leave deep interiors unpainted — see the note at the call site.
+    private static int DepthFromAir(int col, int row, int cap, Func<int, int, bool> IsSolid)
+    {
+        for (int d = 1; d <= cap; d++)
+            for (int dx = -d; dx <= d; dx++)
+                for (int dy = -d; dy <= d; dy++)
+                {
+                    if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != d) continue;
+                    if (!IsSolid(col + dx, row + dy)) return d;
+                }
+        return cap;
+    }
+
+    // Scales and positions an acid pool so it exactly fills the hole it was placed in.
+    //
+    // The pit is measured from the GRID, not from the prefab: walk left/right along the marker's
+    // row while the cells are open, and down while they are open, to get the hole's true extent.
+    // The pool is then scaled to that size and seated so its TOP sits flush with the pit's rim
+    // rather than floating at a cell centre.
+    private static void FitAcidToPit(GameObject go, int col, int row, int cellY, int width, int height,
+                                     Func<int, int, char> At, Func<int, int, bool> IsSolid)
+    {
+        int left = col;
+        while (left - 1 >= 0 && !IsSolid(left - 1, row)) left--;
+        int right = col;
+        while (right + 1 < width && !IsSolid(right + 1, row)) right++;
+
+        int bottom = row;
+        while (bottom + 1 < height && !IsSolid(col, bottom + 1)) bottom++;
+
+        // ⚠️ The pit's top is where its SIDE WALLS run out — NOT the first solid cell above.
+        // A pit opens upward into the room, so walking up until something is solid measures the
+        // whole chamber (9 tiles here instead of 2) and launches the pool into the air. The hole
+        // only exists while there is rock beside it, so climb while either flank is still solid.
+        int top = bottom;
+        while (top - 1 >= 0
+               && !IsSolid(col, top - 1)
+               && (IsSolid(left - 1, top - 1) || IsSolid(right + 1, top - 1)))
+            top--;
+
+        float w = right - left + 1;
+        float h = bottom - top + 1;
+        if (w <= 0f || h <= 0f) return;
+
+        var box = go.GetComponentInChildren<BoxCollider2D>();
+        Vector2 native = box != null ? box.size : new Vector2(5.98f, 2.53f);
+        if (native.x <= 0.01f || native.y <= 0.01f) return;
+
+        // ⚠️ The pool is NOT centred on its own transform. AcidWater's BoxCollider2D carries an
+        // offset of (0, 1.27), so positioning the transform at the pit centre floats the water a
+        // scaled 1.27 units too high - half the pool ends up hanging above the floor it should be
+        // sunk into. Back the offset out, scaled, or the fit is silently off by it.
+        Vector2 nativeOffset = box != null ? box.offset : Vector2.zero;
+
+        Vector3 scale = new Vector3(w / native.x, h / native.y, 1f);
+        go.transform.localScale = scale;
+
+        // Grid rows run DOWNWARD while world Y runs up, so a row above the marker is (row - top)
+        // cells higher. The rim is the top edge of that cell; the pool centres half its height below.
+        float rimY = cellY + (row - top) + 1f;
+        go.transform.position = new Vector3(left + w * 0.5f - nativeOffset.x * scale.x,
+                                            rimY - h * 0.5f - nativeOffset.y * scale.y,
+                                            0f);
+    }
 
     [MenuItem("Deckshift/Import Level From Text...")]
     public static void ImportFromText()
@@ -150,6 +390,8 @@ public static class LevelTextImporter
             var asset = AssetDatabase.LoadAssetAtPath<GameObject>(savedPath);
             Selection.activeObject = asset;
             EditorGUIUtility.PingObject(asset);
+            // Only the interactive menu path shows the modal summary — see the note in Build().
+            EditorUtility.DisplayDialog("Level imported", lastReport, "OK");
         }
         catch (Exception e)
         {
@@ -246,13 +488,53 @@ public static class LevelTextImporter
             warnings.Add($"Unknown marker '{c}' ignored.");
 
         // ---------- Preload assets ----------
-        TileBase topOuter = LoadTile(TileTopOuter), topInner = LoadTile(TileTopInner), ceilFace = LoadTile(TileCeilFace);
-        TileBase leftOuter = LoadTile(TileLeftOuter), leftInner = LoadTile(TileLeftInner);
-        TileBase rightInner = LoadTile(TileRightInner), rightOuter = LoadTile(TileRightOuter);
-        TileBase floorTop = LoadTile(TileFloorTop), floorMid = LoadTile(TileFloorMid), floorDeep = LoadTile(TileFloorDeep);
-        TileBase platCapL = LoadTile(TilePlatCapL), platMid = LoadTile(TilePlatMid), platCapR = LoadTile(TilePlatCapR);
-        TileBase[] dirt = LoadTileSet(DirtTiles);
+        TileBase[] platSingle = LoadTileSet(PlatformSingleTiles);
         TileBase[] backWall = LoadTileSet(BackWallTiles);
+
+        // Resolve a measured tile NAME to an asset. Extra_* live in the biseyler copies; the
+        // Ground_*/Dirt_* platform tiles exist ONLY in the Cainos palette folder, so try both.
+        var tileByName = new Dictionary<string, TileBase>();
+        Func<string, TileBase> Resolve = shortName =>
+        {
+            TileBase cached;
+            if (tileByName.TryGetValue(shortName, out cached)) return cached;
+            string file = "TX Tileset - Dungeon " + shortName + ".asset";
+            // ⚠️ PREFER THE " Solid" VARIANT. The pack's tiles use colliderType = Sprite, so
+            // collision traces the sprite's ALPHA OUTLINE — including the little protruding brick
+            // nubs on the wall-face tiles. The player catches on them, and the collision gizmo
+            // shows a bumpy edge instead of a clean wall. The Solid variants are identical art
+            // with colliderType = Grid, which is what a solid cell in a platformer wants.
+            string solid = "TX Tileset - Dungeon " + shortName + " Solid.asset";
+            TileBase tb = AssetDatabase.LoadAssetAtPath<TileBase>(TileVariantGenerator.VariantFolder + "/" + solid)
+                       ?? AssetDatabase.LoadAssetAtPath<TileBase>(TileVariantGenerator.VariantFolder + "/" + file)
+                       ?? AssetDatabase.LoadAssetAtPath<TileBase>(TileDir + file)
+                       ?? AssetDatabase.LoadAssetAtPath<TileBase>(CainosDir + file);
+            tileByName[shortName] = tb;
+            return tb;
+        };
+
+        // Warm the cache and fail loudly rather than silently painting holes.
+        //
+        // ⚠️ THE SPRITE CHECK IS THE IMPORTANT HALF. `TX Tileset - Dungeon Ground_13` exists as an
+        // asset but ships with a NULL SPRITE — the pack's valid range stops at Ground_12, so it is
+        // one entry past the end. It was the tile used for every platform run, so 30 of 499 cells
+        // in a generated room were painted with nothing and the ledges were literally invisible;
+        // the room looked like it had no mid-air platforms at all because it didn't. A
+        // resolve-only check passes that happily, so both conditions are enforced here.
+        var broken = new List<string>();
+        Action<string> Check = n =>
+        {
+            TileBase tb = Resolve(n);
+            if (tb == null) { broken.Add(n + "  (asset missing)"); return; }
+            Tile asTile = tb as Tile;
+            if (asTile != null && asTile.sprite == null) broken.Add(n + "  (SPRITE IS NULL — would paint an invisible cell)");
+        };
+        foreach (var kv in MaskTiles) Check(kv.Value);
+        foreach (string n in Mask4Tiles) Check(n);
+        foreach (string n in PlatformSingleTiles) Check(ShortNameOf(n));
+        if (broken.Count > 0)
+            throw new Exception("LevelTextImporter: unusable tiles in the mask table:\n  "
+                                + string.Join("\n  ", broken.ToArray()));
 
         var prefabCache = new Dictionary<char, GameObject>();
         var missing = new List<string>();
@@ -369,43 +651,77 @@ public static class LevelTextImporter
                         bool IsStrip(int cc) => cc >= 0 && cc < width && At(cc, row) == '#'
                             && !IsSolid(cc, row - 1) && !IsSolid(cc, row + 1);
 
-                        TileBase tile;
-                        if (airUp && airDown)
+                        // ---- DEEP INTERIORS ARE NOT PAINTED --------------------------------
+                        //
+                        // Measured across the six hand-made rooms: 2355 solid cells sit 1 away
+                        // from open air, 1074 at 2, 134 at 3, 23 at 4, and NOTHING deeper. The
+                        // designer never builds a deep solid interior, so this tileset has never
+                        // had to be a fill texture — it is a FACING set, all edges and near-edge
+                        // detail. Painted across a 10-deep mass it reads as ugly repeating
+                        // wallpaper, which is exactly what generated rooms were doing.
+                        //
+                        // ⚠️ An earlier version left these cells UNPAINTED so the backdrop showed
+                        // through. That was worse: solid rock then reads as open background, which
+                        // misleads the player while moving and while peeking with Ctrl. Deep rock
+                        // must still look SOLID — just recessed.
+                        //
+                        // So deep cells are painted with DARKENED COPIES of the interior tiles
+                        // (TileVariantGenerator). Same art, same collision, pushed dark and
+                        // slightly cool so a mass reads as receding shadow instead of another lit
+                        // surface — and the brick detail stays faintly legible rather than going
+                        // to flat black.
+                        // ⚠️ DO NOT JITTER THIS THRESHOLD. A hashed -1/0/+1 nudge was added on
+                        // 2026-08-08 to break up the Chebyshev metric's rectangular contours, and
+                        // the designer rejected it — the interiors read better with the hard step.
+                        // It also let a +1 push DEEP tiles out to depth 2, one cell from the face,
+                        // which is exactly the dark block sticking out of a wall edge that the
+                        // change was supposed to help. Deep fill starts at a hard depth of 3.
+                        int depth = DepthFromAir(col, row, 5, IsSolid);
+                        if (depth >= 3)
                         {
-                            // strip: caps on OPEN ends only (an end abutting a wall stays a middle)
-                            int runStart = col;
-                            while (IsStrip(runStart - 1)) runStart--;
-                            int runEnd = col;
-                            while (IsStrip(runEnd + 1)) runEnd++;
-                            bool openL = !IsSolid(runStart - 1, row);
-                            bool openR = !IsSolid(runEnd + 1, row);
-
-                            if (runStart == runEnd)
-                                tile = openL && openR ? Pick(dirt, col, cellY)      // lone stepping stone
-                                     : openR ? platCapR : openL ? platCapL : platMid;
-                            else if (col == runStart && openL) tile = platCapL;
-                            else if (col == runEnd && openR) tile = platCapR;
-                            else tile = platMid;
+                            string[] step = DeepFillTiles[Mathf.Min(depth - 3, DeepFillTiles.Length - 1)];
+                            TileBase deep = Resolve(step[Mathf.Abs((col * 73856093) ^ (cellY * 19349663)) % step.Length]);
+                            if (deep != null)
+                            {
+                                tilemap.SetTile(new Vector3Int(col, cellY, 0), deep);
+                                tileCount++;
+                                continue;
+                            }
                         }
-                        else if (airUp) tile = floorTop;        // walkable surface of a thick mass
-                        else if (airDown) tile = ceilFace;      // ceiling face
-                        // Wall faces: the "inner" tiles (_188/_157) are accent tiles with
-                        // protruding brick nubs — only correct when BACKED by a real solid
-                        // tile (2-thick walls, like hand-made borders). A 1-thick wall at
-                        // the grid edge uses the clean outer tiles (_189/_156) instead.
-                        else if (airLeft) tile = InGrid(col + 1, row) && At(col + 1, row) == '#' ? rightInner : rightOuter;
-                        else if (airRight) tile = InGrid(col - 1, row) && At(col - 1, row) == '#' ? leftInner : leftOuter;
-                        // buried cells
-                        else if (row == 0) tile = topOuter;
-                        else if (row == 1 && At(col, 0) == '#') tile = topInner;
-                        else if (col == 0) tile = leftOuter;
-                        else if (col == width - 1) tile = rightOuter;
-                        // hand-made layering: the gappy sub-surface tile (_186) goes in
-                        // exactly ONE row directly under a walkable surface; everything
-                        // deeper is solid dark fill (_185). Repeating _186 reads as a
-                        // broken colonnade.
-                        else if (!IsSolid(col, row - 2)) tile = floorMid;
-                        else tile = floorDeep;
+
+                        // Tile chosen by the cell's 8-neighbour configuration — this IS the
+                        // auto-tiling (see MaskTiles). One tile per configuration, deterministic,
+                        // so edges land on edges and a run of platform cells shares one silhouette.
+                        int mask = 0;
+                        if (IsSolid(col, row - 1)) mask |= 1;     // N
+                        if (IsSolid(col + 1, row - 1)) mask |= 2; // NE
+                        if (IsSolid(col + 1, row)) mask |= 4;     // E
+                        if (IsSolid(col + 1, row + 1)) mask |= 8; // SE
+                        if (IsSolid(col, row + 1)) mask |= 16;    // S
+                        if (IsSolid(col - 1, row + 1)) mask |= 32;// SW
+                        if (IsSolid(col - 1, row)) mask |= 64;    // W
+                        if (IsSolid(col - 1, row - 1)) mask |= 128;// NW
+
+                        TileBase tile;
+                        if (mask == 0)
+                        {
+                            // Isolated stepping stone. The ONLY place variety is safe, because
+                            // there is no neighbour for it to disagree with.
+                            tile = Pick(platSingle, col, cellY);
+                        }
+                        else
+                        {
+                            string name;
+                            if (!MaskTiles.TryGetValue(mask, out name))
+                            {
+                                // Configuration never seen in the hand-made rooms: collapse to the
+                                // four cardinals, which is complete for all 16 cases.
+                                int m4 = ((mask & 1) != 0 ? 1 : 0) | ((mask & 4) != 0 ? 2 : 0)
+                                       | ((mask & 16) != 0 ? 4 : 0) | ((mask & 64) != 0 ? 8 : 0);
+                                name = Mask4Tiles[m4];
+                            }
+                            tile = Resolve(name);
+                        }
 
                         tilemap.SetTile(new Vector3Int(col, cellY, 0), tile);
                         tileCount++;
@@ -414,8 +730,9 @@ public static class LevelTextImporter
 
                     if (c == '=')
                     {
-                        // one-way lip: thin brick-top tile, visually distinct from solid strips
-                        oneWayMap.SetTile(new Vector3Int(col, cellY, 0), floorTop);
+                        // one-way lip: thin brick-top tile, visually distinct from solid strips.
+                        // (Level Design Law 4 bans these in new rooms; kept so old texts import.)
+                        oneWayMap.SetTile(new Vector3Int(col, cellY, 0), Resolve("Ground Extra_162"));
                         tileCount++;
                         continue;
                     }
@@ -464,7 +781,19 @@ public static class LevelTextImporter
                         var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
                         go.transform.SetParent(root.transform);
                         go.transform.position = worldPos;
-                        if (GroundedMarkers.Contains(c))
+
+                        // Acid pools must FIT THEIR PIT, not sit at a cell centre at a fixed size.
+                        //
+                        // AcidWater is a fixed ~5.98 x 2.53 box whose water is a shader/mesh with NO
+                        // SpriteRenderer, so the usual auto-grounding (which measures renderer
+                        // bounds) measures nothing and leaves the pool floating, overflowing the
+                        // hole it is supposed to be filling. Measure the actual hole from the grid
+                        // and scale to it instead.
+                        if (c == 'w')
+                        {
+                            FitAcidToPit(go, col, row, cellY, width, height, At, IsSolid);
+                        }
+                        else if (GroundedMarkers.Contains(c))
                             GroundToSurface(go, cellY);
                         if (c == 'L')
                         {
@@ -609,8 +938,12 @@ public static class LevelTextImporter
             report.AppendLine();
             report.AppendLine("Remember: add the prefab to LevelManager's Room Prefabs list to put it in the run.");
 
+            // NOTE: the summary dialog belongs to the MENU path only (see ImportFromText).
+            // EditorUtility.DisplayDialog is modal and blocks Unity's main thread until someone
+            // clicks OK, which makes Build() impossible to call from a script — it hangs the
+            // editor, and any batch import or automated re-import with it.
             Debug.Log("[LevelTextImporter] " + report);
-            EditorUtility.DisplayDialog("Level imported", report.ToString(), "OK");
+            lastReport = report.ToString();
             return assetPath;
         }
         finally

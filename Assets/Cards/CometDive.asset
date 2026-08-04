@@ -12,9 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 27701a6f0f52d86438cb67605f92527c, type: 3}
   m_Name: CometDive
   m_EditorClassIdentifier: 
-  cardName: CometDive
-  description: Dive down and deal 20 damage to enemies in a radius.
+  cardName: Comet Dive
+  description: Slam straight down. Everything near where you land takes 40 damage.
+    Only works in the air.
   cardArt: {fileID: -6264566646456649978, guid: 82da3f8f21bd06c41842722cd5bef0ac, type: 3}
+  nameIsPaintedIntoArt: 1
   actionType: 12
   actionValue: 0
   singleUse: 0

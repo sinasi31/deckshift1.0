@@ -4,7 +4,7 @@ using UnityEngine.UI;
 using TMPro;
 using UnityEngine.EventSystems;
 
-public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
+public class CardUI : MonoBehaviour, IPointerClickHandler
 {
     [Header("Görseller")]
     public Image cardArtImage;
@@ -19,20 +19,32 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     public float pointSpacing = 20f; // Noktalar arası boşluk (Bunu Inspector'dan değiştirebilirsin)
 
     [Header("Hover")]
+    [Tooltip("LEGACY. The old flat grey overlay — permanently switched off; the card turns over instead. Kept assigned so the change is one line to back out.")]
     public GameObject descriptionPanel;
+    [Tooltip("LEGACY. Text of the old overlay. The description now goes on the card's back.")]
     public TextMeshProUGUI descriptionText;
     public float selectionLiftAmount = 50f;
 
-    [Header("Hover Art Fade")]
-    [SerializeField] private float hoverFadeTargetAlpha = 0.12f;
-    [SerializeField] private float hoverFadeDuration = 0.15f;
-
-    private Coroutine artFadeCoroutine;
+    [Header("Flip")]
+    [Tooltip("How much the card grows while turned over. The back is a page of text on a small card, so the one you are reading comes forward. Kept under the hand's card spacing so it never overlaps a neighbour.")]
+    [SerializeField] private float flipZoom = 1.2f;
+    [Tooltip("How far the card rises while turned over, so the bottom of the back clears the screen edge. See the note in UpdateSelectionVisual for the measurement.")]
+    [SerializeField] private float flipLift = 40f;
 
     private RuntimeCard myCard;
     private int myIndex;
     private Vector3 originalScale;
     private RectTransform rectTransform;
+
+    // --- Hover flip ---------------------------------------------------------------------------
+    // The mechanics live in CardHoverFlip, shared with the Scrap Forge and Blompo so all three
+    // screens turn a card over the same way. This class only adds what is specific to a card in the
+    // HAND: the zoom and lift, and Stagger's bespoke footer.
+    private CardHoverFlip flip;
+    private string bodyText = "";     // what the back's description reads; composed in Setup
+
+    private CardBack back => flip != null ? flip.Back : null;
+    private float flipT => flip != null ? flip.Progress : 0f;
 
     public RuntimeCard GetCard()
     {
@@ -43,6 +55,16 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     {
         rectTransform = GetComponent<RectTransform>();
         originalScale = transform.localScale;
+
+        // The old hover overlay is retired: a flat grey rectangle over the artwork with a 140x50
+        // text box that every real description overflowed. Switched off rather than deleted.
+        if (descriptionPanel != null) descriptionPanel.SetActive(false);
+
+        // ⚠️ The geometry source is cardArtImage, NOT this root. The root carries a LayoutElement
+        // and the hand's layout group rewrites it to 200x100 at runtime — nothing like the 200x300
+        // the prefab shows. Sizing the back off it put it over the card's bottom third.
+        flip = CardHoverFlip.Attach(rectTransform,
+                                    cardArtImage != null ? cardArtImage.rectTransform : rectTransform);
     }
 
     public void Setup(RuntimeCard card, int index)
@@ -51,15 +73,14 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         myIndex = index;
 
         if (cardArtImage != null) cardArtImage.sprite = card.cardData.cardArt;
-        if (keyHintText != null) keyHintText.text = $"[{index + 1}]";
+        // A NEGATIVE index means the card isn't in the hand — the deck view, the play/discard ghosts
+        // and the card-chest offer all pass -1. There is no key to press, and "[0]" is a lie. (The
+        // card's BACK already guarded this; the front did not, so every chest offer read "[0]".)
+        if (keyHintText != null) keyHintText.text = index >= 0 ? $"[{index + 1}]" : "";
 
-        // Açıklama
-        if (descriptionPanel != null)
-        {
-            descriptionPanel.SetActive(false);
-            if (descriptionText != null)
-                descriptionText.text = $"<b>{card.cardData.cardName}</b>\n\n{card.cardData.description}";
-        }
+        // The description lives on the card's BACK now; the title is up there as a header, so the
+        // body is just the effect text. RefreshBlessingBadge/TickCardFace may extend it below.
+        bodyText = card.cardData.description;
 
         // Uses
         if (usesText != null)
@@ -78,17 +99,271 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         // -----------------------------
 
         RefreshBlessingBadge(card);
+        RefreshCardFace(card);
+        RefreshBack(card, index);
 
         UpdateSelectionVisual();
     }
 
-    // --- Blompo blessing badge -----------------------------------------------------------
-    // A blessed card must be identifiable at a glance in the hand. Built procedurally here
-    // (house style) so no CardTemplate prefab rewiring is needed — that prefab has known scale
-    // corruption and is blocked on new art, so we deliberately don't touch it.
-    // PLACEHOLDER LOOK: rarity gem + glow in the top-right corner. Intended to be replaced with
-    // bespoke per-enhancement art later.
-    private GameObject blessBadge;
+    // Pushes the finished text and the stat footer onto the back. Called after the badge and face
+    // passes, because both can add lines to bodyText.
+    private void RefreshBack(RuntimeCard card, int index)
+    {
+        if (flip == null || back == null || card == null || card.cardData == null) return;
+
+        // DeckViewUI passes -1: those cards are not in the hand, so there is no key to press and a
+        // literal "[0]" would be a lie.
+        string key = index >= 0 ? $"[{index + 1}]" : "";
+
+        // Re-bound on every Setup rather than once at build: the hand's layout group has not run
+        // when Awake fires, and DeckViewUI reuses this prefab at a different size.
+        flip.Bind(card, key);
+
+        // Blompo's blessing line is appended by RefreshBlessingBadge into bodyText; BindStandard
+        // composes the same thing, so the normal case is already correct by here. Only Stagger
+        // needs a different footer.
+        if (!isStaggerCard) return;
+
+        // Stagger's price is HP and it rises every play, so its footer says something entirely
+        // different from every other card's. TickCardFace keeps the number live.
+        PlayerController p = GameManager.instance != null ? GameManager.instance.player : null;
+        float cost = p != null ? p.NextStaggerCost : 0f;
+        bool lethal = p != null && cost >= p.CurrentHealth;
+        back.SetContent(card, bodyText, key,
+                        "HEALTH", Mathf.RoundToInt(cost).ToString(),
+                        lethal ? STAGGER_LETHAL_COLOR : STAGGER_COST_COLOR,
+                        "GIVES", $"+{(p != null ? p.staggerShiftGain : 2)}");
+    }
+
+    // --- Procedural card face -------------------------------------------------------------------
+    // Stagger's art is not built like the rest of the set. Every other card carries two painted
+    // medallions in its top corners (Shift cost left, charges right); Stagger's has NEITHER, and
+    // instead a single HEART centred along the top edge. That heart is the cost slot, because what
+    // Stagger costs is HP — an escalating price that goes up every play, for the whole run
+    // (PlayerController.PerformStagger).
+    //
+    // So the two normal readouts are switched OFF for this card rather than left to float over
+    // artwork that has no sockets for them, and the price is drawn into the heart instead.
+    //
+    // ⚠️ THE NUMBER IS PLACED AGAINST THE DISPLAYED IMAGE, NOT THE RECT. CardArt is 200x300 with
+    // preserveAspect ON, and the Stagger art is 124x210 — a narrower aspect — so it letterboxes
+    // with a bar down each side and the artwork is ~177px wide, not 200. Measuring the heart as a
+    // fraction of the RECT would put the number off-centre and too wide. It is measured as a
+    // fraction of the SPRITE and mapped through the letterbox each time the rect resizes.
+    //
+    // Fractions below are measured off Assets/Art/stagger.png. The heart's outline spans x 38-86,
+    // y 2-44 in the FILE, and its widest legible band — where a number actually fits, above the
+    // taper — is centred on y 19. Interior fill is a flat #550A0F, so pale text reads cleanly.
+    //
+    // ⚠️ They are expressed against the SPRITE RECT, not the file. Unity's auto-slice trimmed the
+    // transparent margin, so the sprite is 118x205 at offset (3,3) inside the 124x210 png — a
+    // fraction taken against the file would sit the number low and slightly small. art.rect below
+    // is the sprite rect, which is why the two agree.
+    private const float HEART_CX = 59f / 118f;      // dead-centre, as it happens
+    private const float HEART_CY = 17f / 205f;      // from the TOP of the sprite
+    private const float HEART_W = 44f / 118f;
+    private const float HEART_H = 28f / 205f;
+
+    // --- The name plate, drawn for EVERY card whose art doesn't already carry its title ---------
+    //
+    // Standing convention (designer, 2026-08-09): new card art ships with an EMPTY plate and the UI
+    // types the name into it. That decouples a card's name from its texture — renaming a card stops
+    // being a repaint — and it is why CardData.nameIsPaintedIntoArt defaults to FALSE.
+    //
+    // ⚠️ The 14 pre-2026-08-09 cards have their titles painted in and set that flag, so nothing
+    // about them changes today. Clear it on each as its art is replaced. Getting it backwards is
+    // visible instantly: set-when-blank leaves an empty plate, clear-when-painted double-prints.
+    //
+    // The plate geometry below was measured on Stagger's art but is expressed as fractions of the
+    // sprite, and the old 1024x1536 cards put their plate within ~1% of the same place — so one set
+    // of constants serves both layouts. Re-measure only if a new art moves the plate.
+    private const float PLATE_CY = 190.5f / 205f;
+    private const float PLATE_W = 96f / 118f;
+    private const float PLATE_H = 16f / 205f;
+    // The set's title gold, matching the plates painted into the legacy art.
+    private static readonly Color NAME_COLOR = new Color(0.85f, 0.72f, 0.36f, 1f);
+
+    // The Shift blue used by the resource bar, so a cost on a card back and a cost in the HUD are
+    // recognisably the same currency.
+    private static readonly Color SHIFT_COST_COLOR = new Color(0.55f, 0.52f, 0.96f, 1f);
+
+    private static readonly Color STAGGER_COST_COLOR = new Color(0.98f, 0.90f, 0.87f, 1f);
+    // Shown when the next Stagger costs at least as much HP as the player has left. This is the
+    // only place the run's actual fail state is visible before it happens, so it must be loud.
+    private static readonly Color STAGGER_LETHAL_COLOR = new Color(1f, 0.30f, 0.28f, 1f);
+
+    private TextMeshProUGUI staggerCostText;
+    private TextMeshProUGUI nameText;
+    private Vector2 faceHostSize = Vector2.zero;
+    private bool isStaggerCard;
+
+    private void RefreshCardFace(RuntimeCard card)
+    {
+        CardData data = card != null ? card.cardData : null;
+        if (data == null) return;
+
+        isStaggerCard = data.actionType == CardActionType.Stagger;
+
+        // The two painted medallions belong to the normal card frame, which Stagger's art lacks —
+        // it carries a single heart on the top edge instead (see below). Leaving them on would
+        // float a Shift cost and a charge count over artwork with no sockets for them.
+        if (costText != null) costText.gameObject.SetActive(!isStaggerCard);
+        if (usesText != null) usesText.gameObject.SetActive(!isStaggerCard);
+
+        bool wantName = !data.nameIsPaintedIntoArt && !string.IsNullOrEmpty(data.cardName);
+        if (wantName)
+        {
+            if (nameText == null) nameText = MakeFaceLabel("CardName", 8f, 15f, NAME_COLOR);
+            nameText.gameObject.SetActive(true);
+            nameText.text = data.cardName.ToUpperInvariant();
+        }
+        else if (nameText != null) nameText.gameObject.SetActive(false);
+
+        if (isStaggerCard)
+        {
+            if (staggerCostText == null)
+                staggerCostText = MakeFaceLabel("StaggerCost", 12f, 30f, STAGGER_COST_COLOR);
+            staggerCostText.gameObject.SetActive(true);
+        }
+        else if (staggerCostText != null) staggerCostText.gameObject.SetActive(false);
+
+        faceHostSize = Vector2.zero;   // force a re-place against the current rect
+        TickCardFace();
+    }
+
+    private TextMeshProUGUI MakeFaceLabel(string name, float minSize, float maxSize, Color color)
+    {
+        RectTransform host = cardArtImage != null ? cardArtImage.rectTransform : (RectTransform)transform;
+
+        GameObject go = new GameObject(name, typeof(RectTransform));
+        RectTransform rt = go.GetComponent<RectTransform>();
+        rt.SetParent(host, false);
+        rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);   // top-left; placed by pixel offset below
+        rt.pivot = new Vector2(0.5f, 0.5f);
+
+        TextMeshProUGUI t = go.AddComponent<TextMeshProUGUI>();
+        if (costText != null) t.font = costText.font;
+        t.alignment = TextAlignmentOptions.Center;
+        t.fontStyle = FontStyles.Bold;
+        t.enableAutoSizing = true;   // 3-digit costs arrive fast: 8, 16, 24... 104
+        t.fontSizeMin = minSize;
+        t.fontSizeMax = maxSize;
+        t.color = color;
+        t.raycastTarget = false;
+        return t;
+    }
+
+    // Placement and value are refreshed from Update rather than set once: Stagger's price is read
+    // off the live player, and the lethal warning depends on current HP, which changes while the
+    // card just sits in the hand. All of it is a couple of compares — nothing is written unless it
+    // changed, and the layout block only runs when the rect actually resizes.
+    private void TickCardFace()
+    {
+        bool haveName = nameText != null && nameText.gameObject.activeSelf;
+        bool haveCost = staggerCostText != null && staggerCostText.gameObject.activeSelf;
+        if (!haveName && !haveCost) return;
+
+        RectTransform host = cardArtImage != null ? cardArtImage.rectTransform : (RectTransform)transform;
+        Vector2 size = host.rect.size;
+
+        if (size != faceHostSize && size.x > 0f && size.y > 0f)
+        {
+            faceHostSize = size;
+
+            // Map the sprite-space fractions through preserveAspect's letterbox.
+            Sprite art = cardArtImage != null ? cardArtImage.sprite : null;
+            float aspect = art != null && art.rect.height > 0f ? art.rect.width / art.rect.height
+                                                               : size.x / size.y;
+            float dh = Mathf.Min(size.y, size.x / aspect);
+            float dw = dh * aspect;
+            float padX = (size.x - dw) * 0.5f;
+            float padY = (size.y - dh) * 0.5f;
+
+            if (haveCost)
+            {
+                RectTransform rt = staggerCostText.rectTransform;
+                rt.sizeDelta = new Vector2(HEART_W * dw, HEART_H * dh);
+                rt.anchoredPosition = new Vector2(padX + HEART_CX * dw, -(padY + HEART_CY * dh));
+            }
+            if (haveName)
+            {
+                RectTransform nrt = nameText.rectTransform;
+                nrt.sizeDelta = new Vector2(PLATE_W * dw, PLATE_H * dh);
+                nrt.anchoredPosition = new Vector2(padX + 0.5f * dw, -(padY + PLATE_CY * dh));
+            }
+        }
+
+        if (!haveCost) return;
+
+        PlayerController p = GameManager.instance != null ? GameManager.instance.player : null;
+        if (p == null) return;
+
+        float cost = p.NextStaggerCost;
+        string label = Mathf.RoundToInt(cost).ToString();
+        if (staggerCostText.text != label) staggerCostText.text = label;
+
+        Color want = cost >= p.CurrentHealth ? STAGGER_LETHAL_COLOR : STAGGER_COST_COLOR;
+        if (staggerCostText.color != want) staggerCostText.color = want;
+
+        // The back's footer shows the same price, so it has to track the same way — the card can be
+        // flipped when the player takes a hit and crosses the lethal threshold.
+        if (back != null && back.costValue != null)
+        {
+            if (back.costValue.text != label) back.costValue.text = label;
+            if (back.costValue.color != want) back.costValue.color = want;
+        }
+    }
+
+    // --- Blompo blessing mark ------------------------------------------------------------
+    // A blessed card must be identifiable at a glance in the hand. Built procedurally here (house
+    // style) rather than in the CardTemplate prefab: that prefab has known scale corruption and is
+    // blocked on new art, so we deliberately don't touch it.
+    //
+    // IT IS PARENTED TO THE ART, NOT THE CARD ROOT. The root's RectTransform is much taller than
+    // the visible card, so the old badge — anchored to the root's top-right corner — floated off
+    // the card's right EDGE at mid-height instead of sitting on the card at all. cardArtImage is
+    // the frame the player actually sees, so anchoring there lands the mark correctly no matter
+    // what the corrupt root geometry is doing.
+    //
+    // THE LOOK inverts the gem it replaces. The old badge was an OBJECT: a jewel set in an ornate
+    // gold ring — the chrome this UI pass exists to remove. This is LIGHT INSCRIBED ON THE CARD:
+    // Blompo's own sigil glowing over a soft dark halo, which lifts it off busy artwork without
+    // drawing a frame.
+    //
+    // ⚠️ IT IS ONE COLOUR ON EVERY BLESSING, AND MUST STAY THAT WAY (designer, 2026-08-06). The
+    // incoming card art telegraphs each CARD's rarity in colour — dark grey Common, light grey
+    // Uncommon, yellow Rare, purple Epic (no Legendary cards yet). An earlier pass here tinted the
+    // mark by the BLESSING's rarity, which is a different thing but would not survive contact with
+    // a player: two colour-coded rarity systems on one card, disagreeing with each other (this one
+    // called Rare azure where the art calls it yellow). So the mark carries no rarity at all, and
+    // its colour is chosen to sit OUTSIDE that palette — teal is nowhere near grey, yellow or
+    // purple, and is pushed green of Shift-blue so it can't be misread as a Shift cost either.
+    //
+    // Blessing hierarchy moved to a channel the art doesn't use: only Epic and Legendary blessings
+    // PULSE. If the rarity palette ever changes, re-pick this colour against it — do not reach for
+    // FlatUI.RarityColor here.
+    //
+    // The mark deliberately does NOT say WHICH blessing this is; all seven share one sigil and the
+    // hover text names it. Seven legible glyphs at this size is a bespoke-art job, not a procedural
+    // one.
+    private static readonly Color BLESSED_COLOR = new Color(0.42f, 0.90f, 0.82f, 1f);
+    private const float MARK_SIZE = 34f;    // the sigil itself
+    private const float MARK_GLOW = 46f;    // rarity halo
+    private const float MARK_SHADE = 58f;   // dark halo that separates it from the artwork
+    // Offsets from the art rect's bottom-left, in its own 200x300 units.
+    //
+    // These are NOT arbitrary padding. cardArtImage's sprite is the WHOLE card face — painted
+    // frame, cost medallions and name plate included — not just the inner picture. Measured on the
+    // real cards, the inner picture panel occupies roughly 10%-80% of the card's height, so an
+    // inset of 25 put the mark down inside the painted NAME PLATE, where it clipped the card's
+    // title. 62 sits it just inside the picture's bottom-left corner.
+    private const float MARK_INSET_X = 34f;
+    private const float MARK_INSET_Y = 62f;
+
+    private GameObject blessMark;
+    private Image blessShade, blessGlow, blessSigil;
+    private bool blessPulses;
+    private float blessGlowAlpha;
 
     private void RefreshBlessingBadge(RuntimeCard card)
     {
@@ -96,57 +371,88 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
 
         if (!blessed)
         {
-            if (blessBadge != null) blessBadge.SetActive(false);
+            if (blessMark != null) blessMark.SetActive(false);
             return;
         }
 
-        Color gem = RelicUISprites.GemColor(CardEnhancements.RarityOf(card.enhancement));
+        Rarity rarity = CardEnhancements.RarityOf(card.enhancement);
 
-        if (blessBadge == null)
-        {
-            blessBadge = new GameObject("BlessBadge", typeof(RectTransform));
-            RectTransform brt = blessBadge.GetComponent<RectTransform>();
-            brt.SetParent(transform, false);
-            // Top-right corner, hanging slightly off the card so it reads as attached-on.
-            brt.anchorMin = brt.anchorMax = new Vector2(1f, 1f);
-            brt.pivot = new Vector2(0.5f, 0.5f);
-            brt.anchoredPosition = new Vector2(-14f, -14f);
-            brt.sizeDelta = new Vector2(34f, 34f);
+        // Motion, not colour, is the hierarchy — see the note above. Only the two blessings worth
+        // noticing animate, which is what makes one catch your eye in a full hand.
+        blessPulses = rarity == Rarity.Epic || rarity == Rarity.Legendary;
+        blessGlowAlpha = 0.30f;
 
-            AddBadgePart("Glow", RelicUISprites.Glow(), 54f);
-            AddBadgePart("Setting", RelicUISprites.GemSetting(), 34f);
-            AddBadgePart("Gem", RelicUISprites.Gem(), 21f);
-        }
+        EnsureBlessMark();
+        blessMark.SetActive(true);
 
-        blessBadge.SetActive(true);
-        Transform glowT = blessBadge.transform.Find("Glow");
-        Transform gemT = blessBadge.transform.Find("Gem");
-        if (glowT != null) glowT.GetComponent<Image>().color = new Color(gem.r, gem.g, gem.b, 0.55f);
-        if (gemT != null) gemT.GetComponent<Image>().color = gem;
+        blessShade.color = new Color(0.02f, 0.02f, 0.03f, 0.72f);
+        blessGlow.color = new Color(BLESSED_COLOR.r, BLESSED_COLOR.g, BLESSED_COLOR.b, blessGlowAlpha);
+        blessSigil.color = BLESSED_COLOR;
 
-        // Say what it does on hover, alongside the card's own text.
-        if (descriptionText != null)
-            descriptionText.text =
-                $"<b>{card.cardData.cardName}</b>\n\n{card.cardData.description}\n\n" +
-                $"<b>{CardEnhancements.Name(card.enhancement)}</b> — {CardEnhancements.Description(card.enhancement)}";
+        // Name the blessing on the back, under the card's own text. The mark says a card is
+        // blessed; only this says which one.
+        // Single break, not a blank line: a blessed card carries two extra lines of text on a face
+        // that is already full, and the spare line was enough to push the longest combinations past
+        // the box. The colour change is what separates the sections; it doesn't need whitespace too.
+        bodyText = $"{myCard.cardData.description}\n" +
+                   $"<color=#6BE6D1><b>{CardEnhancements.Name(card.enhancement)}</b></color>\n" +
+                   $"{CardEnhancements.Description(card.enhancement)}";
     }
 
-    private void AddBadgePart(string name, Sprite sprite, float size)
+    private void EnsureBlessMark()
+    {
+        if (blessMark != null) return;
+
+        RectTransform host = cardArtImage != null ? cardArtImage.rectTransform : (RectTransform)transform;
+
+        blessMark = new GameObject("BlessMark", typeof(RectTransform));
+        RectTransform rt = blessMark.GetComponent<RectTransform>();
+        rt.SetParent(host, false);
+        // Bottom-left of the picture. The cost medallion owns the top-left and the card's own
+        // rarity tag owns the top-right, so this is the one corner free on every card in the set.
+        rt.anchorMin = rt.anchorMax = new Vector2(0f, 0f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = new Vector2(MARK_INSET_X, MARK_INSET_Y);
+        rt.sizeDelta = new Vector2(MARK_SIZE, MARK_SIZE);
+
+        blessShade = AddMarkLayer("Shade", FlatUI.SoftGlow(), MARK_SHADE);
+        blessGlow = AddMarkLayer("Glow", FlatUI.SoftGlow(), MARK_GLOW);
+        blessSigil = AddMarkLayer("Sigil", FlatUI.ArcaneSigil(), MARK_SIZE);
+    }
+
+    private Image AddMarkLayer(string name, Sprite sprite, float size)
     {
         GameObject go = new GameObject(name, typeof(RectTransform));
         RectTransform rt = go.GetComponent<RectTransform>();
-        rt.SetParent(blessBadge.transform, false);
+        rt.SetParent(blessMark.transform, false);
         rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = Vector2.zero;
         rt.sizeDelta = new Vector2(size, size);
+
         Image img = go.AddComponent<Image>();
         img.sprite = sprite;
         img.raycastTarget = false;
+        return img;
+    }
+
+    // Unscaled on purpose: blessed cards are on screen during the reward screen, which holds the
+    // game paused at timeScale 0.
+    private void TickBlessMark()
+    {
+        if (!blessPulses || blessGlow == null || blessMark == null || !blessMark.activeSelf) return;
+
+        float t = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 2.1f);
+        Color c = blessGlow.color;
+        c.a = blessGlowAlpha * Mathf.Lerp(0.55f, 1.25f, t);
+        blessGlow.color = c;
     }
 
     private void Update()
     {
-        if (myCard != null) UpdateSelectionVisual();
+        if (myCard == null) return;
+        UpdateSelectionVisual();
+        TickBlessMark();
+        TickCardFace();
     }
 
     private void UpdateSelectionVisual()
@@ -154,9 +460,24 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         bool isSelected = myCard.isSelected;
         if (selectionFrame != null) selectionFrame.SetActive(isSelected);
 
-        Vector3 targetScale = isSelected ? originalScale * 1.1f : originalScale;
-        float targetY = isSelected ? selectionLiftAmount : 0f;
-        float speed = Time.deltaTime * 15f;
+        // The flip zoom composes with the selection bump rather than replacing it, so a selected
+        // card you hover does both instead of one silently winning.
+        float zoom = Mathf.Lerp(1f, flipZoom, flipT);
+        Vector3 targetScale = originalScale * (isSelected ? 1.1f : 1f) * zoom;
+
+        // ⚠️ THE FLIP MUST LIFT AS WELL AS GROW, OR THE BACK'S FOOTER FALLS OFF THE SCREEN.
+        //
+        // The hand sits at the bottom edge and a card's art already overhangs it: measured, the
+        // card's bottom is 6px BELOW the screen at rest, and the 1.2x zoom grows about the root's
+        // pivot so that becomes 22px. The Shift/charges row lives in the lowest 12% of the back, so
+        // it was the part that got cut. 40 clears the overhang with ~18px to spare, and a card that
+        // rises as it turns towards you is the right read anyway.
+        float targetY = (isSelected ? selectionLiftAmount : 0f) + flipLift * flipT;
+
+        // ⚠️ UNSCALED. This used to lerp on Time.deltaTime, which is ZERO on every screen that
+        // pauses the game — so a reward card, the one place reading a description matters most,
+        // would flip over without ever growing.
+        float speed = Time.unscaledDeltaTime * 15f;
 
         transform.localScale = Vector3.Lerp(transform.localScale, targetScale, speed);
 
@@ -176,55 +497,6 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         }
     }
 
-    public void OnPointerEnter(PointerEventData eventData)
-    {
-        if (descriptionPanel != null)
-        {
-            descriptionPanel.SetActive(true);
-            descriptionPanel.transform.SetAsLastSibling();
-        }
-        StartArtFade(hoverFadeTargetAlpha);
-    }
-
-    public void OnPointerExit(PointerEventData eventData)
-    {
-        if (descriptionPanel != null) descriptionPanel.SetActive(false);
-        StartArtFade(1f);
-    }
-
-    // Cleanly (re)starts the artwork alpha fade so rapid enter/exit can't leave it stuck.
-    private void StartArtFade(float targetAlpha)
-    {
-        if (cardArtImage == null) return;
-        if (artFadeCoroutine != null) StopCoroutine(artFadeCoroutine);
-        artFadeCoroutine = StartCoroutine(FadeArtAlpha(targetAlpha));
-    }
-
-    private IEnumerator FadeArtAlpha(float targetAlpha)
-    {
-        Color c = cardArtImage.color;
-        float startAlpha = c.a;
-
-        if (hoverFadeDuration <= 0f)
-        {
-            c.a = targetAlpha;
-            cardArtImage.color = c;
-            artFadeCoroutine = null;
-            yield break;
-        }
-
-        float elapsed = 0f;
-        while (elapsed < hoverFadeDuration)
-        {
-            elapsed += Time.unscaledDeltaTime;
-            float t = Mathf.Clamp01(elapsed / hoverFadeDuration);
-            c.a = Mathf.Lerp(startAlpha, targetAlpha, t);
-            cardArtImage.color = c;
-            yield return null;
-        }
-
-        c.a = targetAlpha;
-        cardArtImage.color = c;
-        artFadeCoroutine = null;
-    }
+    // Hover itself is handled by CardHoverFlip on this same GameObject — it owns the flip, the
+    // counter-rotating hit target and the face swap. Nothing to do here.
 }

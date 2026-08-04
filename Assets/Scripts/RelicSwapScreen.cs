@@ -33,6 +33,7 @@ public class RelicSwapScreen : MonoBehaviour
     private RelicData incoming;
     private RelicData sacrifice;
     private System.Action onAcquired;
+    private System.Action onDeclined;
     private bool isOpen;
 
     // Restore-state bookkeeping.
@@ -45,17 +46,27 @@ public class RelicSwapScreen : MonoBehaviour
     private const float WIN_W = 720f, WIN_H = 516f, CELL = 92f;
     private const float PAD = 32f;
 
-    public static void Open(RelicData incoming, System.Action onAcquired)
+    // onDeclined fires when the player presses LEAVE IT. It exists so a source that must always
+    // pay out something — a chest — can hand over a consolation instead of nothing. A shop passes
+    // null: declining a purchase should cost and give nothing.
+    public static void Open(RelicData incoming, System.Action onAcquired, System.Action onDeclined = null)
     {
         if (incoming == null) return;
         EnsureInstance();
-        if (instance == null) return;
+        if (instance == null)
+        {
+            // No Canvas: the offer can't be shown, so treat it as declined rather than silently
+            // swallowing the reward. Same principle as RunMapScreen never stranding a run.
+            onDeclined?.Invoke();
+            return;
+        }
         if (instance.isOpen)   // a swap is already up — don't stack; drop the extra grant
         {
             Debug.LogWarning("RelicSwapScreen already open; ignoring a second grant.");
+            onDeclined?.Invoke();
             return;
         }
-        instance.Show(incoming, onAcquired);
+        instance.Show(incoming, onAcquired, onDeclined);
     }
 
     private static void EnsureInstance()
@@ -180,11 +191,12 @@ public class RelicSwapScreen : MonoBehaviour
     }
 
     // ---- open / close ----
-    private void Show(RelicData incomingRelic, System.Action acquiredCallback)
+    private void Show(RelicData incomingRelic, System.Action acquiredCallback, System.Action declinedCallback = null)
     {
         isOpen = true;
         incoming = incomingRelic;
         onAcquired = acquiredCallback;
+        onDeclined = declinedCallback;
         sacrifice = null;
 
         gameObject.SetActive(true);
@@ -361,13 +373,16 @@ public class RelicSwapScreen : MonoBehaviour
         RelicManager.instance.AddRelic(incoming);      // fills it back (4→5)
 
         System.Action cb = onAcquired;
+        onDeclined = null;      // taken, not declined — make sure the consolation can't also fire
         Hide();
         cb?.Invoke();   // caller finalizes (e.g. shop charges gold, marks item sold)
     }
 
     private void DoLeave()
     {
-        Hide();   // declined — onAcquired is never called, nothing charged
+        System.Action cb = onDeclined;
+        Hide();         // declined — onAcquired is never called, nothing charged
+        cb?.Invoke();   // ...but a chest still pays its consolation, so it is never empty
     }
 
     // ---- small UGUI builders (house style — self-contained per panel) ----

@@ -13,9 +13,10 @@ MonoBehaviour:
   m_Name: FreefallBlade
   m_EditorClassIdentifier: 
   cardName: Freefall Blade
-  description: Slash in an arc ahead and below you for 15 damage. Deals DOUBLE damage
-    (30) while falling.
+  description: Slash the air in front of and below you for 15 damage. 2X damage and
+    area if played when falling.
   cardArt: {fileID: 3949312561008636491, guid: db24c03a6360afa44a906cd18adf60e6, type: 3}
+  nameIsPaintedIntoArt: 0
   actionType: 18
   actionValue: 15
   singleUse: 0

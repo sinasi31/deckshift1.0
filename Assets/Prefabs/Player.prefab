@@ -228,6 +228,7 @@ MonoBehaviour:
   swimSettleStrength: 8
   swimExitDuration: 0.35
   currentGold: 500
+  currentScrap: 0
   audioSource: {fileID: 7872518250570301061}
   dashSound: {fileID: 8300000, guid: 1f3da61f1655f6e4488574b4e351c8ce, type: 3}
   fireballCastSound: {fileID: 8300000, guid: 2edea64602e6220499330f4c32d7ee4a, type: 3}
@@ -297,19 +298,23 @@ MonoBehaviour:
     m_Bits: 2048
   glassWailEffect: {fileID: 4801726395048172630, guid: e1d4b8a26f3c40579ab1c2d3e4f5a6b7, type: 3}
   freefallBladeRange: 1.7
+  freefallBladeFallingRangeMul: 1.4
   parryRiposteRange: 2.5
-  meteorMinFall: 4
+  meteorMinFall: 6.5
   meteorMaxFall: 14
+  meteorCooldown: 1.5
   meteorMinRadius: 2.5
   meteorMaxRadius: 5.5
   meteorMinDamage: 12
   meteorMaxDamage: 55
+  meteorSfxVolume: 1
   interactionRange: 2
   interactableLayer:
     serializedVersion: 2
     m_Bits: 4096
   staggerCount: 0
-  maxStaggerUses: 3
+  staggerHealthStep: 8
+  staggerShiftGain: 2
   staggerJumpForce: 5
   staggerDamage: 5
   staggerRadius: 2
@@ -640,13 +645,21 @@ MonoBehaviour:
   impactRingSize: 0.55
   impactWallColor: {r: 1, g: 0.55, b: 0.15, a: 0.8}
   impactEnemyColor: {r: 1, g: 0.2, b: 0.1, a: 0.95}
-  dashStreakWidth: 0.07
+  dashTrailSteps: 4
   biteValidColor: {r: 0.35, g: 1, b: 0.45, a: 0.85}
   biteInvalidColor: {r: 1, g: 0.25, b: 0.25, a: 0.4}
   biteRingWidth: 0.05
   portalFirstColor: {r: 0.85, g: 0.85, b: 0.85, a: 0.6}
   portalValidColor: {r: 0.3, g: 0.95, b: 1, a: 0.65}
   portalInvalidColor: {r: 1, g: 0.25, b: 0.25, a: 0.6}
+  platformGhostColor: {r: 1, g: 1, b: 1, a: 0.45}
+  freefallNeutralColor: {r: 0.8, g: 0.9, b: 1, a: 0.55}
+  freefallFallingColor: {r: 1, g: 0.55, b: 0.15, a: 0.85}
+  freefallHitColor: {r: 0.35, g: 1, b: 0.45, a: 0.85}
+  freefallRingWidth: 0.05
+  wailColor: {r: 0.75, g: 0.95, b: 1, a: 0.6}
+  wailRippleMaxRadius: 6
+  wailRipplePeriod: 1.1
 --- !u!1001 &259556885127125483
 PrefabInstance:
   m_ObjectHideFlags: 0

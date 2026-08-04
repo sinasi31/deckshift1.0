@@ -54,7 +54,15 @@ public class ScrapForgeScreen : MonoBehaviour
     private const float WIN_W = 1180f;
     private const float PAD = 44f;
     private const float ROW_W = WIN_W - PAD * 2f, ROW_H = 205f, EMPTY_ROW_H = 38f;
-    private const float CARD_W_MAX = 140f, CARD_H_MAX = 205f, CARD_GAP = 16f;
+    // A chip is now THE CARD FACE plus a price strip under it, so the cost and charges the player
+    // reads here are the ones painted on the card itself — the same object they hold in hand.
+    // Face height is locked to the art's real 2:3 so nothing letterboxes; the strip carries the one
+    // number that is NOT on a card, the repair price.
+    private const float CARD_W_MAX = 140f;
+    private const float FACE_ASPECT = 1.5f;             // 1024x1536 card art
+    private const float COST_STRIP = 36f;
+    private const float CARD_H_MAX = CARD_W_MAX * FACE_ASPECT + COST_STRIP;
+    private const float CARD_GAP = 16f;
 
     // Vertical rhythm, all measured downward from the window's top edge.
     private const float HEADER_RULE_Y = 96f;   // hairline under the title
@@ -251,11 +259,8 @@ public class ScrapForgeScreen : MonoBehaviour
 
     // Places every section top-down and resizes the window to fit. Called after each Refresh, so
     // collapsing an empty section actually shrinks the dialog instead of leaving a hole.
-    private void LayoutSections(bool repairHasCards, bool salvageHasCards)
+    private void LayoutSections(float repairH, float salvageH)
     {
-        float repairH = repairHasCards ? ROW_H : EMPTY_ROW_H;
-        float salvageH = salvageHasCards ? ROW_H : EMPTY_ROW_H;
-
         float y = HEADER_RULE_Y + LABEL_GAP;
         repairLabel.rectTransform.anchoredPosition = new Vector2(PAD, -y);
 
@@ -300,22 +305,54 @@ public class ScrapForgeScreen : MonoBehaviour
             "X", 20f, FontStyles.Bold, FlatUI.TextMuted, TextAlignmentOptions.Center);
     }
 
-    // Rows use a centred HorizontalLayoutGroup and size their cards to fit, so any number of
-    // entries stays centred and on-screen without a scroll view.
+    // ⚠️ ROWS WRAP. They used to be a single HorizontalLayoutGroup that shrank the cards to fit
+    // however many there were, which is fine at three and falls apart at a real deck size: at twelve
+    // the chips were 76px wide with the name printed over the artwork, and past that they run off
+    // the window entirely (the designer hit this).
+    //
+    // A grid wraps onto a second and third line instead, so a chip keeps a legible size and the
+    // SECTION grows in height — which costs nothing, because LayoutSections already resizes the
+    // window to its content. Shrinking is now the last resort rather than the first (see GridCell).
     private RectTransform BuildRow(string name, float y)
     {
         RectTransform rt = AddPoint(window, name, new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(ROW_W, ROW_H));
         rt.pivot = new Vector2(0.5f, 1f);
-        HorizontalLayoutGroup hlg = rt.gameObject.AddComponent<HorizontalLayoutGroup>();
-        hlg.spacing = CARD_GAP;
+        GridLayoutGroup g = rt.gameObject.AddComponent<GridLayoutGroup>();
+        g.cellSize = new Vector2(CARD_W_MAX, CARD_H_MAX);
+        g.spacing = new Vector2(CARD_GAP, CARD_GAP);
         // Left-aligned, indented to line up under the section label. Centring the cards instead
         // left the whole left half of the window empty, which read as a broken layout when only
         // one or two cards were listed.
-        hlg.childAlignment = TextAnchor.UpperLeft;
-        hlg.padding = new RectOffset(4, 0, 0, 0);
-        hlg.childControlWidth = hlg.childControlHeight = false;
-        hlg.childForceExpandWidth = hlg.childForceExpandHeight = false;
+        g.childAlignment = TextAnchor.UpperLeft;
+        g.padding = new RectOffset(4, 0, 0, 0);
+        g.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        g.constraintCount = 1;   // recomputed per refresh in BuildCards
         return rt;
+    }
+
+    // Chooses the cell size and column count for `count` chips.
+    //
+    // Wrap first, shrink only when forced: full-size cells are used while the section stays within
+    // MAX_ROWS, and only a deck big enough to overflow that starts scaling them down — with a floor,
+    // because an illegible chip is no more useful than an off-screen one.
+    private const int MAX_ROWS = 3;
+    private const float CARD_W_MIN = 84f;
+
+    private static void GridCell(int count, out Vector2 cell, out int columns)
+    {
+        columns = Mathf.Max(1, Mathf.FloorToInt((ROW_W + CARD_GAP) / (CARD_W_MAX + CARD_GAP)));
+        float w = CARD_W_MAX;
+
+        int rows = Mathf.CeilToInt((float)count / columns);
+        if (rows > MAX_ROWS)
+        {
+            // Need this many across to fit inside MAX_ROWS; size the cell to match.
+            int needed = Mathf.CeilToInt((float)count / MAX_ROWS);
+            w = Mathf.Max(CARD_W_MIN, (ROW_W - CARD_GAP * (needed - 1)) / needed);
+            columns = Mathf.Max(1, Mathf.FloorToInt((ROW_W + CARD_GAP) / (w + CARD_GAP)));
+        }
+
+        cell = new Vector2(w, w / CARD_W_MAX * CARD_H_MAX);
     }
 
     private void BuildConfirmBar()
@@ -427,15 +464,15 @@ public class ScrapForgeScreen : MonoBehaviour
         repairLabel.text = $"REPAIR   ·   {ScrapEconomy.RECHARGE_PER_CHARGE} SCRAP PER CHARGE";
         salvageLabel.text = $"SALVAGE   ·   {ScrapEconomy.SALVAGE_COST} SCRAP, RETURNS HALF CHARGED";
 
-        BuildCards(repairRow, damaged, Mode.Repair, scrap);
-        BuildCards(salvageRow, exhausted, Mode.Salvage, scrap);
+        float repairH = BuildCards(repairRow, damaged, Mode.Repair, scrap);
+        float salvageH = BuildCards(salvageRow, exhausted, Mode.Salvage, scrap);
 
         // Empty rows get an explicit line rather than nothing. With both sections empty the old
         // screen was a blank field with two headings floating in it and no explanation.
         if (damaged.Count == 0) AddEmptyNote(repairRow, "Every card is at full charges.");
         if (exhausted.Count == 0) AddEmptyNote(salvageRow, "Nothing has burned out yet.");
 
-        LayoutSections(damaged.Count > 0, exhausted.Count > 0);
+        LayoutSections(repairH, salvageH);
 
         UpdateConfirmBar(scrap);
     }
@@ -444,28 +481,38 @@ public class ScrapForgeScreen : MonoBehaviour
     // rendering failure. Sits inside the row's layout group, so it lines up with where cards would.
     private void AddEmptyNote(Transform row, string message)
     {
+        // ⚠️ The row's GridLayoutGroup would force this line into a single card-sized cell and clip
+        // it. A grid controls its children's size unconditionally — a LayoutElement can't opt out —
+        // so the group is switched off while the section is empty and back on in BuildCards.
+        GridLayoutGroup g = row.GetComponent<GridLayoutGroup>();
+        if (g != null) g.enabled = false;
+
         RectTransform rt = AddPoint(row, "Empty", new Vector2(0f, 1f), Vector2.zero, new Vector2(ROW_W - 8f, EMPTY_ROW_H));
-        LayoutElement le = rt.gameObject.AddComponent<LayoutElement>();
-        le.preferredWidth = ROW_W - 8f; le.preferredHeight = EMPTY_ROW_H;
+        rt.anchoredPosition = new Vector2(4f, 0f);
 
         TMP_Text t = AddText(rt, "Text", new Vector2(0f, 1f), new Vector2(2f, -4f), new Vector2(ROW_W - 12f, 28f),
             message, 16f, FontStyles.Italic, FlatUI.TextDisabled, TextAlignmentOptions.TopLeft);
     }
 
-    private void BuildCards(Transform row, List<RuntimeCard> cards, Mode mode, int scrap)
+    // Returns how tall the section ended up, so LayoutSections can place what follows it.
+    private float BuildCards(Transform row, List<RuntimeCard> cards, Mode mode, int scrap)
     {
-        if (cards.Count == 0) return;
+        if (cards.Count == 0) return EMPTY_ROW_H;
 
-        // Shrink to fit rather than overflow — a deck with a lot of damaged cards still lays out
-        // on one centred line.
-        float w = Mathf.Min(CARD_W_MAX, (ROW_W - CARD_GAP * (cards.Count - 1)) / cards.Count);
-        float h = Mathf.Min(CARD_H_MAX, w / CARD_W_MAX * CARD_H_MAX);
+        Vector2 cell; int columns;
+        GridCell(cards.Count, out cell, out columns);
+
+        GridLayoutGroup g = row.GetComponent<GridLayoutGroup>();
+        if (g != null) { g.enabled = true; g.cellSize = cell; g.constraintCount = columns; }
 
         foreach (RuntimeCard card in cards)
         {
             int cost = mode == Mode.Repair ? ScrapEconomy.RechargeCost(card) : ScrapEconomy.SALVAGE_COST;
-            BuildCardChip(row, card, mode, w, h, cost, scrap >= cost);
+            BuildCardChip(row, card, mode, cell.x, cell.y, cost, scrap >= cost);
         }
+
+        int rows = Mathf.CeilToInt((float)cards.Count / columns);
+        return rows * cell.y + (rows - 1) * CARD_GAP;
     }
 
     private void BuildCardChip(Transform parent, RuntimeCard card, Mode mode, float w, float h, int cost, bool affordable)
@@ -487,45 +534,47 @@ public class ScrapForgeScreen : MonoBehaviour
             glow.rectTransform.offsetMax = new Vector2(26f, 26f);
         }
 
+        // ⚠️ THE CHIP IS THE CARD. It used to be a FlatUI plate with the card art squeezed into a
+        // SQUARE box, which letterboxed the whole 2:3 painted face down to something too small to
+        // read — which is exactly why this screen then printed the name, the charges and the Shift
+        // cost as separate text underneath. All three of those are already painted on the card. The
+        // face is now drawn at its true aspect and the duplicated readouts are gone; the only thing
+        // left is the repair price, which is the one number a card does NOT carry.
+        //
+        // A transparent hit plate keeps the whole chip clickable — the card art has its own
+        // transparent margins, and an Image only raycasts where the RECT is, so this must exist.
         Image bg = rt.gameObject.AddComponent<Image>();
-        bg.sprite = FlatUI.Panel(5);
-        bg.type = Image.Type.Sliced;
-        bg.color = isSelected ? new Color(0.165f, 0.180f, 0.204f, 1f) : FlatUI.SurfaceRaised;
+        bg.color = new Color(0f, 0f, 0f, 0f);
         bg.raycastTarget = true;
 
-        Image frame = AddImage(rt, "Frame", FlatUI.Outline(5, isSelected ? 2 : 1), isSelected ? accent : FlatUI.Border, false);
-        frame.type = Image.Type.Sliced;
-        Stretch(frame.rectTransform);
+        float faceH = w * FACE_ASPECT;
 
-        if (card.cardData != null && card.cardData.cardArt != null)
+        // The face and its two medallion numbers, drawn by CardFace so this reads exactly like the
+        // card in hand. Drawing cardArt directly would leave the cost and charge circles EMPTY —
+        // the digits are TMP fields on the card prefab, not part of the painted art.
+        RectTransform face = AddPoint(rt, "CardFace", new Vector2(0.5f, 1f), Vector2.zero, new Vector2(w, faceH));
+        face.pivot = new Vector2(0.5f, 1f);
+        CardFace.Build(face, card);
+
+        // Selection reads as a border around the card itself rather than around a plate.
+        if (isSelected)
         {
-            Image art = AddImage(rt, "Art", card.cardData.cardArt, Color.white, false);
-            art.preserveAspect = true;
-            art.rectTransform.anchorMin = art.rectTransform.anchorMax = new Vector2(0.5f, 1f);
-            art.rectTransform.anchoredPosition = new Vector2(0f, -14f);
-            art.rectTransform.sizeDelta = new Vector2(w - 34f, w - 34f);
-            art.rectTransform.pivot = new Vector2(0.5f, 1f);
+            Image frame = AddImage(rt, "Frame", FlatUI.Outline(5, 2), accent, false);
+            frame.type = Image.Type.Sliced;
+            frame.rectTransform.anchorMin = frame.rectTransform.anchorMax = new Vector2(0.5f, 1f);
+            frame.rectTransform.pivot = new Vector2(0.5f, 1f);
+            frame.rectTransform.anchoredPosition = Vector2.zero;
+            frame.rectTransform.sizeDelta = new Vector2(w + 6f, faceH + 6f);
         }
 
-        TMP_Text nameText = AddText(rt, "Name", new Vector2(0.5f, 0f), new Vector2(0f, 62f), new Vector2(w - 16f, 42f),
-            card.cardData != null ? card.cardData.cardName : "?", 15f, FontStyles.Bold,
-            FlatUI.TextBody, TextAlignmentOptions.Bottom);
-        nameText.enableWordWrapping = true;
-        nameText.enableAutoSizing = true;
-        nameText.fontSizeMin = 11f; nameText.fontSizeMax = 15f;
-
-        // Charges: current out of max, so the player can see exactly what they're buying back.
-        int max = card.cardData != null ? card.cardData.maxUses : 0;
-        string charges = card.isInfinite ? "∞" : $"{card.currentUses}/{max}";
-        AddText(rt, "Charges", new Vector2(0.5f, 0f), new Vector2(0f, 40f), new Vector2(w - 16f, 24f),
-            charges, 16f, FontStyles.Bold, FlatUI.Charges, TextAlignmentOptions.Center);
-
-        // Cost as plain accent-coloured text. A shard icon was tried here at 17px and read as a
-        // smudge fused to the first digit — at this size the accent colour alone carries "scrap",
-        // and the section header already states the unit.
+        // The price, on a strip under the card. A shard icon was tried at 17px and read as a smudge
+        // fused to the first digit — the accent colour carries "scrap", and the section header
+        // already states the unit.
         Color costCol = affordable ? accent : new Color(0.50f, 0.33f, 0.30f);
-        AddText(rt, "Cost", new Vector2(0.5f, 0f), new Vector2(0f, 12f), new Vector2(w - 16f, 26f),
+        TMP_Text costText = AddText(rt, "Cost", new Vector2(0.5f, 0f), new Vector2(0f, 4f), new Vector2(w, COST_STRIP - 6f),
             $"{cost}", 20f, FontStyles.Bold, costCol, TextAlignmentOptions.Center);
+        costText.enableAutoSizing = true;
+        costText.fontSizeMin = 12f; costText.fontSizeMax = 20f;
 
         if (!affordable) rt.gameObject.AddComponent<CanvasGroup>().alpha = 0.40f;
 
@@ -536,6 +585,10 @@ public class ScrapForgeScreen : MonoBehaviour
         RuntimeCard captured = card;
         Mode capturedMode = mode;
         btn.onClick.AddListener(() => OnCardClicked(captured, capturedMode));
+
+        // Hovering turns it over for the effect text, exactly as in the hand. Same component, same
+        // back, so the two can never diverge.
+        CardHoverFlip.Attach(rt).Bind(card);
     }
 
     private void OnCardClicked(RuntimeCard card, Mode mode)

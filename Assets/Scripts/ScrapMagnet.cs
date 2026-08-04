@@ -8,7 +8,12 @@ public static class ScrapMagnet
 {
     public const string RelicID = "ScrapMagnet";
 
-    public const float Range = 6f;         // world units within which a pickup is pulled
+    // ⚠️ RANGE IS THE WHOLE BALANCE OF THIS RELIC — keep it short. At 6 units it reached most of a
+    // screen height and hoovered up loot the player had not gone anywhere near, which deletes the
+    // "reaching the gold costs Shift" trade the level design is built on (see the room law in
+    // CLAUDE.md). At 3 it is a convenience — you still have to get to the loot, you just stop
+    // fumbling for the last pixel of overlap — which is what a Common relic should be.
+    public const float Range = 3f;          // world units within which a pickup is pulled
     public const float MinSpeed = 3f;       // pull speed at the edge of range
     public const float MaxSpeed = 12f;      // pull speed right next to the player
 

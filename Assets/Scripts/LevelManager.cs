@@ -10,14 +10,33 @@ public class LevelManager : MonoBehaviour
     public Transform playerTransform;
 
     [Header("Oda Ayarları")]
-    [Tooltip("Element 0 must be the hub. The rest are the run's levels, each played once per run.")]
+    [Tooltip("Element 0 must be the hub. The rest are the run's combat levels. Add a RoomTier " +
+             "component to a room prefab to bind it to one map tier; untagged rooms serve any tier.")]
     public List<GameObject> roomPrefabs;
-    [Tooltip("Boss room — spawned after every level in roomPrefabs has been played. Leave empty to just loop back to the hub.")]
+    [Tooltip("Boss room — spawned when the map reaches its top floor. Leave empty to just loop back to the hub.")]
     public GameObject bossRoomPrefab;
 
-    private List<int> availableRoomIndices = new List<int>();
+    [Header("Recharge rooms (map attachments)")]
+    [Tooltip("Scrap: repair and salvage cards, Blompo. LEAVE EMPTY AND NO FOUNDRY IS EVER DRAWN ON " +
+             "THE MAP — the map never promises a room it cannot spawn.")]
+    public GameObject foundryRoomPrefab;
+    [Tooltip("Gold: the shop. Leave empty and no Market is ever drawn on the map.")]
+    public GameObject marketRoomPrefab;
+    [Tooltip("Shift and healing. Leave empty and no Well is ever drawn on the map.")]
+    public GameObject wellRoomPrefab;
+
     private GameObject currentRoom;
     private bool hasSpawnedFirstRoom = false;
+
+    // Rooms already spawned this run, so an act doesn't repeat a layout while it still has unused ones.
+    private readonly List<GameObject> usedRoomPrefabs = new List<GameObject>();
+
+    // A node's recharge room is entered AFTER its combat room and is NOT a floor, so it spawns
+    // without advancing the map. Held here between the two spawns.
+    private RechargeType pendingRecharge = RechargeType.None;
+
+    // State for the pre-map room order, kept only as the fallback below.
+    private List<int> availableRoomIndices = new List<int>();
     private bool bossSpawned = false;
 
     private void Awake()
@@ -46,13 +65,184 @@ public class LevelManager : MonoBehaviour
             availableRoomIndices.Add(i);
     }
 
-    // Run order: hub first → each queued level once (random order, no repeats) → boss room →
-    // then loop back to a fresh run from the hub.
+    // Run order is now driven by the RunMap: hub → the branch the player picked, floor by floor →
+    // boss → loop back to a fresh act. RunMapManager owns the graph and the position in it; this
+    // method only translates "which node am I on" into "which prefab do I spawn".
     private GameObject PickNextRoomPrefab()
     {
         if (roomPrefabs == null || roomPrefabs.Count == 0) return null;
 
-        // 1) Hub is always the first room of the run.
+        RunMapManager mapMgr = RunMapManager.instance;
+        if (mapMgr == null) return PickNextRoomPrefabWithoutMap();
+
+        // 1) First room of the run: build the act, then the hub. The hub is the map's Start node,
+        //    so entering it here and entering it on the map are the same event.
+        if (!hasSpawnedFirstRoom)
+        {
+            hasSpawnedFirstRoom = true;
+            usedRoomPrefabs.Clear();
+            pendingRecharge = RechargeType.None;
+            mapMgr.BeginRun(SpawnableRecharges());
+            mapMgr.EnterStart();
+            return roomPrefabs[0];
+        }
+
+        // 2) A recharge room hangs off the node the player just cleared. It is not a floor, so it
+        //    spawns WITHOUT advancing the map.
+        if (pendingRecharge != RechargeType.None)
+        {
+            GameObject recharge = RechargeRoomPrefab(pendingRecharge);
+            pendingRecharge = RechargeType.None;
+            if (recharge != null) return recharge;
+        }
+
+        // 3) Move onto the next node.
+        MapNode node = mapMgr.AdvanceToNext();
+
+        // 4) Nothing left above the boss → the act is over, start a fresh one from the hub.
+        if (node == null)
+        {
+            hasSpawnedFirstRoom = false;
+            mapMgr.ClearMap();
+            return PickNextRoomPrefab();
+        }
+
+        if (node.type == MapNodeType.Boss)
+            return bossRoomPrefab != null ? bossRoomPrefab : roomPrefabs[0];
+
+        pendingRecharge = node.recharge;
+        return PickRoomForTier(node.type);
+    }
+
+    // Which recharge rooms this project can currently spawn. The map is generated against exactly
+    // this list, so an unassigned slot means that room type simply never appears — rather than
+    // appearing as an icon the player routes toward and finds empty.
+    private List<RechargeType> SpawnableRecharges()
+    {
+        List<RechargeType> list = new List<RechargeType>();
+        if (foundryRoomPrefab != null) list.Add(RechargeType.Foundry);
+        if (marketRoomPrefab != null) list.Add(RechargeType.Market);
+        if (wellRoomPrefab != null) list.Add(RechargeType.Well);
+        return list;
+    }
+
+    // --- Out-of-bounds safety net --------------------------------------------------------------
+    //
+    // ⚠️ PHASE CAN TAKE THE PLAYER OUT OF THE LEVEL ENTIRELY, and before this there was nothing to
+    // catch them: the only fall handling in the game is a `DeathZone`-tagged trigger placed by hand
+    // under each room. Phase turns off collision with the world, so the player can leave SIDEWAYS or
+    // upward, miss the DeathZone completely, and then fall forever in empty space with the run
+    // unrecoverable. The designer hit exactly this.
+    //
+    // The fix is deliberately not "put a bigger DeathZone in every room" — that is per-room authoring
+    // that a new room will forget. The room's own geometry already says where the level is, so the
+    // bounds are measured on spawn and anything far outside them is out of play, in any direction,
+    // for any reason (Phase, Portal, a knockback through a gap, a future card nobody has written).
+    //
+    // Measured from RENDERERS, not colliders: a room's backdrop and decoration mark its extent even
+    // where nothing is solid, and the margin is generous enough that legitimate play near an edge
+    // can never trip it.
+    [Header("Out of bounds")]
+    [Tooltip("How far outside the room's own geometry the player may get before being returned to the entry point. Generous on purpose — this is a safety net, not a boundary.")]
+    public float outOfBoundsMargin = 14f;
+
+    private Bounds roomBounds;
+    private bool hasRoomBounds;
+
+    private void MeasureRoomBounds()
+    {
+        hasRoomBounds = false;
+        if (currentRoom == null) return;
+
+        bool any = false;
+        Bounds b = new Bounds();
+        foreach (Renderer r in currentRoom.GetComponentsInChildren<Renderer>(true))
+        {
+            // Particles and trails wander far outside the room and would inflate it into uselessness.
+            if (r is ParticleSystemRenderer || r is TrailRenderer || r is LineRenderer) continue;
+            if (!any) { b = r.bounds; any = true; }
+            else b.Encapsulate(r.bounds);
+        }
+
+        if (!any) return;
+        roomBounds = b;
+        hasRoomBounds = true;
+    }
+
+    private void Update()
+    {
+        if (!hasRoomBounds || playerTransform == null) return;
+        if (GameManager.instance == null || GameManager.instance.currentState != GameState.Playing) return;
+
+        PlayerController pc = GameManager.instance.player;
+        if (pc == null || pc.IsDead) return;
+
+        Vector3 p = playerTransform.position;
+        Bounds safe = roomBounds;
+        safe.Expand(outOfBoundsMargin * 2f);   // Expand takes a total size delta, not a per-side one
+
+        if (safe.Contains(new Vector3(p.x, p.y, safe.center.z))) return;
+
+        Debug.LogWarning($"Player left the room at {p} (room {roomBounds.min}..{roomBounds.max}) — returning to the entry point.");
+        pc.ReturnToEntryPoint();
+    }
+
+    private GameObject RechargeRoomPrefab(RechargeType type)
+    {
+        switch (type)
+        {
+            case RechargeType.Foundry: return foundryRoomPrefab;
+            case RechargeType.Market: return marketRoomPrefab;
+            case RechargeType.Well: return wellRoomPrefab;
+            default: return null;
+        }
+    }
+
+    // Picks a room built for this tier, preferring one that hasn't been used yet this run.
+    private GameObject PickRoomForTier(MapNodeType tier)
+    {
+        GameObject pick = TryPickRoomForTier(tier);
+        if (pick != null) { usedRoomPrefabs.Add(pick); return pick; }
+
+        // Everything eligible has been used. Repeat a layout rather than spawn nothing: with only
+        // seven combat rooms an act can legitimately outlast the pool, and a missing room is an
+        // unfinishable run.
+        usedRoomPrefabs.Clear();
+        pick = TryPickRoomForTier(tier);
+        if (pick != null) { usedRoomPrefabs.Add(pick); return pick; }
+
+        Debug.LogError("LevelManager: no combat room available — roomPrefabs needs at least one level after the hub.");
+        return null;
+    }
+
+    private GameObject TryPickRoomForTier(MapNodeType tier)
+    {
+        List<GameObject> tagged = new List<GameObject>();
+        List<GameObject> untagged = new List<GameObject>();
+
+        for (int i = 1; i < roomPrefabs.Count; i++)
+        {
+            GameObject room = roomPrefabs[i];
+            if (room == null || usedRoomPrefabs.Contains(room)) continue;
+
+            RoomTier rt = room.GetComponent<RoomTier>();
+            if (rt == null) untagged.Add(room);
+            else if (rt.Serves(tier)) tagged.Add(room);
+        }
+
+        // Prefer a room actually authored for this tier; otherwise any untagged room will do, which
+        // is what keeps the map working with rooms that predate RoomTier.
+        List<GameObject> pool = tagged.Count > 0 ? tagged : untagged;
+        if (pool.Count == 0) return null;
+
+        return pool[Random.Range(0, pool.Count)];
+    }
+
+    // The pre-map room order, used only if RunMapManager is somehow absent. It should be
+    // unreachable — RunMapManager bootstraps itself — but a missing manager silently reverting to
+    // random rooms would look almost right, so this stays as a named, obvious fallback.
+    private GameObject PickNextRoomPrefabWithoutMap()
+    {
         if (!hasSpawnedFirstRoom)
         {
             hasSpawnedFirstRoom = true;
@@ -60,7 +250,6 @@ public class LevelManager : MonoBehaviour
             return roomPrefabs[0];
         }
 
-        // 2) Then every other level, once each, in random order.
         if (availableRoomIndices.Count > 0)
         {
             int pick = Random.Range(0, availableRoomIndices.Count);
@@ -69,17 +258,54 @@ public class LevelManager : MonoBehaviour
             return roomPrefabs[idx];
         }
 
-        // 3) Pool exhausted → the boss room.
         if (!bossSpawned && bossRoomPrefab != null)
         {
             bossSpawned = true;
             return bossRoomPrefab;
         }
 
-        // 4) After the boss (or if no boss is assigned) → restart the cycle from the hub.
         hasSpawnedFirstRoom = false;
         bossSpawned = false;
-        return PickNextRoomPrefab();
+        return PickNextRoomPrefabWithoutMap();
+    }
+
+    // Leaving a room through the ExitDoor. THE MAP IS THE ONLY THING THAT OPENS HERE.
+    //
+    // ⚠️ This logic used to live in RewardManager.FinishReward, because a card reward screen was
+    // forced on the player between every pair of rooms and the map choice was bolted onto the end of
+    // it. That screen is gone (designer 2026-08-09: cards come from chests placed in levels, so
+    // taking one is a decision the player makes, not a toll they pay). The map hook had to move with
+    // it — left in RewardManager it would simply have stopped running, and a missing route choice
+    // does not error, it silently falls back to random room order.
+    //
+    // ⚠️ THE MAP OPENS ON EVERY ROOM CHANGE, INCLUDING WHEN THERE IS ONLY ONE WAY ON.
+    //
+    // It used to be gated on RunMapManager.NeedsRouteChoice, on the reasoning that a screen with a
+    // single button is ceremony rather than a decision. That reasoning was wrong in practice, and
+    // the designer reported the symptom as "the map works weird — I open it and I'm 2-3 floors ahead
+    // of where I should be". Measured over 200 generated acts: **62% of room transitions offer
+    // exactly one option**, and planning a branch with M suppressed the screen for a further one. So
+    // the player crossed several rooms without the map ever appearing, and every time they opened it
+    // they had moved without seeing it happen.
+    //
+    // Nothing was corrupt — the same 200 acts produced 0 invalid maps, 0 dead ends, and every step
+    // advanced by exactly one floor. The bug was that the run's only sense of PLACE was being hidden
+    // whenever it had nothing to ask. Orientation is worth more than the saved click.
+    //
+    // ⚠️ THE ZERO-OPTIONS GUARD IS LOad-BEARING. On the boss node AvailableNext() is empty, and the
+    // map opened for a choice refuses Escape and the backdrop (that's what makes a required choice
+    // required) — so opening it with nothing clickable would be an unescapable screen.
+    public void AdvanceToNextRoom()
+    {
+        RunMapManager mgr = RunMapManager.instance;
+
+        if (mgr == null || !mgr.HasMap || mgr.AvailableNext().Count == 0)
+        {
+            SpawnNextRoom();
+            return;
+        }
+
+        RunMapScreen.OpenForChoice(SpawnNextRoom);
     }
 
     public void SpawnNextRoom()
@@ -102,9 +328,15 @@ public class LevelManager : MonoBehaviour
             return;
         }
 
-        Debug.Log($"Spawning room: {selectedRoomPrefab.name}. Levels left this run: {availableRoomIndices.Count}, bossSpawned: {bossSpawned}");
+        MapNode at = RunMapManager.instance != null ? RunMapManager.instance.CurrentNode : null;
+        Debug.Log($"Spawning room: {selectedRoomPrefab.name}" + (at != null ? $" — map node {at}" : " — no map"));
 
         currentRoom = Instantiate(selectedRoomPrefab, Vector3.zero, Quaternion.identity);
+
+        // Put every actor on the shared draw plane and shove decoration behind it. Opaque sprites
+        // sort by camera depth, not sortingOrder, and each room had been authored at its own Z —
+        // which is why the player and enemies sometimes rendered behind props. See PlayPlane.
+        PlayPlane.Apply(currentRoom);
 
         Transform boundsObj = currentRoom.transform.Find("CameraBounds");
         if (boundsObj != null)
@@ -128,16 +360,23 @@ public class LevelManager : MonoBehaviour
             Debug.LogError("CameraBounds objesi bulunamadı!");
         }
 
+        MeasureRoomBounds();
+
         Transform entryPoint = currentRoom.transform.Find("GirisNoktasi");
         if (entryPoint != null && playerTransform != null)
         {
-            playerTransform.position = entryPoint.position;
+            // ⚠️ Take X and Y from the entry point but NOT its Z. Rooms disagree wildly about depth
+            // (spawn Z ranged from -1.06 to +2.56 across the pool), and copying the full Vector3 is
+            // what put the player on a different plane in every room. The player belongs on the
+            // play plane, always.
+            Vector3 spawn = new Vector3(entryPoint.position.x, entryPoint.position.y, PlayPlane.Z);
+            playerTransform.position = spawn;
 
             PlayerController playerController = playerTransform.GetComponent<PlayerController>();
             if (playerController != null)
             {
                 playerController.OnNewRoomEnter();
-                playerController.SetCurrentEntryPoint(entryPoint.position);
+                playerController.SetCurrentEntryPoint(spawn);
             }
         }
 
