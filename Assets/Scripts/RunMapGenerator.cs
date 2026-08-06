@@ -32,6 +32,20 @@ public class RunMapSettings
     [Tooltip("Guarantee at least one Foundry and one Market exist somewhere in the act. Note this " +
              "guarantees they EXIST, not that any single route reaches them — that tension is the point.")]
     public bool guaranteeCoreRecharges = true;
+
+    // Which recharge types this run is allowed to place. RunMapManager narrows this to the ones
+    // LevelManager actually has a room prefab for.
+    //
+    // THE MAP MUST NEVER PROMISE SOMETHING IT CANNOT DELIVER. A Foundry icon on a branch the player
+    // routes three floors to reach, which then spawns nothing because the prefab slot is empty, is
+    // worse than no Foundry at all — it spends the player's Shift on a lie. None of the three
+    // recharge rooms are built yet, so today this list resolves to empty and no recharge icons are
+    // drawn; each one starts appearing on its own the moment its prefab is assigned.
+    [HideInInspector]
+    public List<RechargeType> allowedRecharges = new List<RechargeType>
+    {
+        RechargeType.Foundry, RechargeType.Market, RechargeType.Well
+    };
 }
 
 public static class RunMapGenerator
@@ -222,7 +236,15 @@ public static class RunMapGenerator
     // solved rather than the same one on two branches.
     private static void AttachRechargeRooms(RunMap map, System.Random rng, RunMapSettings s, int topCombatFloor)
     {
-        RechargeType[] all = { RechargeType.Foundry, RechargeType.Market, RechargeType.Well };
+        // Only types this run can actually spawn — see RunMapSettings.allowedRecharges. With none
+        // available the act simply carries no recharge rooms, which is honest, rather than drawing
+        // icons that lead nowhere.
+        List<RechargeType> all = new List<RechargeType>();
+        if (s.allowedRecharges != null)
+            foreach (RechargeType t in s.allowedRecharges)
+                if (t != RechargeType.None && !all.Contains(t)) all.Add(t);
+
+        if (all.Count == 0) return;
 
         for (int f = 1; f <= topCombatFloor; f++)
         {
@@ -243,13 +265,14 @@ public static class RunMapGenerator
         if (!s.guaranteeCoreRecharges) return;
 
         // A run with nowhere to spend gold or repair a card is a dead run, so force those two in if
-        // the rolls did not produce them. Deliberately NOT a guarantee that any single route
-        // reaches one — choosing whether to detour for it is the decision the map exists to pose.
-        EnsureExists(map, rng, RechargeType.Foundry, topCombatFloor);
-        EnsureExists(map, rng, RechargeType.Market, topCombatFloor);
+        // the rolls did not produce them — but only if they're spawnable at all. Deliberately NOT a
+        // guarantee that any single route reaches one: choosing whether to detour for it is the
+        // decision the map exists to pose.
+        if (all.Contains(RechargeType.Foundry)) EnsureExists(map, rng, RechargeType.Foundry);
+        if (all.Contains(RechargeType.Market)) EnsureExists(map, rng, RechargeType.Market);
     }
 
-    private static void EnsureExists(RunMap map, System.Random rng, RechargeType want, int topCombatFloor)
+    private static void EnsureExists(RunMap map, System.Random rng, RechargeType want)
     {
         List<MapNode> eligible = new List<MapNode>();
 
