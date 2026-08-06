@@ -723,11 +723,13 @@ Related: a missing-script warning for `CameraBoundsController` appears in the co
 
 `BreakUniformFloor` exists because the late-floor weights produced all-Elite rows often. A floor where every branch is the same type is a toll, not a choice, which defeats the reason difficulty is the node type at all.
 
-### ⚠️ `roomPrefabs` REGRESSION — the run has no combat levels (found 2026-08-06)
+### `roomPrefabs` emptied for testing — RESTORED 2026-08-06
 
-**`LevelManager.roomPrefabs` in SampleScene currently holds only `[0] hub`.** Commit `2f236ad` ("h") dropped the other 7 entries; `b2760be` and earlier have all 8. This is committed scene state, not local drift.
+Kept as a diagnostic pointer, because the symptom is confusing. Commit `2f236ad` ("h") left `LevelManager.roomPrefabs` holding only `[0] hub` — the designer had emptied it for a test. The map still generated fine, but every combat node failed to spawn, logging *"no combat room available"*, and the player never left the hub.
 
-Consequence: the map generates fine but every combat node fails to spawn a room, logging *"no combat room available"*, and the player stays in the hub. **If the run isn't advancing, check this list first.** Restoring it means re-adding `efeslevel1`, `efeslevel2`, `efeslevel3` (`Assets/LevelEfeS/`) and `EfeVrl4`–`EfeVrl7` (`Assets/LevelEfeVrl/`) — all seven prefabs still exist on disk.
+Restored to the full 8 (hub + `efeslevel1-3` + `EfeVrl4-7`) by resolving the GUIDs recorded in `b2760be`, so the list is byte-identical to what it was rather than rebuilt by filename.
+
+**If the run stops advancing past the hub, check this list first** — an empty or short `roomPrefabs` looks like a map bug and isn't one.
 
 ### Run Order — the pre-map order, now a FALLBACK ONLY (reworked 2026-07-02, superseded 2026-08-06)
 
