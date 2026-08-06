@@ -699,9 +699,41 @@ Related: a missing-script warning for `CameraBoundsController` appears in the co
 
 **Rooms that would BREAK if naively added to the pool** (incomplete contract — verified): `efeslevel4` has CameraBounds + GirisNoktasi but **no ExitDoor** (unfinishable). `EfeVrl1`, `EfeVrl3`, `EfeVrlLevel1..4` (all six now under `Assets/LevelEfeVrl/Old Levels/`), plus `kuzeymap2`, `kuzeymapv1`, `CainosLevel`, are **missing `CameraBounds`** (camera would not clamp). Always re-check the three-part contract before adding a room to `roomPrefabs`. (Note: `CameraBounds.prefab`, `GirisNoktasi.prefab`, `MainMenu`, `GameOverScreen` also match the scan but are shared components/UI, not rooms.)
 
-### Run Order — finite run: hub → levels → boss (reworked 2026-07-02)
+### Run Map — as built (2026-08-06)
 
-`LevelManager` was changed from an endless-refill pool (which repeated the same level forever) into a **finite, structured run**. Driven by `PickNextRoomPrefab()`:
+**The map's data layer, generator and room routing are DONE and verified in play mode. Only the map SCREEN (the `M` key UI) is unbuilt.** Run order is now driven by the graph, not by a shuffled pool — the section below it describes the pre-map order, which survives only as a fallback.
+
+| File | Role |
+|---|---|
+| `RunMap.cs` | `MapNodeType` / `RechargeType` enums, `MapNode`, `RunMap`. Pure data + queries, no Unity types. `Validate()` and `ToAscii()` live here. |
+| `RunMapGenerator.cs` | `RunMapSettings` (Inspector-tunable) + the carving generator. |
+| `RunMapManager.cs` | Singleton owning the act and the player's position. **Self-bootstraps** via `RuntimeInitializeOnLoadMethod` — no scene wiring. |
+| `RoomTier.cs` | Marker on a room prefab root declaring which tier it serves. |
+
+**Things that will bite you if you forget them:**
+
+- ⚠️ **Recharge rooms are an ATTACHMENT to a node (`MapNode.recharge`), NOT a node.** Modelling them as nodes would make them floors, which the design forbids. `LevelManager` spawns the combat room first, then the recharge room, *without advancing the map* (`pendingRecharge`).
+- ⚠️ **Only Fight and Elite may carry a recharge room, never Skirmish.** That is the entire run economy, not a tuning value — `Validate()` re-asserts it so it can't rot.
+- ⚠️ **The map never promises a room it cannot spawn.** Recharge types are generated only for the prefab slots assigned on `LevelManager` (`foundryRoomPrefab` / `marketRoomPrefab` / `wellRoomPrefab`). **All three are empty today, so acts currently draw ZERO recharge icons.** Each type starts appearing the moment its prefab is assigned — nothing else to do.
+- **Untagged rooms serve every tier.** The 7 existing rooms predate `RoomTier`, so requiring tags would have meant a broken map until a chore was finished. Tagging narrows a room; not tagging costs nothing.
+- `ToAscii()`'s edge rows show **direction from the source column**, not lines to scale — a wide fan-out (the hub does this) renders as one `\|/`. Use `Validate()` or the raw `next`/`prev` lists to confirm a specific connection.
+- **`RunMapManager` is scene-local, no `DontDestroyOnLoad`** — a map is per-run and must reset on death, exactly like QuestSystem's quests.
+
+**Measured behaviour** (500 seeds, 2000 random routes, default settings — 8 floors, width 5, 4 paths): 0 invalid acts, 0 uniform floors. Per route: **2.34 Skirmish / 2.39 Fight / 1.28 Elite**, **1.44 recharge rooms** (min 0, max 5), and **55% of random routes never pass a Market**. That last number is the one to watch — it is fine if the player can *see* the Market and route to it, and bad if they can't; re-measure it once the map screen exists.
+
+`BreakUniformFloor` exists because the late-floor weights produced all-Elite rows often. A floor where every branch is the same type is a toll, not a choice, which defeats the reason difficulty is the node type at all.
+
+### ⚠️ `roomPrefabs` REGRESSION — the run has no combat levels (found 2026-08-06)
+
+**`LevelManager.roomPrefabs` in SampleScene currently holds only `[0] hub`.** Commit `2f236ad` ("h") dropped the other 7 entries; `b2760be` and earlier have all 8. This is committed scene state, not local drift.
+
+Consequence: the map generates fine but every combat node fails to spawn a room, logging *"no combat room available"*, and the player stays in the hub. **If the run isn't advancing, check this list first.** Restoring it means re-adding `efeslevel1`, `efeslevel2`, `efeslevel3` (`Assets/LevelEfeS/`) and `EfeVrl4`–`EfeVrl7` (`Assets/LevelEfeVrl/`) — all seven prefabs still exist on disk.
+
+### Run Order — the pre-map order, now a FALLBACK ONLY (reworked 2026-07-02, superseded 2026-08-06)
+
+⚠️ **This is no longer how the run is ordered.** `PickNextRoomPrefab()` routes through the map (above); the logic below now lives in `PickNextRoomPrefabWithoutMap()` and runs only if `RunMapManager.instance` is somehow null. It is kept as a *named, obvious* fallback because a missing manager silently reverting to random rooms would look almost right.
+
+`LevelManager` was changed from an endless-refill pool (which repeated the same level forever) into a **finite, structured run**:
 
 1. **First room is always the hub** (`roomPrefabs[0]`), and `BuildLevelQueue()` fills `availableRoomIndices` with indices `1..n`.
 2. **Then every other pool level, once each, in random order (no repeats)** — pulled from `availableRoomIndices` until empty.
@@ -1032,7 +1064,7 @@ The `CardTemplate` prefab has fundamental scale corruption: root scale is non-un
 - Glass archetype: cards exist in theory, not implemented.
 - Expand Vampiric archetype.
 - Three-act structure: Act 1 prototype exists; Acts 2-3 not started.
-- **Run map system (Slay-the-Spire-style) — DESIGN SETTLED 2026-08-03, not yet built.** The scrap system was built first because the map depends on it (see below). Decisions now locked:
+- **Run map system (Slay-the-Spire-style) — DESIGN SETTLED 2026-08-03. GUTS BUILT 2026-08-06; the map SCREEN is the only piece left.** The scrap system was built first because the map depends on it. See "Run Map — as built" below for what exists. Decisions now locked:
   - **Shape: a Slay-the-Spire branching graph, whole act visible**, so the player plans a route rather than picking one door at a time. **Opened with the `M` key** — meaning it's also viewable in the hub, for quest planning.
   - **Difficulty IS the node type, not a second axis on top of it.** Three combat nodes — **Skirmish / Fight / Elite** — ascending cost and reward. Layering easy/med/hard *onto* Fight/Shop/Event would give ~15 icon combinations and an unreadable map; one node = one icon = one promise.
   - **Per-tier content rules (designer-specified):**
