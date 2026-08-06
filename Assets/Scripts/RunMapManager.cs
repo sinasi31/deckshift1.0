@@ -106,6 +106,17 @@ public class RunMapManager : MonoBehaviour
 
     public bool HasChosenNext => chosenNextId >= 0 && map != null && map.CanTravelTo(chosenNextId);
 
+    // -1 when nothing is chosen. The map screen draws this branch as committed.
+    public int ChosenNextId => HasChosenNext ? chosenNextId : -1;
+
+    // The map key lives here rather than on the screen because this manager is always present and
+    // always active, while the screen deactivates itself when closed and so cannot listen for the
+    // key that reopens it.
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.M)) RunMapScreen.Toggle();
+    }
+
     // Advances the run one node and returns where it landed, or null when the act is over.
     //
     // If the player has not chosen, this picks at random rather than blocking. That is a

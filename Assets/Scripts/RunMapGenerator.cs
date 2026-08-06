@@ -21,8 +21,11 @@ public class RunMapSettings
     public int width = 5;
 
     [Tooltip("How many routes are carved bottom-to-top. More routes = a denser, more connected act. " +
-             "Below 3 the act stops feeling like a choice; above width it just re-treads slots.")]
-    public int pathCount = 4;
+             "Below 3 the act stops feeling like a choice; above width it just re-treads slots. " +
+             "Matching this to width puts one route in every column, which keeps the middle of the " +
+             "act populated — at 4-on-5 no route ever starts in the centre column and the act draws " +
+             "as two arcs around an empty middle.")]
+    public int pathCount = 5;
 
     [Range(0f, 1f)]
     [Tooltip("Chance a Fight or Elite carries a recharge room. Skirmishes NEVER can — that " +

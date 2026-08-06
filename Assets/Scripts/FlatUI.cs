@@ -525,6 +525,35 @@ public static class FlatUI
         TextDisabled = new Color(0.341f, 0.333f, 0.318f, 1f),
     };
 
+    // VERDIGRIS — the run map.
+    //
+    // The other themes dress a PLACE and render it with light on material. A map is not a place:
+    // you are not standing in it, you are READING it. So this one inverts the lighting model
+    // itself — it is flat, matte and unlit, with no glow source anywhere. Motion lives in the
+    // INFORMATION (branches you can take pulse, the route you've walked shimmers) rather than in
+    // the air, because a chart has no air. That is why it carries no particle field while every
+    // other screen does.
+    //
+    // The material is oxidised copper, which is Act 1's own chemistry — the Oxidation District is
+    // rust and corrosion, and verdigris is what copper does there. It also pays off the accent:
+    // the route you have ALREADY TRAVELLED is drawn in warm bare copper, as though the patina were
+    // worn back to metal by walking it. Every other theme's accent is light being ADDED (forge
+    // fire, arcane glow); this one's is surface being WORN AWAY.
+    public static readonly Theme Verdigris = new Theme
+    {
+        Backdrop = new Color(0.012f, 0.020f, 0.019f, 0.93f),
+        Surface = new Color(0.055f, 0.082f, 0.078f, 0.99f),
+        SurfaceRaised = new Color(0.082f, 0.115f, 0.108f, 1f),
+        Border = new Color(0.180f, 0.255f, 0.235f, 1f),
+        BorderSoft = new Color(0.130f, 0.190f, 0.176f, 1f),
+        EdgeLight = new Color(0.290f, 0.400f, 0.360f, 1f),
+        Accent = new Color(0.855f, 0.545f, 0.290f, 1f),   // bare copper, worn through the patina
+        TextBright = new Color(0.878f, 0.925f, 0.905f, 1f),
+        TextBody = new Color(0.706f, 0.780f, 0.755f, 1f),
+        TextMuted = new Color(0.478f, 0.545f, 0.522f, 1f),
+        TextDisabled = new Color(0.310f, 0.365f, 0.349f, 1f),
+    };
+
     // Rarity colours tuned to read on a DARK surface. The old chrome carried rarity on a gem set
     // in gold; without that frame the colour has to stand on its own, so these are brighter and
     // more separated than jewel tones would be.
