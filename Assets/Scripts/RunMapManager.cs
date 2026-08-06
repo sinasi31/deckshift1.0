@@ -109,6 +109,22 @@ public class RunMapManager : MonoBehaviour
     // -1 when nothing is chosen. The map screen draws this branch as committed.
     public int ChosenNextId => HasChosenNext ? chosenNextId : -1;
 
+    // True when the run cannot sensibly continue until the player picks a branch, so the map has
+    // to be put in front of them rather than silently rolling for them.
+    //
+    // Deliberately FALSE when there is only one option: a forced screen with a single button is
+    // ceremony, not a decision. Also false once the player has already planned ahead with M, which
+    // is what makes planning worth doing instead of being asked twice.
+    public bool NeedsRouteChoice
+    {
+        get
+        {
+            if (map == null) return false;
+            if (HasChosenNext) return false;
+            return map.AvailableNext().Count > 1;
+        }
+    }
+
     // The map key lives here rather than on the screen because this manager is always present and
     // always active, while the screen deactivates itself when closed and so cannot listen for the
     // key that reopens it.

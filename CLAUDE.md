@@ -699,16 +699,22 @@ Related: a missing-script warning for `CameraBoundsController` appears in the co
 
 **Rooms that would BREAK if naively added to the pool** (incomplete contract — verified): `efeslevel4` has CameraBounds + GirisNoktasi but **no ExitDoor** (unfinishable). `EfeVrl1`, `EfeVrl3`, `EfeVrlLevel1..4` (all six now under `Assets/LevelEfeVrl/Old Levels/`), plus `kuzeymap2`, `kuzeymapv1`, `CainosLevel`, are **missing `CameraBounds`** (camera would not clamp). Always re-check the three-part contract before adding a room to `roomPrefabs`. (Note: `CameraBounds.prefab`, `GirisNoktasi.prefab`, `MainMenu`, `GameOverScreen` also match the scan but are shared components/UI, not rooms.)
 
-### Run Map — as built (2026-08-06)
+### Run Map — BUILT AND WORKING END TO END (2026-08-06)
 
-**The map's data layer, generator and room routing are DONE and verified in play mode. Only the map SCREEN (the `M` key UI) is unbuilt.** Run order is now driven by the graph, not by a shuffled pool — the section below it describes the pre-map order, which survives only as a fallback.
+**The whole system is done and verified in play mode: graph, generator, room routing, and the `M` screen.** Run order is driven by the graph, not by a shuffled pool — the section below describes the pre-map order, which survives only as a fallback.
 
 | File | Role |
 |---|---|
 | `RunMap.cs` | `MapNodeType` / `RechargeType` enums, `MapNode`, `RunMap`. Pure data + queries, no Unity types. `Validate()` and `ToAscii()` live here. |
 | `RunMapGenerator.cs` | `RunMapSettings` (Inspector-tunable) + the carving generator. |
-| `RunMapManager.cs` | Singleton owning the act and the player's position. **Self-bootstraps** via `RuntimeInitializeOnLoadMethod` — no scene wiring. |
+| `RunMapManager.cs` | Singleton owning the act and the player's position. **Self-bootstraps** via `RuntimeInitializeOnLoadMethod` — no scene wiring. Also owns the `M` key. |
+| `RunMapScreen.cs` | The map UI. Procedural, self-instantiating, Verdigris theme. |
+| `MapGlyphs.cs` | Procedural node + recharge symbols. |
 | `RoomTier.cs` | Marker on a room prefab root declaring which tier it serves. |
+
+**Where the choice happens:** `RewardManager.FinishReward()` — after the card reward, before the next room exists. It calls `RunMapScreen.OpenForChoice(...)` only when `RunMapManager.NeedsRouteChoice` is true, which is **false if only one branch is available** (a forced screen with a single button is ceremony, not a decision) **and false if the player already planned with `M`** (which is what makes planning worth doing). `M` opens the same screen in planning mode: clicking marks a branch and stays open. In forced mode Escape, `M` and the backdrop all refuse to dismiss it, and clicking commits and continues the run.
+
+⚠️ If `RunMapScreen` can't find a Canvas, `OpenForChoice` **invokes its callback anyway**. A missing Canvas must never strand the run in a room with no way forward.
 
 **Things that will bite you if you forget them:**
 
@@ -722,6 +728,14 @@ Related: a missing-script warning for `CameraBoundsController` appears in the co
 **Measured behaviour** (500 seeds, 2000 random routes, default settings — 8 floors, width 5, 4 paths): 0 invalid acts, 0 uniform floors. Per route: **2.34 Skirmish / 2.39 Fight / 1.28 Elite**, **1.44 recharge rooms** (min 0, max 5), and **55% of random routes never pass a Market**. That last number is the one to watch — it is fine if the player can *see* the Market and route to it, and bad if they can't; re-measure it once the map screen exists.
 
 `BreakUniformFloor` exists because the late-floor weights produced all-Elite rows often. A floor where every branch is the same type is a toll, not a choice, which defeats the reason difficulty is the node type at all.
+
+**Traps hit while building the screen — don't re-learn them:**
+
+- ⚠️ **`Image.Type` defaults to `Simple`.** The window outline is a 26px 9-sliced sprite; left at Simple it was stretched across the whole 1040×780 window and rendered as an enormous soft octagon hanging outside the panel. Any FlatUI `Panel`/`Outline` used at panel scale **must** be set to `Image.Type.Sliced` explicitly — the local `AddImage` helper does not do it for you.
+- **Text pivots.** A label positioned by offset with a centred pivot places its BOX centre, so a 34px-tall label put its first line back on top of the glyph it was labelling. Pivot to top (or bottom) whenever the offset is meant to clear something.
+- **Node labels must be narrower than they look like they need to be** — neighbours on a floor sit about one column apart minus jitter, and 150px labels collided on any floor that filled up. Horizontal jitter is deliberately tighter than vertical for the same reason.
+- **`pathCount` must match `width`**, or no route ever starts in the centre column and the act draws as two arcs around an empty middle.
+- ⚠️ **Deferred `Destroy` will bite any test that clicks a map button.** `Refresh()` deactivates old nodes before destroying them, but they survive until end of frame, so `GetComponentsInChildren<Button>(true)` still returns the PREVIOUS chart's buttons — whose listeners point at nodes that are no longer reachable, so the click silently does nothing. Filter on `activeInHierarchy`. This produced a convincing false "callback never fired" failure.
 
 ### `roomPrefabs` emptied for testing — RESTORED 2026-08-06
 
@@ -1066,7 +1080,7 @@ The `CardTemplate` prefab has fundamental scale corruption: root scale is non-un
 - Glass archetype: cards exist in theory, not implemented.
 - Expand Vampiric archetype.
 - Three-act structure: Act 1 prototype exists; Acts 2-3 not started.
-- **Run map system (Slay-the-Spire-style) — DESIGN SETTLED 2026-08-03. GUTS BUILT 2026-08-06; the map SCREEN is the only piece left.** The scrap system was built first because the map depends on it. See "Run Map — as built" below for what exists. Decisions now locked:
+- ~~**Run map system**~~ — **BUILT 2026-08-06, working end to end.** See "Run Map — BUILT AND WORKING END TO END" under Level System for the implementation and its traps. What remains is CONTENT and TUNING, not engineering: the three recharge room prefabs (Foundry / Market / Well) don't exist, so no recharge rooms appear yet; rooms are untagged so every room still serves every tier; and the shift-infused / buffed-enemy half of Elite tiers is not built. The settled design, kept for reference:
   - **Shape: a Slay-the-Spire branching graph, whole act visible**, so the player plans a route rather than picking one door at a time. **Opened with the `M` key** — meaning it's also viewable in the hub, for quest planning.
   - **Difficulty IS the node type, not a second axis on top of it.** Three combat nodes — **Skirmish / Fight / Elite** — ascending cost and reward. Layering easy/med/hard *onto* Fight/Shop/Event would give ~15 icon combinations and an unreadable map; one node = one icon = one promise.
   - **Per-tier content rules (designer-specified):**

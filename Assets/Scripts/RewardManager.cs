@@ -166,6 +166,14 @@ public class RewardManager : MonoBehaviour
 
         if (GameManager.instance != null) GameManager.instance.ReleasePause();
         GameManager.instance.SetGameState(GameState.Playing);
-        LevelManager.instance.SpawnNextRoom();
+
+        // The run map goes here, between taking the reward and the next room existing. If the
+        // player already planned a branch with M, or the act offers only one way on, this is
+        // skipped entirely and the room spawns as before — a forced screen with a single button is
+        // ceremony, not a decision.
+        if (RunMapManager.instance != null && RunMapManager.instance.NeedsRouteChoice)
+            RunMapScreen.OpenForChoice(() => LevelManager.instance.SpawnNextRoom());
+        else
+            LevelManager.instance.SpawnNextRoom();
     }
 }

@@ -41,7 +41,13 @@ public class RunMapScreen : MonoBehaviour
     private RectTransform window, area;
     private CanvasGroup group;
     private TMP_FontAsset font;
-    private TextMeshProUGUI footer;
+    private TextMeshProUGUI footer, sub;
+
+    // Set when the screen was opened BECAUSE a branch is required (leaving a room with more than
+    // one way on). In that mode Escape and the backdrop do not dismiss it, and picking a node
+    // commits and continues the run immediately instead of just noting the plan.
+    private bool mustChoose;
+    private System.Action onChosen;
 
     private bool isOpen;
     private GameObject cachedHud;
@@ -61,7 +67,33 @@ public class RunMapScreen : MonoBehaviour
     {
         EnsureInstance();
         if (instance == null) return;
-        if (instance.isOpen) instance.Hide();
+        if (instance.isOpen)
+        {
+            if (instance.mustChoose) return;   // can't M your way out of a required choice
+            instance.Hide();
+        }
+        else instance.Show();
+    }
+
+    // Opens the map because the run needs a branch before it can continue. `onChosen` runs once
+    // the player commits — that is what actually spawns the next room.
+    //
+    // If the screen cannot be created, onChosen is invoked immediately rather than dropped. A
+    // missing Canvas must not strand the run in a room with no way forward.
+    public static void OpenForChoice(System.Action onChosen)
+    {
+        EnsureInstance();
+        if (instance == null)
+        {
+            Debug.LogWarning("RunMapScreen: no Canvas, continuing without a route choice.");
+            onChosen?.Invoke();
+            return;
+        }
+
+        instance.mustChoose = true;
+        instance.onChosen = onChosen;
+
+        if (instance.isOpen) instance.Refresh();
         else instance.Show();
     }
 
@@ -120,7 +152,7 @@ public class RunMapScreen : MonoBehaviour
         Stretch(backdrop.rectTransform);
         Button backBtn = backdrop.gameObject.AddComponent<Button>();
         backBtn.transition = Selectable.Transition.None;
-        backBtn.onClick.AddListener(Hide);
+        backBtn.onClick.AddListener(DismissIfAllowed);
 
         window = AddPoint(transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(WIN_W, WIN_H));
         Image winBg = window.gameObject.AddComponent<Image>();
@@ -155,7 +187,7 @@ public class RunMapScreen : MonoBehaviour
         title.rectTransform.sizeDelta = new Vector2(-80f, 38f);
         title.characterSpacing = 8f;
 
-        TextMeshProUGUI sub = AddText(window, "Sub", "CHOOSE YOUR ROUTE", 15f, T.TextMuted,
+        sub = AddText(window, "Sub", "CHOOSE YOUR ROUTE", 15f, T.TextMuted,
             TextAlignmentOptions.Center);
         sub.rectTransform.anchorMin = new Vector2(0f, 1f);
         sub.rectTransform.anchorMax = new Vector2(1f, 1f);
@@ -251,9 +283,26 @@ public class RunMapScreen : MonoBehaviour
     {
         if (!isOpen) return;
 
-        if (Input.GetKeyDown(KeyCode.Escape)) { Hide(); return; }
+        if (Input.GetKeyDown(KeyCode.Escape)) { DismissIfAllowed(); return; }
 
         TickMotion();
+    }
+
+    private void DismissIfAllowed()
+    {
+        if (mustChoose) return;
+        Hide();
+    }
+
+    // Commits the branch the player clicked and lets the run continue.
+    private void ConfirmChoice()
+    {
+        System.Action cb = onChosen;
+        onChosen = null;
+        mustChoose = false;
+
+        Hide();
+        cb?.Invoke();
     }
 
     // Motion lives in the information, not the atmosphere — see the header. Branches you can take
@@ -325,8 +374,15 @@ public class RunMapScreen : MonoBehaviour
 
         foreach (MapNode n in map.nodes) DrawNode(map, mgr, n, pos[n.id]);
 
+        if (sub != null)
+            sub.text = mustChoose ? "CHOOSE YOUR ROUTE" : "PRESS ESC TO CLOSE";
+
         int floorsLeft = (map.floors - 1) - (map.Current != null ? map.Current.floor : 0);
-        if (mgr != null && mgr.HasChosenNext)
+        if (mustChoose)
+        {
+            SetFooter($"PICK A BRANCH TO CONTINUE   ·   {floorsLeft} TO THE BOSS");
+        }
+        else if (mgr != null && mgr.HasChosenNext)
         {
             MapNode chosen = map.Get(mgr.ChosenNextId);
             SetFooter($"NEXT: {MapGlyphs.LabelFor(chosen.type)}{RechargeSuffix(chosen)}   ·   {floorsLeft} TO THE BOSS");
@@ -506,7 +562,11 @@ public class RunMapScreen : MonoBehaviour
             int id = n.id;
             btn.onClick.AddListener(() =>
             {
-                if (RunMapManager.instance != null && RunMapManager.instance.ChooseNext(id)) Refresh();
+                if (RunMapManager.instance == null || !RunMapManager.instance.ChooseNext(id)) return;
+                // Opened by the exit: committing IS leaving, so go. Opened with M: this is
+                // planning, so just mark the branch and let the player keep reading the act.
+                if (mustChoose) ConfirmChoice();
+                else Refresh();
             });
 
             AddHoverLabel(rt, n, size);
