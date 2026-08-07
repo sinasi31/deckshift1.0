@@ -342,12 +342,21 @@ public static class LevelTextImporter
         Vector2 native = box != null ? box.size : new Vector2(5.98f, 2.53f);
         if (native.x <= 0.01f || native.y <= 0.01f) return;
 
-        go.transform.localScale = new Vector3(w / native.x, h / native.y, 1f);
+        // ⚠️ The pool is NOT centred on its own transform. AcidWater's BoxCollider2D carries an
+        // offset of (0, 1.27), so positioning the transform at the pit centre floats the water a
+        // scaled 1.27 units too high - half the pool ends up hanging above the floor it should be
+        // sunk into. Back the offset out, scaled, or the fit is silently off by it.
+        Vector2 nativeOffset = box != null ? box.offset : Vector2.zero;
+
+        Vector3 scale = new Vector3(w / native.x, h / native.y, 1f);
+        go.transform.localScale = scale;
 
         // Grid rows run DOWNWARD while world Y runs up, so a row above the marker is (row - top)
         // cells higher. The rim is the top edge of that cell; the pool centres half its height below.
         float rimY = cellY + (row - top) + 1f;
-        go.transform.position = new Vector3(left + w * 0.5f, rimY - h * 0.5f, 0f);
+        go.transform.position = new Vector3(left + w * 0.5f - nativeOffset.x * scale.x,
+                                            rimY - h * 0.5f - nativeOffset.y * scale.y,
+                                            0f);
     }
 
     [MenuItem("Deckshift/Import Level From Text...")]
