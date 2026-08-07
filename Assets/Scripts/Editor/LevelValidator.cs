@@ -349,6 +349,42 @@ public static class LevelValidator
             }
         }
 
+        // LAW 8 (designer 2026-08-07): THE SPAWN IS A SAFE BEACH.
+        //
+        // The player must be able to arrive, look around, open their deck and decide before
+        // anything can touch them. So: no enemy standing on the platform they spawn on, and
+        // nothing able to target them from across the room either.
+        //
+        // Ranged threats are checked by LINE OF SIGHT rather than distance, because a spitter
+        // twenty tiles away down a clear corridor is aiming at the player, while one six tiles
+        // away behind a wall is not.
+        if (hasS)
+        {
+            const string melee = "mzZlM", ranged = "rst", flying = "b";
+            const int RangedGuard = 26, MeleeGuard = 10;
+
+            // The contiguous run of standable ground the spawn is on = "the first platform".
+            int sFloor = sY;
+            while (sFloor > 0 && !g.Grounded(sCol, sFloor) && g.Fits(sCol, sFloor)) sFloor--;
+            int runL = sCol; while (g.Grounded(runL - 1, sFloor)) runL--;
+            int runR = sCol; while (g.Grounded(runR + 1, sFloor)) runR++;
+
+            for (int y = 0; y < g.h; y++)
+                for (int c = 0; c < g.w; c++)
+                {
+                    char e = g.At(c, y);
+                    bool isMelee = melee.IndexOf(e) >= 0, isRanged = ranged.IndexOf(e) >= 0, isFly = flying.IndexOf(e) >= 0;
+                    if (!isMelee && !isRanged && !isFly) continue;
+
+                    if (c >= runL && c <= runR && Mathf.Abs(y - sFloor) <= 1)
+                        fail.Add($"LAW 8 — '{e}' at ({c},{y}) stands on the SPAWN PLATFORM; the first platform must be empty");
+                    else if ((isRanged || isFly) && Dist(c, y, sCol, sFloor) <= RangedGuard && ClearLine(g, c, y, sCol, sFloor))
+                        fail.Add($"LAW 8 — '{e}' at ({c},{y}) has line of sight to the spawn; it can target the player before they act");
+                    else if (isMelee && Dist(c, y, sCol, sFloor) <= MeleeGuard && ClearLine(g, c, y, sCol, sFloor))
+                        warn.Add($"LAW 8 — '{e}' at ({c},{y}) is {Dist(c, y, sCol, sFloor)} tiles from the spawn with a clear path");
+                }
+        }
+
         // LAW 4: no one-way platforms. LAW 5: no turrets in generated rooms.
         int oneWay = Count(g, '='), turrets = Count(g, 't'), crumbling = Count(g, 'c');
         if (oneWay > 0) fail.Add($"LAW 4 — {oneWay} one-way platform tile(s) '='; use solid strips");
@@ -416,6 +452,24 @@ public static class LevelValidator
             sb.AppendLine();
         }
         return sb.ToString();
+    }
+
+    private static int Dist(int ax, int ay, int bx, int by) =>
+        Mathf.Max(Mathf.Abs(ax - bx), Mathf.Abs(ay - by));
+
+    // Bresenham-ish walk: is there unobstructed sight between two cells?
+    private static bool ClearLine(Grid g, int ax, int ay, int bx, int by)
+    {
+        int steps = Mathf.Max(Mathf.Abs(bx - ax), Mathf.Abs(by - ay));
+        if (steps == 0) return true;
+        for (int i = 1; i < steps; i++)
+        {
+            float t = (float)i / steps;
+            int x = Mathf.RoundToInt(Mathf.Lerp(ax, bx, t));
+            int y = Mathf.RoundToInt(Mathf.Lerp(ay, by, t));
+            if (g.Solid(x, y)) return false;
+        }
+        return true;
     }
 
     private static int Count(Grid g, char c)
