@@ -692,9 +692,14 @@ Related: a missing-script warning for `CameraBoundsController` appears in the co
 
 ⚠️ **The movement model constants are read from `PlayerController` + `Player.prefab`, not estimated. If jump/gravity/speed change in the game, change them here or the validator quietly starts lying.**
 
-**Measured from the code 2026-08-07 (tile = 1 world unit):**
+**Measured from the code 2026-08-07 (tile = 1 world unit), designer-confirmed by playtest:**
 - **Jump apex ≈ 4.9 tiles.** Confirms Law #2 ("mandatory rises at 4, 5 is the edge").
-- ⚠️ **Flat jump reach ≈ 15 tiles.** `PerformJump` does `AddForce(moveInput * jumpForce, jumpForce)` — a **horizontal impulse equal to the full jump force**. A running jump leaves the ground at 8 + 11 = 19 u/s and decays toward 8 over ~1.5s of airtime. That is roughly **3× the "flat gaps ≤ 5-6 tiles"** the design laws assume, and is the likeliest reason hand-authored rooms play flat. Whether that impulse is intended is a DESIGN decision — the validator only reports what the code does.
+- **Airtime ≈ 1.5s** (0.90s up at −12.26, 0.60s down at −26.98 thanks to `fallMultiplier`).
+- **Flat jump reach ≈ 12 tiles** — simply `moveSpeed × airtime`. Still about **2× the "flat gaps ≤ 5-6 tiles"** the design laws assume, which is worth knowing when rooms play flat.
+
+⚠️ **`PerformJump`'s horizontal impulse is DEAD CODE — do not model it, and know it's a landmine.** `PerformJump` does `AddForce(moveInput * jumpForce, jumpForce)`, which looks like a running jump should launch at 8 + 11 = 19 u/s. It doesn't: **`isGrounded` is assigned only in `Update()` and nothing clears it on jumping**, so the very next `FixedUpdate` still sees `isGrounded == true`, runs the grounded branch (`rb.linearVelocity = (moveInput * moveSpeed, y)`) and overwrites the horizontal impulse back to 8 about 20ms later. Vertical is untouched, which is why the apex is unaffected. **If anyone ever "fixes" that stale `isGrounded` read, every jump instantly gains a large horizontal boost and every gap in every level becomes trivially clearable.**
+
+(An earlier version of this section claimed a 15-tile reach and a 3× discrepancy, from modelling that impulse as if it survived. It does not.)
 
 **Modelling notes:** the player occupies 1 column × 2 rows. `Solid` (blocks) and `Support` (can land on) are deliberately split — one-way `=` platforms support from above but pass through from below, and treating them as non-support produced a false "exit unreachable" on GenLevel5.
 

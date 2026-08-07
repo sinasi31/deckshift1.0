@@ -35,12 +35,20 @@ public static class LevelValidator
     //                   while falling,                    adds (fallMultiplier-1)   * gravity
     //   FixedUpdate() : airborne horizontal lerps toward moveInput*moveSpeed at 0.07 per step
     //
-    // ⚠️ THE HORIZONTAL IMPULSE IS THE SURPRISING ONE. PerformJump applies moveInput * jumpForce
-    // horizontally as well as vertically, so a running jump leaves the ground at 8 + 11 = 19 u/s
-    // and only decays back toward 8 across the ~1.5s of airtime. That makes a flat jump reach
-    // roughly 15 tiles, about three times the "gaps <= 5-6 tiles" the level design laws assume.
-    // It is almost certainly why hand-authored rooms play flat. Whether that impulse is intended
-    // is a DESIGN decision; this validator only reports what the code actually does.
+    // ⚠️ PerformJump's HORIZONTAL IMPULSE IS DEAD CODE — do not model it.
+    //
+    // PerformJump does AddForce(moveInput * jumpForce, jumpForce), which looks like it should launch
+    // a running jump at 8 + 11 = 19 u/s. It does not. `isGrounded` is assigned ONLY in Update()
+    // and nothing clears it on jumping, so the very next FixedUpdate still sees isGrounded == true
+    // and runs the grounded branch — rb.linearVelocity = (moveInput * moveSpeed, y) — which
+    // overwrites the horizontal impulse back to moveSpeed about 20ms later. Vertical is untouched,
+    // which is why the 4.9-tile apex is unaffected and matches playtest.
+    //
+    // The impulse therefore buys ~0.2 tiles before being wiped, and is ignored here.
+    //
+    // ⚠️ LANDMINE: if anyone ever "fixes" that stale isGrounded read, every jump instantly gains a
+    // large horizontal boost and every gap in every level becomes trivially clearable. Re-measure
+    // here if PlayerController's grounded handling changes.
     private const float Gravity = -9.81f;
     private const float GravityScale = 1.25f;
     private const float MoveSpeed = 8f;
@@ -190,14 +198,7 @@ public static class LevelValidator
         float tDown = Mathf.Sqrt(2f * apex / Mathf.Abs(FallAccel()));
         float t = tUp + tDown;
 
-        float vx = MoveSpeed + JumpForce;
-        float dist = 0f;
-        for (float e = 0f; e < t; e += Dt)
-        {
-            dist += vx * Dt;
-            vx = Mathf.Lerp(vx, MoveSpeed, AirControlPerStep);
-        }
-        return dist;
+        return MoveSpeed * t;   // the jump's horizontal impulse does not survive; see the constants
     }
 
     // Simulates one arc and returns every grounded cell it could land on.
@@ -211,8 +212,9 @@ public static class LevelValidator
         float y = startY;
 
         float vy = jump ? JumpForce : 0f;
-        // PerformJump preserves horizontal velocity and ADDS moveInput * jumpForce on top of it.
-        float vx = dir * MoveSpeed + (jump ? dir * JumpForce : 0f);
+        // NOT dir * (MoveSpeed + JumpForce): the jump's horizontal impulse is wiped by the next
+        // FixedUpdate's grounded branch before it can travel. See the note on the constants.
+        float vx = dir * MoveSpeed;
 
         for (int step = 0; step < MaxSimSteps; step++)
         {
