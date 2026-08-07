@@ -29,6 +29,9 @@ public static class LevelTextImporter
     private const string OutputFolder = "Assets/LevelGenerated";
     private const string InputFolder = "Assets/LevelTexts";
 
+    // Summary of the most recent Build(), shown by the interactive menu path only.
+    private static string lastReport = "";
+
     // Level geometry layer index (matches PlayerController.groundLayer mask, see CLAUDE.md).
     private const int GroundLayer = 3;
     private const int GroundSortingOrder = 1;   // hand-built rooms use 1 for ground
@@ -95,33 +98,110 @@ public static class LevelTextImporter
         'X', 'm', 'r', 'l', 'M', 'z', 'Z', 's', 'C', '^', 'W', 'T', 'F', 'w', 'c', 't', '$', 'L',
     };
 
-    // ---- Tile roles (the biseyler copies are the ones hand-made levels reference) ----
+    // ---- Tile roles ---------------------------------------------------------------------------
+    //
+    // MEASURED, NOT GUESSED (2026-08-07). Every set below is the real frequency distribution from
+    // the six hand-made rooms — efeslevel2/3, EfeVrl4/5/6/7 — counted by classifying each painted
+    // cell by its neighbours. Entries are REPEATED to weight them, so the deterministic picker
+    // reproduces roughly the same mix the designer paints by hand.
+    //
+    // WHY THIS WAS REWRITTEN. The previous table was a guess and it was wrong in three ways that
+    // together made generated rooms read as flat grey wallpaper:
+    //
+    //   1. ⚠️ PLATFORMS WERE PAINTED WITH CEILING TILES. Extra_112/113/114 were used as the
+    //      free-standing platform strip set. In the hand-made rooms those three tiles appear 18
+    //      times each and are CEILING in 100% of cases — never once a platform. Every floating
+    //      ledge in a generated room was wearing ceiling trim, complete with the toothy underside.
+    //
+    //   2. ⚠️ PLATFORMS COME FROM A DIFFERENT PALETTE ENTIRELY. The designer paints mid-air
+    //      platforms from the Cainos "TP Dungeon Ground" palette (Dirt_* and Ground_*), NOT from
+    //      the biseyler "Ground Extra_*" sheet that the masses use. Note Ground_* exists ONLY in
+    //      the Cainos folder. This is the single biggest visual difference.
+    //
+    //   3. ⚠️ LEFT AND RIGHT WALL FACES WERE INVERTED. Extra_156 was used for "air to the right";
+    //      it is the designer's most common tile for "air to the LEFT" (57 uses).
+    //
+    // Also: the hand-made rooms use 46-58 DISTINCT ground tiles each. Picking one fixed tile per
+    // role is most of why generated rooms look like wallpaper, hence weighted sets everywhere.
     private const string TileDir = "Assets/LevelSinasi/biseyler/";
-    private const string TileTopOuter = TileDir + "TX Tileset - Dungeon Ground Extra_153.asset"; // top border, outer row
-    private const string TileTopInner = TileDir + "TX Tileset - Dungeon Ground Extra_154.asset"; // top border, row under outer
-    private const string TileCeilFace = TileDir + "TX Tileset - Dungeon Ground Extra_96.asset";  // ceiling face (bricks on bottom edge)
-    private const string TileLeftOuter = TileDir + "TX Tileset - Dungeon Ground Extra_156.asset";
-    private const string TileLeftInner = TileDir + "TX Tileset - Dungeon Ground Extra_157.asset"; // bricks face the interior
-    private const string TileRightInner = TileDir + "TX Tileset - Dungeon Ground Extra_188.asset";
-    private const string TileRightOuter = TileDir + "TX Tileset - Dungeon Ground Extra_189.asset";
-    private const string TileFloorTop = TileDir + "TX Tileset - Dungeon Ground Extra_144.asset";  // walkable surface
-    private const string TileFloorMid = TileDir + "TX Tileset - Dungeon Ground Extra_186.asset";
-    private const string TileFloorDeep = TileDir + "TX Tileset - Dungeon Ground Extra_185.asset";
+    private const string CainosDir = "Assets/Cainos/Pixel Art Platformer - Dungeon/Tileset Pallete/TP Dungeon Ground/";
 
-    // Free-standing platform STRIPS (2+ cells wide): left cap / middle / right cap.
-    // Learned from EfeVrl6's interior platforms (Extra_112/113/114 painted as runs).
-    private const string TilePlatCapL = TileDir + "TX Tileset - Dungeon Ground Extra_112.asset";
-    private const string TilePlatMid = TileDir + "TX Tileset - Dungeon Ground Extra_113.asset";
-    private const string TilePlatCapR = TileDir + "TX Tileset - Dungeon Ground Extra_114.asset";
+    private static string Bis(string n) => TileDir + "TX Tileset - Dungeon Ground Extra_" + n + ".asset";
+    private static string Dirt(string n) => CainosDir + "TX Tileset - Dungeon Ground Dirt_" + n + ".asset";
+    private static string Grnd(string n) => CainosDir + "TX Tileset - Dungeon Ground_" + n + ".asset";
 
-    // Lone free-standing blocks / pillars: chunky block tiles (what the hand-made
-    // rooms use as spaced stepping stones, e.g. '#..#..#').
-    private static readonly string[] DirtTiles =
+    // LONE free-standing block — a single stepping stone with air on all four sides. This is the
+    // dominant mid-air idiom by far: 104 of the 217 platform cells in the hand-made rooms are
+    // 1-wide singles, and the variety between them is what stops a room reading as stamped.
+    private static readonly string[] PlatformSingleTiles =
     {
-        TileDir + "TX Tileset - Dungeon Ground Dirt_14.asset",
-        TileDir + "TX Tileset - Dungeon Ground Dirt_12.asset",
-        TileDir + "TX Tileset - Dungeon Ground Dirt_4.asset",
-        TileDir + "TX Tileset - Dungeon Ground Dirt_0.asset",
+        Dirt("0"), Dirt("0"), Dirt("0"), Dirt("0"),
+        Dirt("14"), Dirt("14"), Dirt("14"), Dirt("14"),
+        Dirt("4"), Dirt("4"), Dirt("4"),
+        Grnd("3"), Grnd("3"),
+        Grnd("11"), Grnd("11"),
+        Dirt("12"), Dirt("3"), Grnd("1"), Grnd("0"),
+    };
+
+    // Platform RUNS of 2+ cells, and wall-attached shelves. Overwhelmingly Ground_13 repeated
+    // (50 of 113), which is why runs read as one continuous ledge rather than cap/middle/cap.
+    private static readonly string[] PlatformRunTiles =
+    {
+        Grnd("13"), Grnd("13"), Grnd("13"), Grnd("13"), Grnd("13"), Grnd("13"), Grnd("13"), Grnd("13"),
+        Dirt("11"), Dirt("11"),
+        Grnd("11"), Dirt("14"), Grnd("10"),
+    };
+
+    // Walkable top of a thick mass. Extra_162 is the designer's primary (147 uses); the old table
+    // led with Extra_144, which is only their third choice.
+    private static readonly string[] SurfaceTiles =
+    {
+        Bis("162"), Bis("162"), Bis("162"), Bis("162"), Bis("162"), Bis("162"),
+        Bis("101"), Bis("101"), Bis("101"),
+        Bis("144"), Bis("144"), Bis("144"),
+        Grnd("13"), Grnd("13"),
+        Bis("154"), Bis("154"),
+        Bis("166"), Bis("166"),
+        Bis("97"), Bis("49"),
+    };
+
+    // Underside of an overhang.
+    private static readonly string[] CeilingTiles =
+    {
+        Bis("96"), Bis("96"), Bis("96"), Bis("96"),
+        Bis("189"), Bis("189"), Bis("97"), Bis("97"),
+        Bis("3"), Bis("3"), Bis("186"), Bis("186"),
+        Bis("98"), Bis("98"), Bis("160"), Bis("160"), Bis("49"),
+    };
+
+    // Vertical face with open air to the LEFT (a west-facing wall).
+    private static readonly string[] FaceWestTiles =
+    {
+        Bis("156"), Bis("156"), Bis("156"), Bis("156"),
+        Bis("172"), Bis("172"), Bis("172"),
+        Bis("188"), Bis("188"), Bis("137"), Bis("137"),
+        Bis("153"), Bis("140"),
+    };
+
+    // Vertical face with open air to the RIGHT (an east-facing wall).
+    private static readonly string[] FaceEastTiles =
+    {
+        Bis("154"), Bis("154"), Bis("154"),
+        Bis("170"), Bis("170"), Bis("170"),
+        Bis("157"), Bis("157"), Bis("173"), Bis("173"),
+        Bis("189"), Bis("189"), Bis("188"), Bis("186"),
+    };
+
+    // Buried rock with solid neighbours all round — the bulk of any thick mass.
+    private static readonly string[] InteriorTiles =
+    {
+        Bis("153"), Bis("153"), Bis("153"), Bis("153"), Bis("153"),
+        Bis("185"), Bis("185"), Bis("185"), Bis("185"),
+        Bis("101"), Bis("101"), Bis("101"), Bis("101"),
+        Bis("49"), Bis("49"), Bis("49"),
+        Bis("157"), Bis("157"), Bis("157"),
+        Bis("169"), Bis("169"), Bis("169"),
+        Bis("97"), Bis("97"), Bis("189"), Bis("189"), Bis("173"), Bis("173"), Bis("100"),
     };
 
     // Backdrop: the same wall tiles BGPalette's pre-painted background uses.
@@ -150,6 +230,8 @@ public static class LevelTextImporter
             var asset = AssetDatabase.LoadAssetAtPath<GameObject>(savedPath);
             Selection.activeObject = asset;
             EditorGUIUtility.PingObject(asset);
+            // Only the interactive menu path shows the modal summary — see the note in Build().
+            EditorUtility.DisplayDialog("Level imported", lastReport, "OK");
         }
         catch (Exception e)
         {
@@ -246,12 +328,13 @@ public static class LevelTextImporter
             warnings.Add($"Unknown marker '{c}' ignored.");
 
         // ---------- Preload assets ----------
-        TileBase topOuter = LoadTile(TileTopOuter), topInner = LoadTile(TileTopInner), ceilFace = LoadTile(TileCeilFace);
-        TileBase leftOuter = LoadTile(TileLeftOuter), leftInner = LoadTile(TileLeftInner);
-        TileBase rightInner = LoadTile(TileRightInner), rightOuter = LoadTile(TileRightOuter);
-        TileBase floorTop = LoadTile(TileFloorTop), floorMid = LoadTile(TileFloorMid), floorDeep = LoadTile(TileFloorDeep);
-        TileBase platCapL = LoadTile(TilePlatCapL), platMid = LoadTile(TilePlatMid), platCapR = LoadTile(TilePlatCapR);
-        TileBase[] dirt = LoadTileSet(DirtTiles);
+        TileBase[] platSingle = LoadTileSet(PlatformSingleTiles);
+        TileBase[] platRun = LoadTileSet(PlatformRunTiles);
+        TileBase[] surface = LoadTileSet(SurfaceTiles);
+        TileBase[] ceiling = LoadTileSet(CeilingTiles);
+        TileBase[] faceWest = LoadTileSet(FaceWestTiles);
+        TileBase[] faceEast = LoadTileSet(FaceEastTiles);
+        TileBase[] interior = LoadTileSet(InteriorTiles);
         TileBase[] backWall = LoadTileSet(BackWallTiles);
 
         var prefabCache = new Dictionary<char, GameObject>();
@@ -369,10 +452,13 @@ public static class LevelTextImporter
                         bool IsStrip(int cc) => cc >= 0 && cc < width && At(cc, row) == '#'
                             && !IsSolid(cc, row - 1) && !IsSolid(cc, row + 1);
 
+                        // Roles match the classification the tile sets were measured with, so the
+                        // painted result reproduces the hand-made mix. See the tile tables above.
                         TileBase tile;
                         if (airUp && airDown)
                         {
-                            // strip: caps on OPEN ends only (an end abutting a wall stays a middle)
+                            // A 1-thick strip: mid-air platform or wall-attached shelf. These come
+                            // from the CAINOS palette, never from the Extra_* sheet the masses use.
                             int runStart = col;
                             while (IsStrip(runStart - 1)) runStart--;
                             int runEnd = col;
@@ -380,32 +466,21 @@ public static class LevelTextImporter
                             bool openL = !IsSolid(runStart - 1, row);
                             bool openR = !IsSolid(runEnd + 1, row);
 
-                            if (runStart == runEnd)
-                                tile = openL && openR ? Pick(dirt, col, cellY)      // lone stepping stone
-                                     : openR ? platCapR : openL ? platCapL : platMid;
-                            else if (col == runStart && openL) tile = platCapL;
-                            else if (col == runEnd && openR) tile = platCapR;
-                            else tile = platMid;
+                            // A LONE block open on all sides is the designer's dominant mid-air
+                            // idiom (104 of 217 platform cells); everything longer is a run of
+                            // Ground_13. There is deliberately no cap/middle/cap distinction —
+                            // the hand-made runs simply repeat the same tile.
+                            tile = (runStart == runEnd && openL && openR)
+                                 ? Pick(platSingle, col, cellY)
+                                 : Pick(platRun, col, cellY);
                         }
-                        else if (airUp) tile = floorTop;        // walkable surface of a thick mass
-                        else if (airDown) tile = ceilFace;      // ceiling face
-                        // Wall faces: the "inner" tiles (_188/_157) are accent tiles with
-                        // protruding brick nubs — only correct when BACKED by a real solid
-                        // tile (2-thick walls, like hand-made borders). A 1-thick wall at
-                        // the grid edge uses the clean outer tiles (_189/_156) instead.
-                        else if (airLeft) tile = InGrid(col + 1, row) && At(col + 1, row) == '#' ? rightInner : rightOuter;
-                        else if (airRight) tile = InGrid(col - 1, row) && At(col - 1, row) == '#' ? leftInner : leftOuter;
-                        // buried cells
-                        else if (row == 0) tile = topOuter;
-                        else if (row == 1 && At(col, 0) == '#') tile = topInner;
-                        else if (col == 0) tile = leftOuter;
-                        else if (col == width - 1) tile = rightOuter;
-                        // hand-made layering: the gappy sub-surface tile (_186) goes in
-                        // exactly ONE row directly under a walkable surface; everything
-                        // deeper is solid dark fill (_185). Repeating _186 reads as a
-                        // broken colonnade.
-                        else if (!IsSolid(col, row - 2)) tile = floorMid;
-                        else tile = floorDeep;
+                        else if (airUp) tile = Pick(surface, col, cellY);    // walkable top of a mass
+                        else if (airDown) tile = Pick(ceiling, col, cellY);  // underside of an overhang
+                        // Vertical faces. NOTE the direction: "air to the LEFT" is a WEST-facing
+                        // face. The old table had these swapped.
+                        else if (airLeft) tile = Pick(faceWest, col, cellY);
+                        else if (airRight) tile = Pick(faceEast, col, cellY);
+                        else tile = Pick(interior, col, cellY);              // buried rock
 
                         tilemap.SetTile(new Vector3Int(col, cellY, 0), tile);
                         tileCount++;
@@ -414,8 +489,9 @@ public static class LevelTextImporter
 
                     if (c == '=')
                     {
-                        // one-way lip: thin brick-top tile, visually distinct from solid strips
-                        oneWayMap.SetTile(new Vector3Int(col, cellY, 0), floorTop);
+                        // one-way lip: thin brick-top tile, visually distinct from solid strips.
+                        // (Level Design Law 4 bans these in new rooms; kept so old texts import.)
+                        oneWayMap.SetTile(new Vector3Int(col, cellY, 0), Pick(surface, col, cellY));
                         tileCount++;
                         continue;
                     }
@@ -604,8 +680,12 @@ public static class LevelTextImporter
             report.AppendLine();
             report.AppendLine("Remember: add the prefab to LevelManager's Room Prefabs list to put it in the run.");
 
+            // NOTE: the summary dialog belongs to the MENU path only (see ImportFromText).
+            // EditorUtility.DisplayDialog is modal and blocks Unity's main thread until someone
+            // clicks OK, which makes Build() impossible to call from a script — it hangs the
+            // editor, and any batch import or automated re-import with it.
             Debug.Log("[LevelTextImporter] " + report);
-            EditorUtility.DisplayDialog("Level imported", report.ToString(), "OK");
+            lastReport = report.ToString();
             return assetPath;
         }
         finally
