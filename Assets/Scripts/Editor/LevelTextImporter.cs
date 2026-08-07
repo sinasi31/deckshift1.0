@@ -268,6 +268,20 @@ public static class LevelTextImporter
         WallDir + "TX Tileable - Dungeon Wall_35.asset",
     };
 
+    // Chebyshev distance from a solid cell to the nearest open one, capped at `cap`.
+    // Used to leave deep interiors unpainted — see the note at the call site.
+    private static int DepthFromAir(int col, int row, int cap, Func<int, int, bool> IsSolid)
+    {
+        for (int d = 1; d <= cap; d++)
+            for (int dx = -d; dx <= d; dx++)
+                for (int dy = -d; dy <= d; dy++)
+                {
+                    if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != d) continue;
+                    if (!IsSolid(col + dx, row + dy)) return d;
+                }
+        return cap;
+    }
+
     // Scales and positions an acid pool so it exactly fills the hole it was placed in.
     //
     // The pit is measured from the GRID, not from the prefab: walk left/right along the marker's
@@ -562,6 +576,27 @@ public static class LevelTextImporter
                         // floating platforms and wall-attached shelves alike.
                         bool IsStrip(int cc) => cc >= 0 && cc < width && At(cc, row) == '#'
                             && !IsSolid(cc, row - 1) && !IsSolid(cc, row + 1);
+
+                        // ---- DEEP INTERIORS ARE NOT PAINTED --------------------------------
+                        //
+                        // Measured across the six hand-made rooms: 2355 solid cells sit 1 away
+                        // from open air, 1074 at 2, 134 at 3, 23 at 4, and NOTHING deeper. The
+                        // designer never builds a deep solid interior, so this tileset has never
+                        // had to be a fill texture — it is a FACING set, all edges and near-edge
+                        // detail. Painted across a 10-deep mass it reads as ugly repeating
+                        // wallpaper, which is exactly what generated rooms were doing.
+                        //
+                        // So anything more than 2 cells from air is left UNPAINTED and the wall
+                        // backdrop shows through, which is what deep rock looks like in the
+                        // hand-made rooms. Costs nothing in gameplay: those cells are sealed
+                        // inside the mass, the shell still carries the collider, and the player
+                        // can never reach them. Only safe with a backdrop behind it — without one
+                        // the hole would be black void, so the skip is gated on backwallOn.
+                        if (backwallOn && DepthFromAir(col, row, 3, IsSolid) >= 3)
+                        {
+                            tileCount++;
+                            continue;
+                        }
 
                         // Tile chosen by the cell's 8-neighbour configuration — this IS the
                         // auto-tiling (see MaskTiles). One tile per configuration, deterministic,
