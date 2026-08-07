@@ -653,10 +653,20 @@ public static class LevelTextImporter
                         // slightly cool so a mass reads as receding shadow instead of another lit
                         // surface — and the brick detail stays faintly legible rather than going
                         // to flat black.
-                        int depth = DepthFromAir(col, row, 5, IsSolid);
-                        if (depth >= 3)
+                        // ⚠️ THE RECESSION CONTOUR MUST BE JITTERED. DepthFromAir is a Chebyshev
+                        // distance, so its iso-lines are PERFECT RECTANGLES: every step of darkening
+                        // lands on an axis-aligned box, and the core of a mass reads as a black
+                        // rectangle pasted onto the rock — the corners worst of all, because a
+                        // right-angle is the one shape stone never makes. Nudging the threshold by a
+                        // hashed -1/0/+1 per cell makes each boundary wander a tile and the mass
+                        // recede in irregular patches instead. The hash is seeded differently from
+                        // the tile pick below so the two don't correlate into a visible pattern.
+                        int depth = DepthFromAir(col, row, 6, IsSolid);
+                        int jitter = Mathf.Abs((col * 40503131) ^ (cellY * 65599173)) % 3 - 1;
+                        int recess = depth + jitter;
+                        if (recess >= 3)
                         {
-                            string[] step = DeepFillTiles[Mathf.Min(depth - 3, DeepFillTiles.Length - 1)];
+                            string[] step = DeepFillTiles[Mathf.Min(recess - 3, DeepFillTiles.Length - 1)];
                             TileBase deep = Resolve(step[Mathf.Abs((col * 73856093) ^ (cellY * 19349663)) % step.Length]);
                             if (deep != null)
                             {

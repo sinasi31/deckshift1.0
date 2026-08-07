@@ -116,13 +116,24 @@ public static class TileVariantGenerator
         int w = (int)r.width, h = (int)r.height;
         Color[] px = src.texture.GetPixels((int)r.x, (int)r.y, w, h);
 
-        // The tile's own base tone: the 25th-percentile luminance, so bright brick faces don't drag
-        // it up and the darkest mortar lines don't drag it down.
-        var lums = new List<float>(px.Length);
-        foreach (var p in px) if (p.a > 0.5f) lums.Add(0.299f * p.r + 0.587f * p.g + 0.114f * p.b);
-        if (lums.Count == 0) return null;
-        lums.Sort();
-        float baseLum = lums[Mathf.Clamp(lums.Count / 4, 0, lums.Count - 1)];
+        // The tone every pixel is pulled toward: the tile's MEAN luminance.
+        //
+        // ⚠️ THIS MUST BE THE MEAN, NOT A LOW PERCENTILE. It was the 25th percentile ("so bright
+        // brick faces don't drag it up"), which quietly darkened every deep tile by the gap between
+        // its mean and its 25th percentile — about 1.5x — BEFORE DeepTints was applied at all.
+        // Stacked on a 0.58 tint and a 0.5-intensity global light, the core of a mass landed near
+        // 0.04 on screen: a flat black slab with hard rectangular corners, which is exactly what it
+        // looked like. Neither this function nor the tint table knew the other was darkening.
+        //
+        // Flattening is supposed to remove VARIATION, not BRIGHTNESS. Pulling toward the mean is
+        // brightness-preserving by construction, so DeepTints is now the only thing setting how
+        // dark deep rock gets - which is the only way it can be tuned honestly.
+        float sum = 0f;
+        int n = 0;
+        foreach (var p in px)
+            if (p.a > 0.5f) { sum += 0.299f * p.r + 0.587f * p.g + 0.114f * p.b; n++; }
+        if (n == 0) return null;
+        float baseLum = sum / n;
 
         var outPx = new Color[px.Length];
         for (int i = 0; i < px.Length; i++)
