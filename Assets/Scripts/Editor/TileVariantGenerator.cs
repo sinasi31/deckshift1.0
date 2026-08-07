@@ -85,6 +85,79 @@ public static class TileVariantGenerator
         CainosDir + "TX Tileset - Dungeon Ground_0.asset",
     };
 
+    // ---- flattened deep-rock textures -----------------------------------------------------------
+    //
+    // The deep tiles carry small light-grey brick details drawn at DIFFERENT positions in each
+    // tile. Repeat them across a mass and they never line up, so the wall reads as scattered brick
+    // fragments instead of one surface — the designer's "if they were somehow in-sync it might be
+    // better". Syncing them is not possible without redrawing the set.
+    //
+    // But deep rock should not have legible detail in the first place: it is metres of stone in
+    // shadow. So instead of trying to align the bricks, this DELETES them — it compresses each
+    // tile's value range toward its own dark base, which erases the bright brick faces while
+    // keeping the faint mottling that stops a fill looking like flat colour. No detail, no
+    // repetition artefact.
+    //
+    // Written as new PNG assets rather than modifying the pack, so the originals (and every
+    // hand-made room using them) are untouched.
+    private const string FlatTextureFolder = VariantFolder + "/Textures";
+
+    // 0 = perfectly flat, 1 = original. Low on purpose: at 0.35 the bricks were still legible
+    // enough to tile visibly.
+    private const float DetailRetention = 0.16f;
+
+    private static Sprite FlattenSprite(Sprite src, string outName)
+    {
+        string outPath = FlatTextureFolder + "/" + outName + ".png";
+
+        Rect r = src.textureRect;
+        int w = (int)r.width, h = (int)r.height;
+        Color[] px = src.texture.GetPixels((int)r.x, (int)r.y, w, h);
+
+        // The tile's own base tone: the 25th-percentile luminance, so bright brick faces don't drag
+        // it up and the darkest mortar lines don't drag it down.
+        var lums = new List<float>(px.Length);
+        foreach (var p in px) if (p.a > 0.5f) lums.Add(0.299f * p.r + 0.587f * p.g + 0.114f * p.b);
+        if (lums.Count == 0) return null;
+        lums.Sort();
+        float baseLum = lums[Mathf.Clamp(lums.Count / 4, 0, lums.Count - 1)];
+
+        var outPx = new Color[px.Length];
+        for (int i = 0; i < px.Length; i++)
+        {
+            Color p = px[i];
+            if (p.a <= 0.5f) { outPx[i] = p; continue; }
+            float lum = 0.299f * p.r + 0.587f * p.g + 0.114f * p.b;
+            // Pull每 pixel toward the base tone, keeping a sliver of the original variation.
+            float target = baseLum + (lum - baseLum) * DetailRetention;
+            float k = lum > 0.001f ? target / lum : 1f;
+            outPx[i] = new Color(p.r * k, p.g * k, p.b * k, p.a);
+        }
+
+        var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        tex.SetPixels(outPx);
+        tex.Apply();
+
+        Directory.CreateDirectory(Path.GetDirectoryName(outPath));
+        File.WriteAllBytes(outPath, tex.EncodeToPNG());
+        Object.DestroyImmediate(tex);
+        AssetDatabase.ImportAsset(outPath, ImportAssetOptions.ForceUpdate);
+
+        var imp = AssetImporter.GetAtPath(outPath) as TextureImporter;
+        if (imp != null)
+        {
+            imp.textureType = TextureImporterType.Sprite;
+            imp.spriteImportMode = SpriteImportMode.Single;
+            imp.filterMode = FilterMode.Point;       // pixel art — bilinear would smear it
+            imp.spritePixelsPerUnit = src.pixelsPerUnit;
+            imp.mipmapEnabled = false;
+            imp.textureCompression = TextureImporterCompression.Uncompressed;
+            imp.wrapMode = TextureWrapMode.Clamp;
+            imp.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<Sprite>(outPath);
+    }
+
     [MenuItem("Deckshift/Generate Tile Variants")]
     public static void Generate()
     {
@@ -97,9 +170,29 @@ public static class TileVariantGenerator
 
         int made = 0;
         var missing = new List<string>();
+
+        // Deep rock: flatten each source ONCE (the brick detail is what tiles badly), then make
+        // one tinted Tile per recession step pointing at that flattened sprite.
+        var flattened = new Dictionary<string, Sprite>();
+        bool[] restore = PrepareReadable(DeepSources);
+        foreach (string src in DeepSources)
+        {
+            var tile = AssetDatabase.LoadAssetAtPath<Tile>(src);
+            if (tile == null || tile.sprite == null) { missing.Add(src); continue; }
+            string flatName = Path.GetFileNameWithoutExtension(src) + " Flat";
+            Sprite s = FlattenSprite(tile.sprite, flatName);
+            if (s != null) flattened[src] = s;
+        }
+        RestoreReadable(DeepSources, restore);
+
         for (int step = 0; step < DeepTints.Length; step++)
             foreach (string src in DeepSources)
-                if (!MakeVariant(src, "Deep" + (step + 1), DeepTints[step], ref made)) missing.Add(src);
+            {
+                Sprite flat;
+                if (!flattened.TryGetValue(src, out flat)) continue;
+                MakeVariant(src, "Deep" + (step + 1), DeepTints[step], ref made, flat);
+            }
+
         foreach (string src in PlatformSources) if (!MakeVariant(src, "Lit", PlatformTint, ref made)) missing.Add(src);
 
         AssetDatabase.SaveAssets();
@@ -110,8 +203,40 @@ public static class TileVariantGenerator
         Debug.Log("[TileVariantGenerator] " + msg);
     }
 
-    // Returns false if the source tile could not be loaded.
-    private static bool MakeVariant(string sourcePath, string suffix, Color tint, ref int made)
+    // Sprite pixels can only be read when the source texture is marked readable, which the pack's
+    // textures are not. Flip it for the duration and put it back — leaving it on doubles the
+    // texture's memory cost at runtime.
+    private static bool[] PrepareReadable(string[] tilePaths)
+    {
+        var was = new bool[tilePaths.Length];
+        for (int i = 0; i < tilePaths.Length; i++)
+        {
+            var t = AssetDatabase.LoadAssetAtPath<Tile>(tilePaths[i]);
+            if (t == null || t.sprite == null) continue;
+            var imp = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(t.sprite.texture)) as TextureImporter;
+            if (imp == null) continue;
+            was[i] = imp.isReadable;
+            if (!imp.isReadable) { imp.isReadable = true; imp.SaveAndReimport(); }
+        }
+        return was;
+    }
+
+    private static void RestoreReadable(string[] tilePaths, bool[] was)
+    {
+        for (int i = 0; i < tilePaths.Length; i++)
+        {
+            if (was[i]) continue;
+            var t = AssetDatabase.LoadAssetAtPath<Tile>(tilePaths[i]);
+            if (t == null || t.sprite == null) continue;
+            var imp = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(t.sprite.texture)) as TextureImporter;
+            if (imp != null && imp.isReadable) { imp.isReadable = false; imp.SaveAndReimport(); }
+        }
+    }
+
+    // Returns false if the source tile could not be loaded. `spriteOverride` swaps in a different
+    // sprite (used for the flattened deep-rock art) while keeping the source's collision settings.
+    private static bool MakeVariant(string sourcePath, string suffix, Color tint, ref int made,
+                                    Sprite spriteOverride = null)
     {
         var src = AssetDatabase.LoadAssetAtPath<Tile>(sourcePath);
         if (src == null) return false;
@@ -122,9 +247,12 @@ public static class TileVariantGenerator
         var existing = AssetDatabase.LoadAssetAtPath<Tile>(outPath);
         Tile t = existing != null ? existing : ScriptableObject.CreateInstance<Tile>();
 
-        t.sprite = src.sprite;                 // same art, different value
+        t.sprite = spriteOverride != null ? spriteOverride : src.sprite;
         t.color = tint;
-        t.colliderType = src.colliderType;     // collision must not change
+        // Collision must not change. NOTE: the flattened sprites are Single-mode with no custom
+        // physics shape, so a Sprite collider would differ from the original — force Grid, which
+        // is what a solid rock cell wants anyway.
+        t.colliderType = spriteOverride != null ? Tile.ColliderType.Grid : src.colliderType;
         t.transform = src.transform;
         t.gameObject = src.gameObject;
         // Keep LockColor so the tile's own colour is authoritative and a Tilemap can't wash it out.

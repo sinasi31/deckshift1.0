@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 13312, guid: 0000000000000000e000000000000000, type: 0}
   m_Name: TX Tileset - Dungeon Ground Extra_49 Deep3
   m_EditorClassIdentifier: 
-  m_Sprite: {fileID: 435047628, guid: 5da750f36e60e0949ba7085b5e1788ce, type: 3}
+  m_Sprite: {fileID: 21300000, guid: ab956565356cb804bbded76381912ca7, type: 3}
   m_Color: {r: 0.58, g: 0.68, b: 0.74, a: 1}
   m_Transform:
     e00: 1
@@ -33,4 +33,4 @@ MonoBehaviour:
     e33: 1
   m_InstancedGameObject: {fileID: 0}
   m_Flags: 1
-  m_ColliderType: 1
+  m_ColliderType: 2
