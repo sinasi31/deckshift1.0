@@ -29,15 +29,35 @@ public static class TileVariantGenerator
 {
     public const string VariantFolder = "Assets/LevelGenerated/TileVariants";
 
-    // Deep rock: pushed down and slightly cool so a mass reads as receding shadow rather than as
-    // another lit surface.
+    // Deep rock, in three steps of recession.
     //
-    // ⚠️ DON'T GO AS DARK AS IT LOOKS LIKE YOU SHOULD. These tiles render through
-    // Sprite-Lit-Default with a global Light2D at 0.5 intensity, so the scene ALREADY halves them.
-    // A 0.42 tint measured out at ~0.21 on screen and the deep mass came out a flat black hole,
-    // which reads as a pit rather than as rock. Multiply your intended value by the light, then
-    // pick the tint.
-    public static readonly Color DeepTint = new Color(0.72f, 0.74f, 0.80f, 1f);
+    // ⚠️ THE TINT MUST NEUTRALISE HUE, NOT JUST DARKEN. Measured average colour of the sheet:
+    //
+    //     surface tiles  (162/144/154)   0.27, 0.25, 0.24   luma 0.25   R-B 0.028  (near neutral)
+    //     interior tiles (153/185/101/49) 0.24, 0.18, 0.16  luma 0.19   R-B 0.077  (strongly BROWN)
+    //
+    // The interior tiles are inherently browner AND darker than the surface stone. The hand-made
+    // rooms hide this because their interiors are only 1-2 cells deep — you see a thin brown line
+    // and read it as shadow under a ledge. Across a mass 8 cells deep it becomes a brown slab
+    // against grey stone, which is the "tiles don't belong" the designer reported. Simply
+    // darkening made it worse: a darker brown is still brown.
+    //
+    // So each tint below is source-relative: it divides out the brown and multiplies back the
+    // SURFACE tiles' hue ratio at a lower luma, so deep rock is the same stone in shadow rather
+    // than a different material.
+    //
+    // ⚠️ AND DON'T GO AS DARK AS YOU THINK. These render through Sprite-Lit-Default under a
+    // 0.5-intensity global Light2D, so the scene already halves them. A 0.42 tint measured ~0.21
+    // on screen and the mass came out a flat black hole.
+    //
+    // Three steps rather than one because a single cut-off at depth 3 left a hard horizontal seam
+    // where the grey stopped and the dark began. Rock should recede, not change material.
+    public static readonly Color[] DeepTints =
+    {
+        new Color(0.77f, 0.91f, 0.98f, 1f),   // depth 3 — just inside the face
+        new Color(0.67f, 0.79f, 0.85f, 1f),   // depth 4
+        new Color(0.58f, 0.68f, 0.74f, 1f),   // depth 5+ — the core of a mass
+    };
 
     // Platforms: lifted and warmed so a ledge separates from the wall behind it.
     public static readonly Color PlatformTint = new Color(1.14f, 1.10f, 1.00f, 1f);
@@ -77,7 +97,9 @@ public static class TileVariantGenerator
 
         int made = 0;
         var missing = new List<string>();
-        foreach (string src in DeepSources) if (!MakeVariant(src, "Deep", DeepTint, ref made)) missing.Add(src);
+        for (int step = 0; step < DeepTints.Length; step++)
+            foreach (string src in DeepSources)
+                if (!MakeVariant(src, "Deep" + (step + 1), DeepTints[step], ref made)) missing.Add(src);
         foreach (string src in PlatformSources) if (!MakeVariant(src, "Lit", PlatformTint, ref made)) missing.Add(src);
 
         AssetDatabase.SaveAssets();
