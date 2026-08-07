@@ -1,0 +1,80 @@
+// GenLevel8 - "The Toll Shaft"  (FIGHT tier, 56x44)
+//
+// Deliberately the OPPOSITE SHAPE to GenLevel7. That one was a horizontal corridor with a
+// climb bolted on the end and a 57x6 dead chamber in the middle. This is a single TALL
+// SHAFT climbed from the bottom, and the geometry is thin ledges hung in open space rather
+// than tunnels bored through a rock mass - which is how the hand-made rooms are built.
+//
+// FLOW: spawn on the safe west landing -> hop the spike trench (7 tiles) onto the market
+//   floor, where the SHOPKEEPER trades beside the first real fight -> then climb the shaft
+//   on ledges that alternate walls, rise 4 each:
+//     L1 east -> L2 west (a Shambler holds it) -> L3 east -> L4 west, the TOLL LANDING ->
+//     L5 east (melee) -> L6 -> L7 -> exit shelf, top centre-east.
+//
+// THE TOLL (why it's called that): the SHIFT ALTAR sits on L4 facing a sealed GATE. Pay
+//   Shift and the gate grinds open onto a walled VAULT holding a chest and gold. It is pure
+//   Shift-for-loot - the run's core trade made into a room feature - and it is entirely
+//   optional, so Law 1 is untouched.
+//
+// THE ELEVATOR is a SHORTCUT, never the route. It rides the open east shaft and skips two
+//   ledges' worth of climbing for zero Shift. The zig-zag beside it works without it.
+//
+// LAW 1: the spine is walk / one 7-tile hop / eight rise-4 jumps. Altar, gate and elevator
+//   gate only optional things.
+// LAW 2: every rise is 4. No ledge sits directly above its own launch point - each is
+//   entered from the side, so you can never bonk an underside. Same-column ledge spacing is
+//   8 (L1/L3 both cols 24-30; L2/L4 both west).
+// LAW 3: the spike trench is 2 deep and 6 wide - a miss costs health, not the run.
+// LAW 8: the spawn landing (cols 2-14) is enemy-free and the trench breaks it off from the
+//   market floor, so nothing shares the platform and nothing has line of sight to it.
+// LAW 7: spawn (4,38) to exit (37,6) is 65 tiles of Manhattan distance.
+//
+// TUNING after import: elevator travel (col 34) - park it low and set its top near L5;
+//   altar shiftCost (default 3).
+
+!name: GenLevel8
+!backwall: on
+########################################################
+########################################################
+########################################################
+########################################################
+##################################.............#########
+##################################.............#########
+##################################...X..g......#########
+###########################################...........##
+##....................................................##
+##....................................................##
+##.............................................+......##
+##..........................................#######...##
+##....................................................##
+##....................................................##
+##.....................................g..............##
+##..................................#######...........##
+##....................................................##
+##....................................................##
+##..........................m.........................##
+##......................#########.....................##
+##.......G...................................b........##
+##.......G............................................##
+##.g.C...G...A....s...................................##
+#####################.................................##
+##....................................................##
+##....................................................##
+##.........................+..........................##
+##......................#######.......................##
+##....................................................##
+##....................................................##
+##...............z................E...................##
+##............#######.................................##
+##....................................................##
+##....................................................##
+##.........................g..........................##
+##......................#######.......................##
+##....................................................##
+##....................................................##
+##..S.....................$......g......z.....Z.......##
+###############......###################################
+###############.^^^..###################################
+########################################################
+########################################################
+########################################################

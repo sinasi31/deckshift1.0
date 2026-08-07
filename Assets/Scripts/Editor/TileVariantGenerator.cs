@@ -70,6 +70,8 @@ public static class TileVariantGenerator
         "Assets/LevelSinasi/biseyler/TX Tileset - Dungeon Ground Extra_49.asset",
     };
 
+    private const string TileDir = "Assets/LevelSinasi/biseyler/";
+    private static string TileDirAbs => Path.Combine(Directory.GetCurrentDirectory(), TileDir);
     private const string CainosDir = "Assets/Cainos/Pixel Art Platformer - Dungeon/Tileset Pallete/TP Dungeon Ground/";
     private static readonly string[] PlatformSources =
     {
@@ -195,6 +197,22 @@ public static class TileVariantGenerator
 
         foreach (string src in PlatformSources) if (!MakeVariant(src, "Lit", PlatformTint, ref made)) missing.Add(src);
 
+        // Grid-collision copies of every tile the importer paints.
+        //
+        // The pack's tiles use colliderType = Sprite, so collision traces the sprite's ALPHA
+        // OUTLINE — the wall-face tiles have small protruding brick nubs, and the player catches
+        // on them. These are the same art with Grid collision, which is what a solid cell in a
+        // platformer wants: a clean cell edge.
+        int solids = 0;
+        foreach (string shortName in LevelTextImporter.AllPaintedTileNames())
+        {
+            string file = "TX Tileset - Dungeon " + shortName + ".asset";
+            string path = File.Exists(TileDirAbs + file) ? TileDir + file : CainosDir + file;
+            if (AssetDatabase.LoadAssetAtPath<Tile>(path) == null) continue;
+            if (MakeVariant(path, "Solid", Color.white, ref made, null, Tile.ColliderType.Grid)) solids++;
+        }
+        Debug.Log("[TileVariantGenerator] Grid-collision copies: " + solids);
+
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
@@ -236,7 +254,7 @@ public static class TileVariantGenerator
     // Returns false if the source tile could not be loaded. `spriteOverride` swaps in a different
     // sprite (used for the flattened deep-rock art) while keeping the source's collision settings.
     private static bool MakeVariant(string sourcePath, string suffix, Color tint, ref int made,
-                                    Sprite spriteOverride = null)
+                                    Sprite spriteOverride = null, Tile.ColliderType? colliderOverride = null)
     {
         var src = AssetDatabase.LoadAssetAtPath<Tile>(sourcePath);
         if (src == null) return false;
@@ -252,7 +270,7 @@ public static class TileVariantGenerator
         // Collision must not change. NOTE: the flattened sprites are Single-mode with no custom
         // physics shape, so a Sprite collider would differ from the original — force Grid, which
         // is what a solid rock cell wants anyway.
-        t.colliderType = spriteOverride != null ? Tile.ColliderType.Grid : src.colliderType;
+        t.colliderType = colliderOverride ?? (spriteOverride != null ? Tile.ColliderType.Grid : src.colliderType);
         t.transform = src.transform;
         t.gameObject = src.gameObject;
         // Keep LockColor so the tile's own colour is authoritative and a Tilemap can't wash it out.

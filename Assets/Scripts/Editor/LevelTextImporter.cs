@@ -67,7 +67,8 @@ public static class LevelTextImporter
         { 'g', "Assets/YeniLeveller/Gold New.prefab" },
         { 'C', "Assets/YeniLeveller/Chest.prefab" },
         // mechanics (added for GenLevel3):
-        { 'E', "Assets/Cainos/Pixel Art Platformer - Dungeon/Prefab/Props/PF Dungeon Props - Elevator.prefab" }, // moving platform; tune travel in Inspector
+        // Village elevator (designer's pick 2026-08-07) — reads better than the dungeon one.
+        { 'E', "Assets/Cainos/Pixel Art Platformer - Village Props/Prefab/PF Village Props - Elevator.prefab" }, // moving platform; tune travel in Inspector
         { 'F', "Assets/Prefabs/UpdraftFan.prefab" },        // updraft zone ~3 tall, liftForce 20 (~5-7 tiles of lift)
         { 'w', "Assets/Prefabs/AcidWater.prefab" },         // acid pool ~6 wide; damages + slows
         { 'K', "Assets/Prefabs/WreckingBall.prefab" },      // swinging hazard; placed at cell center, tune anchor
@@ -135,6 +136,16 @@ public static class LevelTextImporter
         new[] { "Ground Extra_153 Deep2", "Ground Extra_185 Deep2", "Ground Extra_101 Deep2", "Ground Extra_49 Deep2" },
         new[] { "Ground Extra_153 Deep3", "Ground Extra_185 Deep3", "Ground Extra_101 Deep3", "Ground Extra_49 Deep3" },
     };
+
+    // Every tile name the importer can paint. TileVariantGenerator uses this to build a
+    // Grid-collision copy of each — see the note on Resolve.
+    public static IEnumerable<string> AllPaintedTileNames()
+    {
+        var seen = new HashSet<string>();
+        foreach (var kv in MaskTiles) if (seen.Add(kv.Value)) yield return kv.Value;
+        foreach (string n in Mask4Tiles) if (seen.Add(n)) yield return n;
+        foreach (string p in PlatformSingleTiles) { string n = ShortNameOf(p); if (seen.Add(n)) yield return n; }
+    }
 
     // "…/TX Tileset - Dungeon Ground Dirt_0.asset" -> "Ground Dirt_0"
     private static string ShortNameOf(string assetPath) =>
@@ -462,7 +473,14 @@ public static class LevelTextImporter
             TileBase cached;
             if (tileByName.TryGetValue(shortName, out cached)) return cached;
             string file = "TX Tileset - Dungeon " + shortName + ".asset";
-            TileBase tb = AssetDatabase.LoadAssetAtPath<TileBase>(TileVariantGenerator.VariantFolder + "/" + file)
+            // ⚠️ PREFER THE " Solid" VARIANT. The pack's tiles use colliderType = Sprite, so
+            // collision traces the sprite's ALPHA OUTLINE — including the little protruding brick
+            // nubs on the wall-face tiles. The player catches on them, and the collision gizmo
+            // shows a bumpy edge instead of a clean wall. The Solid variants are identical art
+            // with colliderType = Grid, which is what a solid cell in a platformer wants.
+            string solid = "TX Tileset - Dungeon " + shortName + " Solid.asset";
+            TileBase tb = AssetDatabase.LoadAssetAtPath<TileBase>(TileVariantGenerator.VariantFolder + "/" + solid)
+                       ?? AssetDatabase.LoadAssetAtPath<TileBase>(TileVariantGenerator.VariantFolder + "/" + file)
                        ?? AssetDatabase.LoadAssetAtPath<TileBase>(TileDir + file)
                        ?? AssetDatabase.LoadAssetAtPath<TileBase>(CainosDir + file);
             tileByName[shortName] = tb;
