@@ -75,6 +75,7 @@ public static class LevelTextImporter
         { 'c', "Assets/Prefabs/CrumblingPlatform.prefab" }, // platform that crumbles underfoot
         { 't', "Assets/Prefabs/Taret.prefab" },             // stationary turret enemy
         { '$', "Assets/YeniLeveller/Shopkeeper_NPC.prefab" }, // shop NPC (its 'missing' scripts are TMP/UI package scripts — fine)
+        { 'B', "Assets/Prefabs/Blompo.prefab" },              // Blompo — card-blessing NPC; a way to SPEND loot, so he counts as loot
         { 'L', "Assets/YeniLeveller/Lever.prefab" },          // lever; importer wires it to the NEAREST gate (On=Open, Off=Close)
     };
 
@@ -96,7 +97,7 @@ public static class LevelTextImporter
     // by hand in the Inspector.
     private static readonly HashSet<char> GroundedMarkers = new HashSet<char>
     {
-        'X', 'm', 'r', 'l', 'M', 'z', 'Z', 's', 'C', '^', 'W', 'T', 'F', 'w', 'c', 't', '$', 'L',
+        'X', 'm', 'r', 'l', 'M', 'z', 'Z', 's', 'C', '^', 'W', 'T', 'F', 'w', 'c', 't', '$', 'B', 'L',
     };
 
     // ---- Tile roles ---------------------------------------------------------------------------
@@ -173,23 +174,36 @@ public static class LevelTextImporter
     //
     // THE RULE THAT MATTERS: one tile per configuration, deterministically. Variety is safe only on
     // ISOLATED tiles (mask 0), which have no neighbours to disagree with — see PlatformSingleTiles.
+    // ⚠️ ONLY CONFIGURATIONS WITH n >= 10 SAMPLES ARE LISTED HERE (trimmed 2026-08-08).
+    //
+    // The table originally kept all 55 measured configurations, including ones decided by a
+    // handful of cells. Those were not measurements, they were coin flips — and the coin flips are
+    // exactly the OUTER-CORNER configurations, because a room has hundreds of buried and wall-face
+    // cells and only a few of any given corner. The visible symptom the designer reported: mask 193
+    // (a wall's bottom-right outer corner) resolved to "Ground Extra_205" on **2 votes out of 8**,
+    // and Extra_205 is a brown interior-looking block, so every wall in every generated room had a
+    // brown nub sticking out of that corner.
+    //
+    // Judge these entries by SAMPLE COUNT, never by winner share. Share is low almost everywhere
+    // (mask 255 has n=1231 and its winner takes only 12%) because the designer deliberately varies
+    // tiles across a mass — that is variety, not uncertainty, and trimming on share would gut the
+    // table. Low n is the only honest signal of "we don't actually know".
+    //
+    // Dropped configurations now fall through to Mask4Tiles, which is hand-written and internally
+    // consistent. Mask 193 collapses to cardinals N+W -> "Ground Extra_114" — corroborated by mask
+    // 195 (the same corner plus one diagonal), which has n=27 and picks Extra_114 seventeen times.
     private static readonly Dictionary<int, string> MaskTiles = new Dictionary<int, string>
     {
-        {1,"Ground Dirt_4"}, {2,"Ground Dirt_14"}, {4,"Ground_11"}, {7,"Ground Extra_49"},
-        {14,"Ground Dirt_11"}, {15,"Ground Extra_156"}, {16,"Ground_11"}, {17,"Ground_11"},
-        {24,"Ground_11"}, {28,"Ground Dirt_13"}, {31,"Ground Extra_156"}, {32,"Ground Dirt_4"},
-        {56,"Ground_1"}, {60,"Ground Extra_148"}, {62,"Ground Dirt_13"}, {63,"Ground Extra_188"},
-        {64,"Ground_11"}, {68,"Ground_11"}, {70,"Ground_11"}, {76,"Ground_11"}, {84,"Ground_11"},
-        {95,"Ground Dirt_11"}, {100,"Ground_11"}, {112,"Ground Dirt_13"}, {120,"Ground Extra_146"},
-        {124,"Ground Extra_162"}, {125,"Ground Extra_144"}, {126,"Ground Extra_162"},
-        {127,"Ground Extra_164"}, {129,"Ground_11"}, {131,"Ground_11"}, {135,"Ground Extra_112"},
-        {143,"Ground Extra_70"}, {159,"Ground Extra_172"}, {191,"Ground_11"},
-        {193,"Ground Extra_205"}, {195,"Ground Extra_114"}, {199,"Ground Extra_96"},
-        {207,"Ground Extra_98"}, {223,"Ground Extra_96"}, {224,"Ground Dirt_11"}, {225,"Ground_11"},
-        {227,"Ground Extra_17"}, {231,"Ground Extra_96"}, {240,"Ground_11"},
-        {241,"Ground Extra_154"}, {243,"Ground Extra_138"}, {245,"Ground Extra_186"},
-        {247,"Ground Extra_98"}, {249,"Ground Extra_170"}, {252,"Ground Extra_162"},
-        {253,"Ground Extra_162"}, {254,"Ground Extra_144"}, {255,"Ground Extra_153"},
+        {14,"Ground Dirt_11"}, {16,"Ground_11"}, {28,"Ground Dirt_13"},
+        {31,"Ground Extra_156"}, {60,"Ground Extra_148"}, {63,"Ground Extra_188"},
+        {68,"Ground_11"}, {95,"Ground Dirt_11"}, {112,"Ground Dirt_13"},
+        {120,"Ground Extra_146"}, {124,"Ground Extra_162"}, {125,"Ground Extra_144"},
+        {126,"Ground Extra_162"}, {127,"Ground Extra_164"}, {135,"Ground Extra_112"},
+        {159,"Ground Extra_172"}, {195,"Ground Extra_114"}, {199,"Ground Extra_96"},
+        {207,"Ground Extra_98"}, {223,"Ground Extra_96"}, {224,"Ground Dirt_11"},
+        {231,"Ground Extra_96"}, {241,"Ground Extra_154"}, {243,"Ground Extra_138"},
+        {245,"Ground Extra_186"}, {247,"Ground Extra_98"}, {249,"Ground Extra_170"},
+        {252,"Ground Extra_162"}, {253,"Ground Extra_162"}, {255,"Ground Extra_153"},
     };
 
     // Fallback when an 8-bit configuration wasn't seen in the hand-made rooms: collapse to the four
@@ -653,20 +667,16 @@ public static class LevelTextImporter
                         // slightly cool so a mass reads as receding shadow instead of another lit
                         // surface — and the brick detail stays faintly legible rather than going
                         // to flat black.
-                        // ⚠️ THE RECESSION CONTOUR MUST BE JITTERED. DepthFromAir is a Chebyshev
-                        // distance, so its iso-lines are PERFECT RECTANGLES: every step of darkening
-                        // lands on an axis-aligned box, and the core of a mass reads as a black
-                        // rectangle pasted onto the rock — the corners worst of all, because a
-                        // right-angle is the one shape stone never makes. Nudging the threshold by a
-                        // hashed -1/0/+1 per cell makes each boundary wander a tile and the mass
-                        // recede in irregular patches instead. The hash is seeded differently from
-                        // the tile pick below so the two don't correlate into a visible pattern.
-                        int depth = DepthFromAir(col, row, 6, IsSolid);
-                        int jitter = Mathf.Abs((col * 40503131) ^ (cellY * 65599173)) % 3 - 1;
-                        int recess = depth + jitter;
-                        if (recess >= 3)
+                        // ⚠️ DO NOT JITTER THIS THRESHOLD. A hashed -1/0/+1 nudge was added on
+                        // 2026-08-08 to break up the Chebyshev metric's rectangular contours, and
+                        // the designer rejected it — the interiors read better with the hard step.
+                        // It also let a +1 push DEEP tiles out to depth 2, one cell from the face,
+                        // which is exactly the dark block sticking out of a wall edge that the
+                        // change was supposed to help. Deep fill starts at a hard depth of 3.
+                        int depth = DepthFromAir(col, row, 5, IsSolid);
+                        if (depth >= 3)
                         {
-                            string[] step = DeepFillTiles[Mathf.Min(recess - 3, DeepFillTiles.Length - 1)];
+                            string[] step = DeepFillTiles[Mathf.Min(depth - 3, DeepFillTiles.Length - 1)];
                             TileBase deep = Resolve(step[Mathf.Abs((col * 73856093) ^ (cellY * 19349663)) % step.Length]);
                             if (deep != null)
                             {

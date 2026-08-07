@@ -22,17 +22,19 @@
 //   7-tile gap is inside the ~12-tile flat reach, so the pit is jumpable without them. Step
 //   on one and linger and you are in the acid.
 //
-// LOOT (Elite payout - 6 chests, 7 shift crystals, 16 gold, roughly double a Fight room).
-//   None of it is on the walking line. Every piece is priced by what reaching it costs:
+// LOOT - 3 chests, 7 shift crystals, 10 gold, plus BLOMPO and a SHOPKEEPER.
+//   ⚠️ NPCs ARE LOOT (designer 2026-08-08). A Blompo or a shop is a place to SPEND what you
+//   picked up, so it pays the room out just as a chest does - and it pays better, because it
+//   converts gold you are carrying into something you keep. Chests are the expensive way to
+//   reward a room; a pile of them reads as filler. Three is the ceiling here.
+//   Every piece is priced by what reaching it costs:
 //     free-ish   gold along the sink floor and the gallery
-//     one jump   the two high pockets over the gallery, the east-climb ledges
-//     a detour   the island top - you can only DROP onto it from the gallery, so the chest
-//                there is paid for with the rise-4 climb back out
-//     a risk     gold sitting in the spike trench, which you have to go down into
-//     the vault  two chests, gold and a crystal behind the lever-gate, four jumps off the line
-//   ⚠️ A platform that cannot be entered from below is only good level design if there is
-//   something on it worth claiming (designer 2026-08-08) - otherwise it is a wall that looks
-//   like a route. That is why the island top and both high pockets carry loot.
+//     one jump   the high pocket chest over the gallery, the east-climb gold
+//     a detour   BLOMPO stands on the island top, which you can only DROP onto from the
+//                gallery - the rise-4 climb back out is his price
+//     the climb  the SHOPKEEPER sits at the top of the east wall, five ledges up
+//     a risk     gold down in the spike trench
+//     the vault  a chest, gold and a crystal behind the lever-gate, four jumps off the line
 //
 // ENEMIES (Elite roster - heavier than Fight, and layered up the climb so the room fights
 //   you at every height): Rotbrute + shambler + slimes in the sink, a bat over the acid so
@@ -62,14 +64,14 @@
 ##...............................................#############
 ##...............................................#############
 ##....+.g........................................#############
-##..######...............g.+...............C.g...#############
+##..######.................+...............C.....#############
 ##.......................#####.............#####.#############
 ##..........................................................##
-##..g......X.+..........l.....m..........M...Cg+............##
+##..g......X.+..........l.....m..........M...C.+............##
 ###############.......###########.......#########...........##
-#############........................................C..g...##
+#############........................................$......##
 #############.....................................############
-#############...............z..C..g...+.....................##
+#############...............z..B..g...+.....................##
 #############...........#################...................##
 #############...........#################....s..+...........##
 #############...........#################..#######..........##
@@ -78,7 +80,7 @@
 #############..........G.......##########..............r..g.##
 #############..........G.......##########...........##########
 #############..........G.......##########...................##
-#############.......g..GCg.C.+.##########...................##
+#############..........G.g.C.+.##########...................##
 #############.....#######################...g.l.............##
 #############...........#################..#######..........##
 ##..........................................................##
@@ -86,7 +88,7 @@
 ##.........#######..........................................##
 ##.................................b................##########
 ##..................................................##########
-##..S.................g..z.l...T.T.T..g.Z..l.g..m...##########
+##..S.................g..z.l...T.T.T....Z..l.g..m...##########
 ###############.....##########.......#########################
 ###############.^^^g##########...w...#########################
 ##############################################################
