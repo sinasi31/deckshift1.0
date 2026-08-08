@@ -3,15 +3,16 @@ using UnityEngine;
 
 public class Chest : MonoBehaviour, IInteractable
 {
-    [Header("Relic Pools")]
-    [Tooltip("OPTIONAL. Leave empty (the normal case) and the chest draws from every relic in the " +
-             "project via RelicPool, minus the ones the player already owns. Fill a tier in only to " +
-             "restrict THIS chest to a curated set — a hand-maintained list is how the pools fell " +
-             "13 relics behind the roster in the first place.")]
-    [SerializeField] private List<RelicData> commonRewards = new List<RelicData>();
-    [SerializeField] private List<RelicData> rareRewards = new List<RelicData>();
-    [SerializeField] private List<RelicData> epicRewards = new List<RelicData>();
-    [SerializeField] private List<RelicData> legendaryRewards = new List<RelicData>();
+    // ⚠️ THE PER-TIER RELIC LISTS ARE GONE ON PURPOSE (2026-08-08). Chest.prefab carried 5 relics
+    // across four tiers, and a chest could only ever hand out those five. That is what made the
+    // shop/chest roster fall 13 relics behind, and once the player owned enough of the five the
+    // chest had NOTHING left to offer — the swap screen never appeared and the chest silently paid
+    // a consolation instead. Keeping them as an optional "curated override" did not help: they were
+    // populated, so the override was always on.
+    //
+    // A chest now draws from the whole roster via RelicPool. If per-chest curation is ever wanted,
+    // add ONE list (not one per tier — a per-tier list also breaks the rarity fallback, since
+    // stepping to another tier searches the same single-tier list and finds nothing).
 
     // Only reachable if the player somehow owns every relic the chest could offer (18 relics vs
     // 5 slots makes that impossible today, but a pool can always run dry).
@@ -123,24 +124,12 @@ public class Chest : MonoBehaviour, IInteractable
         // handing back a relic you are already wearing is a dead reward, and the room's cost was
         // paid for nothing. Because ownership is read here, at open time, selling a relic puts it
         // back in circulation automatically.
-        List<RelicData> restrictTo = CuratedPoolFor(rolled);
-        RelicData relic = RelicPool.PickOfferable(rolled, restrictTo);
+        RelicData relic = RelicPool.PickOfferable(rolled);
 
         if (relic == null)
-            Debug.LogWarning($"[Chest] '{name}': no un-owned relic available to grant " +
-                             "(player owns everything this chest can offer).");
+            Debug.LogWarning($"[Chest] '{name}': no un-owned relic available to grant — " +
+                             "the player owns every relic in the project.");
         return relic;
-    }
-
-    // A chest normally draws from the whole roster; a tier list is only consulted when someone has
-    // deliberately curated THIS chest. Empty lists mean "no restriction", not "no relics".
-    private List<RelicData> CuratedPoolFor(Rarity rarity)
-    {
-        List<RelicData> curated =
-            rarity == Rarity.Legendary ? legendaryRewards :
-            rarity == Rarity.Epic ? epicRewards :
-            rarity == Rarity.Rare ? rareRewards : commonRewards;
-        return (curated != null && curated.Count > 0) ? curated : null;
     }
 
     private void OnTriggerEnter2D(Collider2D other)
