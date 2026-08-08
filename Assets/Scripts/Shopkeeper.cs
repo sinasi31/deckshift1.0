@@ -45,30 +45,25 @@ public class Shopkeeper : MonoBehaviour
 
     private void GenerateShopContent()
     {
-        if ((specificCardPool == null || specificCardPool.Count == 0) && ShopManager.instance != null)
-            specificCardPool = ShopManager.instance.allCardsPool;
-
+        // NOTE: ShopManager.allCardsPool is deliberately NOT consulted any more — it held 10 of the
+        // project's 15 cards, the same hand-maintained drift that hid relics. `specificCardPool`
+        // survives as a genuine per-shop restriction; empty means the whole roster.
+        //
         // NOTE: ShopManager.allRelicsPool is deliberately NOT consulted any more. It was a
         // hand-maintained list holding 3 of the project's 18 relics, and copying it into
         // specificRelicPool is exactly what capped the shop's stock. Relics now come from
         // RelicPool (see below), which derives from the assets themselves.
 
-        // Cards — up to 5 DISTINCT offers (draw without replacement so no duplicates show).
-        if (specificCardPool != null)
+        // Cards — up to 5 DISTINCT offers, drawn from every card in the project (CardPool /
+        // CardCatalogue). Stagger is excluded there: it is the fail-state card, and selling the
+        // player a way to lose is not a shop.
+        foreach (CardData card in CardPool.DrawDistinct(5, specificCardPool))
         {
-            List<CardData> pool = new List<CardData>(specificCardPool);
-            int n = Mathf.Min(5, pool.Count);
-            for (int i = 0; i < n; i++)
+            myInventory.Add(new ShopSlotData
             {
-                int idx = Random.Range(0, pool.Count);
-                CardData card = pool[idx];
-                pool.RemoveAt(idx);
-                myInventory.Add(new ShopSlotData
-                {
-                    itemType = ShopItemType.Card, cardReference = card, itemName = card.cardName,
-                    price = Random.Range(40, 70), isSold = false
-                });
-            }
+                itemType = ShopItemType.Card, cardReference = card, itemName = card.cardName,
+                price = Random.Range(40, 70), isSold = false
+            });
         }
 
         // Relics — up to 3 DISTINCT offers, drawn from EVERY relic in the project (RelicPool /

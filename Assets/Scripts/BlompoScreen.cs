@@ -567,7 +567,13 @@ public class BlompoScreen : MonoBehaviour
         glow.rectTransform.sizeDelta = new Vector2(150f, 150f);
 
         // The sigil: an inscribed arcane mark where the gem used to sit.
-        Image star = AddImage(rt, "Sigil", FlatUI.ArcaneSigil(), gem, false);
+        //
+        // ⚠️ A DIFFERENT GLYPH PER RARITY, not one shared mark recoloured. Every offer used the
+        // same sigil, so colour was carrying the tier alone — and the designer reported being
+        // unable to tell the tiers apart at a glance (2026-08-09). Shape is read faster than hue,
+        // and it survives greyscale and colour-blindness: bare ring (Common) -> 4 rays (Rare) ->
+        // 6 rays + inner ring (Epic) -> the full ornate sigil (Legendary).
+        Image star = AddImage(rt, "Sigil", FlatUI.RaritySigil(CardEnhancements.RarityOf(e)), gem, false);
         star.rectTransform.anchorMin = star.rectTransform.anchorMax = new Vector2(0.5f, 1f);
         star.rectTransform.anchoredPosition = new Vector2(0f, -112f);
         star.rectTransform.sizeDelta = new Vector2(112f, 112f);

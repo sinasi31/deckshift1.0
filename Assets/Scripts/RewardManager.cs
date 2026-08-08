@@ -61,7 +61,13 @@ public class RewardManager : MonoBehaviour
         offeredCards.Clear();
         bonusCardIndex = -1;
 
-        List<CardData> cardPool = AchievementManager.instance.GetAvailableCardPool();
+        // ⚠️ Was AchievementManager.GetAvailableCardPool(), which returned only the cards listed in
+        // `defaultUnlockedCards` plus the reward cards of COMPLETED challenges. With one challenge
+        // authored, DeadWeight / FreefallBlade / GlassParry could never be offered by anything —
+        // they existed and were simply not in the game, with nothing to indicate it. Achievement
+        // gating on cards is removed (designer 2026-08-09); AchievementManager still tracks and
+        // saves challenges, it just no longer decides what exists.
+        List<CardData> cardPool = CardPool.Offerable();
         GameManager.instance.SetGameState(GameState.Paused);
 
         // 3 Kart Se�

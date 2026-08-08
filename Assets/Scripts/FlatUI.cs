@@ -27,6 +27,7 @@ public static class FlatUI
     private static Sprite plateLarge, plateSmall, outlineLarge, outlineSmall;
     private static Sprite softGlow, verticalFade, bottomGlow, fadedRule, rivet, pixel;
     private static Sprite emberDot, fourPointStar, arcaneSigil, arcaneSeal;
+    private static Sprite[] raritySigils;   // one glyph per Rarity — see RaritySigil
 
     // Solid chamfered plate. chamfer 10 = windows, 5 = cards and buttons.
     public static Sprite Panel(int chamfer = 10)
@@ -557,16 +558,88 @@ public static class FlatUI
     // Rarity colours tuned to read on a DARK surface. The old chrome carried rarity on a gem set
     // in gold; without that frame the colour has to stand on its own, so these are brighter and
     // more separated than jewel tones would be.
+    // ⚠️ RARITY MUST SEPARATE ON MORE THAN HUE (reworked 2026-08-09). The previous set was amber /
+    // violet / azure / cool-slate, and the designer could not tell the tiers apart at a glance. The
+    // reason: three of the four sat in the blue-violet quadrant, and all four had near-identical
+    // LUMINANCE, so the only cue was a hue step of ~40° — which is invisible on a small sigil over a
+    // dark panel, and gone entirely for a red-green colour-blind player.
+    //
+    // This set separates on THREE channels at once, so any one of them is enough to read it:
+    //   HUE        neutral -> green -> violet -> amber   (spread right around the wheel, not
+    //              clustered; green is the biggest possible jump away from violet and amber)
+    //   LUMINANCE  0.42 -> 0.56 -> 0.66 -> 0.82, strictly ascending, so the tiers are still ordered
+    //              in greyscale and a better blessing is literally brighter
+    //   SATURATION near-zero for Common, climbing with rarity, so Common reads as "no colour at all"
+    //
+    // Common stays the DIMMEST — it was already established that a bright Common makes the weakest
+    // offer the loudest thing on screen.
     public static Color RarityColor(Rarity r)
     {
         switch (r)
         {
-            case Rarity.Legendary: return new Color(0.980f, 0.757f, 0.361f, 1f);   // amber
-            case Rarity.Epic: return new Color(0.729f, 0.529f, 0.961f, 1f);        // violet
-            case Rarity.Rare: return new Color(0.416f, 0.702f, 0.980f, 1f);        // azure
-            // Common is muted on purpose. At a lighter slate it rendered near-white, and since the
-            // sigil is large that made the WEAKEST offer the brightest thing on the screen.
-            default: return new Color(0.510f, 0.549f, 0.635f, 1f);                 // cool slate
+            case Rarity.Legendary: return new Color(1.000f, 0.780f, 0.290f, 1f);   // amber, brightest
+            case Rarity.Epic: return new Color(0.760f, 0.420f, 1.000f, 1f);        // violet, pushed off blue
+            case Rarity.Rare: return new Color(0.290f, 0.850f, 0.520f, 1f);        // green — far from both
+            default: return new Color(0.470f, 0.490f, 0.520f, 1f);                 // neutral grey, dim
         }
+    }
+
+    // A DIFFERENT GLYPH PER RARITY, so the tier is readable without relying on colour at all.
+    //
+    // Shape is the strongest at-a-glance signal there is: the eye counts points long before it
+    // judges a hue, and unlike colour it survives greyscale, colour-blindness, and a 40px icon.
+    // The progression is deliberately "more elaborate = rarer", which needs no legend to read:
+    //
+    //   Common     a bare ring — plainly nothing special
+    //   Rare       ring + four axial rays (a compass mark)
+    //   Epic       ring + six rays + a second inner ring
+    //   Legendary  double ring + eight rays of two lengths + outer ticks (the full ArcaneSigil)
+    //
+    // Legendary deliberately reuses the existing ArcaneSigil so the most ornate mark is the one
+    // already established as "the arcane emblem", and the lesser tiers read as reduced versions of
+    // it rather than as unrelated symbols.
+    public static Sprite RaritySigil(Rarity r)
+    {
+        if (r == Rarity.Legendary) return ArcaneSigil();
+
+        int idx = (int)r;
+        if (raritySigils == null) raritySigils = new Sprite[4];
+        if (raritySigils[idx] != null) return raritySigils[idx];
+
+        const int S = 192;
+        Texture2D tex = NewTex(S);
+        float c = (S - 1) * 0.5f;
+
+        // rays: 0 = none, 4 = cardinals, 6 = six-fold
+        int rays = r == Rarity.Epic ? 6 : (r == Rarity.Rare ? 4 : 0);
+        bool innerRing = r == Rarity.Epic;
+
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+            {
+                float dx = (x - c) / c, dy = (y - c) / c;
+                float d = Mathf.Sqrt(dx * dx + dy * dy);
+                if (d > 1f) { tex.SetPixel(x, y, Clear); continue; }
+                float ang = Mathf.Atan2(dy, dx);
+
+                float ring = Mathf.Clamp01(1f - Mathf.Abs(d - 0.70f) / 0.030f);
+                float inner = innerRing ? Mathf.Clamp01(1f - Mathf.Abs(d - 0.40f) / 0.026f) : 0f;
+
+                float ray = 0f;
+                if (rays > 0)
+                {
+                    // cos(n/2 * ang) gives n lobes; the high power sharpens them into rays.
+                    float lobe = Mathf.Abs(Mathf.Cos(rays * 0.5f * ang));
+                    ray = Mathf.Pow(lobe, 30f) * Falloff(d, 0.66f);
+                }
+
+                float core = Mathf.Pow(Mathf.Clamp01(1f - d * 8f), 2f);
+
+                float a = Mathf.Clamp01(ring * 0.9f + inner * 0.75f + ray + core * 0.8f);
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+            }
+        tex.Apply();
+        raritySigils[idx] = Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), 100f);
+        return raritySigils[idx];
     }
 }

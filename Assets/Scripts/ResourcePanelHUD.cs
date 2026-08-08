@@ -178,11 +178,18 @@ public class ResourcePanelHUD : MonoBehaviour
 
         // Span the row from the panel's own origin so coordinates inside GoldDisplay match the
         // other two rows exactly — the coin can then use the same iconCenterX as the other icons.
-        float h = barGeometry.height;
+        //
+        // ⚠️ The row is now exactly one HudChip, because gold and scrap must read as the same kind
+        // of readout (designer 2026-08-09: "they should not look too different from each other").
+        // Health and Shift stay BARS — they have a maximum and a fill is the honest shape for that.
+        // Gold and scrap are unbounded counts, so both are plates with a number.
+        float h = HudChip.Height;
         rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);
         rt.pivot = new Vector2(0f, 1f);
-        rt.sizeDelta = new Vector2(barX + 200f, h);
+        rt.sizeDelta = new Vector2(HudChip.Width, h);
         rt.anchoredPosition = new Vector2(0f, -goldRowY);
+
+        HudChip.Build(rt);
 
         // Search children only — a stray Image on GoldDisplay itself would otherwise be mistaken
         // for the coin and the real icon would never move.
