@@ -213,6 +213,82 @@ public static class ProcSfx
         return Finalize(dry, 0.07f, 9000f);   // dry and bright — metal, close-miked
     }
 
+    private static AudioClip meteorImpact;
+
+    // Meteor Greaves landing. A heavy stone impact, and deliberately a THIRD sound family from the
+    // two already here: magic is harmonic (bell partials), metal is inharmonic-but-pitched (bar
+    // modes), and this is barely pitched at all — mostly noise and sub. Stone shatters; it does not
+    // ring. Keeping the families distinct is what stops a boulder landing and a scrap pickup
+    // reading as the same event.
+    public static AudioClip MeteorImpact
+    {
+        get { if (meteorImpact == null) meteorImpact = BuildMeteorImpact(); return meteorImpact; }
+    }
+
+    // Four layers, because a big impact is a sequence and not a single hit:
+    //   CRACK   ~8 ms of bright noise — the fracture. Without this the hit has no attack and
+    //           reads as distant rather than underfoot.
+    //   SUB     a sine swept 110 -> 34 Hz. The downward sweep is what makes it feel like MASS
+    //           arriving; a static low sine just sounds like a hum.
+    //   BODY    three inharmonic low partials for the stone slab itself.
+    //   DEBRIS  band-passed noise with a slow decay and a little flutter — rubble settling after,
+    //           which is what sells the scale and stops the sound ending abruptly.
+    private static AudioClip BuildMeteorImpact()
+    {
+        const float dur = 1.15f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(90210);
+
+        // Body: inharmonic, low, and fast-decaying — a struck slab, not a bell.
+        float b0 = 132f;
+        float[] ratio = { 1f, 1.71f, 2.43f };
+        float[] pAmp = { 1f, 0.42f, 0.20f };
+        float[] pDec = { 11f, 17f, 26f };
+
+        float crackLp = 0f;
+        float crackCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 7000f / SampleRate);
+
+        // Two one-pole stages in series make a crude band-pass for the debris.
+        float debLp = 0f, debHp = 0f;
+        float debLpCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 1800f / SampleRate);
+        float debHpCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 260f / SampleRate);
+
+        float subPhase = 0f;
+
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+
+            // CRACK
+            crackLp += crackCoef * (noise - crackLp);
+            float crack = crackLp * Mathf.Exp(-320f * ts);
+
+            // SUB — sweep the frequency, integrating phase so there are no discontinuities.
+            float subF = Mathf.Lerp(110f, 34f, Mathf.Clamp01(ts / 0.30f));
+            subPhase += 2f * Mathf.PI * subF / SampleRate;
+            float sub = Mathf.Sin(subPhase) * Mathf.Exp(-5.5f * ts);
+
+            // BODY
+            float body = 0f;
+            for (int p = 0; p < ratio.Length; p++)
+                body += Mathf.Sin(2f * Mathf.PI * b0 * ratio[p] * ts) * pAmp[p] * Mathf.Exp(-pDec[p] * ts);
+
+            // DEBRIS — rubble skittering, gated so it starts just after the hit.
+            debLp += debLpCoef * (noise - debLp);
+            debHp += debHpCoef * (debLp - debHp);
+            float band = debLp - debHp;
+            float flutter = 0.75f + 0.25f * Mathf.Sin(2f * Mathf.PI * 27f * ts);
+            float debrisEnv = Mathf.Exp(-4.2f * ts) * Mathf.Clamp01(ts / 0.02f);
+            float debris = band * debrisEnv * flutter;
+
+            dry[i] = crack * 0.30f + sub * 0.52f + body * 0.16f + debris * 0.22f;
+        }
+
+        return Finalize(dry, 0.26f, 5200f);   // wet and dark — a big room, heard from inside it
+    }
+
     private static AudioClip arcaneGather, arcaneBind;
 
     // Blompo's blessing, part one: power gathering. A rising shimmer under the ring-and-motes

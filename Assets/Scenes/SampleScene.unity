@@ -3117,7 +3117,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fa14f4e81b467824fbbd79d045afe1ad, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxOffset: 3
+  maxOffset: 9
   lerpDuration: 0.2
   peekKey: 306
 --- !u!1 &520049766

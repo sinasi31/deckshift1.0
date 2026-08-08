@@ -13,6 +13,10 @@ public class Chest : MonoBehaviour, IInteractable
     [SerializeField] private List<RelicData> epicRewards = new List<RelicData>();
     [SerializeField] private List<RelicData> legendaryRewards = new List<RelicData>();
 
+    // Only reachable if the player somehow owns every relic the chest could offer (18 relics vs
+    // 5 slots makes that impossible today, but a pool can always run dry).
+    private const int FallbackGold = 50;
+
     [Header("Interaction")]
     [SerializeField] private string animatorBoolParam = "IsOpened"; // Confirmed: AC Chest 01.controller m_Type:4 (Bool)
     [SerializeField] private AudioClip openSound;
@@ -50,18 +54,49 @@ public class Chest : MonoBehaviour, IInteractable
         }
 
         RelicData relic = PickRandomRelic();
+
+        // ⚠️ A CHEST IS NEVER EMPTY. Once the loadout was full every chest became a swap offer the
+        // player usually refused, so chests stopped being worth opening for the rest of the run.
+        // A chest is treasure; if the relic cannot be carried, the player pockets what it is WORTH
+        // instead. Using the relic's own sell value keeps the payout scaled to the rarity that was
+        // rolled, so a Legendary chest still feels like a Legendary chest.
+        if (relic != null && RelicManager.instance != null)
+        {
+            int consolation = RelicManager.instance.SellValueFor(relic);
+            RelicManager.instance.TryGrantRelic(
+                relic,
+                onAcquired: null,
+                onDeclined: () => PayConsolation(consolation));
+        }
+        else if (relic != null)
+        {
+            Debug.LogWarning($"[Chest] '{name}': RelicManager.instance is null, relic grant skipped.");
+        }
+        else
+        {
+            // No relic could be offered at all (the player owns everything this chest can give).
+            PayConsolation(FallbackGold);
+        }
+
         if (relic != null)
         {
-            if (RelicManager.instance != null)
-                RelicManager.instance.TryGrantRelic(relic);   // full loadout -> Swap Screen
-            else
-                Debug.LogWarning($"[Chest] '{name}': RelicManager.instance is null, relic grant skipped.");
-
             // Reward burst, colour-coded to the relic's rarity, spawned above the lid.
             GameObject fxGO = new GameObject("ChestOpenVFX");
             fxGO.transform.position = transform.position + Vector3.up * openVfxHeight;
             fxGO.AddComponent<ChestOpenVFX>().Play(relic.rarity, relic.relicArt);
         }
+    }
+
+    // Paid when the relic can't be taken. Goes straight to the wallet rather than spawning pickups:
+    // the chest may well have been opened from a menu (the swap screen), so there is no guarantee
+    // the player is still standing next to it to collect anything.
+    private void PayConsolation(int gold)
+    {
+        if (gold <= 0) return;
+        PlayerController pc = GameManager.instance != null && GameManager.instance.player != null
+                            ? GameManager.instance.player.GetComponent<PlayerController>()
+                            : FindFirstObjectByType<PlayerController>();
+        if (pc != null) pc.AddGold(gold);
     }
 
     public string GetInteractText()

@@ -189,9 +189,18 @@ public class RelicManager : MonoBehaviour
     //               onAcquired, LEAVE runs nothing. onAcquired is where the caller finalizes side
     //               effects (e.g. the shop charges gold only when the relic is actually taken), so
     //               a declined full-slot grant costs nothing.
-    public void TryGrantRelic(RelicData relic, System.Action onAcquired = null)
+    // onDeclined fires only when the player refuses a full-slot swap. Sources that must always pay
+    // out something (chests) use it to hand over a consolation; sources where declining should cost
+    // nothing and give nothing (the shop) leave it null.
+    public void TryGrantRelic(RelicData relic, System.Action onAcquired = null, System.Action onDeclined = null)
     {
-        if (relic == null || ownedRelics.Contains(relic)) return;
+        if (relic == null || ownedRelics.Contains(relic))
+        {
+            // Nothing to grant. Treat it as a decline so the caller can still pay out — otherwise
+            // the reward evaporates silently.
+            onDeclined?.Invoke();
+            return;
+        }
 
         if (!IsFull)
         {
@@ -200,7 +209,7 @@ public class RelicManager : MonoBehaviour
         }
         else
         {
-            RelicSwapScreen.Open(relic, onAcquired);
+            RelicSwapScreen.Open(relic, onAcquired, onDeclined);
         }
     }
 

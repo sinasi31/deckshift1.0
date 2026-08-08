@@ -240,14 +240,25 @@ public class PlayerController : MonoBehaviour
     public float parryRiposteRange = 2.5f;    // shard burst radius on a successful Glass Parry
 
     [Header("Meteor Greaves (relic)")]
-    [Tooltip("Minimum fall (world units, apex→landing) before the landing shockwave triggers.")]
-    public float meteorMinFall = 4f;
+    // ⚠️ THIS MUST STAY ABOVE THE JUMP APEX. A max-height jump rises ~4.9 units (measured, see
+    // LevelValidator), so at the old 4.0 the shockwave fired on EVERY full jump — the relic was
+    // free, constant, and stopped being a decision. 6.5 clears the apex with margin, so it takes a
+    // real DROP (a ledge, a shaft) to trigger, which is what the item is about.
+    [Tooltip("Minimum fall (world units, apex→landing) before the landing shockwave triggers. " +
+             "Keep ABOVE the ~4.9-unit jump apex or it procs on every jump.")]
+    public float meteorMinFall = 6.5f;
     [Tooltip("Fall height at which the shockwave's size/damage max out.")]
     public float meteorMaxFall = 14f;
+    [Tooltip("Seconds before it can trigger again — stops a repeated hop off the same ledge from " +
+             "chaining shockwaves into a stun-lock.")]
+    public float meteorCooldown = 1.5f;
     public float meteorMinRadius = 2.5f;
     public float meteorMaxRadius = 5.5f;
     public float meteorMinDamage = 12f;
     public float meteorMaxDamage = 55f;
+    [Tooltip("Impact volume at the biggest fall. Scales down with drop height.")]
+    [Range(0f, 2f)] public float meteorSfxVolume = 1.0f;
+    private float meteorReadyAt;   // Time.time before which the greaves stay quiet
 
     // Fall tracking for Meteor Greaves: record the highest point reached while airborne,
     // so the landing knows how far the player dropped. Reset on teleports (respawn / room
@@ -853,6 +864,8 @@ public class PlayerController : MonoBehaviour
     {
         if (RelicManager.instance == null || !RelicManager.instance.HasRelic("MeteorGreaves")) return;
         if (fallDist < meteorMinFall) return;
+        if (Time.time < meteorReadyAt) return;
+        meteorReadyAt = Time.time + meteorCooldown;
 
         float denom = Mathf.Max(0.01f, meteorMaxFall - meteorMinFall);
         float power01 = Mathf.Clamp01((fallDist - meteorMinFall) / denom);
@@ -871,6 +884,11 @@ public class PlayerController : MonoBehaviour
         MeteorGreavesVFX.Play(transform.position, radius, power01);
         if (CameraShake.instance != null)
             CameraShake.instance.Shake(Mathf.Lerp(0.12f, 0.4f, power01), Mathf.Lerp(0.25f, 0.6f, power01));
+
+        // Impact sound, louder the further you fell. 2D one-shot rather than positional: the player
+        // IS the listener here, and a landing this heavy should hit at full weight every time.
+        if (audioSource != null)
+            SfxManager.PlayOn(audioSource, ProcSfx.MeteorImpact, Mathf.Lerp(0.55f, 1f, power01) * meteorSfxVolume);
     }
 
     public bool IsGroundedCheck()
