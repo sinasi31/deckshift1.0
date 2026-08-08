@@ -108,6 +108,17 @@ public static class TileVariantGenerator
     // enough to tile visibly.
     private const float DetailRetention = 0.16f;
 
+    // True when the tile's art is larger than the 1x1 cell it sits in — i.e. it is one of the
+    // pack's whole-platform pieces rather than a block. Such a tile must keep Sprite collision.
+    public static bool IsOversized(Tile tile)
+    {
+        if (tile == null || tile.sprite == null) return false;
+        Sprite s = tile.sprite;
+        float w = s.rect.width / s.pixelsPerUnit;
+        float h = s.rect.height / s.pixelsPerUnit;
+        return w > 1.01f || h > 1.01f;
+    }
+
     private static Sprite FlattenSprite(Sprite src, string outName)
     {
         string outPath = FlatTextureFolder + "/" + outName + ".png";
@@ -202,21 +213,45 @@ public static class TileVariantGenerator
 
         foreach (string src in PlatformSources) if (!MakeVariant(src, "Lit", PlatformTint, ref made)) missing.Add(src);
 
-        // Grid-collision copies of every tile the importer paints.
+        // Grid-collision copies — FOR CELL-SIZED TILES ONLY.
         //
         // The pack's tiles use colliderType = Sprite, so collision traces the sprite's ALPHA
         // OUTLINE — the wall-face tiles have small protruding brick nubs, and the player catches
-        // on them. These are the same art with Grid collision, which is what a solid cell in a
-        // platformer wants: a clean cell edge.
-        int solids = 0;
+        // on them. A Grid-collision copy is what a solid cell in a platformer wants: a clean edge.
+        //
+        // ⚠️ BUT TEN OF THESE TILES ARE BIGGER THAN THEIR CELL, AND GRID COLLISION MUTILATES THEM.
+        // The Cainos ground palette is not a set of 1x1 blocks — it is a set of whole pre-drawn
+        // PLATFORMS: Ground_11 is 3x1 units, Ground Dirt_0 and Ground_0 are 3x3, Ground_1 is 2x2,
+        // and so on, each centred on its cell. Grid collision is exactly one cell, so forcing it
+        // onto a 3x1 platform strip keeps DRAWING the outer two thirds while deleting their
+        // collision — the player sees platform, steps on it, and falls straight through. That is
+        // precisely the "the edges of the mid-air platforms have no colliders" bug (2026-08-08),
+        // and it was introduced by the nub fix applying Grid to everything.
+        //
+        // The hand-made rooms use Sprite collision throughout, which is why their platforms have
+        // always felt right: what is drawn is what is solid. So oversized tiles are SKIPPED here
+        // and keep their native Sprite collision, while cell-sized tiles still get the nub fix.
+        // Visual and collision then agree for both kinds.
+        int solids = 0, skippedOversize = 0;
         foreach (string shortName in LevelTextImporter.AllPaintedTileNames())
         {
             string file = "TX Tileset - Dungeon " + shortName + ".asset";
             string path = File.Exists(TileDirAbs + file) ? TileDir + file : CainosDir + file;
-            if (AssetDatabase.LoadAssetAtPath<Tile>(path) == null) continue;
+            Tile src = AssetDatabase.LoadAssetAtPath<Tile>(path);
+            if (src == null) continue;
+
+            if (IsOversized(src))
+            {
+                // Any stale Solid copy from before this rule must go, or Resolve keeps preferring it.
+                string stale = VariantFolder + "/TX Tileset - Dungeon " + shortName + " Solid.asset";
+                if (AssetDatabase.LoadAssetAtPath<Tile>(stale) != null) AssetDatabase.DeleteAsset(stale);
+                skippedOversize++;
+                continue;
+            }
             if (MakeVariant(path, "Solid", Color.white, ref made, null, Tile.ColliderType.Grid)) solids++;
         }
-        Debug.Log("[TileVariantGenerator] Grid-collision copies: " + solids);
+        Debug.Log("[TileVariantGenerator] Grid-collision copies: " + solids
+                  + "   (skipped " + skippedOversize + " oversized tiles — they keep Sprite collision)");
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
