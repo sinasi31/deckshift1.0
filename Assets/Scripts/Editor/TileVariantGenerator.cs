@@ -240,6 +240,24 @@ public static class TileVariantGenerator
             Tile src = AssetDatabase.LoadAssetAtPath<Tile>(path);
             if (src == null) continue;
 
+            // ⚠️ NEVER GIVE GRID COLLISION TO A SPRITE-LESS TILE. Several tiles in this pack have a
+            // null sprite (Ground_13, Ground Dirt_31, Ground_25, Ground Dirt_15 — indices past the
+            // end of the sheet), and the DESIGNER USES THEM DELIBERATELY AS AN ERASER: painting one
+            // is quicker than switching to the erase tool, and because their colliderType is Sprite
+            // there is no outline to trace, so they draw nothing and collide with nothing.
+            //
+            // That safety rests entirely on them never getting Grid collision. A Grid copy of a
+            // sprite-less tile is a full-cell collider that renders NOTHING — an invisible wall
+            // everywhere the designer "erased". This is not hypothetical: Ground_13 was in the mask
+            // table until 2026-08-08 and produced exactly that in generated rooms.
+            if (src.sprite == null)
+            {
+                Debug.LogWarning($"[TileVariantGenerator] '{src.name}' has a null sprite — skipping its " +
+                                 "Grid-collision copy. Sprite-less tiles are used as erasers; a Grid " +
+                                 "variant would turn every erased cell into an invisible wall.");
+                continue;
+            }
+
             if (IsOversized(src))
             {
                 // Any stale Solid copy from before this rule must go, or Resolve keeps preferring it.
