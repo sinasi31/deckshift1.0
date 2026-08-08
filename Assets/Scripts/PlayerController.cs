@@ -270,13 +270,27 @@ public class PlayerController : MonoBehaviour
     public float interactionRange = 2f;
     public LayerMask interactableLayer;
 
+    // --- Stagger: buy Shift with blood --------------------------------------------------------
+    // Stagger is no longer a three-strikes death sentence. It is the pump of last resort: it hands
+    // back a little Shift and charges HP for it, and the price goes UP every single time, for the
+    // whole run. There is no cap and no reset — the run ends when you can no longer afford the next
+    // one. That escalation is what keeps it a last resort instead of a Shift printer.
     [Header("Stagger Settings")]
+    [Tooltip("How many times Stagger has been played this RUN. The price is derived from it, so it must not reset per room.")]
     public int staggerCount = 0;
-    public int maxStaggerUses = 3;
+    [Tooltip("HP the FIRST Stagger costs. Every play adds another step on top: 8, 16, 24, 32...")]
+    public float staggerHealthStep = 8f;
+    [Tooltip("Shift handed back per play. This is what the HP is buying.")]
+    public int staggerShiftGain = 2;
     public float staggerJumpForce = 5f;
+    [Tooltip("Incidental damage to enemies caught in the flail. Unrelated to what Stagger costs YOU.")]
     public float staggerDamage = 5f;
     public float staggerRadius = 2f;
     public GameObject staggerEffect;
+
+    // What the NEXT Stagger will cost. The card face and its hover text both read this, so the
+    // player is never surprised by the price — see CardUI.
+    public float NextStaggerCost => staggerHealthStep * (staggerCount + 1);
 
     // Gravity reversal state
     internal bool isGravityReversed = false;
@@ -1572,9 +1586,8 @@ public class PlayerController : MonoBehaviour
 
     internal void PerformStagger()
     {
-        staggerCount++;
-        Debug.Log($"STAGGER KULLANILDI! ({staggerCount}/{maxStaggerUses})");
-
+        // The flail: a free scrap of height plus a shove at anything standing on top of you, so
+        // Stagger also unsticks a player who has jumped themselves into a corner.
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
         float jumpDir = isGravityReversed ? -1f : 1f;
         rb.AddForce(Vector2.up * staggerJumpForce * jumpDir, ForceMode2D.Impulse);
@@ -1591,11 +1604,20 @@ public class PlayerController : MonoBehaviour
 
         if (staggerEffect != null) Instantiate(staggerEffect, transform.position, Quaternion.identity);
 
-        if (staggerCount >= maxStaggerUses)
-        {
-            Debug.Log("KALBİN DAYANAMADI! ÖLÜYORSUN...");
-            playerHealth.Kill();
-        }
+        // The trade itself is a resource change, so the umbrella hub rule covers it: in the sandbox
+        // the flail happens, nothing is bought and nothing is paid — including the escalation, which
+        // is permanent run state and so must not advance there either.
+        if (LevelManager.instance != null && LevelManager.instance.IsCurrentRoomHub()) return;
+
+        float cost = NextStaggerCost;
+        staggerCount++;
+
+        // Pay out BEFORE charging: PayHealthCost can kill, and a lethal Stagger that silently
+        // skipped its own payout would make the last one in a run behave differently from the rest.
+        AddShift(staggerShiftGain);
+        playerHealth.PayHealthCost(cost);
+
+        Debug.Log($"STAGGER #{staggerCount}: +{staggerShiftGain} Shift for {cost} HP. Next one costs {NextStaggerCost}.");
     }
 
     private void CheckInteraction()

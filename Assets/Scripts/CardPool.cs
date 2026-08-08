@@ -33,10 +33,11 @@ public static class CardPool
         }
     }
 
-    // Stagger is the FAIL-STATE card: DeckManager forces it into your hand when you are out of
-    // Shift and out of plays, and three of them ends the run. Offering it as a reward or selling it
-    // would be offering the player a way to lose. Identified by DeckManager's own reference rather
-    // than by name, so renaming the asset cannot silently reintroduce it.
+    // Stagger is not a card the player OWNS: DeckManager conjures it into the hand the moment Shift
+    // hits zero and it evaporates when spent, entering no pile. Offering it as a reward or stocking
+    // it in a shop would put a permanent copy in the deck that arrives on ordinary draws — a card
+    // that only charges HP, handed to a player who never asked for it. Identified by DeckManager's
+    // own reference rather than by name, so renaming the asset cannot silently reintroduce it.
     public static bool IsRewardable(CardData card)
     {
         if (card == null) return false;

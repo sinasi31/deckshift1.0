@@ -13,8 +13,8 @@ using UnityEngine;
 // THE TARGET THE NUMBERS BELOW AIM AT: one act of scrap income should let the player rescue
 // ONE OR TWO cards they really care about — never enough to maintain the whole deck. Scarcity is
 // the entire point. Charges depleting is what pushes cards into exhaust, which is what eventually
-// triggers Stagger, which at three kills the run. Make recharging comfortable and that pressure
-// quietly disappears.
+// leaves the player buying Shift off Stagger at an escalating HP price until they can't afford the
+// next one. Make recharging comfortable and that pressure quietly disappears.
 //
 // Rough maths behind the current values: a combat room holds ~6 mixed enemies ≈ 8-12 scrap, and
 // an act runs ~8 combat rooms ≈ 70-95 scrap. A fully depleted 6-charge card costs 36 to refill,

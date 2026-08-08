@@ -78,8 +78,165 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         // -----------------------------
 
         RefreshBlessingBadge(card);
+        RefreshStaggerFace(card);
 
         UpdateSelectionVisual();
+    }
+
+    // --- Stagger's card face ------------------------------------------------------------------
+    // Stagger's art is not built like the rest of the set. Every other card carries two painted
+    // medallions in its top corners (Shift cost left, charges right); Stagger's has NEITHER, and
+    // instead a single HEART centred along the top edge. That heart is the cost slot, because what
+    // Stagger costs is HP — an escalating price that goes up every play, for the whole run
+    // (PlayerController.PerformStagger).
+    //
+    // So the two normal readouts are switched OFF for this card rather than left to float over
+    // artwork that has no sockets for them, and the price is drawn into the heart instead.
+    //
+    // ⚠️ THE NUMBER IS PLACED AGAINST THE DISPLAYED IMAGE, NOT THE RECT. CardArt is 200x300 with
+    // preserveAspect ON, and the Stagger art is 124x210 — a narrower aspect — so it letterboxes
+    // with a bar down each side and the artwork is ~177px wide, not 200. Measuring the heart as a
+    // fraction of the RECT would put the number off-centre and too wide. It is measured as a
+    // fraction of the SPRITE and mapped through the letterbox each time the rect resizes.
+    //
+    // Fractions below are measured off Assets/Art/stagger.png. The heart's outline spans x 38-86,
+    // y 2-44 in the FILE, and its widest legible band — where a number actually fits, above the
+    // taper — is centred on y 19. Interior fill is a flat #550A0F, so pale text reads cleanly.
+    //
+    // ⚠️ They are expressed against the SPRITE RECT, not the file. Unity's auto-slice trimmed the
+    // transparent margin, so the sprite is 118x205 at offset (3,3) inside the 124x210 png — a
+    // fraction taken against the file would sit the number low and slightly small. art.rect below
+    // is the sprite rect, which is why the two agree.
+    private const float HEART_CX = 59f / 118f;      // dead-centre, as it happens
+    private const float HEART_CY = 17f / 205f;      // from the TOP of the sprite
+    private const float HEART_W = 44f / 118f;
+    private const float HEART_H = 28f / 205f;
+
+    // The name plate along the bottom edge. Every other card in the set has its title PAINTED into
+    // the artwork; Stagger's plate was left empty, which renders as a black bar and reads as an
+    // unfinished card next to its neighbours in the hand. Same measurement basis as the heart:
+    // the framed interior is file-y 184-201, inset here so the text never touches the frame.
+    private const float PLATE_CY = 190.5f / 205f;
+    private const float PLATE_W = 96f / 118f;
+    private const float PLATE_H = 16f / 205f;
+    // The set's title gold, matching the painted plates on the other cards.
+    private static readonly Color STAGGER_NAME_COLOR = new Color(0.85f, 0.72f, 0.36f, 1f);
+
+    private static readonly Color STAGGER_COST_COLOR = new Color(0.98f, 0.90f, 0.87f, 1f);
+    // Shown when the next Stagger costs at least as much HP as the player has left. This is the
+    // only place the run's actual fail state is visible before it happens, so it must be loud.
+    private static readonly Color STAGGER_LETHAL_COLOR = new Color(1f, 0.30f, 0.28f, 1f);
+
+    private TextMeshProUGUI staggerCostText;
+    private TextMeshProUGUI staggerNameText;
+    private Vector2 staggerHostSize = Vector2.zero;
+    private bool isStaggerCard;
+
+    private void RefreshStaggerFace(RuntimeCard card)
+    {
+        isStaggerCard = card != null && card.cardData != null
+                        && card.cardData.actionType == CardActionType.Stagger;
+
+        // The two painted medallions belong to the normal card frame, which this art doesn't have.
+        if (costText != null) costText.gameObject.SetActive(!isStaggerCard);
+        if (usesText != null) usesText.gameObject.SetActive(!isStaggerCard);
+
+        if (!isStaggerCard)
+        {
+            if (staggerCostText != null) staggerCostText.gameObject.SetActive(false);
+            if (staggerNameText != null) staggerNameText.gameObject.SetActive(false);
+            return;
+        }
+
+        EnsureStaggerFace();
+        staggerCostText.gameObject.SetActive(true);
+        staggerNameText.gameObject.SetActive(true);
+        staggerNameText.text = card.cardData.cardName.ToUpperInvariant();
+        staggerHostSize = Vector2.zero;   // force a re-place against the current rect
+        TickStaggerFace();
+    }
+
+    private void EnsureStaggerFace()
+    {
+        if (staggerCostText != null) return;
+
+        staggerCostText = MakeStaggerLabel("StaggerCost", 12f, 30f, STAGGER_COST_COLOR);
+        staggerNameText = MakeStaggerLabel("StaggerName", 8f, 15f, STAGGER_NAME_COLOR);
+    }
+
+    private TextMeshProUGUI MakeStaggerLabel(string name, float minSize, float maxSize, Color color)
+    {
+        RectTransform host = cardArtImage != null ? cardArtImage.rectTransform : (RectTransform)transform;
+
+        GameObject go = new GameObject(name, typeof(RectTransform));
+        RectTransform rt = go.GetComponent<RectTransform>();
+        rt.SetParent(host, false);
+        rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);   // top-left; placed by pixel offset below
+        rt.pivot = new Vector2(0.5f, 0.5f);
+
+        TextMeshProUGUI t = go.AddComponent<TextMeshProUGUI>();
+        if (costText != null) t.font = costText.font;
+        t.alignment = TextAlignmentOptions.Center;
+        t.fontStyle = FontStyles.Bold;
+        t.enableAutoSizing = true;   // 3-digit costs arrive fast: 8, 16, 24... 104
+        t.fontSizeMin = minSize;
+        t.fontSizeMax = maxSize;
+        t.color = color;
+        t.raycastTarget = false;
+        return t;
+    }
+
+    // Placement and value are refreshed from Update rather than set once: the price is read off the
+    // live player, and the lethal warning depends on current HP, which changes while the card just
+    // sits in the hand. Both are a couple of compares — nothing is written unless it changed.
+    private void TickStaggerFace()
+    {
+        if (!isStaggerCard || staggerCostText == null) return;
+
+        RectTransform host = (RectTransform)staggerCostText.transform.parent;
+        Vector2 size = host.rect.size;
+
+        if (size != staggerHostSize && size.x > 0f && size.y > 0f)
+        {
+            staggerHostSize = size;
+
+            // Map the sprite-space fractions through preserveAspect's letterbox.
+            Sprite art = cardArtImage != null ? cardArtImage.sprite : null;
+            float aspect = art != null && art.rect.height > 0f ? art.rect.width / art.rect.height
+                                                               : size.x / size.y;
+            float dh = Mathf.Min(size.y, size.x / aspect);
+            float dw = dh * aspect;
+            float padX = (size.x - dw) * 0.5f;
+            float padY = (size.y - dh) * 0.5f;
+
+            RectTransform rt = staggerCostText.rectTransform;
+            rt.sizeDelta = new Vector2(HEART_W * dw, HEART_H * dh);
+            rt.anchoredPosition = new Vector2(padX + HEART_CX * dw, -(padY + HEART_CY * dh));
+
+            RectTransform nrt = staggerNameText.rectTransform;
+            nrt.sizeDelta = new Vector2(PLATE_W * dw, PLATE_H * dh);
+            nrt.anchoredPosition = new Vector2(padX + 0.5f * dw, -(padY + PLATE_CY * dh));
+        }
+
+        PlayerController p = GameManager.instance != null ? GameManager.instance.player : null;
+        if (p == null) return;
+
+        float cost = p.NextStaggerCost;
+        string label = Mathf.RoundToInt(cost).ToString();
+        if (staggerCostText.text != label) staggerCostText.text = label;
+
+        Color want = cost >= p.CurrentHealth ? STAGGER_LETHAL_COLOR : STAGGER_COST_COLOR;
+        if (staggerCostText.color != want) staggerCostText.color = want;
+
+        // Say the trade out loud on hover — the heart shows the price, but not what it buys.
+        if (descriptionText != null && myCard != null)
+        {
+            string text = $"<b>{myCard.cardData.cardName}</b>\n\n" +
+                          $"Pay <b>{label} HP</b> to claw back <b>{p.staggerShiftGain} Shift</b>.\n" +
+                          $"The price rises by {Mathf.RoundToInt(p.staggerHealthStep)} every time you use it. " +
+                          $"It cannot be discarded.";
+            if (descriptionText.text != text) descriptionText.text = text;
+        }
     }
 
     // --- Blompo blessing mark ------------------------------------------------------------
@@ -217,6 +374,7 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         if (myCard == null) return;
         UpdateSelectionVisual();
         TickBlessMark();
+        TickStaggerFace();
     }
 
     private void UpdateSelectionVisual()

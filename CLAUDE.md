@@ -188,9 +188,24 @@ The gravity reversal factor compensates for the 180° Z rotation inverting the v
 
 `DeckManager` maintains four piles: `drawPile`, `hand`, `discardPile`, `exhaustPile`. **Recall** (R key) is the player's manual refresh action — costs Shift, redraws the hand, cost increases each use within a level.
 
-### Stagger Mechanic
+### Stagger Mechanic (REDESIGNED 2026-08-09 — it is no longer a three-strikes death sentence)
 
-When Shift is 0 AND no playable cards exist, a Stagger card is auto-added to the hand. Three Stagger plays in one run = death.
+**Stagger buys Shift with blood at a price that rises forever.** It appears in the hand the moment Shift hits **0**, and playing it pays **+2 Shift** and charges **HP: 8, then 16, 24, 32, 40…** — `staggerHealthStep × (staggerCount + 1)`, escalating for the whole RUN with no cap and no per-room reset. There is no "three plays and you die" rule any more; the run ends when the next bill is bigger than your health bar. Tunables live on `PlayerController` (`staggerHealthStep`, `staggerShiftGain`) and are serialized in `Player.prefab`.
+
+Four rules make it work, and each exists because the obvious alternative breaks something:
+
+- ⚠️ **It appears on 0 Shift ALONE.** It used to also require an otherwise unplayable hand, because handing over a death sentence early would have been handing over a loss. It isn't one now — it's the pump you reach for when you're out — so gating it hides the option at exactly the moment it's the decision the player should be making.
+- ⚠️ **It can never be discarded.** `ReloadRoutine` retains it exactly like a Clingy card. Recall would otherwise be the dodge (spend Shift you don't have to make the bill vanish), and discarding it would put it in the DECK. It costs a hand slot until you play it — that's the pressure.
+- ⚠️ **IT ENTERS NO PILE.** `PlayCard` drops it on the floor instead of routing it to discard/exhaust. It is not a card the player owns: it is conjured on empty and evaporates when spent. The old code let it fall through to the discard, quietly enrolling it in the deck so it came back on later draws — a free-to-play card that costs HP, in hands where the player had plenty of Shift. It is also created `isInfinite`, so it has no charges and can never appear in the Scrap Forge's repair list.
+- ⚠️ **The HP cost goes through `PlayerHealth.PayHealthCost`, NOT `TakeDamage`.** `TakeDamage` returns early on `isInvincible` and on an open parry window, and the +2 Shift is granted by the caller — so routing it through `TakeDamage` would hand out free Shift any time the player was mid-dash, holding a parry, or inside a Phoenix Cog mercy window. "Sometimes free" is worse than either. Verified: with `isInvincible = true` AND a live parry window, the 16 HP still landed. Phoenix Cog can still save you from a lethal Stagger — paying more than you have is exactly the fail state.
+
+Echo Chamber is exempt from double-casting it (a coin flip that secretly doubles the blood price reads as a bug), and the whole trade — payout, charge and the escalation counter — is skipped in the hub under the umbrella rule.
+
+**The card face is bespoke** — see `CardUI.RefreshStaggerFace`. Stagger's art (`Assets/Art/stagger.png`) has **no corner medallions**, so `costText` and `usesText` are switched OFF for it; the cost is drawn into the **heart centred on the top edge**, and turns **red when the price is ≥ current HP** (the only place the fail state is visible before it happens). The name plate is drawn in code too, because unlike every other card in the set Stagger's title is not painted into the artwork.
+
+⚠️ **The heart/plate fractions in `CardUI` are measured against the SPRITE RECT, not the png.** Unity's auto-slice trimmed the transparent margin, so the sprite is **118×205 at offset (3,3)** inside the 124×210 file; fractions taken against the file sit low and small. `CardArt` is 200×300 with `preserveAspect` ON and the art is a narrower aspect, so it **letterboxes** — the placement maps through that letterbox each time the rect resizes. If new art arrives at a different size, re-measure and update the four `HEART_*` / three `PLATE_*` constants; nothing else needs touching.
+
+**Note for the designer:** `stagger.png` imported with **Bilinear** filtering while every other card art uses **Point**. It is upscaled ~1.4× in the hand, so Bilinear reads slightly softer than its neighbours — worth eyeballing and flipping to Point if it bothers you. Left as imported; it's a look judgement, not a bug.
 
 ---
 
@@ -226,7 +241,7 @@ It is also load-bearing for the **planned difficulty tiers** (see Deferred Work 
 - ⚠️ ~~**Scrap sits with the deck/exhaust pile UI, NOT in the resource panel.**~~ **OVERRULED by the designer 2026-08-09.** The reasoning (scrap is deck-maintenance, so it belongs with the deck UI) did not survive contact with play: bottom-right it read as a stray widget, and having the two CURRENCIES in opposite corners made neither easy to check. **Scrap now sits directly under the gold counter**, and both are built from `HudChip` so they are one piece of geometry rather than two that happen to agree. The resource panel is now two **bars** (health, Shift — bounded, so a fill is the honest shape) above two **chips** (gold, scrap — unbounded counts, so a number in a plate). ⚠️ `ScrapHUD` re-anchors in `LateUpdate`, not once in `Build()`: it is created from a `sceneLoaded` bootstrap that runs before any `Start()`, so at build time `ResourcePanelHUD` has not laid the gold row out yet and a one-shot read parks it in the wrong place.
 - **Kills must out-earn the exhaust rebate by roughly 10:1.** Kills are the lever that changes behaviour; the rebate is only a consolation so losing a card isn't a total loss. If the rebate ever dominates, you've accidentally incentivised burning your own deck down.
 - **Salvage returns a card only HALF charged**, so a full recovery is salvage + repair. Exhaust must stay a real loss.
-- **Target: one act of income rescues ONE OR TWO cards, never the whole deck.** Scarcity is the point — charges depleting is what feeds Stagger, which is the run's only real death pressure. Make repair comfortable and that pressure quietly disappears.
+- **Target: one act of income rescues ONE OR TWO cards, never the whole deck.** Scarcity is the point — charges depleting is what feeds Stagger, and Stagger's escalating HP price is the run's only real death pressure. Make repair comfortable and that pressure quietly disappears.
 - **Scrap spending is NOT hub-exempt.** The umbrella "free in hub" rule covers resources the sandbox *drains* from you; a forge repair is a purchase that permanently improves the run, exactly like a shop buy (which the hub already charges for). Free repairs in the hub = infinite deck refills.
 - Both `DeckManager.TryRechargeCard` / `TrySalvageCard` are **all-or-nothing** — verified by test that a refused operation never charges the player.
 
@@ -442,7 +457,7 @@ Still open (see deferred work): rebalancing the 18 relics *for* a slot economy �
 
 The designer regrets putting the achievement system in this early and wants a proper one for cards/relics near release. `AchievementManager` still tracks and saves challenges — **it just no longer decides what exists**. Same machinery as the relics: `CardCatalogue` (auto-rebuilt asset) + `CardPool`.
 
-⚠️ **`Stagger` must never be offered.** It is the fail-state card — three plays ends the run — so rewarding or selling it hands the player a way to lose. `CardPool.IsRewardable` excludes it by comparing against `DeckManager.staggerCardData`, **not by name**, so renaming the asset can't reintroduce it. Verified: 3000 reward draws surfaced all 14 legitimate cards including the three formerly unreachable ones, and Stagger zero times.
+⚠️ **`Stagger` must never be offered.** It is not a card the player owns — it is conjured into the hand on 0 Shift and evaporates when spent (see Stagger Mechanic). Rewarding or selling it would put a *permanent* copy in the deck that arrives on ordinary draws: a card that only charges HP, handed to a player who never asked for it. `CardPool.IsRewardable` excludes it by comparing against `DeckManager.staggerCardData`, **not by name**, so renaming the asset can't reintroduce it. Verified: 3000 reward draws surfaced all 14 legitimate cards including the three formerly unreachable ones, and Stagger zero times.
 
 ### Relic offer pool — `RelicCatalogue` + `RelicPool` (2026-08-08)
 

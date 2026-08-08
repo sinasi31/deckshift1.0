@@ -313,7 +313,8 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4096
   staggerCount: 0
-  maxStaggerUses: 3
+  staggerHealthStep: 8
+  staggerShiftGain: 2
   staggerJumpForce: 5
   staggerDamage: 5
   staggerRadius: 2

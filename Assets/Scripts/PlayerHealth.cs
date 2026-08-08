@@ -88,6 +88,27 @@ public class PlayerHealth : MonoBehaviour
             return;
         }
 
+        ApplyDamage(damage);
+    }
+
+    // A price the player CHOSE to pay — currently only Stagger's escalating HP cost. Not a hit.
+    //
+    // ⚠️ It deliberately ignores BOTH invincibility and the parry window, which is the whole reason
+    // it isn't just TakeDamage. Those two guards make TakeDamage a silent no-op, and the payout for
+    // a self-inflicted cost is granted by the CALLER, not here — so routing Stagger through
+    // TakeDamage would hand out free Shift any time the player happened to be mid-dash, inside a
+    // Phoenix Cog mercy window, or holding a parry. "Sometimes free" is worse than either.
+    //
+    // It can still kill, and Phoenix Cog can still save you from it: paying more than you have is
+    // exactly the fail state Stagger is supposed to be.
+    public void PayHealthCost(float amount)
+    {
+        if (isDead || amount <= 0f) return;
+        ApplyDamage(amount);
+    }
+
+    private void ApplyDamage(float damage)
+    {
         currentHealth = Mathf.Max(currentHealth - damage, 0f);
 
         SfxManager.PlayOn(audioSource, hurtSound);

@@ -163,7 +163,11 @@ public class DeckManager : MonoBehaviour
             if (playedCard.enhancement == CardEnhancement.DoubleDip)
                 player.ExecuteAction(data.actionType, actionValue, out bool _);
 
+            // Stagger is exempt: a coin flip that secretly doubles the blood price of the one card
+            // you play when you're already out of resources reads as a bug, not as a skill paying
+            // off. Echo Chamber is a bonus, and it should never be able to cost you the run.
             if (SkillManager.instance != null &&
+                !IsStagger(playedCard) &&
                 SkillManager.instance.HasSkill(SkillType.EchoChamber) &&
                 UnityEngine.Random.value < 0.5f) // <--- BURASI DÜZELDÝ
             {
@@ -173,6 +177,17 @@ public class DeckManager : MonoBehaviour
             }
             bool inHub = LevelManager.instance != null && LevelManager.instance.IsCurrentRoomHub();
             if (!playedCard.isInfinite && !inHub) playedCard.currentUses--;
+
+            // ⚠️ STAGGER ENTERS NO PILE. It is not a card the player owns — it is conjured into the
+            // hand whenever Shift hits zero and evaporates when spent. Letting it fall through to
+            // the discard below (which is what used to happen) quietly enrolled it in the DECK, so
+            // it came back around on later draws as a free-to-play card that costs HP, in hands
+            // where the player had plenty of Shift and had never asked for it.
+            if (IsStagger(playedCard))
+            {
+                OnHandChanged?.Invoke(false);
+                return;
+            }
 
             if (inHub || (playedCard.isInfinite || playedCard.currentUses > 0) && (!data.singleUse || playedCard.isInfinite))
             {
@@ -303,44 +318,48 @@ public class DeckManager : MonoBehaviour
             }
         }
     }
+    // Stagger is identified by ACTION TYPE, not by asset reference, so every rule below holds for
+    // any card that staggers — and can't be broken by renaming or duplicating the asset.
+    public static bool IsStagger(RuntimeCard card)
+    {
+        return card != null && card.cardData != null
+            && card.cardData.actionType == CardActionType.Stagger;
+    }
+
+    // Stagger appears the moment you hit ZERO SHIFT — that alone, nothing else.
+    //
+    // It used to also require an otherwise unplayable hand, because Stagger was a death sentence
+    // and handing it over early would have been handing over a loss. It isn't one any more: it buys
+    // Shift with HP at an escalating price (PlayerController.PerformStagger), so it is the pump you
+    // reach for when you're out, and gating it behind "and every card is spent too" would hide the
+    // option at exactly the moment it's the decision the player should be making.
     private void CheckForStaggerCondition()
     {
         if (LevelManager.instance != null && LevelManager.instance.IsCurrentRoomHub()) return;
+        if (player.GetCurrentShift() > 0) return;
 
-        // 1. Shift var mý?
-        if (player.GetCurrentShift() > 0) return; // Shift varsa sorun yok
-
-        // 2. Eldeki kartlarýn Charge'ý var mý?
         foreach (RuntimeCard card in hand)
-        {
-            // Stagger kartýnýn kendisi hariç, kullanýlabilir kart var mý?
-            if (card.cardData != staggerCardData)
-            {
-                if (card.isInfinite || card.currentUses > 0) return; // Kullanýlacak kart var
-            }
-        }
+            if (IsStagger(card)) return;   // already holding one — never stack them
 
-        // BURAYA GELDÝYSEK HÝÇBÝR KAYNAK YOK DEMEKTÝR!
-        // Eline zaten Stagger kartý verdiysek tekrar verme
-        foreach (RuntimeCard card in hand)
-        {
-            if (card.cardData == staggerCardData) return;
-        }
-
-        Debug.Log("KAYNAKLAR TÜKENDÝ! STAGGER KARTI VERÝLÝYOR...");
         AddStaggerCardToHand();
     }
 
     private void AddStaggerCardToHand()
     {
-        // Eli temizle (veya doluysa yer aç)
-        // Senin oyununda el kapasitesi dolunca ne oluyor? 
-        // Acil durum olduðu için eldeki boþ bir yere veya direkt sona ekleyelim.
+        if (staggerCardData == null) return;
 
+        // Deliberately appended past handCapacity rather than displacing a card: Stagger is an extra
+        // option, not a punishment that eats the hand you were dealt. A Recall trims back to
+        // capacity naturally, with Stagger retained (see ReloadRoutine).
         RuntimeCard staggerInstance = new RuntimeCard(staggerCardData);
+
+        // Stagger has no charges. Its cost is the HP price, which rises forever, so a charge count
+        // would be a second limiter doing nothing — and it keeps Stagger out of the Scrap Forge's
+        // repair list, where a card that can never be damaged has no business appearing.
+        staggerInstance.isInfinite = true;
+
         hand.Add(staggerInstance);
 
-        // UI Güncelle
         OnHandChanged?.Invoke(true);
     }
     public void TryRecall()
@@ -394,10 +413,15 @@ public class DeckManager : MonoBehaviour
         // Blompo: "Clingy" cards are held back instead of being discarded, so they survive the
         // Recall and are still in hand afterwards. They occupy their slot, so a hand full of
         // Clingy cards simply doesn't refresh — that's the intended trade-off.
+        //
+        // ⚠️ STAGGER IS RETAINED THE SAME WAY, AND CAN NEVER BE DISCARDED. Recalling it away would
+        // be the obvious dodge — spend a Shift you don't have to make the bill disappear — and the
+        // less obvious problem is that discarding it puts it in the deck. Once it is in your hand
+        // the only way out is to play it. It costs a slot until you do, which is the pressure.
         List<RuntimeCard> retained = new List<RuntimeCard>();
         for (int i = 0; i < hand.Count; i++)
         {
-            if (hand[i] != null && hand[i].enhancement == CardEnhancement.Clingy)
+            if (hand[i] != null && (hand[i].enhancement == CardEnhancement.Clingy || IsStagger(hand[i])))
                 retained.Add(hand[i]);
             else
                 discardPile.Add(hand[i]);
