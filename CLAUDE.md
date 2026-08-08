@@ -436,6 +436,19 @@ What exists today:
 
 Still open (see deferred work): rebalancing the 18 relics *for* a slot economy — they were authored as small always-on Slay-the-Spire bonuses, which is the wrong shape for a 5-slot loadout where each pick should be a real decision.
 
+### Relic offer pool — `RelicCatalogue` + `RelicPool` (2026-08-08)
+
+**Never hand-maintain a list of relics again.** The shop and the chests each carried their own Inspector list and both had silently fallen behind the roster: **18 relics existed, `ShopManager.allRelicsPool` held 3 and `Chest.prefab` held 5 across its four tiers**. Nothing was broken in code — the lists were simply never updated when relics were added, and there is no way to notice that from inside the game.
+
+- **`RelicCatalogue`** — a ScriptableObject at `Assets/Resources/RelicCatalogue.asset` listing every `RelicData`. Rebuilt automatically by `Editor/RelicCatalogueBuilder` (an `AssetPostprocessor`) whenever a relic asset is added, removed, moved or renamed, plus a **Deckshift → Rebuild Relic Catalogue** menu item. It also warns about empty or duplicated `relicID`s, which silently break `HasRelic()`.
+- **`RelicPool`** — the only thing that answers "what may be offered right now". `All`, `Offerable(rarity, restrictTo)`, `PickOfferable(rarity, …)` (steps down tiers, then up), `DrawDistinct(n, …)` for stocking a shelf.
+
+⚠️ **An owned relic is never offered, and ownership is read AT THE MOMENT OF THE OFFER.** Chests used to hand back a relic you were already wearing — a dead reward for a room you paid to cross. Reading the live loadout also gives the sell-behaviour for free: **selling a relic puts it straight back in the pool**, with no bookkeeping. Comparison is by `relicID`, not asset reference.
+
+`Chest`'s four tier lists and `Shopkeeper.specificRelicPool` still work, but now mean *"restrict THIS one to a curated subset"* — **empty means the whole roster**, which is the normal case. `ShopManager.allRelicsPool` is deliberately no longer consulted; copying it into the shopkeeper is precisely what capped the stock at 3.
+
+Verified: 500 chest rolls returned zero owned relics; 200 shop restocks produced zero worn or duplicate offers; with a full 5-slot loadout the pool correctly reports 13 of 18 offerable, and selling restores the sold relic.
+
 ### RelicManager
 
 Singleton. Holds:
@@ -985,6 +998,22 @@ The QuestTrackerHUD looks for children named exactly `Title` and `Progress` (cas
 **A prop drawing on top of the player is almost always a Z-position problem, NOT a sorting-layer/order problem.** The Cainos "Pixel Art Platformer - Dungeon" props (doors, frames, etc.) and the Cainos player character both render with **opaque shaders in render queue 2000** (`Sprite 3D Lit …`, `Customizable Pixel Character/Body`, `.../Alpha Cut`). Opaque geometry sorts by **camera depth (Z distance)** — `SpriteRenderer.sortingOrder` is essentially ignored for them. Two opaque things at the same Z sort ambiguously and one arbitrarily wins.
 
 The fix is **Z position**, not sorting order: push the prop farther from the camera than the player. The camera looks along **+Z** (camera at negative Z), so "behind the player" = **larger Z**. Because the camera is orthographic, changing Z does NOT move the prop on screen — it only changes depth sort. (Setting the door's `sortingOrder` to -1 first did NOTHING — that was a misdiagnosis.) Note: a prop may mix queues (the door's `Door`/`Frame` are opaque 2000, its `Inside`/`Shadow` are transparent 3000); transparent parts do honor sortingOrder and always draw after all opaque.
+
+✅ **SOLVED GENERALLY BY `PlayPlane.cs` (2026-08-08) — you should not need to hand-tune prop Z any more.** Fixing individual props only ever fixes the one somebody noticed, and the designer reported the player and enemies still rendering behind props. Measuring all 11 pool rooms showed why: **there was no play plane at all.** Every room had invented its own depth —
+
+| room | spawn Z | enemies Z | frontmost prop Z |
+|---|---|---|---|
+| `efeslevel1` | 0.00 | 0.00 | **−0.01** (prop in front of every enemy) |
+| `EfeVrl4` | 0.00 | 0.00 | **0.00** (exactly coplanar → arbitrary sort) |
+| `EfeVrl7` | 2.00 | 2.00 | **0.00** (props in front of player *and* enemies) |
+| `efeslevel3` | 2.56 | 0.00 | 3.01 |
+| `hub` | −1.06 | — | −0.61 |
+
+— because `LevelManager` copied the entry point's **full Vector3** onto the player, so the player's depth was whatever that room's `GirisNoktasi` happened to sit at, while enemies sat wherever they were dropped and props ranged from −1.12 to +3.56. Sorting was luck, per room. That "sometimes" is the signature of two opaque things at the *same* Z.
+
+**The rule now: actors live at `PlayPlane.Z` (−2), everything else is behind it.** `PlayPlane.Apply(room)` runs on every spawn — it snaps every `EnemyHealth` onto the plane and pushes any opaque non-actor renderer found at or in front of it behind, moving the prop's top-level ancestor so multi-part props stay together. `LevelManager` now takes only X/Y from the entry point. Verified: all 11 rooms satisfy the invariant (every enemy on the plane, zero props in front), and the fix holds for rooms nobody has authored yet. **Z is free to move** — the camera is orthographic so depth changes cost zero pixels on screen, and Physics2D ignores Z entirely.
+
+The historical per-prop fix below is now redundant but harmless; keep it as the explanation of *why* opaque sprites behave this way.
 
 **The entry-door case is FIXED PROJECT-WIDE (2026-07-22) — at the source, in `Assets/Prefabs/GirisNoktasi.prefab`.** It was never a hub-only bug: `LevelManager` spawns the player with `playerTransform.position = entryPoint.position` (full Vector3, **Z included**), so the player always lands exactly coplanar with the entry door — and a scan found **38 of 39 rooms** with the door on or in front of the spawn plane, because every room nests this one shared prefab. Fix: the `PF Dungeon Props - Door Wood 01` child's local Z is now **0.5**, putting all four door sprites 0.45–0.51 **behind** the spawn plane. All 39 rooms inherited it from the single source change; the hub's earlier per-instance override (and 4 no-op `sortingOrder` overrides) were reverted so the hub tracks the source. **If you add a new room, do not override that door prop's local Z** — inherit it. If you ever place another prop near the entry point, remember the spawn plane is the Z the player occupies.
 

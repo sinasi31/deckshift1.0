@@ -48,8 +48,10 @@ public class Shopkeeper : MonoBehaviour
         if ((specificCardPool == null || specificCardPool.Count == 0) && ShopManager.instance != null)
             specificCardPool = ShopManager.instance.allCardsPool;
 
-        if ((specificRelicPool == null || specificRelicPool.Count == 0) && ShopManager.instance != null)
-            specificRelicPool = ShopManager.instance.allRelicsPool;
+        // NOTE: ShopManager.allRelicsPool is deliberately NOT consulted any more. It was a
+        // hand-maintained list holding 3 of the project's 18 relics, and copying it into
+        // specificRelicPool is exactly what capped the shop's stock. Relics now come from
+        // RelicPool (see below), which derives from the assets themselves.
 
         // Cards — up to 5 DISTINCT offers (draw without replacement so no duplicates show).
         if (specificCardPool != null)
@@ -69,16 +71,19 @@ public class Shopkeeper : MonoBehaviour
             }
         }
 
-        // Relics — up to 3 DISTINCT offers.
-        if (specificRelicPool != null)
+        // Relics — up to 3 DISTINCT offers, drawn from EVERY relic in the project (RelicPool /
+        // RelicCatalogue) rather than a hand-kept list. ShopManager.allRelicsPool had drifted to 3
+        // of the 18 relics, so five sixths of the roster was simply unbuyable and nothing in the
+        // game could show that. `specificRelicPool` still works as a deliberate per-shop
+        // restriction; empty means "the whole roster".
+        //
+        // Already-owned relics are excluded: shelf space spent on something you are wearing is a
+        // wasted offer, and since ownership is read when the shop stocks, a relic you SELL becomes
+        // buyable again in the next shop.
         {
-            List<RelicData> pool = new List<RelicData>(specificRelicPool);
-            int n = Mathf.Min(3, pool.Count);
-            for (int i = 0; i < n; i++)
+            List<RelicData> picked = RelicPool.DrawDistinct(3, specificRelicPool);
+            foreach (RelicData relic in picked)
             {
-                int idx = Random.Range(0, pool.Count);
-                RelicData relic = pool[idx];
-                pool.RemoveAt(idx);
                 myInventory.Add(new ShopSlotData
                 {
                     itemType = ShopItemType.Relic, relicReference = relic, itemName = relic.relicName,

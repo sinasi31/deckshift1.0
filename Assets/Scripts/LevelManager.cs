@@ -233,6 +233,11 @@ public class LevelManager : MonoBehaviour
 
         currentRoom = Instantiate(selectedRoomPrefab, Vector3.zero, Quaternion.identity);
 
+        // Put every actor on the shared draw plane and shove decoration behind it. Opaque sprites
+        // sort by camera depth, not sortingOrder, and each room had been authored at its own Z —
+        // which is why the player and enemies sometimes rendered behind props. See PlayPlane.
+        PlayPlane.Apply(currentRoom);
+
         Transform boundsObj = currentRoom.transform.Find("CameraBounds");
         if (boundsObj != null)
         {
@@ -258,13 +263,18 @@ public class LevelManager : MonoBehaviour
         Transform entryPoint = currentRoom.transform.Find("GirisNoktasi");
         if (entryPoint != null && playerTransform != null)
         {
-            playerTransform.position = entryPoint.position;
+            // ⚠️ Take X and Y from the entry point but NOT its Z. Rooms disagree wildly about depth
+            // (spawn Z ranged from -1.06 to +2.56 across the pool), and copying the full Vector3 is
+            // what put the player on a different plane in every room. The player belongs on the
+            // play plane, always.
+            Vector3 spawn = new Vector3(entryPoint.position.x, entryPoint.position.y, PlayPlane.Z);
+            playerTransform.position = spawn;
 
             PlayerController playerController = playerTransform.GetComponent<PlayerController>();
             if (playerController != null)
             {
                 playerController.OnNewRoomEnter();
-                playerController.SetCurrentEntryPoint(entryPoint.position);
+                playerController.SetCurrentEntryPoint(spawn);
             }
         }
 

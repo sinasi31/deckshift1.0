@@ -4,6 +4,10 @@ using UnityEngine;
 public class Chest : MonoBehaviour, IInteractable
 {
     [Header("Relic Pools")]
+    [Tooltip("OPTIONAL. Leave empty (the normal case) and the chest draws from every relic in the " +
+             "project via RelicPool, minus the ones the player already owns. Fill a tier in only to " +
+             "restrict THIS chest to a curated set — a hand-maintained list is how the pools fell " +
+             "13 relics behind the roster in the first place.")]
     [SerializeField] private List<RelicData> commonRewards = new List<RelicData>();
     [SerializeField] private List<RelicData> rareRewards = new List<RelicData>();
     [SerializeField] private List<RelicData> epicRewards = new List<RelicData>();
@@ -74,25 +78,34 @@ public class Chest : MonoBehaviour, IInteractable
         int r3 = Random.Range(1, 8);
         int total = r1 + r2 + r3;
 
-        // Fallback chain: if the rolled tier's pool is empty, step down to the next lower tier.
-        List<RelicData>[] fallbackChain;
-        if (total == 21)
-            fallbackChain = new[] { legendaryRewards, epicRewards, rareRewards, commonRewards };
-        else if (total >= 16)
-            fallbackChain = new[] { epicRewards, rareRewards, commonRewards };
-        else if (total >= 11)
-            fallbackChain = new[] { rareRewards, commonRewards };
-        else
-            fallbackChain = new[] { commonRewards };
+        Rarity rolled;
+        if (total == 21) rolled = Rarity.Legendary;
+        else if (total >= 16) rolled = Rarity.Epic;
+        else if (total >= 11) rolled = Rarity.Rare;
+        else rolled = Rarity.Common;
 
-        foreach (var pool in fallbackChain)
-        {
-            if (pool != null && pool.Count > 0)
-                return pool[Random.Range(0, pool.Count)];
-        }
+        // RelicPool does the tier fallback AND excludes relics the player already holds — a chest
+        // handing back a relic you are already wearing is a dead reward, and the room's cost was
+        // paid for nothing. Because ownership is read here, at open time, selling a relic puts it
+        // back in circulation automatically.
+        List<RelicData> restrictTo = CuratedPoolFor(rolled);
+        RelicData relic = RelicPool.PickOfferable(rolled, restrictTo);
 
-        Debug.LogWarning($"[Chest] '{name}': all relic pools are empty, no relic granted.");
-        return null;
+        if (relic == null)
+            Debug.LogWarning($"[Chest] '{name}': no un-owned relic available to grant " +
+                             "(player owns everything this chest can offer).");
+        return relic;
+    }
+
+    // A chest normally draws from the whole roster; a tier list is only consulted when someone has
+    // deliberately curated THIS chest. Empty lists mean "no restriction", not "no relics".
+    private List<RelicData> CuratedPoolFor(Rarity rarity)
+    {
+        List<RelicData> curated =
+            rarity == Rarity.Legendary ? legendaryRewards :
+            rarity == Rarity.Epic ? epicRewards :
+            rarity == Rarity.Rare ? rareRewards : commonRewards;
+        return (curated != null && curated.Count > 0) ? curated : null;
     }
 
     private void OnTriggerEnter2D(Collider2D other)
