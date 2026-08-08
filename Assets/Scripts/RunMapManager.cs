@@ -37,8 +37,19 @@ public class RunMapManager : MonoBehaviour
     // marker can rebuild without polling.
     public event System.Action OnMapChanged;
 
+    // ⚠️ Registered through SceneBootstrap, NOT called directly. RuntimeInitializeOnLoadMethod runs
+    // once per play session, so creating the manager here alone meant that after the player died
+    // (SampleScene -> GameOverScene) and restarted (-> SampleScene), this manager was destroyed by
+    // the scene load and never came back. The map then silently vanished for the rest of the
+    // session and LevelManager fell back to random room order — precisely the "looks almost right"
+    // failure this class's own header warns about. See SceneBootstrap.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
+    {
+        SceneBootstrap.Register(Create);
+    }
+
+    private static void Create()
     {
         if (instance != null) return;
         if (FindFirstObjectByType<RunMapManager>() != null) return;

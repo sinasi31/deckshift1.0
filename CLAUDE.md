@@ -943,6 +943,22 @@ Check whether the component is **actually in the scene and enabled**. Multiple t
 
 When a system "doesn't seem to work," verify scene presence and enabled state BEFORE assuming the code is wrong.
 
+### "[RuntimeInitializeOnLoadMethod] runs ONCE PER SESSION, not once per scene" (2026-08-09)
+
+**`RuntimeInitializeLoadType.AfterSceneLoad` says WHEN in the startup sequence the method runs. It does NOT mean "after each scene load".** The name reads exactly like it does, which is why this survived.
+
+Consequence, reported by the designer as *"after restarting from the death screen I can no longer use the map"*: dying is `SampleScene → GameOverScene` and RESTART is `GameOverScene → SampleScene`. Both are scene loads, and a **scene-local self-bootstrapping singleton is destroyed by the first one and never re-created**. So from the player's first death onward, for the rest of the session:
+
+- **`RunMapManager` gone** — `M` did nothing, and `LevelManager` silently fell back to `PickNextRoomPrefabWithoutMap()`, i.e. random room order. Exactly the "looks almost right" failure that class's own header warns about.
+- **`ScrapHUD` gone** — no scrap counter.
+- `SfxManager` was fine only because it happens to call `DontDestroyOnLoad`.
+
+⚠️ **The irony worth remembering: self-bootstrapping was adopted to stop systems going missing from scenes, and it introduced a new way for systems to go missing.** Managers *placed* in the scene never had this problem — reloading the scene brings them back.
+
+**Fix: `SceneBootstrap.Register(Create)`** — runs the creator now and on every `sceneLoaded`. Any new self-bootstrapping singleton must use it, and its `Create` must be idempotent. Verified across two full death→restart cycles: both managers return, the hub is the first room again, the map regenerates, and `M` opens a freshly drawn chart.
+
+**When touching anything per-run, test the SECOND run, not the first.** A scan for dangling statics found none, so the damage was confined to these two — but the first run is not evidence about the second.
+
 ### "Idempotent operations hide bugs"
 
 Setting `Time.timeScale = 0` is idempotent — calling it twice does the same as once. This hid the ExitDoor double-fire bug for months. Now that the pause counter is in place, redundant calls become visible (pauseDepth goes to 2). **If you find redundant-but-harmless calls, audit whether they should be redundant.**

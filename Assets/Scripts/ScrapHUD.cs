@@ -24,8 +24,16 @@ public class ScrapHUD : MonoBehaviour
     private const float CHIP_W = 132f, CHIP_H = 44f;
     private const float ABOVE_EXHAUST = 56f;   // vertical gap above the ExhaustPile button
 
+    // ⚠️ Registered through SceneBootstrap, NOT called directly — RuntimeInitializeOnLoadMethod
+    // fires once per play session, so the counter disappeared permanently the first time the player
+    // died and restarted (two scene loads). See SceneBootstrap.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
+    {
+        SceneBootstrap.Register(Create);
+    }
+
+    private static void Create()
     {
         // The HUD only belongs in gameplay scenes. GameplayHUD is the marker for those — menus
         // and the game-over scene don't have one, so the counter simply doesn't appear there.
