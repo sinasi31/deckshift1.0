@@ -15,6 +15,7 @@ MonoBehaviour:
   cardName: Glass Wail
   description: 'Stuns all enemies for 10 seconds. '
   cardArt: {fileID: -8024131544370953100, guid: d8b48ba556ef0c24ab4bfa1fbd51c3d0, type: 3}
+  nameIsPaintedIntoArt: 1
   actionType: 10
   actionValue: 10
   singleUse: 1

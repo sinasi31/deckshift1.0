@@ -15,6 +15,7 @@ MonoBehaviour:
   cardName: Floor is Lava
   description: Reverses gravity for 5 seconds
   cardArt: {fileID: 2009918283491603417, guid: 62c9b2396e547224d89fff46d2814fa7, type: 3}
+  nameIsPaintedIntoArt: 1
   actionType: 15
   actionValue: 5
   singleUse: 0

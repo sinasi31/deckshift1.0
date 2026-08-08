@@ -15,6 +15,7 @@ MonoBehaviour:
   cardName: CometDive
   description: Dive down and deal 20 damage to enemies in a radius.
   cardArt: {fileID: -6264566646456649978, guid: 82da3f8f21bd06c41842722cd5bef0ac, type: 3}
+  nameIsPaintedIntoArt: 1
   actionType: 12
   actionValue: 0
   singleUse: 0

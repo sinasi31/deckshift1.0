@@ -201,7 +201,7 @@ Four rules make it work, and each exists because the obvious alternative breaks 
 
 Echo Chamber is exempt from double-casting it (a coin flip that secretly doubles the blood price reads as a bug), and the whole trade — payout, charge and the escalation counter — is skipped in the hub under the umbrella rule.
 
-**The card face is bespoke** — see `CardUI.RefreshStaggerFace`. Stagger's art (`Assets/Art/stagger.png`) has **no corner medallions**, so `costText` and `usesText` are switched OFF for it; the cost is drawn into the **heart centred on the top edge**, and turns **red when the price is ≥ current HP** (the only place the fail state is visible before it happens). The name plate is drawn in code too, because unlike every other card in the set Stagger's title is not painted into the artwork.
+**The card face is bespoke** — see `CardUI.RefreshCardFace`. Stagger's art (`Assets/Art/stagger.png`) has **no corner medallions**, so `costText` and `usesText` are switched OFF for it; the cost is drawn into the **heart centred on the top edge**, and turns **red when the price is ≥ current HP** (the only place the fail state is visible before it happens).
 
 ⚠️ **The heart/plate fractions in `CardUI` are measured against the SPRITE RECT, not the png.** Unity's auto-slice trimmed the transparent margin, so the sprite is **118×205 at offset (3,3)** inside the 124×210 file; fractions taken against the file sit low and small. `CardArt` is 200×300 with `preserveAspect` ON and the art is a narrower aspect, so it **letterboxes** — the placement maps through that letterbox each time the rect resizes. If new art arrives at a different size, re-measure and update the four `HEART_*` / three `PLATE_*` constants; nothing else needs touching.
 
@@ -644,6 +644,14 @@ The designer's brief for the shop was **"make the player feel like they are talk
 **Card rarity is telegraphed in the card ARTWORK, in colour: dark grey Common, light grey Uncommon, yellow Rare, purple Epic. There are no Legendary cards.** The incoming art has this baked in, so **UI code must not invent a second rarity colour system on a card** — two colour codes on one object that disagree is worse than one.
 
 This is a live constraint, not a preference: `CardUI`'s blessing mark originally tinted itself by the *blessing's* rarity via `FlatUI.RarityColor`. That's a different axis, but no player would read it as one — and it contradicted the art (calling Rare azure where the art calls it yellow). It is now **one fixed teal on every blessing**, chosen to sit outside the grey/grey/yellow/purple palette and pushed green of Shift-blue so it can't read as a cost either. Blessing hierarchy moved to a channel the art doesn't use: **only Epic/Legendary blessings pulse.**
+
+### Card name plates are drawn in CODE from now on (designer 2026-08-09)
+
+**New card art must ship with an EMPTY name plate.** `CardUI` types `cardName` into it. This decouples a card's name from its texture — renaming a card stops being a repaint — and it is why **`CardData.nameIsPaintedIntoArt` defaults to `false`**.
+
+⚠️ **The 14 pre-2026-08-09 cards have their titles painted in and all set that flag**, so nothing about them changed. **Clear it on each card as its art is replaced.** Getting it backwards is visible instantly: set-when-blank leaves an empty plate, clear-when-painted prints the name on top of itself.
+
+Plate geometry (`PLATE_CY/W/H` in `CardUI`) was measured on Stagger's art but is expressed as fractions of the **sprite rect**, and the legacy 1024×1536 cards put their plate within ~1% of the same place — so one set of constants serves both layouts, letterboxing included. Re-measure only if new art moves the plate. Colour is the set's title gold, matching the painted plates.
 
 ### `CardUI` — the blessing mark (2026-08-06)
 

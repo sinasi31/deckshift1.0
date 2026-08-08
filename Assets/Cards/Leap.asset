@@ -15,6 +15,7 @@ MonoBehaviour:
   cardName: Leap
   description: Perform a high jump.
   cardArt: {fileID: -2058102481636132610, guid: 425b6cce100ff6648a5e72a7f9dd850f, type: 3}
+  nameIsPaintedIntoArt: 1
   actionType: 0
   actionValue: 10
   singleUse: 0

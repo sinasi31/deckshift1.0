@@ -78,12 +78,12 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         // -----------------------------
 
         RefreshBlessingBadge(card);
-        RefreshStaggerFace(card);
+        RefreshCardFace(card);
 
         UpdateSelectionVisual();
     }
 
-    // --- Stagger's card face ------------------------------------------------------------------
+    // --- Procedural card face -------------------------------------------------------------------
     // Stagger's art is not built like the rest of the set. Every other card carries two painted
     // medallions in its top corners (Shift cost left, charges right); Stagger's has NEITHER, and
     // instead a single HEART centred along the top edge. That heart is the cost slot, because what
@@ -112,15 +112,24 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     private const float HEART_W = 44f / 118f;
     private const float HEART_H = 28f / 205f;
 
-    // The name plate along the bottom edge. Every other card in the set has its title PAINTED into
-    // the artwork; Stagger's plate was left empty, which renders as a black bar and reads as an
-    // unfinished card next to its neighbours in the hand. Same measurement basis as the heart:
-    // the framed interior is file-y 184-201, inset here so the text never touches the frame.
+    // --- The name plate, drawn for EVERY card whose art doesn't already carry its title ---------
+    //
+    // Standing convention (designer, 2026-08-09): new card art ships with an EMPTY plate and the UI
+    // types the name into it. That decouples a card's name from its texture — renaming a card stops
+    // being a repaint — and it is why CardData.nameIsPaintedIntoArt defaults to FALSE.
+    //
+    // ⚠️ The 14 pre-2026-08-09 cards have their titles painted in and set that flag, so nothing
+    // about them changes today. Clear it on each as its art is replaced. Getting it backwards is
+    // visible instantly: set-when-blank leaves an empty plate, clear-when-painted double-prints.
+    //
+    // The plate geometry below was measured on Stagger's art but is expressed as fractions of the
+    // sprite, and the old 1024x1536 cards put their plate within ~1% of the same place — so one set
+    // of constants serves both layouts. Re-measure only if a new art moves the plate.
     private const float PLATE_CY = 190.5f / 205f;
     private const float PLATE_W = 96f / 118f;
     private const float PLATE_H = 16f / 205f;
-    // The set's title gold, matching the painted plates on the other cards.
-    private static readonly Color STAGGER_NAME_COLOR = new Color(0.85f, 0.72f, 0.36f, 1f);
+    // The set's title gold, matching the plates painted into the legacy art.
+    private static readonly Color NAME_COLOR = new Color(0.85f, 0.72f, 0.36f, 1f);
 
     private static readonly Color STAGGER_COST_COLOR = new Color(0.98f, 0.90f, 0.87f, 1f);
     // Shown when the next Stagger costs at least as much HP as the player has left. This is the
@@ -128,43 +137,45 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     private static readonly Color STAGGER_LETHAL_COLOR = new Color(1f, 0.30f, 0.28f, 1f);
 
     private TextMeshProUGUI staggerCostText;
-    private TextMeshProUGUI staggerNameText;
-    private Vector2 staggerHostSize = Vector2.zero;
+    private TextMeshProUGUI nameText;
+    private Vector2 faceHostSize = Vector2.zero;
     private bool isStaggerCard;
 
-    private void RefreshStaggerFace(RuntimeCard card)
+    private void RefreshCardFace(RuntimeCard card)
     {
-        isStaggerCard = card != null && card.cardData != null
-                        && card.cardData.actionType == CardActionType.Stagger;
+        CardData data = card != null ? card.cardData : null;
+        if (data == null) return;
 
-        // The two painted medallions belong to the normal card frame, which this art doesn't have.
+        isStaggerCard = data.actionType == CardActionType.Stagger;
+
+        // The two painted medallions belong to the normal card frame, which Stagger's art lacks —
+        // it carries a single heart on the top edge instead (see below). Leaving them on would
+        // float a Shift cost and a charge count over artwork with no sockets for them.
         if (costText != null) costText.gameObject.SetActive(!isStaggerCard);
         if (usesText != null) usesText.gameObject.SetActive(!isStaggerCard);
 
-        if (!isStaggerCard)
+        bool wantName = !data.nameIsPaintedIntoArt && !string.IsNullOrEmpty(data.cardName);
+        if (wantName)
         {
-            if (staggerCostText != null) staggerCostText.gameObject.SetActive(false);
-            if (staggerNameText != null) staggerNameText.gameObject.SetActive(false);
-            return;
+            if (nameText == null) nameText = MakeFaceLabel("CardName", 8f, 15f, NAME_COLOR);
+            nameText.gameObject.SetActive(true);
+            nameText.text = data.cardName.ToUpperInvariant();
         }
+        else if (nameText != null) nameText.gameObject.SetActive(false);
 
-        EnsureStaggerFace();
-        staggerCostText.gameObject.SetActive(true);
-        staggerNameText.gameObject.SetActive(true);
-        staggerNameText.text = card.cardData.cardName.ToUpperInvariant();
-        staggerHostSize = Vector2.zero;   // force a re-place against the current rect
-        TickStaggerFace();
+        if (isStaggerCard)
+        {
+            if (staggerCostText == null)
+                staggerCostText = MakeFaceLabel("StaggerCost", 12f, 30f, STAGGER_COST_COLOR);
+            staggerCostText.gameObject.SetActive(true);
+        }
+        else if (staggerCostText != null) staggerCostText.gameObject.SetActive(false);
+
+        faceHostSize = Vector2.zero;   // force a re-place against the current rect
+        TickCardFace();
     }
 
-    private void EnsureStaggerFace()
-    {
-        if (staggerCostText != null) return;
-
-        staggerCostText = MakeStaggerLabel("StaggerCost", 12f, 30f, STAGGER_COST_COLOR);
-        staggerNameText = MakeStaggerLabel("StaggerName", 8f, 15f, STAGGER_NAME_COLOR);
-    }
-
-    private TextMeshProUGUI MakeStaggerLabel(string name, float minSize, float maxSize, Color color)
+    private TextMeshProUGUI MakeFaceLabel(string name, float minSize, float maxSize, Color color)
     {
         RectTransform host = cardArtImage != null ? cardArtImage.rectTransform : (RectTransform)transform;
 
@@ -186,19 +197,22 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         return t;
     }
 
-    // Placement and value are refreshed from Update rather than set once: the price is read off the
-    // live player, and the lethal warning depends on current HP, which changes while the card just
-    // sits in the hand. Both are a couple of compares — nothing is written unless it changed.
-    private void TickStaggerFace()
+    // Placement and value are refreshed from Update rather than set once: Stagger's price is read
+    // off the live player, and the lethal warning depends on current HP, which changes while the
+    // card just sits in the hand. All of it is a couple of compares — nothing is written unless it
+    // changed, and the layout block only runs when the rect actually resizes.
+    private void TickCardFace()
     {
-        if (!isStaggerCard || staggerCostText == null) return;
+        bool haveName = nameText != null && nameText.gameObject.activeSelf;
+        bool haveCost = staggerCostText != null && staggerCostText.gameObject.activeSelf;
+        if (!haveName && !haveCost) return;
 
-        RectTransform host = (RectTransform)staggerCostText.transform.parent;
+        RectTransform host = cardArtImage != null ? cardArtImage.rectTransform : (RectTransform)transform;
         Vector2 size = host.rect.size;
 
-        if (size != staggerHostSize && size.x > 0f && size.y > 0f)
+        if (size != faceHostSize && size.x > 0f && size.y > 0f)
         {
-            staggerHostSize = size;
+            faceHostSize = size;
 
             // Map the sprite-space fractions through preserveAspect's letterbox.
             Sprite art = cardArtImage != null ? cardArtImage.sprite : null;
@@ -209,14 +223,21 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
             float padX = (size.x - dw) * 0.5f;
             float padY = (size.y - dh) * 0.5f;
 
-            RectTransform rt = staggerCostText.rectTransform;
-            rt.sizeDelta = new Vector2(HEART_W * dw, HEART_H * dh);
-            rt.anchoredPosition = new Vector2(padX + HEART_CX * dw, -(padY + HEART_CY * dh));
-
-            RectTransform nrt = staggerNameText.rectTransform;
-            nrt.sizeDelta = new Vector2(PLATE_W * dw, PLATE_H * dh);
-            nrt.anchoredPosition = new Vector2(padX + 0.5f * dw, -(padY + PLATE_CY * dh));
+            if (haveCost)
+            {
+                RectTransform rt = staggerCostText.rectTransform;
+                rt.sizeDelta = new Vector2(HEART_W * dw, HEART_H * dh);
+                rt.anchoredPosition = new Vector2(padX + HEART_CX * dw, -(padY + HEART_CY * dh));
+            }
+            if (haveName)
+            {
+                RectTransform nrt = nameText.rectTransform;
+                nrt.sizeDelta = new Vector2(PLATE_W * dw, PLATE_H * dh);
+                nrt.anchoredPosition = new Vector2(padX + 0.5f * dw, -(padY + PLATE_CY * dh));
+            }
         }
+
+        if (!haveCost) return;
 
         PlayerController p = GameManager.instance != null ? GameManager.instance.player : null;
         if (p == null) return;
@@ -374,7 +395,7 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         if (myCard == null) return;
         UpdateSelectionVisual();
         TickBlessMark();
-        TickStaggerFace();
+        TickCardFace();
     }
 
     private void UpdateSelectionVisual()
