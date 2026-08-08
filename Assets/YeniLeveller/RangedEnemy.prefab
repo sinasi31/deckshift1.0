@@ -215,6 +215,8 @@ MonoBehaviour:
   attackRange: 7
   fireRate: 2.5
   yTolerance: 1.5
+  shootSound: {fileID: 8300000, guid: b855762454f2d67468da655b38fe2019, type: 3}
+  shootVolume: 1
 --- !u!114 &1626646847183605829
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -227,10 +229,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4813e138349d3bd47bc9e51b493d345a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHealth: 20
+  maxHealth: 25
   canBeHeadBounced: 1
   healthBarPrefab: {fileID: 5647382910293847562, guid: 7a3f9b4c1d8e2f6b5c3d7e9f4a1b2c3d, type: 3}
-  headBarOffset: {x: 0, y: 1}
+  headBarOffset: {x: 0, y: 2}
   stunSpriteRenderers: []
   stunSkinnedRenderers:
   - {fileID: 6805959683191456920}

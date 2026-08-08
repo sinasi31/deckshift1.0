@@ -7,15 +7,25 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 namespace Cainos.InteractivePixelWater
 {
     [RequireComponent(typeof(MeshRenderer))]
     [RequireComponent(typeof(MeshFilter))]
+    [HelpURL("https://docs.cainos.net/interactive-pixel-water/script-reference")]
     public class PixelWater : MonoBehaviour
     {
         private const int VERTEX_COUNT_X_PER_UNIT = 8;                                      //how many vertices to generate at x direction per world unit
         private const float VERTEX_SPACING_X = 1.0f / VERTEX_COUNT_X_PER_UNIT;          
         private const int VERTEX_COUNT_Y = 2;                                               //how many vertices to generate at y direction
+
+        private string GeneratedMeshName
+        {
+            get { return $"[Water Mesh] {GetInstanceID()}"; }
+        }
 
         [Space]
         [FoldoutGroup("Basic")] public LayerMask interactionLayerMask;                      //defines non trigger colliders at which layer can interact with the water
@@ -277,8 +287,9 @@ namespace Cainos.InteractivePixelWater
 
         private void OnValidate()
         {
-            UpdateMaterial();
+            ResetCollider();
             UpdateFx();
+            UpdateMaterial();
         }
 
         [FoldoutGroup("Action"), Button("Refresh")]
@@ -301,6 +312,7 @@ namespace Cainos.InteractivePixelWater
             if (BuoyancyEffector)
             {
                 BuoyancyEffector.surfaceLevel = Size.y * fill;
+                BuoyancyEffector.colliderMask = interactionLayerMask;
             }
         }
 
@@ -389,6 +401,8 @@ namespace Cainos.InteractivePixelWater
             if (meshFilter == null) meshFilter = GetComponent<MeshFilter>();
             if (WaterMaterial) meshRenderer.material = WaterMaterial;
 
+            DestroyGeneratedMesh();
+
             mesh = new Mesh();
             mesh.vertices = vertices;
             mesh.triangles = triangles;
@@ -396,9 +410,41 @@ namespace Cainos.InteractivePixelWater
             mesh.uv2 = uv2;
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
-            mesh.name = "[Water Mesh]";
+            mesh.name = GeneratedMeshName;
 
             meshFilter.mesh = mesh;
+        }
+
+        private void DestroyGeneratedMesh()
+        {
+            Mesh meshToDestroy = mesh;
+
+            if (meshToDestroy == null || meshToDestroy.name != GeneratedMeshName)
+            {
+                mesh = null;
+                return;
+            }
+
+            if (meshFilter && meshFilter.sharedMesh == meshToDestroy)
+            {
+                meshFilter.sharedMesh = null;
+            }
+
+            #if UNITY_EDITOR
+            if (Application.isPlaying == false)
+            {
+                if (AssetDatabase.Contains(meshToDestroy) == false)
+                {
+                    DestroyImmediate(meshToDestroy);
+                }
+
+                mesh = null;
+                return;
+            }
+            #endif
+
+            Destroy(meshToDestroy);
+            mesh = null;
         }
 
         public void UpdateMaterial()
@@ -412,6 +458,7 @@ namespace Cainos.InteractivePixelWater
                 meshRenderer = GetComponent<MeshRenderer>();
                 meshRenderer.SetPropertyBlock(null);
             }
+            meshRenderer.material = WaterMaterial;
 
             WaterMaterial.SetColor("_WaterColorShallow", waterColorEnabled ? waterColorShallow : Color.clear);
             WaterMaterial.SetColor("_WaterColorDeep", waterColorEnabled ? waterColorDeep : Color.clear);
@@ -587,6 +634,9 @@ namespace Cainos.InteractivePixelWater
         //add a splash at the given pos with the given size
         public void AddSplash ( Vector3 pos, float size, float speed)
         {
+            //no splash configs, return
+            if (splashConfigs == null || splashConfigs.Count == 0) return;
+
             //check position
             if (pos.x + size < LeftPos) return;
             if (pos.x - size > RightPos) return;
@@ -701,6 +751,8 @@ namespace Cainos.InteractivePixelWater
         //decayDis: the distance to the water surface where the wave effect will decay to none, set to 0.0 to disable decay
         public void AddWave( Vector2 center, float radius, float vel, float decayDis = 0.0f)
         {
+            if (surfacePoints == null || surfacePoints.Length == 0) return;
+
             //caculate decay
             if (decayDis > 0.01f)
             {
@@ -790,6 +842,8 @@ namespace Cainos.InteractivePixelWater
         //doing wave sim here
         private void FixedUpdate()
         {
+            if (mesh == null || vertices == null || surfacePoints == null) return;
+
             //update all surface points
             //the left-most and right-most point is excluded
             for ( int i = 1; i < surfacePoints.Length - 1; i++ )

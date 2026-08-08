@@ -4,161 +4,900 @@ Shader "Cainos/Interactive Pixel Water/FX Pixel Water Spark"
 {
 	Properties
 	{
+		[HideInInspector] _EmissionColor("Emission Color", Color) = (1,1,1,1)
 		_StencilReference( "Stencil Reference", Int ) = 123
 		_OutlineColor( "Outline Color", Color ) = ( 0, 0, 0, 0 )
 		_SparkColor( "Spark Color", Color ) = ( 0, 0, 0, 0 )
 		_MainTex( "Main Tex", 2D ) = "white" {}
 		[HideInInspector] _texcoord( "", 2D ) = "white" {}
 
+		[HideInInspector][NoScaleOffset] unity_Lightmaps("unity_Lightmaps", 2DArray) = "" {}
+        [HideInInspector][NoScaleOffset] unity_LightmapsInd("unity_LightmapsInd", 2DArray) = "" {}
+        [HideInInspector][NoScaleOffset] unity_ShadowMasks("unity_ShadowMasks", 2DArray) = "" {}
 	}
 
 	SubShader
 	{
+		LOD 0
+
 		
 
-		Tags { "RenderType"="Transparent" }
+		Tags { "RenderPipeline"="UniversalPipeline" "RenderType"="Transparent" "Queue"="Transparent" "UniversalMaterialType"="Lit" "ShaderGraphShader"="true" }
 
-	LOD 100
+		Cull Off
 
-		Stencil
-		{
-			Ref [_StencilReference]
-			Comp NotEqual
-			Pass Replace
-		}
+		HLSLINCLUDE
+		#pragma target 2.0
+		#pragma prefer_hlslcc gles
+		// ensure rendering platforms toggle list is visible
 
-		Blend SrcAlpha OneMinusSrcAlpha, SrcAlpha OneMinusSrcAlpha
-		AlphaToMask Off
-		Cull Back
-		ColorMask RGBA
-		ZWrite Off
-		ZTest LEqual
-		Offset 0 , 0
-		
+		#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+		#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Filtering.hlsl"
 
-		CGINCLUDE
-			#pragma target 4.0
-
-			float4 ComputeClipSpacePosition( float2 screenPosNorm, float deviceDepth )
-			{
-				float4 positionCS = float4( screenPosNorm * 2.0 - 1.0, deviceDepth, 1.0 );
-			#if UNITY_UV_STARTS_AT_TOP
-				positionCS.y = -positionCS.y;
-			#endif
-				return positionCS;
-			}
-		ENDCG
+		ENDHLSL
 
 		
 		Pass
 		{
-			Name "Unlit"
+			Name "Sprite Lit"
+            Tags { "LightMode"="Universal2D" }
 
-			CGPROGRAM
-				#define ASE_VERSION 19905
+			Blend SrcAlpha OneMinusSrcAlpha, One OneMinusSrcAlpha
+			ZTest LEqual
+			ZWrite On
+			Offset 0 , 0
+			ColorMask RGBA
+			Stencil
+			{
+				Ref [_StencilReference]
+				Comp NotEqual
+				Pass Replace
+			}
 
-				#ifndef UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX
-					#define UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input)
+			HLSLPROGRAM
+
+			#define ASE_VERSION 19905
+			#define ASE_SRP_VERSION 170004
+
+
+			#pragma vertex vert
+			#pragma fragment frag
+
+			#pragma multi_compile _ DEBUG_DISPLAY SKINNED_SPRITE
+
+			#pragma multi_compile _ USE_SHAPE_LIGHT_TYPE_0
+			#pragma multi_compile _ USE_SHAPE_LIGHT_TYPE_1
+			#pragma multi_compile _ USE_SHAPE_LIGHT_TYPE_2
+			#pragma multi_compile _ USE_SHAPE_LIGHT_TYPE_3
+
+            #define _SURFACE_TYPE_TRANSPARENT 1
+            #define ATTRIBUTES_NEED_NORMAL
+            #define ATTRIBUTES_NEED_TANGENT
+            #define ATTRIBUTES_NEED_TEXCOORD0
+            #define ATTRIBUTES_NEED_COLOR
+            #define FEATURES_GRAPH_VERTEX_NORMAL_OUTPUT
+            #define FEATURES_GRAPH_VERTEX_TANGENT_OUTPUT
+            #define VARYINGS_NEED_POSITION_WS
+            #define VARYINGS_NEED_TEXCOORD0
+            #define VARYINGS_NEED_COLOR
+            #define VARYINGS_NEED_SCREENPOSITION
+            #define FEATURES_GRAPH_VERTEX
+
+			#define SHADERPASS SHADERPASS_SPRITELIT
+
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Texture.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Shaders/2D/Include/Core2D.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Input.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/TextureStack.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRendering.hlsl"
+			#include_with_pragmas "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRenderingKeywords.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DebugMipmapStreamingMacros.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderGraphFunctions.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Shaders/2D/Include/LightingUtility.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShaderPass.hlsl"
+
+			#include "Packages/com.unity.render-pipelines.universal/Shaders/2D/Include/SurfaceData2D.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Debug/Debugging2D.hlsl"
+
+			#if USE_SHAPE_LIGHT_TYPE_0
+			SHAPE_LIGHT(0)
+			#endif
+
+			#if USE_SHAPE_LIGHT_TYPE_1
+			SHAPE_LIGHT(1)
+			#endif
+
+			#if USE_SHAPE_LIGHT_TYPE_2
+			SHAPE_LIGHT(2)
+			#endif
+
+			#if USE_SHAPE_LIGHT_TYPE_3
+			SHAPE_LIGHT(3)
+			#endif
+
+			#include "Packages/com.unity.render-pipelines.universal/Shaders/2D/Include/CombinedShapeLightShared.hlsl"
+
+			#define ASE_NEEDS_TEXTURE_COORDINATES0
+			#define ASE_NEEDS_FRAG_TEXTURE_COORDINATES0
+
+
+			sampler2D _MainTex;
+			CBUFFER_START( UnityPerMaterial )
+			float4 _OutlineColor;
+			float4 _MainTex_TexelSize;
+			float4 _MainTex_ST;
+			float4 _SparkColor;
+			int _StencilReference;
+			CBUFFER_END
+
+
+			struct VertexInput
+			{
+				float3 positionOS : POSITION;
+				float3 normal : NORMAL;
+				float4 tangent : TANGENT;
+				float4 uv0 : TEXCOORD0;
+				float4 color : COLOR;
+				
+				UNITY_SKINNED_VERTEX_INPUTS
+				UNITY_VERTEX_INPUT_INSTANCE_ID
+			};
+
+			struct VertexOutput
+			{
+				float4 positionCS : SV_POSITION;
+				float4 texCoord0 : TEXCOORD0;
+				float4 color : TEXCOORD1;
+				float4 screenPosition : TEXCOORD2;
+				float3 positionWS : TEXCOORD3;
+				float4 ase_color : COLOR;
+				UNITY_VERTEX_INPUT_INSTANCE_ID
+				UNITY_VERTEX_OUTPUT_STEREO
+			};
+
+			#if ETC1_EXTERNAL_ALPHA
+				TEXTURE2D(_AlphaTex); SAMPLER(sampler_AlphaTex);
+				float _EnableAlphaTexture;
+			#endif
+
+			
+			VertexOutput vert( VertexInput v  )
+			{
+				VertexOutput o = (VertexOutput)0;
+
+				UNITY_SETUP_INSTANCE_ID(v);
+				UNITY_TRANSFER_INSTANCE_ID(v, o);
+				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+				UNITY_SKINNED_VERTEX_COMPUTE(v);
+
+				v.positionOS = UnityFlipSprite( v.positionOS, unity_SpriteProps.xy );
+
+				o.ase_color = v.color;
+				#ifdef ASE_ABSOLUTE_VERTEX_POS
+					float3 defaultVertexValue = v.positionOS;
+				#else
+					float3 defaultVertexValue = float3(0, 0, 0);
 				#endif
-				#pragma vertex vert
-				#pragma fragment frag
-				#pragma multi_compile_instancing
-				#include "UnityCG.cginc"
+				float3 vertexValue = defaultVertexValue;
+				#ifdef ASE_ABSOLUTE_VERTEX_POS
+					v.positionOS = vertexValue;
+				#else
+					v.positionOS += vertexValue;
+				#endif
+				v.normal = v.normal;
+				v.tangent.xyz = v.tangent.xyz;
 
-				#define ASE_NEEDS_TEXTURE_COORDINATES0
-				#define ASE_NEEDS_FRAG_TEXTURE_COORDINATES0
+				VertexPositionInputs vertexInput = GetVertexPositionInputs(v.positionOS);
+
+				o.positionCS = vertexInput.positionCS;
+				o.positionWS = vertexInput.positionWS;
+				o.texCoord0 = v.uv0;
+				o.color = v.color;
+				o.screenPosition = vertexInput.positionNDC;
+				return o;
+			}
+
+			half4 frag( VertexOutput IN  ) : SV_Target
+			{
+				UNITY_SETUP_INSTANCE_ID(IN);
+				UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(IN);
+
+				float4 positionCS = IN.positionCS;
+				float3 positionWS = IN.positionWS;
+
+				float4 P_Outline_Color310 = _OutlineColor;
+				float2 appendResult269 = (float2(( _MainTex_TexelSize.x * -1.0 ) , 0.0));
+				float M_Outline_L288 = tex2D( _MainTex, ( IN.texCoord0.xy + appendResult269 ) ).a;
+				float2 appendResult267 = (float2(( _MainTex_TexelSize.x * 1.0 ) , 0.0));
+				float M_Outline_R287 = tex2D( _MainTex, ( IN.texCoord0.xy + appendResult267 ) ).a;
+				float2 appendResult272 = (float2(0.0 , ( _MainTex_TexelSize.y * 1.0 )));
+				float M_Outline_T289 = tex2D( _MainTex, ( IN.texCoord0.xy + appendResult272 ) ).a;
+				float2 appendResult273 = (float2(0.0 , ( _MainTex_TexelSize.y * -1.0 )));
+				float M_Outline_B290 = tex2D( _MainTex, ( IN.texCoord0.xy + appendResult273 ) ).a;
+				float2 uv_MainTex = IN.texCoord0.xy * _MainTex_ST.xy + _MainTex_ST.zw;
+				float P_Spark_Alpha319 = tex2D( _MainTex, uv_MainTex ).a;
+				float temp_output_302_0 = saturate( ( step( 0.1 , max( max( M_Outline_L288 , M_Outline_R287 ) , max( M_Outline_T289 , M_Outline_B290 ) ) ) - step( 0.1 , P_Spark_Alpha319 ) ) );
+				float4 M_Outline_Final305 = ( P_Outline_Color310 * temp_output_302_0 );
+				float4 P_Spark_Color322 = _SparkColor;
+				float4 temp_output_311_0 = ( M_Outline_Final305 + ( P_Spark_Color322 * P_Spark_Alpha319 ) );
+				clip( temp_output_311_0.a - 0.01);
+				
+				float4 Color = ( IN.ase_color * temp_output_311_0 );
+				float4 Mask = float4(1,1,1,1);
+				float3 Normal = float3( 0, 0, 1 );
+
+				#if ETC1_EXTERNAL_ALPHA
+					float4 alpha = SAMPLE_TEXTURE2D(_AlphaTex, sampler_AlphaTex, IN.texCoord0.xy);
+					Color.a = lerp( Color.a, alpha.r, _EnableAlphaTexture);
+				#endif
+
+				SurfaceData2D surfaceData;
+				InitializeSurfaceData(Color.rgb, Color.a, Mask, surfaceData);
+				InputData2D inputData;
+				InitializeInputData(IN.texCoord0.xy, half2(IN.screenPosition.xy / IN.screenPosition.w), inputData);
+				SETUP_DEBUG_DATA_2D(inputData, positionWS, positionCS);
+				return CombinedShapeLightShared(surfaceData, inputData);
+
+				Color *= IN.color;
+			}
+
+			ENDHLSL
+		}
+
+		
+		Pass
+		{
+			
+            Name "Sprite Normal"
+            Tags { "LightMode"="NormalsRendering" }
+
+			Blend SrcAlpha OneMinusSrcAlpha, One OneMinusSrcAlpha
+			ZTest LEqual
+			ZWrite On
+			Offset 0 , 0
+			ColorMask RGBA
+			Stencil
+			{
+				Ref [_StencilReference]
+				Comp NotEqual
+				Pass Replace
+			}
+
+			HLSLPROGRAM
+
+			#define ASE_VERSION 19905
+			#define ASE_SRP_VERSION 170004
 
 
-				struct appdata
-				{
-					float4 vertex : POSITION;
-					float4 ase_color : COLOR;
-					float4 ase_texcoord : TEXCOORD0;
-					UNITY_VERTEX_INPUT_INSTANCE_ID
-				};
+			#pragma vertex vert
+			#pragma fragment frag
 
-				struct v2f
-				{
-					float4 pos : SV_POSITION;
-					float4 ase_color : COLOR;
-					float4 ase_texcoord : TEXCOORD0;
-					UNITY_VERTEX_INPUT_INSTANCE_ID
-					UNITY_VERTEX_OUTPUT_STEREO
-				};
+			#pragma multi_compile _ SKINNED_SPRITE
 
-				uniform int _StencilReference;
-				uniform float4 _OutlineColor;
-				uniform sampler2D _MainTex;
-				float4 _MainTex_TexelSize;
-				uniform float4 _MainTex_ST;
-				uniform float4 _SparkColor;
+			#define _SURFACE_TYPE_TRANSPARENT 1
+            #define ATTRIBUTES_NEED_NORMAL
+            #define ATTRIBUTES_NEED_TANGENT
+            #define FEATURES_GRAPH_VERTEX_NORMAL_OUTPUT
+            #define FEATURES_GRAPH_VERTEX_TANGENT_OUTPUT
+            #define VARYINGS_NEED_NORMAL_WS
+            #define VARYINGS_NEED_TANGENT_WS
+            #define FEATURES_GRAPH_VERTEX
 
+			#define SHADERPASS SHADERPASS_SPRITENORMAL
+
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Texture.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Shaders/2D/Include/Core2D.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Input.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/TextureStack.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRendering.hlsl"
+			#include_with_pragmas "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRenderingKeywords.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DebugMipmapStreamingMacros.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderGraphFunctions.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Shaders/2D/Include/NormalsRenderingShared.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShaderPass.hlsl"
+
+			#define ASE_NEEDS_FRAG_COLOR
+			#define ASE_NEEDS_TEXTURE_COORDINATES0
+			#define ASE_NEEDS_FRAG_TEXTURE_COORDINATES0
+
+
+			sampler2D _MainTex;
+			CBUFFER_START( UnityPerMaterial )
+			float4 _OutlineColor;
+			float4 _MainTex_TexelSize;
+			float4 _MainTex_ST;
+			float4 _SparkColor;
+			int _StencilReference;
+			CBUFFER_END
+
+
+			struct VertexInput
+			{
+				float3 positionOS : POSITION;
+				float3 normal : NORMAL;
+				float4 tangent : TANGENT;
+				float4 uv0 : TEXCOORD0;
+				float4 color : COLOR;
+				
+				UNITY_SKINNED_VERTEX_INPUTS
+				UNITY_VERTEX_INPUT_INSTANCE_ID
+			};
+
+			struct VertexOutput
+			{
+				float4 positionCS : SV_POSITION;
+				float4 texCoord0 : TEXCOORD0;
+				float4 color : TEXCOORD1;
+				float3 normalWS : TEXCOORD2;
+				float4 tangentWS : TEXCOORD3;
+				float3 bitangentWS : TEXCOORD4;
+				
+				UNITY_VERTEX_INPUT_INSTANCE_ID
+				UNITY_VERTEX_OUTPUT_STEREO
+			};
+
+			
+			VertexOutput vert( VertexInput v  )
+			{
+				VertexOutput o = (VertexOutput)0;
+
+				UNITY_SETUP_INSTANCE_ID(v);
+				UNITY_TRANSFER_INSTANCE_ID(v, o);
+				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+				UNITY_SKINNED_VERTEX_COMPUTE(v);
+
+				v.positionOS = UnityFlipSprite( v.positionOS, unity_SpriteProps.xy );
 
 				
-				v2f vert ( appdata v )
-				{
-					v2f o;
-					UNITY_SETUP_INSTANCE_ID( v );
-					UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO( o );
-					UNITY_TRANSFER_INSTANCE_ID( v, o );
+				#ifdef ASE_ABSOLUTE_VERTEX_POS
+					float3 defaultVertexValue = v.positionOS;
+				#else
+					float3 defaultVertexValue = float3(0, 0, 0);
+				#endif
+				float3 vertexValue = defaultVertexValue;
+				#ifdef ASE_ABSOLUTE_VERTEX_POS
+					v.positionOS = vertexValue;
+				#else
+					v.positionOS += vertexValue;
+				#endif
+				v.normal = v.normal;
+				v.tangent.xyz = v.tangent.xyz;
 
-					o.ase_color = v.ase_color;
-					o.ase_texcoord.xy = v.ase_texcoord.xy;
-					
-					//setting value to unused interpolator channels and avoid initialization warnings
-					o.ase_texcoord.zw = 0;
+				VertexPositionInputs vertexInput = GetVertexPositionInputs(v.positionOS);
 
-					float3 vertexValue = float3( 0, 0, 0 );
-					#if ASE_ABSOLUTE_VERTEX_POS
-						vertexValue = v.vertex.xyz;
-					#endif
-					vertexValue = vertexValue;
-					#if ASE_ABSOLUTE_VERTEX_POS
-						v.vertex.xyz = vertexValue;
-					#else
-						v.vertex.xyz += vertexValue;
-					#endif
+				o.texCoord0 = v.uv0;
+				o.color = v.color;
+				o.positionCS = vertexInput.positionCS;
 
-					o.pos = UnityObjectToClipPos( v.vertex );
-					return o;
-				}
+				float3 normalWS = TransformObjectToWorldNormal(v.normal);
+				o.normalWS = -GetViewForwardDir();
+				float4 tangentWS = float4( TransformObjectToWorldDir(v.tangent.xyz), v.tangent.w);
+				o.tangentWS = normalize(tangentWS);
+				half crossSign = (tangentWS.w > 0.0 ? 1.0 : -1.0) * GetOddNegativeScale();
+				o.bitangentWS = crossSign * cross(normalWS, tangentWS.xyz) * tangentWS.w;
+				return o;
+			}
 
-				half4 frag( v2f IN  ) : SV_Target
-				{
-					UNITY_SETUP_INSTANCE_ID( IN );
-					UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX( IN );
-					half4 finalColor;
+			half4 frag( VertexOutput IN  ) : SV_Target
+			{
+				UNITY_SETUP_INSTANCE_ID(IN);
+				UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(IN);
 
-					float4 ScreenPosNorm = float4( IN.pos.xy * ( _ScreenParams.zw - 1.0 ), IN.pos.zw );
-					float4 ClipPos = ComputeClipSpacePosition( ScreenPosNorm.xy, IN.pos.z ) * IN.pos.w;
-					float4 ScreenPos = ComputeScreenPos( ClipPos );
+				float4 P_Outline_Color310 = _OutlineColor;
+				float2 appendResult269 = (float2(( _MainTex_TexelSize.x * -1.0 ) , 0.0));
+				float M_Outline_L288 = tex2D( _MainTex, ( IN.texCoord0.xy + appendResult269 ) ).a;
+				float2 appendResult267 = (float2(( _MainTex_TexelSize.x * 1.0 ) , 0.0));
+				float M_Outline_R287 = tex2D( _MainTex, ( IN.texCoord0.xy + appendResult267 ) ).a;
+				float2 appendResult272 = (float2(0.0 , ( _MainTex_TexelSize.y * 1.0 )));
+				float M_Outline_T289 = tex2D( _MainTex, ( IN.texCoord0.xy + appendResult272 ) ).a;
+				float2 appendResult273 = (float2(0.0 , ( _MainTex_TexelSize.y * -1.0 )));
+				float M_Outline_B290 = tex2D( _MainTex, ( IN.texCoord0.xy + appendResult273 ) ).a;
+				float2 uv_MainTex = IN.texCoord0.xy * _MainTex_ST.xy + _MainTex_ST.zw;
+				float P_Spark_Alpha319 = tex2D( _MainTex, uv_MainTex ).a;
+				float temp_output_302_0 = saturate( ( step( 0.1 , max( max( M_Outline_L288 , M_Outline_R287 ) , max( M_Outline_T289 , M_Outline_B290 ) ) ) - step( 0.1 , P_Spark_Alpha319 ) ) );
+				float4 M_Outline_Final305 = ( P_Outline_Color310 * temp_output_302_0 );
+				float4 P_Spark_Color322 = _SparkColor;
+				float4 temp_output_311_0 = ( M_Outline_Final305 + ( P_Spark_Color322 * P_Spark_Alpha319 ) );
+				clip( temp_output_311_0.a - 0.01);
+				
+				float4 Color = ( IN.color * temp_output_311_0 );
+				float3 Normal = float3( 0, 0, 1 );
 
-					float4 P_Outline_Color310 = _OutlineColor;
-					float2 appendResult269 = (float2(( _MainTex_TexelSize.x * -1.0 ) , 0.0));
-					float M_Outline_L288 = tex2D( _MainTex, ( IN.ase_texcoord.xy + appendResult269 ) ).a;
-					float2 appendResult267 = (float2(( _MainTex_TexelSize.x * 1.0 ) , 0.0));
-					float M_Outline_R287 = tex2D( _MainTex, ( IN.ase_texcoord.xy + appendResult267 ) ).a;
-					float2 appendResult272 = (float2(0.0 , ( _MainTex_TexelSize.y * 1.0 )));
-					float M_Outline_T289 = tex2D( _MainTex, ( IN.ase_texcoord.xy + appendResult272 ) ).a;
-					float2 appendResult273 = (float2(0.0 , ( _MainTex_TexelSize.y * -1.0 )));
-					float M_Outline_B290 = tex2D( _MainTex, ( IN.ase_texcoord.xy + appendResult273 ) ).a;
-					float2 uv_MainTex = IN.ase_texcoord.xy * _MainTex_ST.xy + _MainTex_ST.zw;
-					float P_Spark_Alpha319 = tex2D( _MainTex, uv_MainTex ).a;
-					float temp_output_302_0 = saturate( ( step( 0.1 , max( max( M_Outline_L288 , M_Outline_R287 ) , max( M_Outline_T289 , M_Outline_B290 ) ) ) - step( 0.1 , P_Spark_Alpha319 ) ) );
-					float4 M_Outline_Final305 = ( P_Outline_Color310 * temp_output_302_0 );
-					float4 P_Spark_Color322 = _SparkColor;
-					float4 temp_output_311_0 = ( M_Outline_Final305 + ( P_Spark_Color322 * P_Spark_Alpha319 ) );
-					clip( temp_output_311_0.a - 0.01);
-					
+				Color *= IN.color;
 
-					finalColor = ( IN.ase_color * temp_output_311_0 );
+				return NormalsRenderingShared(Color, Normal, IN.tangentWS.xyz, IN.bitangentWS, IN.normalWS);
+			}
 
-					return finalColor;
-				}
-			ENDCG
+			ENDHLSL
 		}
+
+		
+		Pass
+		{
+			
+            Name "Sprite Forward"
+            Tags { "LightMode"="UniversalForward" }
+
+			Blend SrcAlpha OneMinusSrcAlpha, One OneMinusSrcAlpha
+			ZTest LEqual
+			ZWrite On
+			Offset 0 , 0
+			ColorMask RGBA
+			Stencil
+			{
+				Ref [_StencilReference]
+				Comp NotEqual
+				Pass Replace
+			}
+
+			HLSLPROGRAM
+
+			#define ASE_VERSION 19905
+			#define ASE_SRP_VERSION 170004
+
+
+			#pragma vertex vert
+			#pragma fragment frag
+
+			#pragma multi_compile _ SKINNED_SPRITE
+
+            #define _SURFACE_TYPE_TRANSPARENT 1
+            #define ATTRIBUTES_NEED_NORMAL
+            #define ATTRIBUTES_NEED_TANGENT
+            #define ATTRIBUTES_NEED_TEXCOORD0
+            #define ATTRIBUTES_NEED_COLOR
+            #define FEATURES_GRAPH_VERTEX_NORMAL_OUTPUT
+            #define FEATURES_GRAPH_VERTEX_TANGENT_OUTPUT
+            #define VARYINGS_NEED_POSITION_WS
+            #define VARYINGS_NEED_TEXCOORD0
+            #define VARYINGS_NEED_COLOR
+            #define FEATURES_GRAPH_VERTEX
+
+			#define SHADERPASS SHADERPASS_SPRITEFORWARD
+
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Texture.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Shaders/2D/Include/Core2D.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Input.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/TextureStack.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRendering.hlsl"
+			#include_with_pragmas "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRenderingKeywords.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DebugMipmapStreamingMacros.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderGraphFunctions.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShaderPass.hlsl"
+
+			#include "Packages/com.unity.render-pipelines.universal/Shaders/2D/Include/SurfaceData2D.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Debug/Debugging2D.hlsl"
+
+			#define ASE_NEEDS_FRAG_COLOR
+			#define ASE_NEEDS_TEXTURE_COORDINATES0
+			#define ASE_NEEDS_FRAG_TEXTURE_COORDINATES0
+
+
+			sampler2D _MainTex;
+			CBUFFER_START( UnityPerMaterial )
+			float4 _OutlineColor;
+			float4 _MainTex_TexelSize;
+			float4 _MainTex_ST;
+			float4 _SparkColor;
+			int _StencilReference;
+			CBUFFER_END
+
+
+			struct VertexInput
+			{
+				float3 positionOS : POSITION;
+				float3 normal : NORMAL;
+				float4 tangent : TANGENT;
+				float4 uv0 : TEXCOORD0;
+				float4 color : COLOR;
+				
+				UNITY_SKINNED_VERTEX_INPUTS
+				UNITY_VERTEX_INPUT_INSTANCE_ID
+			};
+
+			struct VertexOutput
+			{
+				float4 positionCS : SV_POSITION;
+				float4 texCoord0 : TEXCOORD0;
+				float4 color : TEXCOORD1;
+				float3 positionWS : TEXCOORD2;
+				
+				UNITY_VERTEX_INPUT_INSTANCE_ID
+				UNITY_VERTEX_OUTPUT_STEREO
+			};
+
+			#if ETC1_EXTERNAL_ALPHA
+				TEXTURE2D( _AlphaTex ); SAMPLER( sampler_AlphaTex );
+				float _EnableAlphaTexture;
+			#endif
+
+			
+			VertexOutput vert( VertexInput v  )
+			{
+				VertexOutput o = (VertexOutput)0;
+				UNITY_SETUP_INSTANCE_ID(v);
+				UNITY_TRANSFER_INSTANCE_ID(v, o);
+				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+				UNITY_SKINNED_VERTEX_COMPUTE( v );
+
+				v.positionOS = UnityFlipSprite( v.positionOS, unity_SpriteProps.xy );
+
+				
+				#ifdef ASE_ABSOLUTE_VERTEX_POS
+					float3 defaultVertexValue = v.positionOS;
+				#else
+					float3 defaultVertexValue = float3( 0, 0, 0 );
+				#endif
+				float3 vertexValue = defaultVertexValue;
+				#ifdef ASE_ABSOLUTE_VERTEX_POS
+					v.positionOS = vertexValue;
+				#else
+					v.positionOS += vertexValue;
+				#endif
+				v.normal = v.normal;
+				v.tangent.xyz = v.tangent.xyz;
+
+				VertexPositionInputs vertexInput = GetVertexPositionInputs(v.positionOS);
+
+				o.positionCS = vertexInput.positionCS;
+				o.positionWS = vertexInput.positionWS;
+				o.texCoord0 = v.uv0;
+				o.color = v.color;
+
+				return o;
+			}
+
+			half4 frag( VertexOutput IN  ) : SV_Target
+			{
+				UNITY_SETUP_INSTANCE_ID(IN);
+				UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(IN);
+
+				float4 positionCS = IN.positionCS;
+				float3 positionWS = IN.positionWS;
+
+				float4 P_Outline_Color310 = _OutlineColor;
+				float2 appendResult269 = (float2(( _MainTex_TexelSize.x * -1.0 ) , 0.0));
+				float M_Outline_L288 = tex2D( _MainTex, ( IN.texCoord0.xy + appendResult269 ) ).a;
+				float2 appendResult267 = (float2(( _MainTex_TexelSize.x * 1.0 ) , 0.0));
+				float M_Outline_R287 = tex2D( _MainTex, ( IN.texCoord0.xy + appendResult267 ) ).a;
+				float2 appendResult272 = (float2(0.0 , ( _MainTex_TexelSize.y * 1.0 )));
+				float M_Outline_T289 = tex2D( _MainTex, ( IN.texCoord0.xy + appendResult272 ) ).a;
+				float2 appendResult273 = (float2(0.0 , ( _MainTex_TexelSize.y * -1.0 )));
+				float M_Outline_B290 = tex2D( _MainTex, ( IN.texCoord0.xy + appendResult273 ) ).a;
+				float2 uv_MainTex = IN.texCoord0.xy * _MainTex_ST.xy + _MainTex_ST.zw;
+				float P_Spark_Alpha319 = tex2D( _MainTex, uv_MainTex ).a;
+				float temp_output_302_0 = saturate( ( step( 0.1 , max( max( M_Outline_L288 , M_Outline_R287 ) , max( M_Outline_T289 , M_Outline_B290 ) ) ) - step( 0.1 , P_Spark_Alpha319 ) ) );
+				float4 M_Outline_Final305 = ( P_Outline_Color310 * temp_output_302_0 );
+				float4 P_Spark_Color322 = _SparkColor;
+				float4 temp_output_311_0 = ( M_Outline_Final305 + ( P_Spark_Color322 * P_Spark_Alpha319 ) );
+				clip( temp_output_311_0.a - 0.01);
+				
+				float4 Color = ( IN.color * temp_output_311_0 );
+
+				#if defined(DEBUG_DISPLAY)
+					SurfaceData2D surfaceData;
+					InitializeSurfaceData(Color.rgb, Color.a, surfaceData);
+					InputData2D inputData;
+					InitializeInputData(positionWS.xy, half2(IN.texCoord0.xy), inputData);
+					half4 debugColor = 0;
+
+					SETUP_DEBUG_DATA_2D(inputData, positionWS, positionCS);
+
+					if (CanDebugOverrideOutputColor(surfaceData, inputData, debugColor))
+					{
+						return debugColor;
+					}
+				#endif
+
+				#if ETC1_EXTERNAL_ALPHA
+					float4 alpha = SAMPLE_TEXTURE2D( _AlphaTex, sampler_AlphaTex, IN.texCoord0.xy );
+					Color.a = lerp( Color.a, alpha.r, _EnableAlphaTexture );
+				#endif
+
+				Color *= IN.color;
+				return Color;
+			}
+
+			ENDHLSL
+		}
+		
+        Pass
+        {
+			
+            Name "SceneSelectionPass"
+            Tags { "LightMode"="SceneSelectionPass" }
+
+            Cull Off
+
+            HLSLPROGRAM
+
+			#define ASE_VERSION 19905
+			#define ASE_SRP_VERSION 170004
+
+
+			#pragma vertex vert
+			#pragma fragment frag
+
+			#pragma multi_compile _ DEBUG_DISPLAY SKINNED_SPRITE
+
+            #define _SURFACE_TYPE_TRANSPARENT 1
+            #define ATTRIBUTES_NEED_NORMAL
+            #define ATTRIBUTES_NEED_TANGENT
+            #define FEATURES_GRAPH_VERTEX_NORMAL_OUTPUT
+            #define FEATURES_GRAPH_VERTEX_TANGENT_OUTPUT
+            #define FEATURES_GRAPH_VERTEX
+
+            #define SHADERPASS SHADERPASS_DEPTHONLY
+			#define SCENESELECTIONPASS 1
+
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Texture.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Shaders/2D/Include/Core2D.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Input.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/TextureStack.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRendering.hlsl"
+			#include_with_pragmas "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRenderingKeywords.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DebugMipmapStreamingMacros.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderGraphFunctions.hlsl"
+			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShaderPass.hlsl"
+
+			#define ASE_NEEDS_TEXTURE_COORDINATES0
+			#define ASE_NEEDS_FRAG_TEXTURE_COORDINATES0
+
+
+			sampler2D _MainTex;
+			CBUFFER_START( UnityPerMaterial )
+			float4 _OutlineColor;
+			float4 _MainTex_TexelSize;
+			float4 _MainTex_ST;
+			float4 _SparkColor;
+			int _StencilReference;
+			CBUFFER_END
+
+
+            struct VertexInput
+			{
+				float3 positionOS : POSITION;
+				float3 normal : NORMAL;
+				float4 tangent : TANGENT;
+				float4 ase_color : COLOR;
+				float4 ase_texcoord : TEXCOORD0;
+				UNITY_SKINNED_VERTEX_INPUTS
+				UNITY_VERTEX_INPUT_INSTANCE_ID
+			};
+
+			struct VertexOutput
+			{
+				float4 positionCS : SV_POSITION;
+				float4 ase_color : COLOR;
+				float4 ase_texcoord : TEXCOORD0;
+				UNITY_VERTEX_INPUT_INSTANCE_ID
+			};
+
+            int _ObjectId;
+            int _PassValue;
+
+			
+			VertexOutput vert(VertexInput v )
+			{
+				VertexOutput o = (VertexOutput)0;
+
+				UNITY_SETUP_INSTANCE_ID(v);
+				UNITY_TRANSFER_INSTANCE_ID(v, o);
+				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+				UNITY_SKINNED_VERTEX_COMPUTE(v);
+
+				v.positionOS = UnityFlipSprite( v.positionOS, unity_SpriteProps.xy );
+
+				o.ase_color = v.ase_color;
+				o.ase_texcoord.xy = v.ase_texcoord.xy;
+				
+				//setting value to unused interpolator channels and avoid initialization warnings
+				o.ase_texcoord.zw = 0;
+				#ifdef ASE_ABSOLUTE_VERTEX_POS
+					float3 defaultVertexValue = v.positionOS;
+				#else
+					float3 defaultVertexValue = float3(0, 0, 0);
+				#endif
+				float3 vertexValue = defaultVertexValue;
+				#ifdef ASE_ABSOLUTE_VERTEX_POS
+					v.positionOS = vertexValue;
+				#else
+					v.positionOS += vertexValue;
+				#endif
+
+				VertexPositionInputs vertexInput = GetVertexPositionInputs(v.positionOS);
+				float3 positionWS = TransformObjectToWorld(v.positionOS);
+				o.positionCS = TransformWorldToHClip(positionWS);
+
+				return o;
+			}
+
+			half4 frag(VertexOutput IN) : SV_TARGET
+			{
+				float4 P_Outline_Color310 = _OutlineColor;
+				float2 appendResult269 = (float2(( _MainTex_TexelSize.x * -1.0 ) , 0.0));
+				float M_Outline_L288 = tex2D( _MainTex, ( IN.ase_texcoord.xy + appendResult269 ) ).a;
+				float2 appendResult267 = (float2(( _MainTex_TexelSize.x * 1.0 ) , 0.0));
+				float M_Outline_R287 = tex2D( _MainTex, ( IN.ase_texcoord.xy + appendResult267 ) ).a;
+				float2 appendResult272 = (float2(0.0 , ( _MainTex_TexelSize.y * 1.0 )));
+				float M_Outline_T289 = tex2D( _MainTex, ( IN.ase_texcoord.xy + appendResult272 ) ).a;
+				float2 appendResult273 = (float2(0.0 , ( _MainTex_TexelSize.y * -1.0 )));
+				float M_Outline_B290 = tex2D( _MainTex, ( IN.ase_texcoord.xy + appendResult273 ) ).a;
+				float2 uv_MainTex = IN.ase_texcoord.xy * _MainTex_ST.xy + _MainTex_ST.zw;
+				float P_Spark_Alpha319 = tex2D( _MainTex, uv_MainTex ).a;
+				float temp_output_302_0 = saturate( ( step( 0.1 , max( max( M_Outline_L288 , M_Outline_R287 ) , max( M_Outline_T289 , M_Outline_B290 ) ) ) - step( 0.1 , P_Spark_Alpha319 ) ) );
+				float4 M_Outline_Final305 = ( P_Outline_Color310 * temp_output_302_0 );
+				float4 P_Spark_Color322 = _SparkColor;
+				float4 temp_output_311_0 = ( M_Outline_Final305 + ( P_Spark_Color322 * P_Spark_Alpha319 ) );
+				clip( temp_output_311_0.a - 0.01);
+				
+				float4 Color = ( IN.ase_color * temp_output_311_0 );
+
+				half4 outColor = half4(_ObjectId, _PassValue, 1.0, 1.0);
+				return outColor;
+			}
+
+            ENDHLSL
+        }
+
+		
+        Pass
+        {
+			
+            Name "ScenePickingPass"
+            Tags { "LightMode"="Picking" }
+
+			Cull Off
+
+            HLSLPROGRAM
+
+			#define ASE_VERSION 19905
+			#define ASE_SRP_VERSION 170004
+
+
+			#pragma vertex vert
+			#pragma fragment frag
+
+			#pragma multi_compile _ DEBUG_DISPLAY SKINNED_SPRITE
+
+            #define _SURFACE_TYPE_TRANSPARENT 1
+            #define ATTRIBUTES_NEED_NORMAL
+            #define ATTRIBUTES_NEED_TANGENT
+            #define FEATURES_GRAPH_VERTEX_NORMAL_OUTPUT
+            #define FEATURES_GRAPH_VERTEX_TANGENT_OUTPUT
+            #define FEATURES_GRAPH_VERTEX
+
+            #define SHADERPASS SHADERPASS_DEPTHONLY
+			#define SCENEPICKINGPASS 1
+
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Texture.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Shaders/2D/Include/Core2D.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Input.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/TextureStack.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRendering.hlsl"
+			#include_with_pragmas "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRenderingKeywords.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DebugMipmapStreamingMacros.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderGraphFunctions.hlsl"
+			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShaderPass.hlsl"
+
+        	#define ASE_NEEDS_TEXTURE_COORDINATES0
+        	#define ASE_NEEDS_FRAG_TEXTURE_COORDINATES0
+
+
+			sampler2D _MainTex;
+			CBUFFER_START( UnityPerMaterial )
+			float4 _OutlineColor;
+			float4 _MainTex_TexelSize;
+			float4 _MainTex_ST;
+			float4 _SparkColor;
+			int _StencilReference;
+			CBUFFER_END
+
+
+            struct VertexInput
+			{
+				float3 positionOS : POSITION;
+				float3 normal : NORMAL;
+				float4 tangent : TANGENT;
+				float4 ase_color : COLOR;
+				float4 ase_texcoord : TEXCOORD0;
+				UNITY_SKINNED_VERTEX_INPUTS
+				UNITY_VERTEX_INPUT_INSTANCE_ID
+			};
+
+			struct VertexOutput
+			{
+				float4 positionCS : SV_POSITION;
+				float4 ase_color : COLOR;
+				float4 ase_texcoord : TEXCOORD0;
+				UNITY_VERTEX_INPUT_INSTANCE_ID
+			};
+
+            float4 _SelectionID;
+
+			
+			VertexOutput vert(VertexInput v  )
+			{
+				VertexOutput o = (VertexOutput)0;
+
+				UNITY_SETUP_INSTANCE_ID(v);
+				UNITY_TRANSFER_INSTANCE_ID(v, o);
+				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+				UNITY_SKINNED_VERTEX_COMPUTE(v);
+
+				v.positionOS = UnityFlipSprite( v.positionOS, unity_SpriteProps.xy );
+
+				o.ase_color = v.ase_color;
+				o.ase_texcoord.xy = v.ase_texcoord.xy;
+				
+				//setting value to unused interpolator channels and avoid initialization warnings
+				o.ase_texcoord.zw = 0;
+				#ifdef ASE_ABSOLUTE_VERTEX_POS
+					float3 defaultVertexValue = v.positionOS;
+				#else
+					float3 defaultVertexValue = float3(0, 0, 0);
+				#endif
+				float3 vertexValue = defaultVertexValue;
+				#ifdef ASE_ABSOLUTE_VERTEX_POS
+					v.positionOS = vertexValue;
+				#else
+					v.positionOS += vertexValue;
+				#endif
+
+				VertexPositionInputs vertexInput = GetVertexPositionInputs(v.positionOS);
+				float3 positionWS = TransformObjectToWorld(v.positionOS);
+				o.positionCS = TransformWorldToHClip(positionWS);
+
+				return o;
+			}
+
+			half4 frag(VertexOutput IN ) : SV_TARGET
+			{
+				float4 P_Outline_Color310 = _OutlineColor;
+				float2 appendResult269 = (float2(( _MainTex_TexelSize.x * -1.0 ) , 0.0));
+				float M_Outline_L288 = tex2D( _MainTex, ( IN.ase_texcoord.xy + appendResult269 ) ).a;
+				float2 appendResult267 = (float2(( _MainTex_TexelSize.x * 1.0 ) , 0.0));
+				float M_Outline_R287 = tex2D( _MainTex, ( IN.ase_texcoord.xy + appendResult267 ) ).a;
+				float2 appendResult272 = (float2(0.0 , ( _MainTex_TexelSize.y * 1.0 )));
+				float M_Outline_T289 = tex2D( _MainTex, ( IN.ase_texcoord.xy + appendResult272 ) ).a;
+				float2 appendResult273 = (float2(0.0 , ( _MainTex_TexelSize.y * -1.0 )));
+				float M_Outline_B290 = tex2D( _MainTex, ( IN.ase_texcoord.xy + appendResult273 ) ).a;
+				float2 uv_MainTex = IN.ase_texcoord.xy * _MainTex_ST.xy + _MainTex_ST.zw;
+				float P_Spark_Alpha319 = tex2D( _MainTex, uv_MainTex ).a;
+				float temp_output_302_0 = saturate( ( step( 0.1 , max( max( M_Outline_L288 , M_Outline_R287 ) , max( M_Outline_T289 , M_Outline_B290 ) ) ) - step( 0.1 , P_Spark_Alpha319 ) ) );
+				float4 M_Outline_Final305 = ( P_Outline_Color310 * temp_output_302_0 );
+				float4 P_Spark_Color322 = _SparkColor;
+				float4 temp_output_311_0 = ( M_Outline_Final305 + ( P_Spark_Color322 * P_Spark_Alpha319 ) );
+				clip( temp_output_311_0.a - 0.01);
+				
+				float4 Color = ( IN.ase_color * temp_output_311_0 );
+				half4 outColor = unity_SelectionID;
+				return outColor;
+			}
+
+            ENDHLSL
+        }
+		
 	}
-	
+	CustomEditor "UnityEditor.ShaderGraph.GenericShaderGraphMaterialGUI"
+	FallBack "Hidden/Shader Graph/FallbackError"
 	
 	Fallback Off
 }
@@ -230,7 +969,11 @@ Node;AmplifyShaderEditor.BreakToComponentsNode, AmplifyShaderEditor, Version=0.0
 Node;AmplifyShaderEditor.ClipNode, AmplifyShaderEditor, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null;258;1168,-896;Inherit;False;3;0;COLOR;0,0,0,0;False;1;FLOAT;0;False;2;FLOAT;0.01;False;1;COLOR;0
 Node;AmplifyShaderEditor.RegisterLocalVarNode, AmplifyShaderEditor, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null;306;-1035.347,-11.94836;Inherit;False;M Outline Alpha;-1;True;1;0;FLOAT;0;False;1;FLOAT;0
 Node;AmplifyShaderEditor.IntNode, AmplifyShaderEditor, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null;4;176,-1728;Inherit;False;Property;_StencilReference;Stencil Reference;0;0;Create;True;0;0;0;True;0;False;123;0;False;0;1;INT;0
-Node;AmplifyShaderEditor.TemplateMultiPassMasterNode, AmplifyShaderEditor, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null;8;1520,-896;Float;False;True;-1;2;;100;5;Cainos/Interactive Pixel Water/FX Pixel Water Spark;0770190933193b94aaa3065e307002fa;True;Unlit;0;0;Unlit;2;True;True;2;5;False;;10;False;;2;5;False;;10;False;;True;0;False;;0;False;;False;False;False;False;False;False;False;False;False;True;0;False;;False;True;0;False;;False;True;True;True;True;True;0;False;;False;False;False;False;False;False;True;True;True;202;True;_StencilReference;255;False;;255;False;;6;False;;3;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;True;True;2;False;;True;3;False;;True;True;0;False;;0;False;;True;1;RenderType=Transparent=RenderType;True;4;False;0;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;0;;0;0;Standard;1;Vertex Position;1;0;0;1;True;False;;False;0
+Node;AmplifyShaderEditor.TemplateMultiPassMasterNode, AmplifyShaderEditor, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null;335;1616,-896;Float;False;True;-1;3;UnityEditor.ShaderGraph.GenericShaderGraphMaterialGUI;0;17;Cainos/Interactive Pixel Water/FX Pixel Water Spark;199187dac283dbe4a8cb1ea611d70c58;True;Sprite Lit;0;0;Sprite Lit;6;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;2;False;;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;5;RenderPipeline=UniversalPipeline;RenderType=Transparent=RenderType;Queue=Transparent=Queue=0;UniversalMaterialType=Lit;ShaderGraphShader=true;True;0;True;14;all;0;False;True;2;5;False;;10;False;;3;1;False;;10;False;;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;True;True;True;True;0;False;;False;False;False;False;False;False;True;True;True;0;True;_StencilReference;255;False;;255;False;;6;False;;3;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;True;True;1;False;;True;3;False;;True;True;0;False;;0;False;;True;1;LightMode=Universal2D;False;False;0;;0;0;Standard;3;Vertex Position;1;0;Debug Display;0;0;External Alpha;0;0;0;5;True;True;True;True;True;False;;False;0
+Node;AmplifyShaderEditor.TemplateMultiPassMasterNode, AmplifyShaderEditor, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null;336;1616,-896;Float;False;False;-1;3;UnityEditor.ShaderGraph.GenericShaderGraphMaterialGUI;0;1;New Amplify Shader;199187dac283dbe4a8cb1ea611d70c58;True;Sprite Normal;0;1;Sprite Normal;0;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;2;False;;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;5;RenderPipeline=UniversalPipeline;RenderType=Transparent=RenderType;Queue=Transparent=Queue=0;UniversalMaterialType=Lit;ShaderGraphShader=true;True;0;True;14;all;0;False;True;2;5;False;;10;False;;3;1;False;;10;False;;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;True;True;True;True;0;False;;False;False;False;False;False;False;False;True;True;0;True;;255;False;;255;False;;6;False;;3;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;False;True;1;False;;True;3;False;;True;True;0;False;;0;False;;True;1;LightMode=NormalsRendering;False;False;0;;0;0;Standard;0;False;0
+Node;AmplifyShaderEditor.TemplateMultiPassMasterNode, AmplifyShaderEditor, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null;337;1616,-896;Float;False;False;-1;3;UnityEditor.ShaderGraph.GenericShaderGraphMaterialGUI;0;1;New Amplify Shader;199187dac283dbe4a8cb1ea611d70c58;True;Sprite Forward;0;2;Sprite Forward;0;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;2;False;;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;5;RenderPipeline=UniversalPipeline;RenderType=Transparent=RenderType;Queue=Transparent=Queue=0;UniversalMaterialType=Lit;ShaderGraphShader=true;True;0;True;14;all;0;False;True;2;5;False;;10;False;;3;1;False;;10;False;;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;True;True;True;True;0;False;;False;False;False;False;False;False;False;True;True;0;True;;255;False;;255;False;;6;False;;3;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;False;True;1;False;;True;3;False;;True;True;0;False;;0;False;;True;1;LightMode=UniversalForward;False;False;0;;0;0;Standard;0;False;0
+Node;AmplifyShaderEditor.TemplateMultiPassMasterNode, AmplifyShaderEditor, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null;338;1616,-896;Float;False;False;-1;3;UnityEditor.ShaderGraph.GenericShaderGraphMaterialGUI;0;1;New Amplify Shader;199187dac283dbe4a8cb1ea611d70c58;True;SceneSelectionPass;0;3;SceneSelectionPass;0;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;2;False;;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;5;RenderPipeline=UniversalPipeline;RenderType=Transparent=RenderType;Queue=Transparent=Queue=0;UniversalMaterialType=Lit;ShaderGraphShader=true;True;0;True;14;all;0;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;2;False;;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;1;LightMode=SceneSelectionPass;False;False;0;;0;0;Standard;0;False;0
+Node;AmplifyShaderEditor.TemplateMultiPassMasterNode, AmplifyShaderEditor, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null;339;1616,-896;Float;False;False;-1;3;UnityEditor.ShaderGraph.GenericShaderGraphMaterialGUI;0;1;New Amplify Shader;199187dac283dbe4a8cb1ea611d70c58;True;ScenePickingPass;0;4;ScenePickingPass;0;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;2;False;;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;5;RenderPipeline=UniversalPipeline;RenderType=Transparent=RenderType;Queue=Transparent=Queue=0;UniversalMaterialType=Lit;ShaderGraphShader=true;True;0;True;14;all;0;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;2;False;;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;1;LightMode=Picking;False;False;0;;0;0;Standard;0;False;0
 WireConnection;262;0;261;0
 WireConnection;263;0;262;1
 WireConnection;264;0;262;1
@@ -289,6 +1032,6 @@ WireConnection;260;0;311;0
 WireConnection;258;0;256;0
 WireConnection;258;1;260;3
 WireConnection;306;0;302;0
-WireConnection;8;0;258;0
+WireConnection;335;1;258;0
 ASEEND*/
-//CHKSM=730EDF11AE671CD97A81C0E16F5E08911E9A9D17
+//CHKSM=45C7C3030D984D4541733610DA2044FB69069734

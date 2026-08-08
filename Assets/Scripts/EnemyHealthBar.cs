@@ -88,25 +88,27 @@ public class EnemyHealthBar : MonoBehaviour
     public void Initialize(Transform enemy, Vector2 offset, float worldWidth)
     {
         followTarget = enemy;
-        worldOffset = new Vector3(offset.x, offset.y, -0.1f);
         SetBarWidth(worldWidth);
 
-        // Düşmanın sprite sorting layer'ına göre canvas sıralamasını ayarla
-        SpriteRenderer enemySR = enemy.GetComponentInChildren<SpriteRenderer>();
-        if (enemySR != null)
+        // Match the enemy's own renderer for sorting. Prefer a SpriteRenderer; Cainos monsters
+        // have only a SkinnedMeshRenderer.
+        Renderer enemyRenderer = enemy.GetComponentInChildren<SpriteRenderer>();
+        if (enemyRenderer == null) enemyRenderer = enemy.GetComponentInChildren<SkinnedMeshRenderer>();
+
+        // Sit the bar a solid margin IN FRONT of that renderer in Z. Cainos monsters render as an
+        // OPAQUE SkinnedMeshRenderer pulled toward the camera; an opaque mesh writes depth and was
+        // occluding the bar's Image fills (the TMP number, which draws on top, still showed — that's
+        // why sprite-based enemies like AeroBat worked but mesh-based ones didn't). A fixed -0.1 was
+        // too shallow to clear the mesh.
+        float frontZ = -0.5f;
+        if (enemyRenderer != null)
         {
-            canvas.sortingLayerID = enemySR.sortingLayerID;
-            canvas.sortingOrder = enemySR.sortingOrder + 10;
+            canvas.sortingLayerID = enemyRenderer.sortingLayerID;
+            canvas.sortingOrder = enemyRenderer.sortingOrder + 10;
+            frontZ = (enemyRenderer.transform.position.z - enemy.position.z) - 1f;
         }
-        else
-        {
-            SkinnedMeshRenderer enemySMR = enemy.GetComponentInChildren<SkinnedMeshRenderer>();
-            if (enemySMR != null)
-            {
-                canvas.sortingLayerID = enemySMR.sortingLayerID;
-                canvas.sortingOrder = enemySMR.sortingOrder + 10;
-            }
-        }
+
+        worldOffset = new Vector3(offset.x, offset.y, frontZ);
 
         if (followTarget != null)
             transform.position = followTarget.position + worldOffset;

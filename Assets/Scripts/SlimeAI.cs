@@ -22,6 +22,11 @@ public class SlimeAI : MonoBehaviour
     public float edgeCheckOffsetX = 0.5f;
     public float edgeCheckDepth = 1f;
 
+    [Header("Ses")]
+    // Played at the start of each attack. PlayClipAtPoint survives enemy destroy.
+    [SerializeField] private AudioClip attackSound;
+    [SerializeField, Range(0f, 1f)] private float attackVolume = 1f;
+
     private MonsterController controller;
     private EnemyHealth health;
     private Transform player;
@@ -74,6 +79,10 @@ public class SlimeAI : MonoBehaviour
                 {
                     controller.inputAttack = true;
                     lastAttackTime = Time.time;
+
+                    // Play the attack sound at the moment the attack starts.
+                    SfxManager.PlayAtPoint(attackSound, transform.position, attackVolume);
+
                     StartCoroutine(DealDamageRoutine());
                 }
             }

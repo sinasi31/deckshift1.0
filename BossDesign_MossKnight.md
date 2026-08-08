@@ -1,0 +1,138 @@
+# Boss Design — The Moss Knight (Act 1, Oxidation District)
+
+**Status:** Playable encounter (updated 2026-07-02). The full moveset, fight intro, SFX, health bar, and a
+death celebration with real loot drops are all implemented. What's left is content/tuning, not core build:
+the acid arena (static flank pools + platforms) and an optional RewardManager card/relic screen after the
+kill. Phases were cut (§5). Decisions below are locked unless revisited.
+
+Green is *oxidation* too — copper/bronze oxidize to green verdigris. The Oxidation District's
+guardian fused with that corrosion: a patient, acid-bleeding knight.
+
+---
+
+## 1. Toolkit (all assets already owned — no new art)
+
+- **Boss visual/anims:** `PF Knight - Moss` (`Cainos/Pixel Art Monster - Dungeon/`). Anim clips:
+  Idle, Walk, **Run**, **Attack**, **Jump Prepare → Air Up → Air Down → Land**, Injured Front/Back, Die.
+- **Adds:** `PF Slime - Green` (has its own Attack anim).
+- **Arena hazard:** `PF Pixel Water - Acid` + `HazardZone.cs` (damages player on contact; LavaBoots relic already interacts).
+- **Card-free damage:** `CrusherTrap.cs` + a `Lever` (already built and in the boss room).
+- **Arena:** `LevelSinasi/BossRoom.prefab`.
+- **Reuse:** `EnemyHealth` (boss + slimes), enemy healthbar system, `CameraShake`, our procedural VFX (`ShockwaveVFX` recolored green for slam splashes).
+
+## 2. Core combat loop
+
+Boss is **always damageable** (no armor windows). The challenge is *surviving and creating damage*, via two avenues:
+
+- **Cards** — Fireball/Bite/Comet Dive etc. (may run dry → that's why the crusher exists).
+- **Crusher Trap** — lever-activated press, **80 dmg** to the boss, but **20 to the player** if caught, ~6s rearm. Bait the boss under it, flip the lever, punish. Positioning = damage. A crusher hit on the boss also **bursts Shift crystals** out of him around the arena (resource lifeline — see §8), and the lever shows a radial cooldown clock + auto-resets.
+
+So the boss must be **baitable**: it approaches/chases the player predictably enough to be led under the press.
+
+## 3. Moveset (3 attacks, all from existing anims)
+
+| Attack | Built from | Telegraph | Effect |
+|--------|-----------|-----------|--------|
+| **Acid Cleave** | Attack clip | brief wind-up | close-range melee arc; small acid splash at strike point |
+| **Leap Slam** | Jump Prepare → Air → Land | crouch + target marker | leaps toward player, slams on landing → green acid shockwave (ShockwaveVFX) you must jump/dash over; spreads an acid pool |
+| **Charge** | Run | wind-up + flash | dashes across the arena; dodge with dash/phase/jump |
+| **Lob (Slime / Acid Blob)** | Attack clip as a throw | overhead throw gesture | arcs a payload **up onto the platforms** — either a Green Slime (an add) or an acid blob that splashes a short-lived acid patch. Makes the platforms unsafe so they aren't a free refuge. |
+
+## 4. Signature threats (the "depth")
+
+**① Acid & the Shift tax (spatial).** **The boss is IMMUNE to acid** (it's a creature of corrosion) — this is the key that makes floor-acid work: it only threatens the player, so the boss can wade through it freely and it never blocks his melee/charge/crusher-bait game.
+- **P1–P2:** acid sits in the **two flank pits** (far left/right of the floor); the **center stays dry** (melee duel + crusher kill-zone). Falling off a side platform into a flank pool punishes sloppiness.
+- **P3 "Meltdown":** the acid **rises and creeps inward** across the floor, shrinking the dry ground until the player is pushed **up onto the platforms** — leaving a small dry-ish island around the crusher so the bait stays *possible but risky*. The boss roams the acid untouched.
+
+**② Slimes + the unsafe platforms.** Once acid pushes the player up, the **platforms must not be a free refuge**, so the boss contests them from the ground:
+- **Slimes lobbed onto platforms (P2+).** The knight reuses its **Attack anim as a throw**, hurling `Green Slime` adds **up onto the platforms** where they crowd the player and can drop back down. Pure adds — they do **NOT** heal the boss.
+- **Acid Lob projectile.** Same throw gesture, different payload: an **arcing acid blob** that splashes a short-lived acid patch on the platform the player is camping. Since the Knight has no ranged anim, the slime-lob and acid-lob **share the one throw gesture** (economical + readable).
+
+Net effect: **floor** (melee, charge, rising acid) and **platforms** (slimes, acid lobs) are both hostile — constant repositioning between two bad options *is* the Shift tax.
+
+## 5. Phases — CUT (decision 2026-07-01)
+
+**No phase system.** This is a first-act boss most players reach under-geared, so it's deliberately kept simple/readable: all attacks are available from the start, no HP-gated escalation, no rising-acid climax. The full moveset (Cleave / Charge / Leap Slam / Lob[acid|slime]) just runs by range + cooldown the whole fight. The 3-phase plan below is kept only as a historical record in case a harder remix is ever wanted.
+
+- ~~**P1 "Duelist"**~~ / ~~**P2 "Bloom"**~~ / ~~**P3 "Verdant Meltdown"**~~ — shelved.
+
+## 6. Starting numbers (all to tune)
+
+- **Boss HP:** **~300** (revised down 2026-07-01 — players reach this boss under-geared; the crusher's 80-dmg hits are then a big assist, with cards/attacks doing the rest). Fair, non-punishing damage. Was ~600 in the original phased plan.
+- **Contact/Cleave dmg:** ~15; **Leap Slam:** ~20 + acid; **Charge:** ~18.
+- **Acid pool dmg:** reuse HazardZone's current value.
+- **Slimes:** spawn 1–2 at a time in P2, up to 3 concurrent in P3; low HP (~30), small contact dmg.
+- **Crusher:** unchanged (80 boss / 20 player / 6s rearm).
+
+## 7. Kit synergies (why cards matter)
+
+- **Platform Create** — build safe ground as acid rises (power play).
+- **Floor is Lava (Reverse Gravity)** — cling to the ceiling above rising acid.
+- **Glass Wail** — stun all slimes at once.
+- **Dash / Phase** — i-frame the charge and slams; cross acid.
+- **Comet Dive** — burst the boss during its Land recovery.
+- **Adrenaline** — slow-mo a tight slam, or heal when low.
+- **Shift economy** — every dodge-jump spends Shift; Recall refreshes; running dry risks Stagger death. The arena taxes the resource the run is built on.
+
+## 8. Implementation map (for build sessions)
+
+- `BossController` (new) — state machine: Idle/Pursue → choose attack (Cleave/Slam/Charge) by range + cooldowns; phase transitions on HP thresholds; slime spawning; P3 acid-rise trigger.
+- Boss uses `EnemyHealth` for HP/damage/death (so cards + crusher both work for free via `TakeDamage`).
+- **Boss acid-immunity:** when the acid hazard is built, it must skip the boss (flag/tag the boss so `HazardZone` ignores it). The boss also passes through the player physically (already done — ignores solid collision so a charge doesn't bulldoze the player).
+- Slimes: `EnemyHealth` + a simple chase AI (reuse `MeleeEnemy` pattern). Spawned by the **Lob** attack, which arcs them onto a platform; the acid-blob variant shares the lob and splashes a temp acid patch.
+- Acid rise (P3): move/scale the `PF Pixel Water - Acid` surface up, or enable stacked HazardZones. Flank pools in P1–P2; floods inward in P3.
+- **Boss collider fix — tile-seam snag (2026-07-01):** the boss walked jerkily / got randomly stuck on floor tiles. Cause: it inherits a **BoxCollider2D** from the shared base **`PF Knight - Normal`** (guid `59b4256d26973574fb30e9472bf3dabc`; Size ~1.11×2.56, Offset ~0,1.31) — a box's flat bottom corners catch on the hairline seams between adjacent tilemap-tile colliders. Fix (same as the player/slime already use): on the **boss** root, **disable** the inherited Box Collider 2D and **add a Capsule Collider 2D** — **Direction Vertical, Size 1.1×2.55, Offset (0, 1.31), Is Trigger off** — the rounded bottom glides over the seams. Copies the box footprint so hit area/standing height are unchanged; pass-through (charge) and card/crusher damage still work (they grab whatever solid collider exists / detect `EnemyHealth`). Note: `PF Knight - Normal` & `- Rusted` share that box, so any knight used as a normal enemy needs the same capsule.
+- **Crusher fix (2026-07-01):** the **PressHead** is a kinematic mover; with a *solid* collider it physically rammed the boss (a dynamic body) down through the static floor. Fix = set the PressHead **BoxCollider2D `Is Trigger` = ON**. All crusher damage is dealt by `CrusherTrap.ApplyImpactDamage` via `Physics2D.OverlapBoxAll` (not by the collision), so making the head a trigger keeps the 80 dmg and removes the shove. Same protection for the player. (Texture is just the PressHead's SpriteRenderer sprite; it's tinted grey via its Color — set Color to white to show true art.)
+- Boss healthbar: ✔ done. `BossHealthBar.cs` + `Assets/Prefabs/UI/BossHealthBar.prefab` — big screen-anchored bar (top-center) with the boss name + a delayed "damage chunk" drain, built procedurally like EnemyHealthBar. Spawned by the boss in Start (assign to `MossKnightBoss.bossHealthBarPrefab`); polls `EnemyHealth.CurrentHealth`; removes itself when the boss dies. Clear the boss's `EnemyHealth.healthBarPrefab` slot so the small floating bar doesn't also show. Reworked to fit the pixel style: black+bronze frame, segment notches, verdigris/acid fill, hit flash + shake, low-HP pulse, fill-up intro, styled name (uses `CCBattleScarred SDF` font; `Pixie SDF` is the consistent alt).
+- **Lob + Leap visuals/feel (2026-07-01):** mechanics were fine, visuals were cheap. Lob now uses the **Slime Gel** sprite (`Cainos/Pixel Art Icon Pack - RPG/.../Slime Gel.png`) for the in-flight blob + a 3-blob gel splat puddle (`AcidBlobProjectile` `blobSprite`/`puddleSprite`, prefab pre-wired). Leap arc made **weighty** (`leapGravityMul` boosts gravity, `leapFallMul` speeds the descent) and the slam **punchy** (`HitStop` + strong shake + a `slamDebrisSprite` gel-chunk burst — assign Slime Gel to the boss's **Slam Debris Sprite** slot). NOTE: the game's real acid (`PF Pixel Water - Acid`) is a heavy mesh+buoyancy+shader sim, NOT a flat sprite — don't try to spawn it as a puddle.
+- **Boss flinch on big hits (2026-07-01):** ✔ `EnemyHealth` fires `OnDamagedAmount(float)`; the boss subscribes and plays the Cainos injured anim (`pm.InjuredFront()`/`InjuredBack()`, chosen by player-vs-facing) when a single hit exceeds `hurtAnimThreshold` (default 50 → the Crusher's 80 or a heavy card). Visual only, no stagger.
+- **Lever = momentary cooldown switch (2026-07-01):** ✔ `Lever.cs` gained a `crusher` ref — when assigned it drops + fires `CrusherTrap.Activate()` on pull, shows a procedural **radial "pie" cooldown clock** above itself (no text), and auto-rises when the crusher rearms (driven by new `CrusherTrap.CooldownRemaining01`). Presses during cooldown ignored. In crusher mode it does NOT invoke OnFlippedOn/OnFlippedOff (invoking OnFlippedOff on the rise used to re-fire the slam). **INSPECTOR: assign the CrusherTrap to the lever's Crusher field.** Lever rig is a 2-sprite switch (not a rotatable handle) so it pops down/up — the clock is the smooth telegraph.
+- **Crusher drops Shift on the boss (2026-07-01):** ✔ eases the Shift crunch without touching attacks. `CrusherTrap` detects a boss crush (`enemy.GetComponent<MossKnightBoss>()`) → `DropShiftCrystals(bossPos)` bursts existing `Prefabs/ShiftCrystal` (+1 Shift each) **out of the boss** and arcs each to a placed `crystalSpawnPoints` Transform (user's plan: 1 per platform, 2 ground sides). Collectible mid-air. **INSPECTOR: assign ShiftCrystal prefab + place spawn-point GameObjects.** Count/placement tunable via the points array.
+- **Footstep console spam fix (2026-07-01):** unrelated to the boss but done same session — the player's Cainos clips fire ~20 animation events (OnFootstep etc.) with the pack's receiver disabled → "has no receiver" spam. Added inert `PlayerAnimEventSink.cs` (empty methods for every event name); **add it to the player's `Animator` child GameObject.** `OnFootstep` was later wired to relay to `PlayerController.PlayFootstep()` for real footstep SFX (see CLAUDE.md → Visual Model Internals / Audio System).
+- **Fight start gated (2026-07-01):** ✔ the boss no longer aggros the instant the room loads. `MossKnightBoss.startDormant` (default on) keeps it an idle statue until a `BossFightTrigger.cs` (RequireComponent Collider2D, one-shot on Player enter) calls `StartFight()`. **INSPECTOR: place an empty GO with a trigger BoxCollider2D + BossFightTrigger over the arena platform and assign the boss.** The health bar + boss music are split into `BeginBattle()` so the awaken can land them on the roar beat.
+- **Awaken cinematic (2026-07-01):** ✔ `StartFight()` → `AwakenRoutine()` (toggle `playAwakenEffect`). Sequence: camera pans onto the boss (`CameraFollow.FocusOn`) + roar → a couple of hard **ground pounds** (`GroundPound(count)`, drives the Rigidbody like the leap) → a coil crouch with an escalating tremor → **ROAR** beat: freeze-frame + big shake + green screen-flash + scaled acid shockwave rings + gel eruption + a gentle non-damaging shove → `BeginBattle()` (bar sweeps in, music drops) + camera release → settle → AI takes over. All tunables are public on the boss; reuses the slam shockwave + gel sprites (no new mandatory wiring).
+- **Ability SFX (2026-07-02):** ✔ boss builds a 2D `AudioSource` at runtime; `PlayBossSfx(clip, vol)` → `SfxManager.PlayOn` (2D so it's audible across the arena, sliders go past 1 for headroom). [Header("Audio")] clip+volume pairs: **roar** (on the camera pan), **pound** (each stomp), **cleave**, **charge** (own source so it can be `.Stop()`ped the instant the dash ends), **leap**, **slam**, **lob**, and **hurt** (every landed hit, played in `OnDamaged` before the flinch-threshold check). USER assigns clips; empty = silent.
+- **Cleave synced to the animation (2026-07-02):** ✔ the pack's `AnimationEventReceiver.onAttack` fires at the attack clip's authored contact frame. The boss subscribes `OnAttackAnimHit`; `CleaveRoutine` arms `pendingAttackHit` (plays cleaveSound + `TryMeleeHit`) so damage + SFX land ON the swing, not a guessed delay. Gated to cleave only (lob/charge/awaken reuse the same Attack anim harmlessly); a timeout still forces the hit if the event never fires. `cleaveDamageDelay` is now just that safety fallback.
+- **Death celebration + real loot (2026-07-02):** ✔ **top-priority "poofs with no payoff" gripe is solved.** `EnemyHealth.Die()` fires `OnDied` then destroys the boss the SAME frame, so the effect runs on its own self-destroying object, **`BossDeathVFX.cs`** (house style, procedural, no art/prefab). `MossKnightBoss.OnBossDied` spawns it and passes drop physics from `ResolveDeathGroundY(out airborne)` (a downward `RaycastAll` for the floor beneath the boss). Sequence: freeze-frame + gold screen-flash (masks the instant body despawn) + camera focus + a brief robust slow-mo (`Time.timeScale` dip, always restored, even in OnDestroy) + light pillar + staggered acid/gold shockwave rings + secondary eruption puffs + a shower of **REAL collectible loot** + rising motes. **Loot = the actual game pickups:** `Gold New.prefab` (`YeniLeveller/`, `GoldPickup` → AddGold) × `deathGoldCount` (14) and `ShiftCrystal.prefab` (`Prefabs/`, → AddShift) × `deathCrystalCount` (5). They erupt and transform-arc (no Rigidbody, like CrusherTrap's crystals), grabbable the whole time; **grounded death** → they bounce and settle on the floor, **mid-air death** → they hover in the air with a gentle bob. **INSPECTOR [Header("Death")]: assign `deathGoldPrefab` (Gold New) + `deathShiftCrystalPrefab` (ShiftCrystal)** — empty = that type doesn't drop; `deathSound`+`deathVolume` optional. NOTE: the boss BODY still despawns instantly (masked by the flash) — there's no literal Cainos collapse anim; adding one means deferring EnemyHealth's Destroy for the boss. `deathCrystalCount` 5 is a chunky Shift injection — tune down if too generous.
+- Telegraphs: procedural markers/flashes (reuse our VFX approach).
+
+## 9. Arena layout (BossRoom.prefab — ~58 wide × 23 tall, 1 tile ≈ 1 unit)
+
+Current state: tilemap geometry + the Crusher (PressHead/Chain/ChainAnchor) + a Lever exist. Acid, platforms still to place.
+
+```
+══════════════════ ceiling ══════════════════
+                  ▟▟ crusher head ▙▙
+                  (over CENTER kill-zone)
+
+   [plat]                              [plat]      high platforms (~+4–6):
+            [plat]            [plat]               safe perches in P3 +
+                    [plat]                         ranged-poke / Comet spots
+ ~~~acid~~~   ===dry center===   ~~~acid~~~        pools FLANK; center dry
+ ████████████████ floor ████████████████           so the boss can be baited
+        ⊏ LEVER ⊐  (side shelf, away from kill-zone)
+```
+
+- **Damage loop:** lure Knight onto dry center → run to the side **Lever** → slam (80) → reposition. Lever placement away from the kill-zone is the skill tax (can't camp both).
+- **~5 platforms** at mid-height for P3 survival + ranged angles.
+- **Flank acid pools** static in P1–P2; **rise & merge in P3** over ~8s to flood the floor, leaving platforms + a small central island safe.
+
+## 9b. Resolved decisions (this design pass)
+
+- **Slime spawn:** Knight spits them (Attack anim as a lob). ✔
+- **Crusher:** fully baitable; boss never avoids it. ✔
+- **Acid:** static pools → rising tide flood in P3. ✔
+- **Numbers (starting):** HP ~600; Cleave 15 / Slam 20+acid / Charge 18 / contact 10; ~90–120s fight. ✔ (playtest-tune) — superseded: HP is now ~300 (see §6), phases cut.
+- **Reward:** as of 2026-07-02 the kill drops **real collectible gold + shift crystals** (see the Death entry in §8) — that's the current payoff. A `RewardManager` card-pick + bonus scrap + guaranteed Act-1-boss relic screen is still a later add on top.
+- **Run placement (2026-07-02):** the boss room is the **run finale**. `LevelManager` runs hub → every pool level once (random, no repeats) → the boss room (a separate `bossRoomPrefab` slot) → loops back to the hub. The BossRoom prefab must keep the room contract (`CameraBounds` + `GirisNoktasi` children). ✔
+
+**Remaining (tune in-engine, not blocking the build):** exact HP/damage, lever vs. kill-zone spacing, platform count/positions, acid-rise rate + max height, slime spit cadence.
+
+## 10. Build order (greybox roadmap)
+
+1. ✔ `BossController` greybox: Moss Knight with EnemyHealth + healthbar, pursues player, **Acid Cleave**. Cards + crusher damage it.
+2. ✔ **Charge** (run-across dash, passes through player) and **Leap Slam** (parabolic leap → green acid shockwave + AoE).
+3. ✔ **Lob**: `AcidBlobProjectile.cs` (+ prefab) is an arcing carrier. On the floor it bursts into a lingering acid puddle (reuses `HazardZone`, so LavaBoots protects); when the player is camped **above** (platform), it carries a **Slime add** (`SlimeEnemy.prefab` in `Assets/YeniLeveller/`, already wired with SlimeAI + EnemyHealth) and drops it onto the perch instead. Boss prioritizes the slime-lob when the player is above, acid-pokes at floor-range otherwise.
+4. ~~Phase transitions~~ CUT (§5). ✔ **Instead this session delivered:** gated fight start (BossFightTrigger), the awaken cinematic, ability/roar/hurt SFX, animation-synced cleave, and the **death celebration with real collectible loot** (BossDeathVFX — see §8). Still open: an optional RewardManager card/relic screen on top of the loot, and a literal death animation if wanted.
+5. **Acid system**: static flank pools → P3 rising tide (the slam + lob puddles foreshadow it). *(P3 rise is moot now phases are cut — static flank pools + platforms are the remaining arena build.)*
+6. Arena/layout tuning, ~~boss healthbar UI~~ ✔, reward, balance pass.

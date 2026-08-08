@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardName: Phase
   description: Become a ghost for 2 seconds. Fly through walls and enemies.
-  cardArt: {fileID: -6287111259993005184, guid: cf32ccf9e36bc74408b58cbb62482e87, type: 3}
+  cardArt: {fileID: 7381869878930933662, guid: 76bbeeaa923429049a514414b924aa13, type: 3}
   actionType: 11
   actionValue: 2
   singleUse: 0

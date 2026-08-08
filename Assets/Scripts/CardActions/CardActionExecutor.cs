@@ -41,6 +41,9 @@ public class CardActionExecutor : MonoBehaviour
             { CardActionType.Adrenaline,     new AdrenalineAction()     },
             { CardActionType.Stagger,        new StaggerAction()        },
             { CardActionType.ReverseGravity, new ReverseGravityAction() },
+            { CardActionType.GlassParry,     new GlassParryAction()     },
+            { CardActionType.DeadWeight,     new DeadWeightAction()     },
+            { CardActionType.FreefallBlade,  new FreefallBladeAction()  },
         };
     }
 

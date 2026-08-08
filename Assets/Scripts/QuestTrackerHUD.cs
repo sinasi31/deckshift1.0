@@ -1,14 +1,13 @@
 using System.Collections.Generic;
 using UnityEngine;
-using TMPro;
 
 public class QuestTrackerHUD : MonoBehaviour
 {
     [SerializeField] private Transform questRowContainer;
     [SerializeField] private GameObject questRowPrefab;
 
-    private readonly Dictionary<QuestSystem.ActiveQuest, GameObject> rows =
-        new Dictionary<QuestSystem.ActiveQuest, GameObject>();
+    private readonly Dictionary<QuestSystem.ActiveQuest, QuestTrackerRow> rows =
+        new Dictionary<QuestSystem.ActiveQuest, QuestTrackerRow>();
 
     private void Start()
     {
@@ -44,10 +43,11 @@ public class QuestTrackerHUD : MonoBehaviour
         GameObject row = Instantiate(questRowPrefab, questRowContainer);
         row.transform.localScale = Vector3.one;
 
-        SetChildText(row, "Title", quest.data.questName);
-        SetChildText(row, "Progress", $"{quest.currentAmount}/{quest.data.targetAmount}");
+        QuestTrackerRow view = row.GetComponent<QuestTrackerRow>();
+        if (view == null) view = row.AddComponent<QuestTrackerRow>();
+        view.Build(quest.data.questName, quest.currentAmount, quest.data.targetAmount);
 
-        rows[quest] = row;
+        rows[quest] = view;
     }
 
     private void UpdateRow(QuestSystem.ActiveQuest quest)
@@ -58,30 +58,15 @@ public class QuestTrackerHUD : MonoBehaviour
             return;
         }
 
-        SetChildText(rows[quest], "Progress", $"{quest.currentAmount}/{quest.data.targetAmount}");
+        rows[quest].SetProgress(quest.currentAmount, quest.data.targetAmount);
     }
 
+    // On completion the row celebrates + self-destroys, so drop it from the map immediately.
     private void RemoveRow(QuestSystem.ActiveQuest quest)
     {
         if (!rows.ContainsKey(quest)) return;
-        Destroy(rows[quest]);
+        QuestTrackerRow view = rows[quest];
         rows.Remove(quest);
-    }
-
-    private void SetChildText(GameObject row, string childName, string text)
-    {
-        Transform child = row.transform.Find(childName);
-        if (child == null)
-        {
-            Debug.LogWarning($"QuestTrackerHUD: Row prefab has no child named '{childName}'.");
-            return;
-        }
-        TextMeshProUGUI tmp = child.GetComponent<TextMeshProUGUI>();
-        if (tmp == null)
-        {
-            Debug.LogWarning($"QuestTrackerHUD: Child '{childName}' has no TextMeshProUGUI component.");
-            return;
-        }
-        tmp.text = text;
+        if (view != null) view.PlayComplete(quest.data.rewardText);
     }
 }

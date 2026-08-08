@@ -11,6 +11,21 @@
 
 ---
 
+> ## ⏱️ STATUS UPDATE — 2026-07-02 (read this first)
+>
+> **This is a historical snapshot from 2026-06-10. The findings below are NOT auto-maintained.** They record the codebase as it was on the audit date. Treat every finding as **still open unless it carries a 【RESOLVED】 tag** — do not assume anything here was fixed just because time passed.
+>
+> **Confirmed resolved since the audit:**
+> - **1.4 (QuestSystem survives scene changes with dead UI refs)** — ✅ **RESOLVED 2026-06-10.** `DontDestroyOnLoad` was removed from QuestSystem; it's now scene-local like every other manager and quests reset per run (see CLAUDE.md rule #3). The recommended fix (removal) was taken.
+> - **§4.4 (CLAUDE.md stale in five places)** — ✅ **ADDRESSED.** CLAUDE.md gained a "Resolved bugs (verified 2026-06-10)" section correcting the shield-leak / CameraPeek / spike-knockback / `CameraBounds`-naming / fall-damage entries, and was refreshed again 2026-07-02 (Audio System, run order, Relic HUD, footstep sink). The doc-drift those items describe is corrected.
+> - The items §4.4 already self-marked "ALREADY FIXED" at audit time (shield-block leak, CameraPeek rebuild, spike knockback, fall-damage removal) remain fixed — re-confirmed by reading the current `EnemyHealth.cs`.
+>
+> **Explicitly NOT confirmed fixed (still treat as open):** the Critical/High items 1.1 (R-key ownership), 1.2 (Phase death wall-stuck), 1.3 (Adrenaline death slow-mo), 1.5 (Turret double-fire), 1.6 (ESC-in-shop), 1.7 (AchievementManager null-guards), 3.5 (F12 wipes saves). Several hot-path `Debug.Log`s (2.2) and the `.material` flash (2.5) are also still present in `EnemyHealth.cs` as of this update. The RECOMMENDED FIX ORDER below stands.
+>
+> **Context (not audit findings):** since this audit the project also grew new systems — the Act 1 Moss Knight boss (moveset, awaken cinematic, ability SFX, boss health bar, death VFX + real loot drops), a `SfxManager`-centred audio pattern, a finite hub→levels→boss run order, and procedural chest/relic VFX. None of that is covered below; see CLAUDE.md and `BossDesign_MossKnight.md`.
+
+---
+
 ## 1. CORRECTNESS RISKS
 
 ### 1.1 — CRITICAL — The R key is handled by THREE scripts, and whether Recall costs Shift is decided by luck
@@ -33,7 +48,7 @@
 - **What happens:** Adrenaline sets `Time.timeScale = 0.4` and `Time.fixedDeltaTime = 0.008`, restoring both after 3 real-time seconds. If the player dies in that window, the scene loads `GameOverScene` and the restore never runs. `Time.timeScale` is global and survives scene loads. The Game Over screen, and the entire next run after "Restart", play in slow motion. Nothing in `GameManager.Awake()` or `GameOverUI` resets it (only `PauseMenu.LoadMenu()` does, and that's the menu path, not the death path).
 - **Blast radius:** Isolated — reset `timeScale`/`fixedDeltaTime` in `PlayerHealth.Die()` (or defensively in `GameManager.Awake()`). One commit.
 
-### 1.4 — HIGH — QuestSystem survives scene changes but its UI references don't
+### 1.4 — HIGH — QuestSystem survives scene changes but its UI references don't  ·  【RESOLVED 2026-06-10 — `DontDestroyOnLoad` removed from QuestSystem; now scene-local, quests reset per run (CLAUDE.md rule #3)】
 - **Where:** `QuestSystem.Awake()` (`DontDestroyOnLoad`), plus the death flow `PlayerHealth.Die() → GameOverScene → GameOverUI.RestartGame() → SampleScene`
 - **What happens:** QuestSystem is the one manager with `DontDestroyOnLoad`. Its serialized fields (`overlayPanel`, `container`, `paperPrefab` target) live in SampleScene's Canvas. After the first death-and-restart cycle: the original QuestSystem survives, the freshly-loaded scene's QuestSystem destroys itself as a "duplicate," and the survivor is now pointing at **destroyed UI objects**. Opening the quest board after your first death will throw errors or silently do nothing. Bonus side effect: `activeQuests` (and completed quests' permanent rewards like max-Shift increases) carry over between runs, which is probably not intended for a roguelike.
 - **Why it matters:** This is the exact failure mode CLAUDE.md already flags as "inconsistent, pending review" — the audit confirms it's not just inconsistent, it's actively broken across the death loop that already exists in the game today.

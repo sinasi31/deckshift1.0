@@ -1,0 +1,96 @@
+// GenLevel9 - "The Lockworks"  (ELITE tier, 62x38)
+//
+// The third distinct SHAPE. GenLevel7 is a horizontal corridor, GenLevel8 a vertical shaft;
+// this one is a LOOP. You cross the room low, climb the far wall, and come back along the
+// top - so the room is read twice from two heights, and the whole space is visible from the
+// start. Nothing here is a dead corridor.
+//
+//   THE SINK      spawn (west floor) -> east across a SPIKE TRENCH and an ACID PIT
+//   THE EAST WALL -> a 5-ledge climb alternating between the east wall and mid-air
+//   THE GALLERY   -> west along the top, over two 7-tile floor gaps -> exit
+//
+// Falling through a gallery gap is the room's signature punishment: the west gap drops you
+// the full height back into the sink, the east gap only onto the island top (recoverable in
+// one rise-4). Both are survivable - there is no fall damage - so the cost is Shift, which is
+// exactly the currency an Elite room should be charging.
+//
+// THE VAULT (optional, and the reason it is called the Lockworks): a LEVER on a low west
+//   ledge opens the GATE sealing a chamber cut into the island. Two rise-4 jumps off the
+//   mandatory line to reach the lever, two more to reach the door - the loot scales to the
+//   Shift the detour costs, per the room law.
+// THE TRAPDOORS bridge the acid pit. They are a SHORTCUT that saves nothing but nerve: the
+//   7-tile gap is inside the ~12-tile flat reach, so the pit is jumpable without them. Step
+//   on one and linger and you are in the acid.
+//
+// LOOT - 3 chests, 7 shift crystals, 10 gold, plus BLOMPO and a SHOPKEEPER.
+//   ⚠️ NPCs ARE LOOT (designer 2026-08-08). A Blompo or a shop is a place to SPEND what you
+//   picked up, so it pays the room out just as a chest does - and it pays better, because it
+//   converts gold you are carrying into something you keep. Chests are the expensive way to
+//   reward a room; a pile of them reads as filler. Three is the ceiling here.
+//   Every piece is priced by what reaching it costs:
+//     free-ish   gold along the sink floor and the gallery
+//     one jump   the high pocket chest over the gallery, the east-climb gold
+//     a detour   BLOMPO stands on the island top, which you can only DROP onto from the
+//                gallery - the rise-4 climb back out is his price
+//     the climb  the SHOPKEEPER sits at the top of the east wall, five ledges up
+//     a risk     gold down in the spike trench
+//     the vault  a chest, gold and a crystal behind the lever-gate, four jumps off the line
+//
+// ENEMIES (Elite roster - heavier than Fight, and layered up the climb so the room fights
+//   you at every height): Rotbrute + shambler + slimes in the sink, a bat over the acid so
+//   the one open-air crossing is contested, a Spitter and a ranged enemy perched on climb
+//   ledges where you cannot answer them mid-jump, and a Mimic parked beside a real chest in
+//   the gallery. Slimes are the fodder that keeps landings from being free.
+//
+// LAW 1: the whole spine is walk / 5-and-7-tile gaps / rise-4 jumps. Lever, gate and
+//   trapdoors gate only optional things. LAW 2: every rise is 4; ledges alternate columns so
+//   same-column spacing is 8, and no ledge sits over its own approach. LAW 3: trench and
+//   acid pit are both 2 deep - a miss costs HP, never the run. LAW 8: the spawn run (cols
+//   2-14) is enemy-free, the trench breaks it off from the rest of the sink, and the nearest
+//   ranged/flying thing (the bat, 31 tiles) has no business with you there.
+//   LAW 7: spawn (4,32) to exit (11,11) is 28 tiles apart THROUGH the west buttress - 14
+//   solid rows of rock, cols 2-12. Phase and Portal cannot shortcut it.
+//
+// TUNING after import: trapdoor spacing over the pit (cols 31/33/35) if the prefab is wider
+//   than a cell; gate speed; the lever is auto-wired to the only gate in the room.
+
+!name: GenLevel9
+!backwall: on
+##############################################################
+##############################################################
+##############################################################
+##############...................................#############
+##############...................................#############
+##...............................................#############
+##...............................................#############
+##....+.g........................................#############
+##..######.................+...............C.....#############
+##.......................#####.............#####.#############
+##..........................................................##
+##..g......X.+..........l.....m..........M...C.+............##
+###############.......###########.......#########...........##
+#############........................................$......##
+#############.....................................############
+#############...............z..B..g...+.....................##
+#############...........#################...................##
+#############...........#################....s..+...........##
+#############...........#################..#######..........##
+#############...........#################...................##
+#############..........G.......##########...................##
+#############..........G.......##########..............r..g.##
+#############..........G.......##########...........##########
+#############..........G.......##########...................##
+#############..........G.g.C.+.##########...................##
+#############.....#######################...g.l.............##
+#############...........#################..#######..........##
+##..........................................................##
+##............L.g...........................................##
+##.........#######..........................................##
+##.................................b................##########
+##..................................................##########
+##..S.................g..z.l...T.T.T....Z..l.g..m...##########
+###############.....##########.......#########################
+###############.^^^g##########...w...#########################
+##############################################################
+##############################################################
+##############################################################

@@ -12,6 +12,11 @@ public class RangedEnemyAI : MonoBehaviour
     [Tooltip("Oyuncu okçudan en fazla ne kadar yukarıda/aşağıda olursa ateş etsin? (Y ekseni farkı)")]
     public float yTolerance = 1.5f;
 
+    [Header("Ses")]
+    // Played when the archer fires. PlayClipAtPoint requires no AudioSource component.
+    [SerializeField] private AudioClip shootSound;
+    [SerializeField, Range(0f, 1f)] private float shootVolume = 1f;
+
     private MonsterController controller;
     private EnemyHealth health;
     private PixelMonster pm; // Yüzünü dönmesi için eklendi
@@ -64,6 +69,9 @@ public class RangedEnemyAI : MonoBehaviour
                     {
                         controller.inputAttack = true;
                         lastAttackTime = Time.time;
+
+                        // Play the bow-shot sound when the archer fires.
+                        SfxManager.PlayAtPoint(shootSound, transform.position, shootVolume);
                     }
                 }
                 // (Eğer menzilde ama yukarıdaysa sadece bekler ve oyuncuya bakar)

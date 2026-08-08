@@ -35,6 +35,23 @@ public class PlayerController : MonoBehaviour
     public GameObject platformPrefab;
     private bool isPhasing = false;
     private float verticalInput;
+
+    [Header("Swim Settings")]
+    [Tooltip("Horizontal/vertical move speed while swimming. Lower than moveSpeed to simulate water resistance.")]
+    public float swimSpeed = 5f;
+    [Tooltip("Upward impulse applied when pressing Jump while swimming, used to break the surface and leap out.")]
+    public float swimExitJumpForce = 9f;
+    [Tooltip("How far BELOW the surface the player settles when NOT actively swimming up/down, so they sit in the water instead of bobbing on top. Hold Up to swim above this and out of the water.")]
+    public float swimSurfaceOffset = 1.2f;
+    [Tooltip("How quickly the player sinks to the idle rest depth when not pressing up/down. Higher = snappier settle.")]
+    [SerializeField] private float swimSettleStrength = 8f;
+    [Tooltip("Seconds the upward swim-jump pop is preserved, to help breach the surface and leave the water.")]
+    [SerializeField] private float swimExitDuration = 0.35f;
+    private bool isSwimming = false;
+    private float swimCachedGravityScale;
+    private int swimZoneCount = 0; // refcount so overlapping swim zones don't exit early
+    private SwimZone currentSwimZone;
+    private float swimExitTimer;
     private Vector3 originalScale;
     internal Vector3 currentRoomEntryPoint;
 
@@ -43,6 +60,13 @@ public class PlayerController : MonoBehaviour
     [Header("Gold Settings")]
     public int currentGold = 0;
     public event System.Action<int> OnGoldChanged;
+
+    [Header("Scrap Settings")]
+    [Tooltip("Card-maintenance currency. Earned from kills and from cards exhausting; " +
+             "spent at a Scrap Forge to recharge cards and salvage them out of exhaust. " +
+             "Tuning lives in ScrapEconomy.cs.")]
+    public int currentScrap = 0;
+    public event System.Action<int> OnScrapChanged;
 
     [Header("Audio Settings")]
     public AudioSource audioSource;
@@ -54,19 +78,36 @@ public class PlayerController : MonoBehaviour
     public AudioClip createPlatformSound;
     public AudioClip vampireBiteSound;
     public AudioClip glassVailSound;
+    public AudioClip glassParrySound;      // successful parry: chime + shatter
+    public AudioClip freefallBladeSound;   // slash swipe
     public AudioClip jumpSound;
     public AudioClip leapSound;
     public AudioClip spendSound;
     public AudioClip warningSoundClip;
     public float soundVolume = 1f;
 
+    [Header("Footsteps")]
+    [Tooltip("Footstep clips — a random one plays each time the walk/run animation plants a foot. " +
+             "Add a few variations so steps don't sound identical. Leave empty for no footstep sound.")]
+    public AudioClip[] footstepClips;
+    [Range(0f, 1f)] public float footstepVolume = 0.6f;
+    [Tooltip("Random pitch range per step so repeated footsteps feel natural (x = min, y = max).")]
+    public Vector2 footstepPitchRange = new Vector2(0.92f, 1.08f);
+    private AudioSource footstepSource;   // dedicated 2D source (built on first step) so per-step pitch doesn't touch other SFX
+
     [Header("VFX Settings")]
     public GameObject biteEffectPrefab;
     public GameObject leapEffectPrefab;
     public TrailRenderer diveTrail;
     public GameObject dashEffectPrefab;
-    [SerializeField] internal float dashImpulse = 18f;
-    [SerializeField] internal float dashIFrameDuration = 0.15f;
+
+    [Header("Dash Settings")]
+    [SerializeField] internal float dashSpeed = 26f;            // driven horizontal speed during the dash
+    [SerializeField] internal float dashDuration = 0.16f;       // how long the dash drives velocity
+    [SerializeField] internal float dashEndSpeed = 9f;          // momentum carried out of the dash (no dead stop)
+    [SerializeField] internal float dashIFrameDuration = 0.22f; // i-frames; keep >= dashDuration to stay safe through the dash
+    [SerializeField] internal bool  dashAfterimages = true;     // procedural motion-blur ghosts (no art needed)
+    [SerializeField] internal Color dashAfterimageTint = new Color(0.6f, 0.85f, 1f, 0.55f);
 
     [Header("Adrenaline VFX")]
     public GameObject ghostPrefab;
@@ -81,6 +122,8 @@ public class PlayerController : MonoBehaviour
     public GameObject portalPrefab;
     public float portalMaxRange = 10f;
     private Portal firstPortalInstance;
+    // Read-only view for CardAimIndicator's portal ghost (first vs second placement preview).
+    internal Portal FirstPortalInstance => firstPortalInstance;
 
     [Header("Wall Settings")]
     public Transform wallCheck;
@@ -97,6 +140,40 @@ public class PlayerController : MonoBehaviour
     [Header("Movement Settings")]
     public float moveSpeed = 8f;
     private float moveInput;
+
+    [Header("Locomotion Animation")]
+    [Tooltip("TEST TOGGLE: play the Cainos pack's dedicated RUN animation (the Shift-to-run clip) while moving, via the pack's IsRunning bool. Uncheck to go back to the normal walk.")]
+    [SerializeField] private bool useRunAnimation = true;
+    [Tooltip("Base locomotion pose used when NOT running. 0 = idle, 1 = walk, 3 = run — blends in between. Default 1 (walk).")]
+    [SerializeField] private float locomotionPose = 1f;
+    [Tooltip("How strongly the leg cadence follows actual ground speed. Higher = feet cycle faster. Tune this until the feet stop sliding at your move speed. At speed 8 a value of 0.16 gives ~1.28x cadence.")]
+    [SerializeField] private float animCadenceScale = 0.16f;
+    [Tooltip("Lower clamp on the cadence multiplier (keeps slow-nudge steps from crawling).")]
+    [SerializeField] private float minCadence = 0.7f;
+    [Tooltip("Upper clamp on the cadence multiplier (keeps top speed / dash from looking frantic).")]
+    [SerializeField] private float maxCadence = 2.2f;
+
+    // --- Temporary movement slow (acid drag / sticky goo) ---
+    // Kept as a separate multiplier ON TOP of moveSpeed rather than mutating moveSpeed itself,
+    // so it composes cleanly with Adrenaline's speed boost (which mutates moveSpeed) instead of
+    // corrupting its save/restore snapshot. Refreshed each frame by hazard zones the player
+    // stands in, and auto-clears shortly after they leave.
+    private float slowFactor = 1f;       // 1 = normal, <1 = slowed
+    private float slowExpireTime = 0f;
+
+    /// <summary>
+    /// Applies a temporary movement slow. Called repeatedly by hazard zones while the player is
+    /// inside them; the strongest (lowest) active multiplier wins, and it fades <paramref name="duration"/>
+    /// seconds after the last call.
+    /// </summary>
+    public void ApplySlow(float multiplier, float duration)
+    {
+        multiplier = Mathf.Clamp(multiplier, 0.05f, 1f);
+        // If a slow is already active this frame, keep whichever is stronger.
+        if (Time.time < slowExpireTime) multiplier = Mathf.Min(multiplier, slowFactor);
+        slowFactor = multiplier;
+        slowExpireTime = Time.time + Mathf.Max(0.02f, duration);
+    }
 
     [Header("Health Settings")]
     public float CurrentHealth => playerHealth.CurrentHealth;
@@ -120,13 +197,17 @@ public class PlayerController : MonoBehaviour
     [Header("Comet Dive Settings")]
     public float cometSpeed = 25f;
     public float cometDamage = 40f;
+    [Tooltip("Blast radius on landing. CometDiveVFX telegraphs exactly this value on the ground while falling.")]
     public float cometRadius = 3f;
-    public GameObject cometImpactEffect;
+    // The comet, its ground telegraph and the landing burst are all built procedurally by
+    // CometDiveVFX — no prefabs to assign.
+    private CometDiveVFX cometVfx;
 
     [Header("Adrenaline Card Settings")]
     public float adrenalineDuration = 3f;
     public float slowMotionFactor = 0.4f;
     public float speedBoostMultiplier = 1.5f;
+    public GameObject adrenalineAuraEffect;   // looping energy aura (AdrenalineAuraVFX), played for the buff duration
 
     public PlayerState currentState;
     internal bool isGrounded;
@@ -138,7 +219,52 @@ public class PlayerController : MonoBehaviour
     [SerializeField] internal float fireballCastDelay = 0.12f;
     public float biteRange = 1.5f;
     public float biteHealAmount = 10f;
+    // Vampiric Bite is a regular circle around the BODY center (designer 2026-07-17) — it used
+    // to be centered on the wand-side firePoint, which read as lopsided. Derived from the
+    // capsule's serialized offset so it's valid in both play mode and editor gizmos.
+    private CapsuleCollider2D bodyCapsule;
+    internal Vector2 BiteCenter
+    {
+        get
+        {
+            if (bodyCapsule == null) bodyCapsule = GetComponent<CapsuleCollider2D>();
+            return bodyCapsule != null
+                ? (Vector2)transform.position + bodyCapsule.offset
+                : (Vector2)transform.position;
+        }
+    }
     public LayerMask enemyLayer;
+    public GameObject glassWailEffect;   // Glass Wail shockwave VFX (world-space ShockwaveVFX prefab; size set on the prefab)
+    public float freefallBladeRange = 1.7f;   // radius of the ")" arc slash (front + below)
+    public float freefallBladeFallingRangeMul = 1.4f;   // falling slash swings BIGGER (designer 2026-07-17)
+    public float parryRiposteRange = 2.5f;    // shard burst radius on a successful Glass Parry
+
+    [Header("Meteor Greaves (relic)")]
+    // ⚠️ THIS MUST STAY ABOVE THE JUMP APEX. A max-height jump rises ~4.9 units (measured, see
+    // LevelValidator), so at the old 4.0 the shockwave fired on EVERY full jump — the relic was
+    // free, constant, and stopped being a decision. 6.5 clears the apex with margin, so it takes a
+    // real DROP (a ledge, a shaft) to trigger, which is what the item is about.
+    [Tooltip("Minimum fall (world units, apex→landing) before the landing shockwave triggers. " +
+             "Keep ABOVE the ~4.9-unit jump apex or it procs on every jump.")]
+    public float meteorMinFall = 6.5f;
+    [Tooltip("Fall height at which the shockwave's size/damage max out.")]
+    public float meteorMaxFall = 14f;
+    [Tooltip("Seconds before it can trigger again — stops a repeated hop off the same ledge from " +
+             "chaining shockwaves into a stun-lock.")]
+    public float meteorCooldown = 1.5f;
+    public float meteorMinRadius = 2.5f;
+    public float meteorMaxRadius = 5.5f;
+    public float meteorMinDamage = 12f;
+    public float meteorMaxDamage = 55f;
+    [Tooltip("Impact volume at the biggest fall. Scales down with drop height.")]
+    [Range(0f, 2f)] public float meteorSfxVolume = 1.0f;
+    private float meteorReadyAt;   // Time.time before which the greaves stay quiet
+
+    // Fall tracking for Meteor Greaves: record the highest point reached while airborne,
+    // so the landing knows how far the player dropped. Reset on teleports (respawn / room
+    // enter) and consumed by comet-dive landings so they don't also meteor.
+    private bool trackingFall = false;
+    private float fallApexY = 0f;
 
     [Header("Interaction Settings")]
     public float interactionRange = 2f;
@@ -164,11 +290,8 @@ public class PlayerController : MonoBehaviour
     [Header("Gravity Reversal")]
     // Tune in Play mode: feet should just touch the ceiling when flipped
     [SerializeField] private float visualFlipYOffset = 2.0f;
-
-    // Cached renderer for warning flash (same approach as EnemyHealth)
-    private SkinnedMeshRenderer playerSkinnedRenderer;
-    private bool playerRendererHasColor;
-    private Color playerRendererOriginalColor;
+    public GameObject gravityAuraEffect;        // looping anti-gravity aura prefab (GravityAuraVFX), played for the reversal duration
+    private GameObject gravityAuraInstance;
 
     [Header("Phase Visual")]
     [SerializeField] internal SkinnedMeshRenderer[] phaseVisuals;
@@ -183,15 +306,6 @@ public class PlayerController : MonoBehaviour
         cardActionExecutor = GetComponent<CardActionExecutor>();
         capsuleCollider = GetComponent<CapsuleCollider2D>();
         playerHealth = GetComponent<PlayerHealth>();
-
-        // Cache SkinnedMeshRenderer for gravity-reversal warning flash
-        playerSkinnedRenderer = GetComponentInChildren<SkinnedMeshRenderer>(true);
-        if (playerSkinnedRenderer != null)
-        {
-            playerRendererHasColor = playerSkinnedRenderer.material.HasProperty("_Color");
-            if (playerRendererHasColor)
-                playerRendererOriginalColor = playerSkinnedRenderer.material.color;
-        }
 
         if (visualModel != null)
         {
@@ -248,9 +362,23 @@ public class PlayerController : MonoBehaviour
         }
         isWallDetected = WallCheck();
 
+        // Meteor Greaves fall tracking: remember the apex while airborne.
+        if (!isGrounded)
+        {
+            if (!trackingFall) { trackingFall = true; fallApexY = transform.position.y; }
+            else if (transform.position.y > fallApexY) fallApexY = transform.position.y;
+        }
+
         if (isGrounded && !wasGrounded)
         {
             currentAirJumps = 0;
+
+            if (trackingFall)
+            {
+                float fallDist = fallApexY - transform.position.y;
+                trackingFall = false;
+                TryMeteorGreavesLanding(fallDist);
+            }
         }
 
         if (GameManager.instance != null && GameManager.instance.currentState == GameState.Paused)
@@ -274,6 +402,17 @@ public class PlayerController : MonoBehaviour
             moveInput = Input.GetAxisRaw("Horizontal");
             verticalInput = Input.GetAxisRaw("Vertical");
         }
+        else if (isSwimming)
+        {
+            // Free 8-directional swim. Jump kicks upward to break the surface.
+            moveInput = Input.GetAxisRaw("Horizontal");
+            verticalInput = Input.GetAxisRaw("Vertical");
+
+            if (Input.GetButtonDown("Jump")) PerformSwimJump();
+
+            if (moveInput > 0 && !isFacingRight) Flip();
+            else if (moveInput < 0 && isFacingRight) Flip();
+        }
         else
         {
             if (Input.GetButtonDown("Jump"))
@@ -293,20 +432,31 @@ public class PlayerController : MonoBehaviour
         // gravitySign flips fall/low-jump-cut direction when gravity is reversed.
         // Fall check: velocity dot gravitySign < 0 means moving against gravity (falling).
         // Low-jump cut: velocity dot gravitySign > 0 means rising; multiplied force sign follows.
-        float gravitySign = isGravityReversed ? -1f : 1f;
-        if (rb.linearVelocity.y * gravitySign < 0)
+        // Skip Better Jump while swimming: it manually applies Physics2D.gravity
+        // regardless of gravityScale, which would pull the swimmer down.
+        if (!isSwimming)
         {
-            rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (fallMultiplier - 1) * Time.deltaTime * gravitySign;
-        }
-        else if (rb.linearVelocity.y * gravitySign > 0 && !Input.GetKey(KeyCode.Space))
-        {
-            rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (lowJumpMultiplier - 1) * Time.deltaTime * gravitySign;
+            float gravitySign = isGravityReversed ? -1f : 1f;
+            if (rb.linearVelocity.y * gravitySign < 0)
+            {
+                rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (fallMultiplier - 1) * Time.deltaTime * gravitySign;
+            }
+            else if (rb.linearVelocity.y * gravitySign > 0 && !Input.GetKey(KeyCode.Space))
+            {
+                rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (lowJumpMultiplier - 1) * Time.deltaTime * gravitySign;
+            }
         }
 
-        if (!isPhasing)
+        // Swimming handles its own facing above and must not let ground-based
+        // transitions (e.g. touching the water floor) knock it out of Swimming.
+        if (!isPhasing && !isSwimming)
         {
             HandleStateTransitions();
             UpdateAnimations();
+        }
+        else if (isSwimming)
+        {
+            UpdateSwimAnimations();
         }
     }
 
@@ -347,10 +497,38 @@ public class PlayerController : MonoBehaviour
         {
             currentGold -= amount;
             OnGoldChanged?.Invoke(currentGold);
-            if (spendSound != null && audioSource != null)
-            {
-                audioSource.PlayOneShot(spendSound, soundVolume);
-            }
+            SfxManager.PlayOn(audioSource, spendSound, soundVolume);
+            return true;
+        }
+        return false;
+    }
+
+    // --- Scrap ---------------------------------------------------------------------------------
+    // Scrap is the CARD-MAINTENANCE currency, deliberately separate from gold. The split
+    // (designer-set 2026-08-03): gold comes from piles placed in levels (exploration) and buys NEW
+    // power at the shop; scrap comes from kills and from your own cards wearing out, and only ever
+    // SUSTAINS what you already own. They must never become interchangeable — if the shop ever
+    // sells charges, or scrap ever buys cards, the two have merged and one of them is redundant.
+    //
+    // Scrap spending is NOT hub-exempt. The umbrella "free in hub" rule covers resources the
+    // sandbox drains from you (jump Shift, card charges); a forge recharge is a purchase that
+    // permanently improves the run, exactly like a shop buy, which the hub already charges for.
+    // Making it free would let the player stand in the hub and refill their whole deck.
+
+    public void AddScrap(int amount)
+    {
+        if (amount <= 0) return;
+        currentScrap += amount;
+        OnScrapChanged?.Invoke(currentScrap);
+    }
+
+    public bool TrySpendScrap(int amount)
+    {
+        if (currentScrap >= amount)
+        {
+            currentScrap -= amount;
+            OnScrapChanged?.Invoke(currentScrap);
+            SfxManager.PlayOn(audioSource, spendSound, soundVolume);
             return true;
         }
         return false;
@@ -360,14 +538,42 @@ public class PlayerController : MonoBehaviour
     {
         if (animator == null) return;
 
-        // GÜNCELLENDİ: Yeni paket "MovingBlend" kullanıyor (0.0 Durma, 1.0 Koşma)
-        float movingBlend = (Mathf.Abs(moveInput) > 0.1f) ? 1.0f : 0.0f;
-        animator.SetFloat("MoveBlendX", movingBlend);
+        float speed = Mathf.Abs(rb.linearVelocity.x);
+        bool moving = Mathf.Abs(moveInput) > 0.1f && speed > 0.1f;
 
-        // GÜNCELLENDİ: Yeni paket "SpeedVertical" kullanıyor
+        // Pose: hold the walk (or chosen) locomotion pose while actually moving, idle otherwise.
+        // MoveBlendX blends idle(0)/walk(1)/run(3) in the grounded locomotion blend tree.
+        // Gated on real speed too, so pushing into a wall shows idle instead of walking in place.
+        animator.SetFloat("MoveBlendX", moving ? locomotionPose : 0f);
+
+        // Run animation: the Cainos pack reaches its dedicated RUN clip via the IsRunning bool,
+        // normally flipped by the pack's own Shift-to-run input controller — which was removed
+        // when the character was integrated, so nothing ever set it and the character was stuck
+        // walking. Drive it ourselves. Toggle off (useRunAnimation) to revert to the walk.
+        animator.SetBool("IsRunning", moving && useRunAnimation);
+
+        // Cadence: scale the walk-cycle PLAYBACK to the actual ground speed so the feet grip the
+        // ground instead of sliding. This drives the pack's built-in MoveSpeedMul (the "Movement
+        // Blend" state's speed parameter), which was never set — that's why the walk always
+        // played at a fixed cadence regardless of how fast the body travelled. Also scales down
+        // naturally when acid/goo slows the player, keeping the feet locked.
+        float cadence = moving ? Mathf.Clamp(speed * animCadenceScale, minCadence, maxCadence) : 1f;
+        animator.SetFloat("MoveSpeedMul", cadence);
+
         animator.SetFloat("VelocityY", rb.linearVelocity.y);
-
         animator.SetBool("IsGrounded", isGrounded);
+    }
+
+    // Feeds the Cainos swim blend tree so it picks the forward / backward / up / down
+    // swim clip based on actual movement. IsInWater (set in EnterWater) gates entry.
+    private void UpdateSwimAnimations()
+    {
+        if (animator == null) return;
+
+        animator.SetFloat("MoveBlendX", Mathf.Abs(moveInput) > 0.1f ? 1f : 0f);
+        // VelocityX is signed by facing so "forward" stays positive regardless of direction.
+        animator.SetFloat("VelocityX", rb.linearVelocity.x * (isFacingRight ? 1f : -1f));
+        animator.SetFloat("VelocityY", rb.linearVelocity.y);
     }
 
     private void HandleJumpInput()
@@ -391,7 +597,7 @@ public class PlayerController : MonoBehaviour
                 rb.AddForce(new Vector2(0f, defaultJumpForce), ForceMode2D.Impulse);
                 ChangeState(PlayerState.Jumping);
 
-                if (audioSource != null && jumpSound != null) audioSource.PlayOneShot(jumpSound);
+                SfxManager.PlayOn(audioSource, jumpSound);
                 Debug.Log("SPECTRAL WINGS: Bedava Zıplama!");
                 return;
             }
@@ -406,9 +612,43 @@ public class PlayerController : MonoBehaviour
 
     private void FixedUpdate()
     {
+        // Expire the acid/goo slow once the player has been out of the hazard long enough.
+        if (Time.time >= slowExpireTime) slowFactor = 1f;
+
         if (isPhasing)
         {
-            rb.linearVelocity = new Vector2(moveInput * moveSpeed, verticalInput * moveSpeed);
+            rb.linearVelocity = new Vector2(moveInput * moveSpeed * slowFactor, verticalInput * moveSpeed * slowFactor);
+        }
+        else if (isSwimming && currentState != PlayerState.Dashing && currentState != PlayerState.KnockedBack && currentState != PlayerState.CometDiving)
+        {
+            // Direct velocity control with water resistance. Overwriting velocity each
+            // step keeps swimming responsive even if gravityScale gets changed elsewhere.
+            float vx = moveInput * swimSpeed;
+            float vy;
+
+            if (swimExitTimer > 0f)
+            {
+                // Swim-jump pop in progress: preserve the upward velocity to breach and exit.
+                swimExitTimer -= Time.fixedDeltaTime;
+                vy = rb.linearVelocity.y;
+            }
+            else if (Mathf.Abs(verticalInput) > 0.01f)
+            {
+                // Actively swimming up or down. Holding Up carries the player to the
+                // surface and out of the water — this is the normal way to exit.
+                vy = verticalInput * swimSpeed;
+            }
+            else
+            {
+                // Idle: settle DOWN to a rest depth below the surface so the player sits
+                // in the water instead of floating on top. Never pushes up, so it can't trap.
+                float restY = (currentSwimZone != null ? currentSwimZone.SurfaceY : transform.position.y) - swimSurfaceOffset;
+                vy = transform.position.y > restY
+                    ? Mathf.Max(-swimSpeed, (restY - transform.position.y) * swimSettleStrength)
+                    : 0f;
+            }
+
+            rb.linearVelocity = new Vector2(vx, vy);
         }
         else if (currentState == PlayerState.WallSliding)
         {
@@ -418,13 +658,13 @@ public class PlayerController : MonoBehaviour
         {
             if (isGrounded)
             {
-                rb.linearVelocity = new Vector2(moveInput * moveSpeed, rb.linearVelocity.y);
+                rb.linearVelocity = new Vector2(moveInput * moveSpeed * slowFactor, rb.linearVelocity.y);
             }
             else
             {
                 // Havadayken yatay hızı koru, ama input ile biraz kontrol ver
                 float airControl = 0.7f;
-                float targetX = moveInput * moveSpeed;
+                float targetX = moveInput * moveSpeed * slowFactor;
                 float newX = Mathf.Lerp(rb.linearVelocity.x, targetX, airControl * Time.fixedDeltaTime * 5f);
                 rb.linearVelocity = new Vector2(newX, rb.linearVelocity.y);
             }
@@ -473,6 +713,49 @@ public class PlayerController : MonoBehaviour
         ApplyVisualFacing();
     }
 
+    // === SWIMMING ===
+    // Called by SwimZone when the player enters/exits swimmable water (Clear/Normal).
+    // Hazard waters (Acid/Lava/Poison) use HazardZone and never call these.
+    // Swimming is free (no Shift cost) and uses gravity-off, 8-directional control.
+    public void EnterWater(SwimZone zone)
+    {
+        swimZoneCount++;
+        if (isSwimming || playerHealth.IsDead || currentState == PlayerState.InCannon) return;
+
+        isSwimming = true;
+        currentSwimZone = zone;
+        swimExitTimer = 0f;
+        swimCachedGravityScale = rb.gravityScale; // restore exactly on exit (handles gravity reversal)
+        rb.gravityScale = 0f;
+        ChangeState(PlayerState.Swimming);
+
+        // Drives the Cainos "Swim" state machine in AC Character.controller.
+        if (animator != null) animator.SetBool("IsInWater", true);
+    }
+
+    public void ExitWater(SwimZone zone)
+    {
+        swimZoneCount = Mathf.Max(0, swimZoneCount - 1);
+        if (!isSwimming || swimZoneCount > 0) return; // still inside another overlapping zone
+
+        isSwimming = false;
+        currentSwimZone = null;
+        swimExitTimer = 0f;
+        rb.gravityScale = swimCachedGravityScale;
+        if (currentState == PlayerState.Swimming) ChangeState(PlayerState.Jumping);
+
+        if (animator != null) animator.SetBool("IsInWater", false);
+    }
+
+    // Upward kick to break the surface and leap out of water. Free, no Shift cost.
+    // Starts a brief window where the surface clamp is bypassed so the player can exit.
+    private void PerformSwimJump()
+    {
+        swimExitTimer = swimExitDuration;
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, swimExitJumpForce);
+        SfxManager.PlayOn(audioSource, jumpSound, soundVolume);
+    }
+
     // Detailed outcome of the most recent card play (Success / Failed / Blocked).
     // DeckManager only needs the bool; UI feedback for Blocked reads this later.
     public CardExecuteResult LastExecuteResult { get; private set; } = CardExecuteResult.Success;
@@ -489,8 +772,10 @@ public class PlayerController : MonoBehaviour
         {
             if (audioSource != null && jumpSound != null)
             {
+                // Live sound is back to the original clip while the procedural "shift" SFX is
+                // paused (designer hunting the vibe). Re-wire to ProcSfx.Jump to resume the test.
                 audioSource.pitch = Random.Range(0.95f, 1.05f);
-                audioSource.PlayOneShot(jumpSound);
+                SfxManager.PlayOn(audioSource, jumpSound);
                 audioSource.pitch = 1f;
             }
             if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
@@ -504,6 +789,60 @@ public class PlayerController : MonoBehaviour
 
     internal IEnumerator DashIFrames(float duration) => playerHealth.GrantInvincibility(duration);
 
+    // Driven dash. Enters the Dashing state — which both the movement FixedUpdate and
+    // HandleStateTransitions deliberately leave alone — and HOLDS a flat horizontal velocity
+    // for dashDuration, re-asserting it every physics step (with y forced to 0) so it stays
+    // level and snappy and works identically on the ground and in the air. Gravity scale is
+    // never touched, so the dash composes cleanly with Floor is Lava. On exit it carries a
+    // little momentum out instead of dead-stopping. i-frames + procedural afterimages for feel.
+    // The PlayerVelocity | Invincibility conflict flags are held by the executor's managed
+    // coroutine for the full duration of this routine.
+    internal IEnumerator DashRoutine()
+    {
+        float dir = isFacingRight ? 1f : -1f;
+
+        ChangeState(PlayerState.Dashing);
+
+        // Instant feedback.
+        SfxManager.PlayOn(audioSource, dashSound);
+        if (dashEffectPrefab != null)
+            Instantiate(dashEffectPrefab, transform.position, Quaternion.identity);
+        if (CameraShake.instance != null)
+            CameraShake.instance.Shake(0.12f, 0.55f);
+
+        // i-frames for the whole dash (the field's buffer keeps the momentum tail safe too).
+        StartCoroutine(DashIFrames(dashIFrameDuration));
+
+        float elapsed = 0f;
+        float ghostTimer = 0f;
+        while (elapsed < dashDuration)
+        {
+            if (playerHealth != null && playerHealth.IsDead) yield break;
+
+            rb.linearVelocity = new Vector2(dir * dashSpeed, 0f);
+
+            if (dashAfterimages && visualModel != null)
+            {
+                ghostTimer -= Time.fixedDeltaTime;
+                if (ghostTimer <= 0f)
+                {
+                    DashAfterimage.Spawn(visualModel.transform, dashAfterimageTint);
+                    ghostTimer = 0.03f;
+                }
+            }
+
+            elapsed += Time.fixedDeltaTime;
+            yield return new WaitForFixedUpdate();
+        }
+
+        // Carry a bit of momentum out in the dash direction — feels better than a hard stop.
+        rb.linearVelocity = new Vector2(dir * dashEndSpeed, rb.linearVelocity.y);
+
+        // Hand control back to the state machine.
+        if (currentState == PlayerState.Dashing)
+            ChangeState(isGrounded ? PlayerState.Idle : PlayerState.Jumping);
+    }
+
     public void ApplyKnockback(Vector2 knockbackForce) => playerHealth.ApplyKnockback(knockbackForce);
 
     public void TakeDamage(float damage) => playerHealth.TakeDamage(damage);
@@ -511,6 +850,45 @@ public class PlayerController : MonoBehaviour
     public void OnNewRoomEnter()
     {
         tookDamageThisRoom = false;
+        ResetFallTracking();
+    }
+
+    // Clears Meteor Greaves fall tracking so a teleport (fall-respawn, room spawn) isn't
+    // read as an enormous drop on the next landing. Called from PlayerHealth.FallAndRespawn.
+    public void ResetFallTracking() => trackingFall = false;
+
+    // Meteor Greaves: landing after a fall of at least meteorMinFall stomps a shockwave whose
+    // radius and damage scale with how far you dropped (capped at meteorMaxFall). Damage routes
+    // through the relic damage hook like every other player source. No-op without the relic.
+    private void TryMeteorGreavesLanding(float fallDist)
+    {
+        if (RelicManager.instance == null || !RelicManager.instance.HasRelic("MeteorGreaves")) return;
+        if (fallDist < meteorMinFall) return;
+        if (Time.time < meteorReadyAt) return;
+        meteorReadyAt = Time.time + meteorCooldown;
+
+        float denom = Mathf.Max(0.01f, meteorMaxFall - meteorMinFall);
+        float power01 = Mathf.Clamp01((fallDist - meteorMinFall) / denom);
+        float radius = Mathf.Lerp(meteorMinRadius, meteorMaxRadius, power01);
+        float damage = Mathf.Lerp(meteorMinDamage, meteorMaxDamage, power01);
+
+        HashSet<IDamageable> struck = new HashSet<IDamageable>();
+        foreach (Collider2D hit in Physics2D.OverlapCircleAll(transform.position, radius, ~0))
+        {
+            IDamageable target = hit.GetComponentInParent<IDamageable>();
+            if (target == null || !struck.Add(target)) continue;
+            float dmg = RelicManager.instance.ModifyPlayerDamage(damage, target as EnemyHealth);
+            target.TakeDamage(dmg);
+        }
+
+        MeteorGreavesVFX.Play(transform.position, radius, power01);
+        if (CameraShake.instance != null)
+            CameraShake.instance.Shake(Mathf.Lerp(0.12f, 0.4f, power01), Mathf.Lerp(0.25f, 0.6f, power01));
+
+        // Impact sound, louder the further you fell. 2D one-shot rather than positional: the player
+        // IS the listener here, and a landing this heavy should hit at full weight every time.
+        if (audioSource != null)
+            SfxManager.PlayOn(audioSource, ProcSfx.MeteorImpact, Mathf.Lerp(0.55f, 1f, power01) * meteorSfxVolume);
     }
 
     public bool IsGroundedCheck()
@@ -552,11 +930,8 @@ public class PlayerController : MonoBehaviour
             Gizmos.color = Color.blue;
             Gizmos.DrawLine(wallCheck.position, wallCheck.position + (Vector3.right * (isFacingRight ? 1f : -1f) * wallCheckDistance));
         }
-        if (firePoint != null)
-        {
-            Gizmos.color = Color.red;
-            Gizmos.DrawWireSphere(firePoint.position, biteRange);
-        }
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(BiteCenter, biteRange);
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, cometRadius);
     }
@@ -585,7 +960,11 @@ public class PlayerController : MonoBehaviour
             {
                 float enemyTopY = other.bounds.center.y + other.bounds.extents.y * 0.5f;
                 float enemyBottomY = other.bounds.center.y - other.bounds.extents.y * 0.5f;
+#if UNITY_EDITOR && DECKSHIFT_VERBOSE
+                // Verbose only: this fires on EVERY enemy trigger overlap and the interpolated
+                // string allocates each time. Define DECKSHIFT_VERBOSE to re-enable.
                 Debug.Log($"[HeadBounce Trigger] {other.gameObject.name}, playerY: {transform.position.y:F2}, enemyTopY: {enemyTopY:F2}, velocity.y: {rb.linearVelocity.y:F2}");
+#endif
 
                 bool positionOk = isGravityReversed ? transform.position.y < enemyBottomY : transform.position.y > enemyTopY;
                 if (positionOk)
@@ -596,10 +975,7 @@ public class PlayerController : MonoBehaviour
 
     private void PerformFireball(float damageFromCard)
     {
-        if (audioSource != null && fireballCastSound != null)
-        {
-            audioSource.PlayOneShot(fireballCastSound);
-        }
+        SfxManager.PlayOn(audioSource, fireballCastSound);
         if (fireballPrefab == null || firePoint == null) return;
 
         Quaternion fireballRotation = !isFacingRight ? Quaternion.Euler(0, 180, 0) : Quaternion.identity;
@@ -698,48 +1074,148 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    internal void PerformVampiricBite(float damageAmount)
+    // Returns true if the bite landed on a target. Returns false when nothing damageable is in
+    // range, so the play is refused upstream (no Shift/charge spent, card stays in hand) instead
+    // of whiffing into empty air.
+    internal bool PerformVampiricBite(float damageAmount)
     {
-        if (audioSource != null && vampireBiteSound != null)
-            audioSource.PlayOneShot(vampireBiteSound);
-
         // ~0 = all layers: avoids the AeroBat/MeleeEnemy Default-layer miss from enemyLayer mask.
         // GetComponentInParent finds EnemyHealth even when the collider is on a child.
-        Collider2D[] hits = Physics2D.OverlapCircleAll(firePoint.position, biteRange, ~0);
+        // Centered on the body (BiteCenter), not the wand — a regular circle around the player.
+        Collider2D[] hits = Physics2D.OverlapCircleAll(BiteCenter, biteRange, ~0);
         foreach (Collider2D hit in hits)
         {
             IDamageable targetHealth = hit.GetComponentInParent<IDamageable>();
             if (targetHealth == null) continue;
 
-            targetHealth.TakeDamage(damageAmount);
+            SfxManager.PlayOn(audioSource, vampireBiteSound);   // only chomp when there's a real target
+            float biteDamage = RelicManager.instance != null
+                ? RelicManager.instance.ModifyPlayerDamage(damageAmount, targetHealth as EnemyHealth)
+                : damageAmount;
+            targetHealth.TakeDamage(biteDamage);
             if (targetHealth is EnemyHealth) Heal(biteHealAmount);
             if (biteEffectPrefab != null)
-            {
-                GameObject vfx = Instantiate(biteEffectPrefab, hit.transform.position, Quaternion.identity);
-                Destroy(vfx, 1.0f);
-            }
-            return; // one bite, one target
+                Instantiate(biteEffectPrefab, hit.transform.position, Quaternion.identity);  // BiteVFX self-destroys
+
+            if (CameraShake.instance != null)
+                CameraShake.instance.Shake(0.08f, 0.25f);   // chomp impact
+
+            return true; // one bite, one target
         }
+        return false; // nothing in range — play refused, card retained
     }
 
     public void Heal(float amount) => playerHealth.Heal(amount);
 
     internal void PerformGlassWail(float stunDuration)
     {
-        if (audioSource != null && glassVailSound != null)
-        {
-            audioSource.PlayOneShot(glassVailSound);
-        }
+        SfxManager.PlayOn(audioSource, glassVailSound);
 
         EnemyHealth[] allEnemies = FindObjectsByType<EnemyHealth>(FindObjectsSortMode.None);
 
         if (CameraShake.instance != null)
             CameraShake.instance.Shake(0.5f, 0.5f);
 
+        // Wail origin: a shockwave ripples out from the player so the screen-wide stun reads visually.
+        // World-space prefab (self-destroys), so spawn it directly rather than via the UI-canvas helper.
+        if (glassWailEffect != null)
+            Instantiate(glassWailEffect, transform.position, Quaternion.identity);
+
         foreach (EnemyHealth enemy in allEnemies)
         {
             enemy.Stun(stunDuration);
         }
+    }
+
+    // Glass Parry: a 0.5s window. Eat a hit inside it and the hit is negated, the card's
+    // charge is refunded (mastery = self-sustaining), and glass shards riposte everything
+    // close for actionValue damage. Let the window close on nothing and the charge is
+    // simply gone — Glass identity: brutal on failure, brilliant on success.
+    private const float ParryWindowDuration = 0.5f;
+
+    internal IEnumerator GlassParryRoutine(float riposteDamage, RuntimeCard playedCard)
+    {
+        GlassParryVFX windowVfx = GlassParryVFX.SpawnWindow(transform, ParryWindowDuration);
+        playerHealth.BeginParryWindow();
+
+        float elapsed = 0f;
+        while (elapsed < ParryWindowDuration && !playerHealth.ParryTriggered)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        bool success = playerHealth.ParryTriggered;   // must read BEFORE EndParryWindow clears it
+        playerHealth.EndParryWindow();
+
+        if (!success)
+        {
+            // Window closed on nothing. The charge was already spent — that's the cost.
+            yield break;
+        }
+
+        if (windowVfx != null) windowVfx.CutShort();
+
+        if (DeckManager.instance != null) DeckManager.instance.RefundCharge(playedCard);
+
+        SfxManager.PlayOn(audioSource, glassParrySound);
+        GlassParryVFX.SpawnShatter(transform.position);
+        if (CameraShake.instance != null) CameraShake.instance.Shake(0.25f, 0.45f);
+
+        // Brief mercy so the parried enemy's lingering hitbox can't clip you next frame.
+        StartCoroutine(playerHealth.GrantInvincibility(0.35f));
+
+        // The riposte: shards bite everyone close. Same all-layers + parent-lookup pattern
+        // as Vampiric Bite (enemy colliders aren't reliably on the Enemy layer).
+        HashSet<IDamageable> struck = new HashSet<IDamageable>();
+        foreach (Collider2D hit in Physics2D.OverlapCircleAll(transform.position, parryRiposteRange, ~0))
+        {
+            IDamageable target = hit.GetComponentInParent<IDamageable>();
+            if (target == null || struck.Contains(target)) continue;
+            struck.Add(target);
+
+            float finalDamage = RelicManager.instance != null
+                ? RelicManager.instance.ModifyPlayerDamage(riposteDamage, target as EnemyHealth)
+                : riposteDamage;
+            target.TakeDamage(finalDamage);
+        }
+    }
+
+    // Freefall Blade: a ")" arc slash — out in front and wrapping down below the feet.
+    // Playable grounded or airborne, but while actually falling it hits for DOUBLE damage
+    // AND swings a BIGGER arc (freefallBladeFallingRangeMul, designer 2026-07-17) —
+    // Momentum: the fall you already paid for becomes a weapon. Always plays, even
+    // into empty air (designer 2026-07-15) — the swing itself costs the charge.
+    internal bool PerformFreefallBlade(float damageAmount)
+    {
+        bool falling = !isGrounded && rb.linearVelocity.y < -0.01f;
+        float damage = falling ? damageAmount * 2f : damageAmount;
+        float range = falling ? freefallBladeRange * freefallBladeFallingRangeMul : freefallBladeRange;
+        float facing = isFacingRight ? 1f : -1f;
+
+        // One circle seated forward-and-low covers the bracket: its top edge reaches
+        // chest height in front, its bottom wraps under the feet.
+        Vector2 center = (Vector2)transform.position
+                       + new Vector2(facing * range * 0.55f, -range * 0.35f);
+
+        HashSet<IDamageable> struck = new HashSet<IDamageable>();
+        foreach (Collider2D hit in Physics2D.OverlapCircleAll(center, range, ~0))
+        {
+            IDamageable target = hit.GetComponentInParent<IDamageable>();
+            if (target == null || struck.Contains(target)) continue;
+            struck.Add(target);
+
+            float finalDamage = RelicManager.instance != null
+                ? RelicManager.instance.ModifyPlayerDamage(damage, target as EnemyHealth)
+                : damage;
+            target.TakeDamage(finalDamage);
+        }
+
+        SfxManager.PlayOn(audioSource, freefallBladeSound);
+        FreefallBladeVFX.Spawn(transform.position, isFacingRight, falling, range);
+        if (struck.Count > 0 && CameraShake.instance != null)
+            CameraShake.instance.Shake(falling ? 0.15f : 0.08f, falling ? 0.35f : 0.2f);
+
+        return true;
     }
 
     internal IEnumerator PhaseRoutine(float duration)
@@ -881,8 +1357,10 @@ public class PlayerController : MonoBehaviour
         cardActionExecutor?.SetManualFlag(ConflictFlags.PlayerVelocity, true);
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, -cometSpeed);
         if (diveTrail != null) diveTrail.emitting = true;
-        if (audioSource != null && cometDiveSound != null)
-            audioSource.PlayOneShot(cometDiveSound);
+        SfxManager.PlayOn(audioSource, cometDiveSound);
+
+        if (cometVfx != null) cometVfx.Cancel();   // defensive: never leave an orphan telegraph behind
+        cometVfx = CometDiveVFX.Begin(this, cometRadius);
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
@@ -900,7 +1378,10 @@ public class PlayerController : MonoBehaviour
         if (eHealth != null)
         {
             ContactPoint2D contact = collision.GetContact(0);
+#if UNITY_EDITOR && DECKSHIFT_VERBOSE
+            // Verbose only: fires on EVERY enemy collision (see the trigger path above).
             Debug.Log($"[HeadBounce] Collision: {collision.gameObject.name}, normal.y: {contact.normal.y:F2}, velocity.y: {rb.linearVelocity.y:F2}, canBounce: {eHealth.canBeHeadBounced}");
+#endif
 
             bool normalFromBelow = isGravityReversed ? contact.normal.y < -0.7f : contact.normal.y > 0.7f;
             if (normalFromBelow)
@@ -933,37 +1414,102 @@ public class PlayerController : MonoBehaviour
             cardActionExecutor?.SetManualFlag(ConflictFlags.PlayerVelocity, false);
         }
         if (diveTrail != null) diveTrail.emitting = false;
+
+        // A dive that ends without landing (knockback, death, fall-respawn) fades the comet out.
+        // LandCometDive hands the VFX off first, so this can't cancel the landing burst.
+        if (cometVfx != null) { cometVfx.Cancel(); cometVfx = null; }
     }
 
     private void LandCometDive()
     {
+        // The blast is centred on the player's root (the feet). CometDiveVFX telegraphs and draws
+        // its rings around this same point — keep the two in sync if either ever moves.
         Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, cometRadius, ~0);
         HashSet<IDamageable> damaged = new HashSet<IDamageable>();
         foreach (Collider2D hit in hits)
         {
             IDamageable target = hit.GetComponentInParent<IDamageable>();
             if (target != null && damaged.Add(target))
-                target.TakeDamage(cometDamage);
+            {
+                float diveDamage = RelicManager.instance != null
+                    ? RelicManager.instance.ModifyPlayerDamage(cometDamage, target as EnemyHealth)
+                    : cometDamage;
+                target.TakeDamage(diveDamage);
+            }
         }
 
-        if (cometImpactEffect != null)
-            Instantiate(cometImpactEffect, transform.position, Quaternion.identity);
-        if (CameraShake.instance != null) CameraShake.instance.Shake(0.15f, 0.5f);
+        // Hand off before EndCometDive so its Cancel() sees nothing to cancel. Camera shake and
+        // hit-stop live inside the burst.
+        if (cometVfx != null) { cometVfx.Land(transform.position); cometVfx = null; }
+        else CometDiveVFX.PlayImpact(transform.position, cometRadius);
+
+        // Consume the fall so the normal-landing detector doesn't ALSO fire Meteor Greaves —
+        // the dive is its own landing burst.
+        trackingFall = false;
 
         EndCometDive();
         ChangeState(PlayerState.Idle);
     }
 
+    public void FlashCardPlay()
+    {
+        StartCoroutine(CardPlayFlashRoutine());
+    }
+
+    // Called by the walk/run animation's footstep event, relayed from PlayerAnimEventSink on the
+    // Animator child. Clips/volume live here on the main player object.
+    public void PlayFootstep()
+    {
+        if (footstepClips == null || footstepClips.Length == 0) return;
+        AudioClip clip = footstepClips[Random.Range(0, footstepClips.Length)];
+        if (clip == null) return;
+        if (footstepSource == null)
+        {
+            footstepSource = gameObject.AddComponent<AudioSource>();
+            footstepSource.playOnAwake = false;
+            footstepSource.spatialBlend = 0f;
+        }
+        footstepSource.pitch = Random.Range(footstepPitchRange.x, footstepPitchRange.y);
+        SfxManager.PlayOn(footstepSource, clip, footstepVolume);
+    }
+
+    private IEnumerator CardPlayFlashRoutine()
+    {
+        SpriteRenderer[] renderers = visualModel != null
+            ? visualModel.GetComponentsInChildren<SpriteRenderer>()
+            : GetComponentsInChildren<SpriteRenderer>();
+
+        Color flashColor = new Color(1f, 0.85f, 0.2f); // gold
+        Color[] original = new Color[renderers.Length];
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            original[i] = renderers[i].color;
+            renderers[i].color = flashColor;
+        }
+
+        yield return new WaitForSecondsRealtime(0.08f);
+
+        for (int i = 0; i < renderers.Length; i++)
+            if (renderers[i] != null) renderers[i].color = original[i];
+    }
+
     internal void UseAdrenaline(float value)
     {
-        if (audioSource != null && adrenalineSound != null)
-        {
-            audioSource.PlayOneShot(adrenalineSound);
-        }
+        SfxManager.PlayOn(audioSource, adrenalineSound);
 
         float healthPercentage = playerHealth.HealthPercent;
 
         if (CameraShake.instance != null) CameraShake.instance.Shake(0.1f, 0.5f);
+
+        // Energy aura for the whole buff (both branches last adrenalineDuration). Parent to the
+        // player root (identity rotation) so sparks rise in world space; it self-destroys.
+        if (adrenalineAuraEffect != null)
+        {
+            GameObject aura = Instantiate(adrenalineAuraEffect, transform);
+            aura.transform.localPosition = Vector3.zero;
+            AdrenalineAuraVFX auraVfx = aura.GetComponent<AdrenalineAuraVFX>();
+            if (auraVfx != null) auraVfx.duration = adrenalineDuration;
+        }
 
         if (healthPercentage > 0.5f)
         {
@@ -1081,6 +1627,7 @@ public class PlayerController : MonoBehaviour
         {
             cardActionExecutor?.SetManualFlag(ConflictFlags.GravityScale | ConflictFlags.VisualTransform, false);
             StopCoroutine(gravityReversalCoroutine);
+            DestroyGravityAura();   // stopping the routine skips its normal cleanup; clear the aura too
         }
         gravityReversalCoroutine = StartCoroutine(GravityReversalRoutine());
     }
@@ -1101,6 +1648,15 @@ public class PlayerController : MonoBehaviour
             ApplyVisualFacing();
             originalGravityScale = rb.gravityScale;
             rb.gravityScale = -originalGravityScale;
+
+            // Anti-gravity aura: parent to the player root (identity rotation) so motes
+            // rise in world space rather than inheriting the visual's 180 deg flip.
+            if (gravityAuraEffect != null)
+            {
+                gravityAuraInstance = Instantiate(gravityAuraEffect, transform);
+                gravityAuraInstance.transform.localPosition = Vector3.zero;
+            }
+
             yield return StartCoroutine(LerpVisualTransform(0f, 180f, originalVisualLocalPos.y, originalVisualLocalPos.y + visualFlipYOffset, 0.15f));
             // Wait until 0.5s before the 5s mark (5.0 - 0.5 - 0.15 initial rotation = 4.35s)
             yield return new WaitForSeconds(4.35f);
@@ -1116,8 +1672,7 @@ public class PlayerController : MonoBehaviour
         }
 
         // Warning at t=4.5s: sound + visual strobe
-        if (warningSoundClip != null && audioSource != null)
-            audioSource.PlayOneShot(warningSoundClip, soundVolume);
+        SfxManager.PlayOn(audioSource, warningSoundClip, soundVolume);
         yield return StartCoroutine(WarningFlashRoutine());
 
         // t=5.0s: gravity snaps back instantly, visual lerps back
@@ -1126,10 +1681,21 @@ public class PlayerController : MonoBehaviour
         ApplyVisualFacing();
         yield return StartCoroutine(LerpVisualTransform(180f, 0f, originalVisualLocalPos.y + visualFlipYOffset, originalVisualLocalPos.y, 0.15f));
 
+        DestroyGravityAura();
+
         // Cleared only after the visual lerp-back so VisualTransform stays honest
         // for the full effect, mirroring the set at the top of this routine.
         cardActionExecutor?.SetManualFlag(ConflictFlags.GravityScale | ConflictFlags.VisualTransform, false);
         gravityReversalCoroutine = null;
+    }
+
+    private void DestroyGravityAura()
+    {
+        if (gravityAuraInstance != null)
+        {
+            Destroy(gravityAuraInstance);
+            gravityAuraInstance = null;
+        }
     }
 
     private IEnumerator LerpVisualTransform(float fromZ, float toZ, float fromY, float toY, float duration)
@@ -1155,19 +1721,65 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator WarningFlashRoutine()
     {
+        // The gravity-reversal warning must read on the WHOLE character. The Mage M rig is
+        // 16 SkinnedMeshRenderers (body + outfit) plus 1 SpriteRenderer (the staff). A prior
+        // version flashed only SpriteRenderers, so it tinted the staff alone and the body
+        // never reacted — the warning was effectively invisible. A red tint can't fix it
+        // either: the Cainos "Alpha Cut" shader on most outfit parts exposes no color
+        // property. But EVERY Cainos rig shader shares "_Alpha" (the same handle Phase
+        // strobes), so we blink the whole body's alpha — a blink reads as "effect expiring"
+        // — and still red-tint the staff, which does support color.
+        SkinnedMeshRenderer[] bodyParts = visualModel != null
+            ? visualModel.GetComponentsInChildren<SkinnedMeshRenderer>(true)
+            : new SkinnedMeshRenderer[0];
+        SpriteRenderer[] sprites = visualModel != null
+            ? visualModel.GetComponentsInChildren<SpriteRenderer>(true)
+            : new SpriteRenderer[0];
+        Color[] originals = new Color[sprites.Length];
+        for (int i = 0; i < sprites.Length; i++)
+            originals[i] = sprites[i].color;
+
+        MaterialPropertyBlock block = new MaterialPropertyBlock();
+        Color warnColor = new Color(1f, 0.3f, 0.3f);   // red danger tint (staff only)
+        const float dimAlpha = 0.2f;                   // blinked-down body alpha
+
         // 3 rapid on/off cycles ≈ 0.5s total
-        for (int i = 0; i < 3; i++)
+        for (int c = 0; c < 3; c++)
         {
-            SetPlayerFlashColor(Color.white);
+            SetBodyAlpha(bodyParts, block, dimAlpha);
+            SetSpriteColors(sprites, warnColor, null);
             yield return new WaitForSeconds(0.083f);
-            SetPlayerFlashColor(playerRendererOriginalColor);
+            SetBodyAlpha(bodyParts, block, 1f);
+            SetSpriteColors(sprites, default, originals);
             yield return new WaitForSeconds(0.083f);
+        }
+
+        // Guarantee restoration regardless of where the loop ended.
+        SetBodyAlpha(bodyParts, block, 1f);
+        SetSpriteColors(sprites, default, originals);
+    }
+
+    // Strobe the "_Alpha" property every Cainos rig shader exposes. Mirrors
+    // PhaseVisualRoutine — MaterialPropertyBlocks apply cleanly to these SkinnedMeshRenderers,
+    // and _Alpha == 1 is the confirmed "normal" value (Phase restores to 1 the same way).
+    private void SetBodyAlpha(SkinnedMeshRenderer[] parts, MaterialPropertyBlock block, float alpha)
+    {
+        block.SetFloat("_Alpha", alpha);
+        for (int i = 0; i < parts.Length; i++)
+        {
+            if (parts[i] == null) continue;
+            parts[i].SetPropertyBlock(block);
         }
     }
 
-    private void SetPlayerFlashColor(Color color)
+    // Tint all sprites to a single color, or restore each to its captured original
+    // when 'restore' is supplied.
+    private void SetSpriteColors(SpriteRenderer[] sprites, Color flat, Color[] restore)
     {
-        if (playerSkinnedRenderer != null && playerRendererHasColor)
-            playerSkinnedRenderer.material.SetColor("_Color", color);
+        for (int i = 0; i < sprites.Length; i++)
+        {
+            if (sprites[i] == null) continue;
+            sprites[i].color = restore != null ? restore[i] : flat;
+        }
     }
 }

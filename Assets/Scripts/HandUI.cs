@@ -19,8 +19,9 @@ public class HandUI : MonoBehaviour
     [Range(0f, 1f)] public float soundVolume = 0.5f;
     private AudioSource audioSource;
 
-    // Havada kalan hayaletleri takip etmek için liste
     private List<GameObject> activeGhosts = new List<GameObject>();
+    private Coroutine animateCoroutine;
+    private Coroutine popCoroutine;
 
     private void Awake()
     {
@@ -35,11 +36,13 @@ public class HandUI : MonoBehaviour
     private void OnEnable()
     {
         DeckManager.OnHandChanged += UpdateHandDisplay;
+        DeckManager.OnCardPlayed += HandleCardPlayed;
     }
 
     private void OnDisable()
     {
         DeckManager.OnHandChanged -= UpdateHandDisplay;
+        DeckManager.OnCardPlayed -= HandleCardPlayed;
     }
 
     private void Start()
@@ -55,7 +58,11 @@ public class HandUI : MonoBehaviour
 
     public void UpdateHandDisplay(bool animate)
     {
-        StopAllCoroutines();
+        if (animateCoroutine != null)
+        {
+            StopCoroutine(animateCoroutine);
+            animateCoroutine = null;
+        }
 
         // Hayalet Temizliği
         foreach (GameObject ghost in activeGhosts)
@@ -107,7 +114,7 @@ public class HandUI : MonoBehaviour
 
         if (animate && drawPilePosition != null && createdCards.Count > 0)
         {
-            StartCoroutine(SafeAnimateRoutine(createdCards));
+            animateCoroutine = StartCoroutine(SafeAnimateRoutine(createdCards));
         }
     }
 
@@ -127,7 +134,7 @@ public class HandUI : MonoBehaviour
             {
                 // Pitch'i hafifçe değiştiriyoruz (0.9 ile 1.1 arası) ki ses doğal gelsin
                 audioSource.pitch = Random.Range(0.9f, 1.1f);
-                audioSource.PlayOneShot(drawSound, soundVolume);
+                SfxManager.PlayOn(audioSource, drawSound, soundVolume);
             }
             // -----------------------------
 
@@ -173,4 +180,65 @@ public class HandUI : MonoBehaviour
     }
 
     public void AnimateCardFromHand(int index) { }
+
+    private void HandleCardPlayed(int index)
+    {
+        if (index < 0 || index >= handContainer.childCount) return;
+        Transform source = handContainer.GetChild(index);
+        if (source == null) return;
+
+        // Spawn a ghost outside the hand container so UpdateHandDisplay cleanup doesn't touch it
+        GameObject ghost = Instantiate(cardUIPrefab, handContainer.parent);
+        ghost.transform.position = source.position;
+        ghost.transform.localScale = source.localScale;
+
+        CardUI sourceUI = source.GetComponent<CardUI>();
+        CardUI ghostUI = ghost.GetComponent<CardUI>();
+        if (ghostUI != null && sourceUI != null)
+            ghostUI.Setup(sourceUI.GetCard(), -1);
+
+        Destroy(ghost.GetComponent<CardHover>());
+        CanvasGroup cg = ghost.GetComponent<CanvasGroup>();
+        if (cg == null) cg = ghost.AddComponent<CanvasGroup>();
+        cg.blocksRaycasts = false;
+
+        if (popCoroutine != null) StopCoroutine(popCoroutine);
+        popCoroutine = StartCoroutine(CardPlayPopRoutine(ghost));
+    }
+
+    private IEnumerator CardPlayPopRoutine(GameObject ghost)
+    {
+        if (ghost == null) yield break;
+
+        RectTransform rt = ghost.GetComponent<RectTransform>();
+        CanvasGroup cg = ghost.GetComponent<CanvasGroup>();
+        Vector3 startScale = ghost.transform.localScale;
+        Vector2 startPos = rt.anchoredPosition;
+
+        // Quick scale punch up
+        float t = 0f;
+        while (t < 0.07f)
+        {
+            if (ghost == null) yield break;
+            t += Time.unscaledDeltaTime;
+            ghost.transform.localScale = startScale * Mathf.Lerp(1f, 1.25f, t / 0.07f);
+            yield return null;
+        }
+
+        // Fade out while drifting up
+        t = 0f;
+        while (t < 0.15f)
+        {
+            if (ghost == null) yield break;
+            t += Time.unscaledDeltaTime;
+            float p = t / 0.15f;
+            ghost.transform.localScale = startScale * Mathf.Lerp(1.25f, 0.85f, p);
+            if (cg != null) cg.alpha = Mathf.Lerp(1f, 0f, p);
+            rt.anchoredPosition = startPos + Vector2.up * (40f * p);
+            yield return null;
+        }
+
+        if (ghost != null) Destroy(ghost);
+        popCoroutine = null;
+    }
 }

@@ -6,14 +6,28 @@ public class Shopkeeper : MonoBehaviour
     private bool playerInRange = false;
     public KeyCode interactKey = KeyCode.E;
 
-    [Header("Görsel Referans")]
+    [Header("Gï¿½rsel Referans")]
     public GameObject interactionPopup;
 
-    [Header("Bu Dükkanýn Ýçeriði")]
+    [Header("Shop Screen")]
+    [Tooltip("Portrait shown on the shop screen. Leave empty to use this shopkeeper's own world " +
+             "sprite, so a placed stall gets a face with no wiring.")]
+    public Sprite portrait;
+
+    // The face the shop screen puts on the counter. Falls back to whatever this shopkeeper looks
+    // like in the world, which is almost always the right answer and needs no Inspector step.
+    public Sprite ResolvePortrait()
+    {
+        if (portrait != null) return portrait;
+        SpriteRenderer sr = GetComponentInChildren<SpriteRenderer>();
+        return sr != null ? sr.sprite : null;
+    }
+
+    [Header("Bu Dï¿½kkanï¿½n ï¿½ï¿½eriï¿½i")]
     public List<CardData> specificCardPool;
     public List<RelicData> specificRelicPool;
 
-    // Dükkanýn Hafýzasý
+    // Dï¿½kkanï¿½n Hafï¿½zasï¿½
     public List<ShopSlotData> myInventory = new List<ShopSlotData>();
 
     private bool isInitialized = false;
@@ -31,45 +45,50 @@ public class Shopkeeper : MonoBehaviour
 
     private void GenerateShopContent()
     {
-        if (specificCardPool.Count == 0 && ShopManager.instance != null)
+        if ((specificCardPool == null || specificCardPool.Count == 0) && ShopManager.instance != null)
             specificCardPool = ShopManager.instance.allCardsPool;
 
-        if (specificRelicPool.Count == 0 && ShopManager.instance != null)
-            specificRelicPool = ShopManager.instance.allRelicsPool;
+        // NOTE: ShopManager.allRelicsPool is deliberately NOT consulted any more. It was a
+        // hand-maintained list holding 3 of the project's 18 relics, and copying it into
+        // specificRelicPool is exactly what capped the shop's stock. Relics now come from
+        // RelicPool (see below), which derives from the assets themselves.
 
-        // Kartlarý Oluþtur
-        for (int i = 0; i < 5; i++)
+        // Cards â€” up to 5 DISTINCT offers (draw without replacement so no duplicates show).
+        if (specificCardPool != null)
         {
-            if (specificCardPool != null && specificCardPool.Count > 0)
+            List<CardData> pool = new List<CardData>(specificCardPool);
+            int n = Mathf.Min(5, pool.Count);
+            for (int i = 0; i < n; i++)
             {
-                CardData card = specificCardPool[Random.Range(0, specificCardPool.Count)];
-
-                ShopSlotData data = new ShopSlotData();
-                data.itemType = ShopItemType.Card;
-                data.cardReference = card;
-                data.itemName = card.cardName;
-                data.price = Random.Range(40, 70);
-                data.isSold = false;
-
-                myInventory.Add(data);
+                int idx = Random.Range(0, pool.Count);
+                CardData card = pool[idx];
+                pool.RemoveAt(idx);
+                myInventory.Add(new ShopSlotData
+                {
+                    itemType = ShopItemType.Card, cardReference = card, itemName = card.cardName,
+                    price = Random.Range(40, 70), isSold = false
+                });
             }
         }
 
-        // Relicleri Oluþtur
-        for (int i = 0; i < 3; i++)
+        // Relics â€” up to 3 DISTINCT offers, drawn from EVERY relic in the project (RelicPool /
+        // RelicCatalogue) rather than a hand-kept list. ShopManager.allRelicsPool had drifted to 3
+        // of the 18 relics, so five sixths of the roster was simply unbuyable and nothing in the
+        // game could show that. `specificRelicPool` still works as a deliberate per-shop
+        // restriction; empty means "the whole roster".
+        //
+        // Already-owned relics are excluded: shelf space spent on something you are wearing is a
+        // wasted offer, and since ownership is read when the shop stocks, a relic you SELL becomes
+        // buyable again in the next shop.
         {
-            if (specificRelicPool != null && specificRelicPool.Count > 0)
+            List<RelicData> picked = RelicPool.DrawDistinct(3, specificRelicPool);
+            foreach (RelicData relic in picked)
             {
-                RelicData relic = specificRelicPool[Random.Range(0, specificRelicPool.Count)];
-
-                ShopSlotData data = new ShopSlotData();
-                data.itemType = ShopItemType.Relic;
-                data.relicReference = relic;
-                data.itemName = relic.relicName;
-                data.price = Random.Range(100, 150);
-                data.isSold = false;
-
-                myInventory.Add(data);
+                myInventory.Add(new ShopSlotData
+                {
+                    itemType = ShopItemType.Relic, relicReference = relic, itemName = relic.relicName,
+                    price = Random.Range(100, 150), isSold = false
+                });
             }
         }
     }

@@ -9,6 +9,7 @@ public enum PlayerState
     WallSliding,
     InCannon,
     CometDiving,
+    Swimming,
 }
 
 public enum CardActionType
@@ -29,6 +30,9 @@ public enum CardActionType
     Adrenaline       = 13,
     Stagger          = 14,
     ReverseGravity   = 15,
+    GlassParry       = 16,
+    DeadWeight       = 17,
+    FreefallBlade    = 18,
 }
 
 public enum SkillType

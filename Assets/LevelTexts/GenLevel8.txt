@@ -1,0 +1,81 @@
+// GenLevel8 - "The Toll Shaft"  (FIGHT tier, 56x44)
+//
+// A single TALL SHAFT climbed from the bottom - deliberately the opposite shape to GenLevel7's
+// horizontal corridor. Geometry is thin ledges hung in open space rather than tunnels bored
+// through a rock mass, which is how the hand-made rooms are built.
+//
+// THREE ROUTES UP, not one. The first draft had a single zig-zag with dead air either side of
+// it; the whole left and right thirds were empty. Now the shaft braids:
+//
+//   CENTRE SPINE   bottom floor -> L1 -> L2 -> L3 -> L4 (toll landing) -> L5 -> L6 -> L7 -> exit
+//   WEST STAIR     spawn -> SW1 -> L2, and from L4 a west gallery W1 -> W2 -> W3 (chest)
+//   EAST STAIR     market floor -> E1 -> E2 -> E3 -> E4 -> rejoins the spine at L5
+//
+// They cross and rejoin, so the room reads as one space with choices in it rather than a
+// corridor. The west gallery is a dead-end BRANCH - it pays a chest, and you must come back.
+//
+// THE TOLL: the SHIFT ALTAR on L4 faces a sealed GATE onto a walled vault (chest + gold).
+//   Shift-for-loot, the run's core trade as a room feature, and entirely optional.
+// THE ELEVATOR is a SHORTCUT on the far-east wall (col 52), skipping ledges for zero Shift.
+//   The east stair beside it works without it, so it assists and never gates.
+//
+// ENEMIES: slimes are the small fodder that fills a shaft like this - they sit on ledges and
+//   make a landing contested rather than free. The BAT is parked at (22,25) ON PURPOSE: it
+//   hovers in the open gap between L3 and L4, the one jump with no wall to hug, so it has an
+//   actual job instead of idling in a corner. Rock blocks its line to the spawn.
+//
+// LAW 1: spine is walk / one 7-tile hop / rise-4 jumps. Altar, gate and elevator gate only
+//   optional things. LAW 2: every rise is 4; no ledge sits above its own launch point, and
+//   same-column ledge spacing is 8. LAW 3: the spike trench is 2 deep. LAW 8: the spawn
+//   landing (cols 2-14) is enemy-free and the trench breaks it off from the market floor.
+//   LAW 7: spawn (4,38) to exit (37,6) is 65 tiles of Manhattan distance.
+//
+// TUNING after import: elevator travel (col 52) - park it low, set its top near E3;
+//   altar shiftCost (default 3).
+
+!name: GenLevel8
+!backwall: on
+########################################################
+########################################################
+########################################################
+########################################################
+##################################.............#########
+##################################.............#########
+##################################...X..g......#########
+###########################################...........##
+##....................................................##
+##....................................................##
+##...C.........................................+......##
+##########..................................#######...##
+##....................................................##
+##....................................................##
+##...........l.......................g................##
+##........#######...................#######...........##
+##....................................................##
+##....................................................##
+##....g.....................m.........................##
+##########............#########.......................##
+##.......G............................................##
+##.......G............................................##
+##.g.C...G...A....s.........................l.........##
+#####################.............#######.............##
+##....................................................##
+##....................b...............................##
+##.........................+.................l........##
+##......................#######.............#######...##
+##....................................................##
+##....................................................##
+##...............z...................g............E...##
+##............#######.............#######.............##
+##....................................................##
+##....................................................##
+##.......+.................g.................l........##
+##....#######..........#######.............#######....##
+##....................................................##
+##....................................................##
+##..S.....................$...l..g......z.....Z.......##
+###############......###################################
+###############.^^^..###################################
+########################################################
+########################################################
+########################################################

@@ -1,0 +1,71 @@
+// GenLevel7 - "The Drainage Works"  (FIGHT tier, 64x34)
+//
+// Built to the CORRECTED movement budget (validator, 2026-08-07): apex 4.9 tiles,
+// flat reach ~12. Every mandatory rise is 4. Mandatory gaps are 7 and 8 tiles -
+// real commitment, but well inside the reach, unlike the 5-6 tile hops the older
+// rooms used (those were a third of what the character can do, which is why they
+// play flat).
+//
+// FLOW: spawn on the west sump floor -> east across TWO ACID PITS (7 and 8 tiles,
+//   both only 2 deep so a miss is a scare, not a death) with a WRECKING BALL
+//   swinging over the walkway between them -> a Rotbrute guards the east end ->
+//   THE STANDPIPE, a shaft climbed on ledges alternating walls, rise 4 each, a
+//   Spitter perched on one and a bat contesting the middle -> arrive west into
+//   the UPPER GALLERY: chest, gold, a Mimic parked beside gold bait, melee +
+//   ranged, spikes at the east end -> one last rise 4 onto the exit shelf.
+//
+// LAW 1 (jump+move only): the whole spine is walk / 7-8 tile gaps / rise-4 jumps.
+//   The updraft fan at the shaft base is a SHORTCUT that saves Shift; the climb
+//   works without it.
+// LAW 2: rises all 4. Same-column ledge spacing L1(row26)/L3(row18) = 8. Every
+//   launch surface has 5+ rows of air, and no ledge sits directly over its own
+//   approach - each is entered from the side, so you cannot bonk its underside.
+// LAW 3: both acid pits are 2 deep. Fall in and you climb out with a rise-2 hop.
+// LAW 4/5: no one-way platforms, no turrets. All ledges are solid strips.
+// LAW 7: spawn (4,29) to exit (24,9) is 41 tiles of Manhattan distance with the
+//   entire rock mass (rows 15-22, cols 2-46) between the sump and the gallery.
+//   Phase/Portal cannot shortcut it.
+//
+// CARD-GATED SECRET: a sealed vault (cols 60-62) sits behind the 1-thick col-59
+//   wall, level with ledge L2 - Phase through it for a chest, gold and a crystal.
+//   Visible from the climb, unreachable without a card. The validator reports its
+//   cells as orphaned; that is the secret working, not a fault.
+//
+// TUNING after import: wrecking ball anchor/chain (col 22); fan liftForce.
+
+!name: GenLevel7
+!backwall: on
+################################################################
+################################################################
+################################################################
+################################################################
+################################################################
+################################################################
+#####################..................#########################
+#####################..................#########################
+#####################..................#########################
+#####################...X..g...............................#####
+##################################.........................#####
+######################.....................................#####
+######################................b....................#####
+######################...gM...g..r..C...m..^^..............#####
+###############################################............#####
+###############################################............#####
+###############################################............#####
+###############################################..+.........#####
+####################################################.......#####
+###############################################............#...#
+###############################################............#...#
+###############################################.........g..#gC+#
+###############################################.......##########
+##.........................................................#####
+##.........................................................#####
+##....................K..........................s.........#####
+##.............................................#####.......#####
+##.........................................................#####
+##.......................................+...b.............#####
+##..S.....g...........z.............Z...................F..#####
+#############......#######.......###############################
+#############..w...#######...w...###############################
+################################################################
+################################################################

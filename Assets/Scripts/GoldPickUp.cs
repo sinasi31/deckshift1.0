@@ -3,11 +3,17 @@ using UnityEngine;
 public class GoldPickup : MonoBehaviour
 {
     [Header("Ayarlar")]
-    public int goldAmount = 10; // Bu altýn kaç para veriyor?
+    public int goldAmount = 10; // Bu altï¿½n kaï¿½ para veriyor?
 
-    [Header("Ses Ayarlarý")]
+    [Header("Ses Ayarlarï¿½")]
     public AudioClip goldSound;
     [Range(0f, 1f)] public float soundVolume = 0.5f;
+
+    // Scrap Magnet relic pulls the coin toward the player when in range (no-op without it).
+    private void Update()
+    {
+        ScrapMagnet.Attract(transform);
+    }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
@@ -16,16 +22,16 @@ public class GoldPickup : MonoBehaviour
             // 1. Oyuncuyu bul
             PlayerController player = other.GetComponent<PlayerController>();
 
-            // Eðer oyuncu scripti varsa parayý ekle
+            // Eï¿½er oyuncu scripti varsa parayï¿½ ekle
             if (player != null)
             {
                 player.AddGold(goldAmount);
             }
 
-            // 2. Sesi çal (Obje yok olsa bile çalar)
+            // 2. Sesi ï¿½al (Obje yok olsa bile ï¿½alar)
             PlaySound();
 
-            // 3. Altýný yok et
+            // 3. Altï¿½nï¿½ yok et
             Destroy(gameObject);
         }
     }
@@ -36,7 +42,7 @@ public class GoldPickup : MonoBehaviour
         {
             Vector3 soundPos = transform.position;
             soundPos.z = Camera.main.transform.position.z;
-            AudioSource.PlayClipAtPoint(goldSound, soundPos, soundVolume);
+            SfxManager.PlayAtPoint(goldSound, soundPos, soundVolume);
         }
     }
 }

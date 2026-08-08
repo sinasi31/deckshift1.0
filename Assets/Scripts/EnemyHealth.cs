@@ -6,6 +6,9 @@ public class EnemyHealth : MonoBehaviour, IDamageable
     [Header("Can Ayarları")]
     public float maxHealth = 30f;
 
+    // Set the first time the player damages this enemy (Whetstone relic reads/sets it).
+    [HideInInspector] public bool playerHasStruck = false;
+
     [Header("Head Bounce")]
     public bool canBeHeadBounced = true;
 
@@ -20,9 +23,24 @@ public class EnemyHealth : MonoBehaviour, IDamageable
     [Header("Efektler")]
     public GameObject damagePopupPrefab;
 
+    [Header("Drops")]
+    [Tooltip("Scrap dropped on death. Leave at -1 to derive it automatically from maxHealth " +
+             "(ScrapEconomy.ScrapForEnemy), which tiers new enemies correctly with no wiring. " +
+             "Set a positive number to override — this is the hook for 'shift-infused' elites, " +
+             "which should pay noticeably more than their base version. 0 means drops nothing.")]
+    public int scrapDropOverride = -1;
+
     private float currentHealth;
 
+    // Read-only accessor so external HUDs (e.g. the boss health bar) can poll current HP.
+    public float CurrentHealth => currentHealth;
+
     public event System.Action OnDamaged;
+    // Carries the hit's damage amount (e.g. so the boss can flinch on big hits). Fires after a landed hit.
+    public event System.Action<float> OnDamagedAmount;
+    // Fired once when this enemy dies, right before the GameObject is destroyed
+    // (e.g. so the boss can hand music back to the level track).
+    public event System.Action OnDied;
 
     // Polled by AI scripts — they return early while this is true.
     public bool IsStunned { get; private set; }
@@ -75,12 +93,26 @@ public class EnemyHealth : MonoBehaviour, IDamageable
             healthBar = barGO.GetComponent<EnemyHealthBar>();
             if (healthBar != null)
             {
-                Collider2D col = GetComponent<Collider2D>();
-                float barWidth = col != null ? col.bounds.size.x * 1.2f : 1f;
-                healthBar.Initialize(transform, headBarOffset, barWidth);
+                healthBar.Initialize(transform, headBarOffset, ComputeBarWidth());
                 healthBar.SetHealth(currentHealth, maxHealth);
             }
         }
+    }
+
+    // Width for the health bar. Prefer an ENABLED collider — a disabled one (e.g. the box on
+    // capsule-fixed enemies) reports a zero-size bounds, which produced a zero-width, invisible
+    // bar. Fall back to the visual renderer, then a sane floor so the bar is never sized to nothing.
+    private float ComputeBarWidth()
+    {
+        foreach (Collider2D c in GetComponents<Collider2D>())
+            if (c.enabled && c.bounds.size.x > 0.05f)
+                return Mathf.Max(0.6f, c.bounds.size.x * 1.2f);
+
+        Renderer r = GetComponentInChildren<Renderer>();
+        if (r != null && r.bounds.size.x > 0.05f)
+            return Mathf.Max(0.6f, r.bounds.size.x * 1.2f);
+
+        return 1f;
     }
 
     public void TakeDamage(float damage)
@@ -93,7 +125,18 @@ public class EnemyHealth : MonoBehaviour, IDamageable
         }
 
         currentHealth -= damage;
+
+        // Executioner's Seal (relic): a hit that leaves a non-boss enemy at/under 20% HP finishes it.
+        // NOTE: only the Moss Knight is excluded today — future bosses must be added to this guard.
+        if (currentHealth > 0 && currentHealth <= maxHealth * 0.2f
+            && RelicManager.instance != null && RelicManager.instance.HasRelic("ExecutionersSeal")
+            && GetComponent<MossKnightBoss>() == null)
+        {
+            currentHealth = 0;
+        }
+
         OnDamaged?.Invoke();
+        OnDamagedAmount?.Invoke(damage);
         if (HitStop.instance != null) HitStop.instance.Stop(0.15f);
         Debug.Log($"{gameObject.name} hasar aldı! Kalan Can: {currentHealth}");
 
@@ -154,6 +197,16 @@ public class EnemyHealth : MonoBehaviour, IDamageable
                 Debug.Log("OVERCLOCK AKTİF: Sonraki kart bedava!");
             }
         }
+
+        // Scrap payout. This is the ONLY intrinsic reward for killing anything — before it,
+        // a kill paid nothing at all and skipping every fight was the optimal play.
+        // Spawned before OnDied/Destroy because the shards must outlive this GameObject
+        // (SpawnBurst builds free-standing objects, so they do).
+        int scrap = scrapDropOverride >= 0 ? scrapDropOverride : ScrapEconomy.ScrapForEnemy(maxHealth);
+        if (scrap > 0) ScrapPickup.SpawnBurst(transform.position, scrap);
+
+        // Notify listeners (e.g. the boss) before the object is destroyed.
+        OnDied?.Invoke();
 
         Destroy(gameObject);
     }

@@ -105,24 +105,31 @@ public class ShopItemUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
     {
         PlayerController player = GameManager.instance.player;
 
-        // Eğer parayı harcayabiliyorsa (Yani satın alma başarılıysa)
+        // Relics route through the slot system so the "pay only if you take it" rule holds
+        // (RelicRedesign.md): if the loadout is full, the Swap Screen decides first and gold is
+        // charged only on TAKE — a "leave it" costs nothing.
+        if (type == ShopItemType.Relic && myData != null)
+        {
+            if (player.currentGold < price) return;   // can't afford — same silent no-op as before
+            RelicManager.instance.TryGrantRelic(myData.relicReference, () =>
+            {
+                player.TrySpendGold(price);            // charged only when actually acquired
+                PlayBuySound();
+                myData.isSold = true;
+                BuySuccessful();
+            });
+            return;
+        }
+
+        // Cards & services: charge upfront as before.
         if (player.TrySpendGold(price))
         {
-            // --- SESİ BURADA ÇALIYORUZ ---
-            if (buySound != null)
-            {
-                // Sesi kameranın olduğu pozisyonda çalıyoruz ki her yerden duyulsun
-                AudioSource.PlayClipAtPoint(buySound, Camera.main.transform.position, soundVolume);
-            }
-            // -----------------------------
+            PlayBuySound();
 
             switch (type)
             {
                 case ShopItemType.Card:
                     if (myData != null) DeckManager.instance.AddCardToDeck(myData.cardReference);
-                    break;
-                case ShopItemType.Relic:
-                    if (myData != null) RelicManager.instance.AddRelic(myData.relicReference);
                     break;
                 case ShopItemType.Service:
                     serviceAction?.Invoke();
@@ -132,6 +139,13 @@ public class ShopItemUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
             if (myData != null) myData.isSold = true;
             BuySuccessful();
         }
+    }
+
+    // Buy SFX at the camera so it's audible everywhere.
+    private void PlayBuySound()
+    {
+        if (buySound != null)
+            SfxManager.PlayAtPoint(buySound, Camera.main.transform.position, soundVolume);
     }
 
     private void BuySuccessful()

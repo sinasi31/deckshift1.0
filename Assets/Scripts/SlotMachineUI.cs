@@ -118,7 +118,7 @@ public class SlotMachineUI : MonoBehaviour
                 if (resultText != null)
                     resultText.text = $"{rarityText}\nYOU WON: {reward.relicName}";
 
-                RelicManager.instance.AddRelic(reward);
+                RelicManager.instance.TryGrantRelic(reward);   // full loadout -> Swap Screen
             }
         }
     }

@@ -32,7 +32,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -12.66, y: -2.22, z: 0}
-  m_LocalScale: {x: 3.0236206, y: 3.0236206, z: 3.0236206}
+  m_LocalScale: {x: 2.0080469, y: 2.0080469, z: 2.0080469}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -81,7 +81,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: 5353841184698615464, guid: 29c97c90705c9c347abdab5a5736a144, type: 3}
+  m_Sprite: {fileID: -66295132, guid: dc49d52cf6e97f040a69a39e628e3204, type: 3}
   m_Color: {r: 0.9811321, g: 0.013883919, b: 0.013883919, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -119,8 +119,8 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 0
---- !u!58 &8324526200269074279
-CircleCollider2D:
+--- !u!70 &8324526200269074279
+CapsuleCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -153,8 +153,9 @@ CircleCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0.0021838066, y: 0.0021838855}
-  m_Radius: 0.1374759
+  m_Offset: {x: 0.0021838066, y: -0.16833}
+  m_Size: {x: 0.30876, y: 0.62249}
+  m_Direction: 0
 --- !u!114 &3101831543337624085
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -169,7 +170,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   speed: 15
   lifeTime: 3
-  explosionEffect: {fileID: 7254208443641311414, guid: 8aca44dbf844a7a4899d5cd52b7b744a, type: 3}
+  explosionEffect: {fileID: 1148100095273426946, guid: 11fac573aa7824f4ab01e53fe6b2e880, type: 3}
+  trailEffect: {fileID: 4306167161924932604, guid: e7d65df30c4a0d84596ac70c3b0ba454, type: 3}
+  vfxWorldScale: 0.0105
   damage: 10
 --- !u!114 &-5960682082996986560
 MonoBehaviour:

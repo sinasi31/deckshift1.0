@@ -28,18 +28,51 @@ public class CrusherTrap : MonoBehaviour
 
     [Header("Feedback")]
     [SerializeField] private AudioClip slamSound;
+    [Tooltip("Loudness of the slam. Plays as a 2D sound (no distance falloff); above 1 boosts it.")]
+    [SerializeField, Range(0f, 2f)] private float slamVolume = 1.5f;
     [SerializeField] private float shakeDuration = 0.25f;
     [SerializeField] private float shakeIntensity = 0.35f;
+
+    private AudioSource sfxSource;   // 2D one-shot source built at runtime so the slam is always audible
+
+    [Header("Shift Reward (only when it crushes the boss)")]
+    [Tooltip("Shift crystal spawned at each point below when this crushes the boss. Assign Prefabs/ShiftCrystal.")]
+    [SerializeField] private GameObject shiftCrystalPrefab;
+    [Tooltip("Empty GameObjects placed where crystals should drop (e.g. one per platform, two on the ground sides).")]
+    [SerializeField] private Transform[] crystalSpawnPoints;
+    [Tooltip("How high the crystals arc as they burst from the boss toward their points.")]
+    [SerializeField] private float crystalArcHeight = 3f;
+    [Tooltip("Flight time from the boss to each point.")]
+    [SerializeField] private float crystalFlightTime = 0.6f;
 
     private Vector2 idleHeadPos;   // world position cached at Start
     private bool isBusy;           // mid-slam or winching up
     private bool isArmed = true;
 
+    private float cooldownStartTime;
+    private float cooldownTotal;
+
     public bool IsReady => isArmed && !isBusy;
+
+    // 1 right after firing, easing to 0 as it rearms. For a cooldown clock on the lever.
+    public float CooldownRemaining01
+    {
+        get
+        {
+            if (IsReady || cooldownTotal <= 0f) return 0f;
+            return Mathf.Clamp01((cooldownStartTime + cooldownTotal - Time.time) / cooldownTotal);
+        }
+    }
 
     private void Start()
     {
         if (pressHead != null) idleHeadPos = pressHead.position;
+
+        // 2D source so the slam plays at a flat, controllable volume regardless of how far the
+        // press is from the camera (PlayClipAtPoint was 3D-attenuated, which made it too quiet).
+        sfxSource = gameObject.AddComponent<AudioSource>();
+        sfxSource.playOnAwake = false;
+        sfxSource.spatialBlend = 0f;
     }
 
     // Called by the Lever's UnityEvents. Ignores the pull if the press isn't rearmed yet.
@@ -53,6 +86,12 @@ public class CrusherTrap : MonoBehaviour
     {
         isBusy = true;
         isArmed = false;
+
+        // Estimate the full not-ready window so the lever's clock can count it down.
+        float slamTime = travelDistance / Mathf.Max(0.01f, slamSpeed);
+        float raiseTime = travelDistance / Mathf.Max(0.01f, raiseSpeed);
+        cooldownStartTime = Time.time;
+        cooldownTotal = slamTime + holdTime + raiseTime + rearmTime;
 
         Vector2 target = idleHeadPos + Vector2.down * travelDistance;
 
@@ -68,7 +107,7 @@ public class CrusherTrap : MonoBehaviour
         ApplyImpactDamage();
 
         if (CameraShake.instance != null) CameraShake.instance.Shake(shakeDuration, shakeIntensity);
-        if (slamSound != null) AudioSource.PlayClipAtPoint(slamSound, pressHead.position);
+        SfxManager.PlayOn(sfxSource, slamSound, slamVolume);
 
         yield return new WaitForSeconds(holdTime);
 
@@ -98,6 +137,8 @@ public class CrusherTrap : MonoBehaviour
         Collider2D[] hits = Physics2D.OverlapBoxAll(center, size, 0f);
         var damagedEnemies = new HashSet<EnemyHealth>();
         bool playerHit = false;
+        bool bossHit = false;
+        Vector2 bossPos = center;
 
         foreach (Collider2D hit in hits)
         {
@@ -105,6 +146,11 @@ public class CrusherTrap : MonoBehaviour
             if (enemy != null && damagedEnemies.Add(enemy))
             {
                 enemy.TakeDamage(crushDamage);
+                if (enemy.GetComponent<MossKnightBoss>() != null)
+                {
+                    bossHit = true;
+                    bossPos = enemy.transform.position;
+                }
                 continue;
             }
 
@@ -114,6 +160,47 @@ public class CrusherTrap : MonoBehaviour
                 playerHit = true;
                 player.TakeDamage(playerDamage);
             }
+        }
+
+        // Landing a crusher hit on the boss bursts Shift out of him toward the arena — a resource lifeline.
+        if (bossHit) DropShiftCrystals(bossPos);
+    }
+
+    private void DropShiftCrystals(Vector2 bossPos)
+    {
+        if (shiftCrystalPrefab == null || crystalSpawnPoints == null) return;
+
+        Vector2 origin = bossPos + Vector2.up * 1.5f;   // erupt from the boss's body, not his feet
+        foreach (Transform p in crystalSpawnPoints)
+        {
+            if (p == null) continue;
+            GameObject crystal = Instantiate(shiftCrystalPrefab, origin, Quaternion.identity);
+            StartCoroutine(ArcCrystal(crystal, crystal.transform.localScale, origin, p.position));
+        }
+    }
+
+    // Pops the crystal into existence at the boss and arcs it to its resting point. It stays a live
+    // pickup the whole time, so the player can even snag it out of the air.
+    private IEnumerator ArcCrystal(GameObject crystal, Vector3 baseScale, Vector2 from, Vector2 to)
+    {
+        float time = Mathf.Max(0.05f, crystalFlightTime);
+        float arcH = crystalArcHeight * Random.Range(0.8f, 1.2f);
+        float t = 0f;
+        while (t < time)
+        {
+            if (crystal == null) yield break;   // collected mid-flight
+            float k = t / time;
+            float x = Mathf.Lerp(from.x, to.x, k);
+            float y = Mathf.Lerp(from.y, to.y, k) + arcH * 4f * k * (1f - k);
+            crystal.transform.position = new Vector3(x, y, crystal.transform.position.z);
+            crystal.transform.localScale = baseScale * Mathf.Clamp01(k / 0.15f);   // pop out as it launches
+            t += Time.deltaTime;
+            yield return null;
+        }
+        if (crystal != null)
+        {
+            crystal.transform.position = new Vector3(to.x, to.y, crystal.transform.position.z);
+            crystal.transform.localScale = baseScale;
         }
     }
 

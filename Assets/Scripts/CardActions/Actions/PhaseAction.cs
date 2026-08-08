@@ -12,8 +12,7 @@ public class PhaseAction : CardAction
     public override bool Execute(PlayerController player, float value, out bool keepCardInHand)
     {
         keepCardInHand = false;
-        if (player.audioSource != null && player.phaseSound != null)
-            player.audioSource.PlayOneShot(player.phaseSound);
+        SfxManager.PlayOn(player.audioSource, player.phaseSound);
         return true;
     }
 

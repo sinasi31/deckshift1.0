@@ -1,0 +1,69 @@
+﻿// GenLevel5 - "The Toll Keep"
+// Carved-interior chamber crawl (54x40). Solid rock, rooms cut out of it.
+// FLOW: entry hall -> low corridor (trapdoors over acid) -> THE TOLL HALL ->
+//   corridor ambush -> THE WELL (vertical) -> upper gallery (turret fight)
+//   -> the keep -> exit. Entry bottom-left, exit top-left via the long loop.
+//
+// THE TOLL HALL (centerpiece): a 16-tall chamber. The exit gate at floor
+//   level is driven by a LEVER high on the right wall - climb the one-way
+//   ladder (spikes under the first hop, a bat contesting the air), flip it,
+//   watch the gate grind open below, drop down, walk through... into a
+//   ranged ambush. The same ladder also leads to the TREASURE BALCONY sealed
+//   by a 4-tall gate: pay the SHIFT ALTAR on the dais (bottom-left) and its
+//   signal orb flies up the whole chamber to unlock it. Chest + gold inside.
+// THE WELL: a one-way ladder shaft, jumpable all the way (the law), with a
+//   fan at the bottom that boosts the first hops for free. Crystals in the
+//   draft. Tops out through a one-way grate into the gallery.
+// THE GALLERY: turret + ranged skeleton cover a long approach; two rock
+//   pillars are your cover. Then spikes, a Mimic sitting next to real gold,
+//   and the exit door.
+// SECRETS: bookshelf pocket beside the lever ledge (gold + crystal);
+//   sealed vault beside the dais - Phase through the 1-thick wall or Portal
+//   in (2 gold + crystal); shopkeeper nook above the gallery ceiling hole
+//   (6-tile rise: Leap / Create Platform / Portal).
+// All mandatory rises exactly 3. Trapdoors not crumbles. Backwall by hand.
+// TUNING: altar cost (default 3, suggest 4 here); gate clank + altar chime
+//   AudioClips when ready.
+
+!name: GenLevel5
+######################################################
+######################################################
+######################################################
+######################################################
+######################################################
+######################################################
+######################################################
+######################################################
+######################################################
+######################################################
+######################################################
+##############################....####################
+##############################....####################
+##############################$..+####################
+##############..........#######..###########......####
+##############....................................####
+##############....................................####
+##############....................................####
+##############....................#.......#.......####
+##############..X.g.M.^^.+..t..g..#...r...#.......####
+############################################==....####
+############################################......####
+####################.........G........######......####
+####################.........G........######...===####
+####################.........G........######......####
+####################.........G.g.C.g..######....+.####
+####################......===.######..######===...####
+####################..................######......####
+####################..................######......####
+####################.....===..........######...===####
+####################................L....###......####
+####################......b.........##Wg+###......####
+##............######.........===......######===...####
+##............##...#..................######......####
+##............##gg+#.A................######.+....####
+##..................###..........===..G........===####
+##....................................G...........####
+##..S...+.l....T.T..........m....^^...G..r....F...####
+###############.w..###################################
+######################################################
+

@@ -7,6 +7,7 @@ public class DeckManager : MonoBehaviour
 {
     public static DeckManager instance;
     public static event Action<bool> OnHandChanged;
+    public static event Action<int> OnCardPlayed;
     public bool isNextCardFree = false;
     [Header("Recall Settings")]
     public int baseRecallCost = 1; // Başlangıç maliyeti
@@ -31,6 +32,14 @@ public class DeckManager : MonoBehaviour
     public int handCapacity = 4;
     private int selectedIndex = -1;
     private bool isReloading = false;
+
+    // Reclaimer's Clamp salvages one exhausting card per room; reset on each new room.
+    private bool clampUsedThisRoom = false;
+
+    // The RuntimeCard currently mid-play — set around ExecuteAction in PlayCard so actions
+    // that need a handle on their own card (Glass Parry's refund) can capture it. Only
+    // valid during that call; null at all other times.
+    public RuntimeCard CardBeingPlayed { get; private set; }
 
     // Getterlar
     public List<RuntimeCard> GetDrawPile() { return drawPile; }
@@ -99,6 +108,10 @@ public class DeckManager : MonoBehaviour
         int cost = data.shiftCost;
         if (SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.KineticDiscount))
             cost = Mathf.Max(0, cost - 1);
+        // Blompo: "On the House" zeroes the cost. CardAimIndicator mirrors this in
+        // EffectiveShiftCost — keep the two in sync or the affordability dimming lies.
+        if (playedCard.enhancement == CardEnhancement.OnTheHouse)
+            cost = 0;
         if (isNextCardFree)
         {
             cost = 0;
@@ -106,7 +119,14 @@ public class DeckManager : MonoBehaviour
         if (player.GetCurrentShift() < cost) return;
         if (!playedCard.isInfinite && playedCard.currentUses <= 0) return;
 
-        bool success = player.ExecuteAction(data.actionType, data.actionValue, out bool keepInHand);
+        // Blompo: "Extra Spicy" scales the action's damage value.
+        float actionValue = data.actionValue;
+        if (playedCard.enhancement == CardEnhancement.ExtraSpicy)
+            actionValue *= CardEnhancements.EXTRA_SPICY_MULT;
+
+        CardBeingPlayed = playedCard;
+        bool success = player.ExecuteAction(data.actionType, actionValue, out bool keepInHand);
+        CardBeingPlayed = null;
 
         // Shift is deducted only when the action actually executed — Blocked plays
         // (conflict refusal) and Failed plays (e.g. Comet Dive while grounded) cost
@@ -120,6 +140,8 @@ public class DeckManager : MonoBehaviour
 
         if (success && !keepInHand)
         {
+            OnCardPlayed?.Invoke(index);
+            player.FlashCardPlay();
 
             hand.RemoveAt(index);
             selectedIndex = -1;
@@ -127,21 +149,54 @@ public class DeckManager : MonoBehaviour
             {
                 isNextCardFree = false;
             }
+            // Blompo: "Kickback" refunds Shift on play. Gated by the hub rule like every other
+            // resource change — the sandbox neither charges nor pays out.
+            if (playedCard.enhancement == CardEnhancement.Kickback)
+            {
+                if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
+                    player.AddShift(CardEnhancements.KICKBACK_SHIFT);
+            }
+
+            // Blompo: "Double Dip" casts a second time. Only ever offered on cards that hold no
+            // ConflictFlags (CardEnhancements.IsInstantCard), so unlike Echo Chamber below this
+            // second cast can't be silently refused by TryExecute.
+            if (playedCard.enhancement == CardEnhancement.DoubleDip)
+                player.ExecuteAction(data.actionType, actionValue, out bool _);
+
             if (SkillManager.instance != null &&
                 SkillManager.instance.HasSkill(SkillType.EchoChamber) &&
                 UnityEngine.Random.value < 0.5f) // <--- BURASI DÜZELDÝ
             {
                 Debug.Log("ECHO CHAMBER: Çift Etki!");
                 // Ýkinci kez çalýþtýr
-                player.ExecuteAction(data.actionType, data.actionValue, out bool _);
+                player.ExecuteAction(data.actionType, actionValue, out bool _);
             }
             bool inHub = LevelManager.instance != null && LevelManager.instance.IsCurrentRoomHub();
             if (!playedCard.isInfinite && !inHub) playedCard.currentUses--;
 
             if (inHub || (playedCard.isInfinite || playedCard.currentUses > 0) && (!data.singleUse || playedCard.isInfinite))
+            {
                 discardPile.Add(playedCard);
+            }
+            else if (!clampUsedThisRoom && RelicManager.instance != null
+                     && RelicManager.instance.HasRelic("ReclaimersClamp"))
+            {
+                // Reclaimer's Clamp: the first card that would exhaust each room is salvaged —
+                // it returns to hand with a single charge instead of going to the exhaust pile.
+                clampUsedThisRoom = true;
+                playedCard.currentUses = 1;
+                hand.Add(playedCard);
+            }
             else
+            {
                 exhaustPile.Add(playedCard);
+
+                // A card burning out leaves scrap behind — a small consolation so losing a card
+                // isn't a total loss, deliberately far below what it costs to salvage one back
+                // (see ScrapEconomy). No hub guard needed: charges don't decrement in the hub,
+                // so this branch is unreachable there.
+                if (player != null) player.AddScrap(ScrapEconomy.EXHAUST_REBATE);
+            }
             OnHandChanged?.Invoke(false);
         }
     }
@@ -152,15 +207,101 @@ public class DeckManager : MonoBehaviour
             TryRecall();
         }
         // Her karede kontrol etmek yerine sadece oyun akarken bak
-        if (GameManager.instance.currentState == GameState.Playing)
+        // (null guard: a recompile during Play mode resets the singleton's static instance.)
+        if (GameManager.instance != null && GameManager.instance.currentState == GameState.Playing)
         {
             CheckForStaggerCondition();
         }
     }
+    // Lets systems that mutate cards IN PLACE ask the hand UI to redraw. Blompo needs this: a
+    // blessing changes an existing RuntimeCard without adding/removing/playing anything, so no
+    // normal hand event fires and the new badge would not appear until the next redraw.
+    // OnHandChanged is an event, so only DeckManager can raise it — hence this wrapper.
+    public void RefreshHandUI()
+    {
+        OnHandChanged?.Invoke(false);
+    }
+
     public void ResetRecallCost()
     {
         currentRecallCost = baseRecallCost;
         OnRecallCostChanged?.Invoke(currentRecallCost);
+    }
+
+    // Clears per-room relic state (currently Reclaimer's Clamp's once-per-room salvage).
+    public void ResetRoomRelicState()
+    {
+        clampUsedThisRoom = false;
+    }
+
+    // Glass Parry's mastery refund: gives one charge back to a card that was already
+    // played this frame. If spending that charge exhausted the card, pull it back out
+    // of the exhaust pile — perfect play means the card never really left.
+    public void RefundCharge(RuntimeCard card)
+    {
+        if (card == null) return;
+        if (!card.isInfinite)
+            card.currentUses = Mathf.Min(card.currentUses + 1, card.cardData.maxUses);
+        if (exhaustPile.Remove(card))
+            discardPile.Add(card);
+        OnHandChanged?.Invoke(false);
+    }
+
+    // --- Scrap forge operations ----------------------------------------------------------------
+    // Both are all-or-nothing: the scrap is only spent if the operation actually applies, so a
+    // failed call leaves the player's wallet and the piles untouched. The UI (ScrapForgeScreen)
+    // gates on the same conditions, but these re-check independently — never trust the caller.
+
+    // Tops a card the player still owns back up to full charges.
+    public bool TryRechargeCard(RuntimeCard card)
+    {
+        if (card == null || player == null) return false;
+        if (exhaustPile.Contains(card)) return false;   // must be Salvaged first, not recharged
+
+        int missing = ScrapEconomy.MissingCharges(card);
+        if (missing <= 0) return false;                 // already full, or infinite
+
+        int cost = ScrapEconomy.RechargeCost(card);
+        if (!player.TrySpendScrap(cost)) return false;
+
+        card.currentUses = card.cardData.maxUses;
+        OnHandChanged?.Invoke(false);
+        return true;
+    }
+
+    // Pulls a card back out of the exhaust pile. It returns to the DISCARD pile (not the hand) so
+    // it re-enters the deck through the normal shuffle, and comes back only half charged — exhaust
+    // is meant to stay a real loss, so a full recovery costs the salvage plus a recharge on top.
+    public bool TrySalvageCard(RuntimeCard card)
+    {
+        if (card == null || player == null) return false;
+        if (!exhaustPile.Contains(card)) return false;
+
+        if (!player.TrySpendScrap(ScrapEconomy.SALVAGE_COST)) return false;
+
+        exhaustPile.Remove(card);
+        card.currentUses = ScrapEconomy.SalvageCharges(card);
+        card.isSelected = false;
+        discardPile.Add(card);
+        OnHandChanged?.Invoke(false);
+        return true;
+    }
+
+    // Called by LevelManager.SpawnNextRoom at the moment a COMBAT room ends, while the
+    // ending room's hand still exists (the reload that discards it comes right after).
+    // Held payoff cards trigger here — Dead Weight: +actionValue Shift per copy still
+    // in hand. Recalling earlier discarded it and forfeited this.
+    public void OnRoomEnd()
+    {
+        foreach (RuntimeCard card in hand)
+        {
+            if (card.cardData != null && card.cardData.actionType == CardActionType.DeadWeight)
+            {
+                int payout = Mathf.RoundToInt(card.cardData.actionValue);
+                player.AddShift(payout);
+                Debug.Log($"DEAD WEIGHT held to room end: +{payout} Shift.");
+            }
+        }
     }
     private void CheckForStaggerCondition()
     {
@@ -207,23 +348,32 @@ public class DeckManager : MonoBehaviour
         // 1. Zaten el yenileniyorsa dur
         if (isReloading) return;
 
-        // 2. Maliyet kontrolü
-        if (player.GetCurrentShift() < currentRecallCost)
+        bool inHub = LevelManager.instance != null && LevelManager.instance.IsCurrentRoomHub();
+        bool overclocked = RelicManager.instance != null && RelicManager.instance.HasRelic("OverclockedRecall");
+
+        if (overclocked)
         {
-            Debug.Log("Yetersiz Shift! Recall yapılamıyor.");
-            // Buraya "Yetersiz Enerji" sesi veya görseli eklenebilir
-            return;
+            // Overclocked Recall: no Shift cost — paid in blood instead (5 HP per Recall,
+            // never in the sandbox hub). Cost escalation is irrelevant when Shift is free.
+            if (!inHub) player.TakeDamage(5);
         }
-
-        // 3. Shift Harca
-        if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
-            player.SpendShift(currentRecallCost);
-
-        // 4. Maliyeti Artır (Level bitene kadar)
-        if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
+        else
         {
-            currentRecallCost++;
-            OnRecallCostChanged?.Invoke(currentRecallCost);
+            // 2. Maliyet kontrolü
+            if (player.GetCurrentShift() < currentRecallCost)
+            {
+                Debug.Log("Yetersiz Shift! Recall yapılamıyor.");
+                // Buraya "Yetersiz Enerji" sesi veya görseli eklenebilir
+                return;
+            }
+
+            // 3. Shift Harca + 4. Maliyeti Artır (Level bitene kadar)
+            if (!inHub)
+            {
+                player.SpendShift(currentRecallCost);
+                currentRecallCost++;
+                OnRecallCostChanged?.Invoke(currentRecallCost);
+            }
         }
 
         // 5. Asıl işlemi başlat
@@ -241,10 +391,21 @@ public class DeckManager : MonoBehaviour
         DeselectCard();
         yield return new WaitForSeconds(0.2f);
 
-        discardPile.AddRange(hand);
+        // Blompo: "Clingy" cards are held back instead of being discarded, so they survive the
+        // Recall and are still in hand afterwards. They occupy their slot, so a hand full of
+        // Clingy cards simply doesn't refresh — that's the intended trade-off.
+        List<RuntimeCard> retained = new List<RuntimeCard>();
+        for (int i = 0; i < hand.Count; i++)
+        {
+            if (hand[i] != null && hand[i].enhancement == CardEnhancement.Clingy)
+                retained.Add(hand[i]);
+            else
+                discardPile.Add(hand[i]);
+        }
         hand.Clear();
+        hand.AddRange(retained);
 
-        for (int i = 0; i < handCapacity; i++)
+        for (int i = hand.Count; i < handCapacity; i++)
         {
             if (drawPile.Count == 0 && discardPile.Count > 0)
             {

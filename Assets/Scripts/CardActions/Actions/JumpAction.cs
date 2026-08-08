@@ -11,8 +11,7 @@ public class JumpAction : CardAction
     public override bool Execute(PlayerController player, float value, out bool keepCardInHand)
     {
         keepCardInHand = false;
-        if (player.audioSource != null && player.leapSound != null)
-            player.audioSource.PlayOneShot(player.leapSound);
+        SfxManager.PlayOn(player.audioSource, player.leapSound);
         player.rb.linearVelocity = new Vector2(player.rb.linearVelocity.x, 0);
         float jumpDir = player.isGravityReversed ? -1f : 1f;
         player.rb.AddForce(new Vector2(0f, value * jumpDir), ForceMode2D.Impulse);
