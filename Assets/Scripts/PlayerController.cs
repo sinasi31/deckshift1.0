@@ -1121,6 +1121,10 @@ public class PlayerController : MonoBehaviour
 
     public void Heal(float amount) => playerHealth.Heal(amount);
 
+    // Snap back to where this room started. Used by the DeathZone trigger and by LevelManager's
+    // out-of-bounds net, which is what catches a player who has Phased clean out of the level.
+    public void ReturnToEntryPoint() => playerHealth.FallAndRespawn();
+
     internal void PerformGlassWail(float stunDuration)
     {
         SfxManager.PlayOn(audioSource, glassVailSound);

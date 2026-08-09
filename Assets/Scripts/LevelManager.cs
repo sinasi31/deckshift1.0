@@ -126,6 +126,67 @@ public class LevelManager : MonoBehaviour
         return list;
     }
 
+    // --- Out-of-bounds safety net --------------------------------------------------------------
+    //
+    // ⚠️ PHASE CAN TAKE THE PLAYER OUT OF THE LEVEL ENTIRELY, and before this there was nothing to
+    // catch them: the only fall handling in the game is a `DeathZone`-tagged trigger placed by hand
+    // under each room. Phase turns off collision with the world, so the player can leave SIDEWAYS or
+    // upward, miss the DeathZone completely, and then fall forever in empty space with the run
+    // unrecoverable. The designer hit exactly this.
+    //
+    // The fix is deliberately not "put a bigger DeathZone in every room" — that is per-room authoring
+    // that a new room will forget. The room's own geometry already says where the level is, so the
+    // bounds are measured on spawn and anything far outside them is out of play, in any direction,
+    // for any reason (Phase, Portal, a knockback through a gap, a future card nobody has written).
+    //
+    // Measured from RENDERERS, not colliders: a room's backdrop and decoration mark its extent even
+    // where nothing is solid, and the margin is generous enough that legitimate play near an edge
+    // can never trip it.
+    [Header("Out of bounds")]
+    [Tooltip("How far outside the room's own geometry the player may get before being returned to the entry point. Generous on purpose — this is a safety net, not a boundary.")]
+    public float outOfBoundsMargin = 14f;
+
+    private Bounds roomBounds;
+    private bool hasRoomBounds;
+
+    private void MeasureRoomBounds()
+    {
+        hasRoomBounds = false;
+        if (currentRoom == null) return;
+
+        bool any = false;
+        Bounds b = new Bounds();
+        foreach (Renderer r in currentRoom.GetComponentsInChildren<Renderer>(true))
+        {
+            // Particles and trails wander far outside the room and would inflate it into uselessness.
+            if (r is ParticleSystemRenderer || r is TrailRenderer || r is LineRenderer) continue;
+            if (!any) { b = r.bounds; any = true; }
+            else b.Encapsulate(r.bounds);
+        }
+
+        if (!any) return;
+        roomBounds = b;
+        hasRoomBounds = true;
+    }
+
+    private void Update()
+    {
+        if (!hasRoomBounds || playerTransform == null) return;
+        if (GameManager.instance == null || GameManager.instance.currentState != GameState.Playing) return;
+
+        PlayerController pc = GameManager.instance.player;
+        if (pc == null || pc.IsDead) return;
+
+        Vector3 p = playerTransform.position;
+        Bounds safe = roomBounds;
+        safe.Expand(outOfBoundsMargin * 2f);   // Expand takes a total size delta, not a per-side one
+
+        if (safe.Contains(new Vector3(p.x, p.y, safe.center.z))) return;
+
+        Debug.LogWarning($"Player left the room at {p} (room {roomBounds.min}..{roomBounds.max}) — returning to the entry point.");
+        pc.ReturnToEntryPoint();
+    }
+
     private GameObject RechargeRoomPrefab(RechargeType type)
     {
         switch (type)
@@ -217,14 +278,34 @@ public class LevelManager : MonoBehaviour
     // it — left in RewardManager it would simply have stopped running, and a missing route choice
     // does not error, it silently falls back to random room order.
     //
-    // The map is skipped when the act offers only one way on, or when the player already planned a
-    // branch with M: a forced screen with a single button is ceremony, not a decision.
+    // ⚠️ THE MAP OPENS ON EVERY ROOM CHANGE, INCLUDING WHEN THERE IS ONLY ONE WAY ON.
+    //
+    // It used to be gated on RunMapManager.NeedsRouteChoice, on the reasoning that a screen with a
+    // single button is ceremony rather than a decision. That reasoning was wrong in practice, and
+    // the designer reported the symptom as "the map works weird — I open it and I'm 2-3 floors ahead
+    // of where I should be". Measured over 200 generated acts: **62% of room transitions offer
+    // exactly one option**, and planning a branch with M suppressed the screen for a further one. So
+    // the player crossed several rooms without the map ever appearing, and every time they opened it
+    // they had moved without seeing it happen.
+    //
+    // Nothing was corrupt — the same 200 acts produced 0 invalid maps, 0 dead ends, and every step
+    // advanced by exactly one floor. The bug was that the run's only sense of PLACE was being hidden
+    // whenever it had nothing to ask. Orientation is worth more than the saved click.
+    //
+    // ⚠️ THE ZERO-OPTIONS GUARD IS LOad-BEARING. On the boss node AvailableNext() is empty, and the
+    // map opened for a choice refuses Escape and the backdrop (that's what makes a required choice
+    // required) — so opening it with nothing clickable would be an unescapable screen.
     public void AdvanceToNextRoom()
     {
-        if (RunMapManager.instance != null && RunMapManager.instance.NeedsRouteChoice)
-            RunMapScreen.OpenForChoice(SpawnNextRoom);
-        else
+        RunMapManager mgr = RunMapManager.instance;
+
+        if (mgr == null || !mgr.HasMap || mgr.AvailableNext().Count == 0)
+        {
             SpawnNextRoom();
+            return;
+        }
+
+        RunMapScreen.OpenForChoice(SpawnNextRoom);
     }
 
     public void SpawnNextRoom()
@@ -278,6 +359,8 @@ public class LevelManager : MonoBehaviour
         {
             Debug.LogError("CameraBounds objesi bulunamadı!");
         }
+
+        MeasureRoomBounds();
 
         Transform entryPoint = currentRoom.transform.Find("GirisNoktasi");
         if (entryPoint != null && playerTransform != null)

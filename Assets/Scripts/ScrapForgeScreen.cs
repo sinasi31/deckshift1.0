@@ -251,11 +251,8 @@ public class ScrapForgeScreen : MonoBehaviour
 
     // Places every section top-down and resizes the window to fit. Called after each Refresh, so
     // collapsing an empty section actually shrinks the dialog instead of leaving a hole.
-    private void LayoutSections(bool repairHasCards, bool salvageHasCards)
+    private void LayoutSections(float repairH, float salvageH)
     {
-        float repairH = repairHasCards ? ROW_H : EMPTY_ROW_H;
-        float salvageH = salvageHasCards ? ROW_H : EMPTY_ROW_H;
-
         float y = HEADER_RULE_Y + LABEL_GAP;
         repairLabel.rectTransform.anchoredPosition = new Vector2(PAD, -y);
 
@@ -300,22 +297,54 @@ public class ScrapForgeScreen : MonoBehaviour
             "X", 20f, FontStyles.Bold, FlatUI.TextMuted, TextAlignmentOptions.Center);
     }
 
-    // Rows use a centred HorizontalLayoutGroup and size their cards to fit, so any number of
-    // entries stays centred and on-screen without a scroll view.
+    // ⚠️ ROWS WRAP. They used to be a single HorizontalLayoutGroup that shrank the cards to fit
+    // however many there were, which is fine at three and falls apart at a real deck size: at twelve
+    // the chips were 76px wide with the name printed over the artwork, and past that they run off
+    // the window entirely (the designer hit this).
+    //
+    // A grid wraps onto a second and third line instead, so a chip keeps a legible size and the
+    // SECTION grows in height — which costs nothing, because LayoutSections already resizes the
+    // window to its content. Shrinking is now the last resort rather than the first (see GridCell).
     private RectTransform BuildRow(string name, float y)
     {
         RectTransform rt = AddPoint(window, name, new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(ROW_W, ROW_H));
         rt.pivot = new Vector2(0.5f, 1f);
-        HorizontalLayoutGroup hlg = rt.gameObject.AddComponent<HorizontalLayoutGroup>();
-        hlg.spacing = CARD_GAP;
+        GridLayoutGroup g = rt.gameObject.AddComponent<GridLayoutGroup>();
+        g.cellSize = new Vector2(CARD_W_MAX, CARD_H_MAX);
+        g.spacing = new Vector2(CARD_GAP, CARD_GAP);
         // Left-aligned, indented to line up under the section label. Centring the cards instead
         // left the whole left half of the window empty, which read as a broken layout when only
         // one or two cards were listed.
-        hlg.childAlignment = TextAnchor.UpperLeft;
-        hlg.padding = new RectOffset(4, 0, 0, 0);
-        hlg.childControlWidth = hlg.childControlHeight = false;
-        hlg.childForceExpandWidth = hlg.childForceExpandHeight = false;
+        g.childAlignment = TextAnchor.UpperLeft;
+        g.padding = new RectOffset(4, 0, 0, 0);
+        g.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        g.constraintCount = 1;   // recomputed per refresh in BuildCards
         return rt;
+    }
+
+    // Chooses the cell size and column count for `count` chips.
+    //
+    // Wrap first, shrink only when forced: full-size cells are used while the section stays within
+    // MAX_ROWS, and only a deck big enough to overflow that starts scaling them down — with a floor,
+    // because an illegible chip is no more useful than an off-screen one.
+    private const int MAX_ROWS = 3;
+    private const float CARD_W_MIN = 84f;
+
+    private static void GridCell(int count, out Vector2 cell, out int columns)
+    {
+        columns = Mathf.Max(1, Mathf.FloorToInt((ROW_W + CARD_GAP) / (CARD_W_MAX + CARD_GAP)));
+        float w = CARD_W_MAX;
+
+        int rows = Mathf.CeilToInt((float)count / columns);
+        if (rows > MAX_ROWS)
+        {
+            // Need this many across to fit inside MAX_ROWS; size the cell to match.
+            int needed = Mathf.CeilToInt((float)count / MAX_ROWS);
+            w = Mathf.Max(CARD_W_MIN, (ROW_W - CARD_GAP * (needed - 1)) / needed);
+            columns = Mathf.Max(1, Mathf.FloorToInt((ROW_W + CARD_GAP) / (w + CARD_GAP)));
+        }
+
+        cell = new Vector2(w, w / CARD_W_MAX * CARD_H_MAX);
     }
 
     private void BuildConfirmBar()
@@ -427,15 +456,15 @@ public class ScrapForgeScreen : MonoBehaviour
         repairLabel.text = $"REPAIR   ·   {ScrapEconomy.RECHARGE_PER_CHARGE} SCRAP PER CHARGE";
         salvageLabel.text = $"SALVAGE   ·   {ScrapEconomy.SALVAGE_COST} SCRAP, RETURNS HALF CHARGED";
 
-        BuildCards(repairRow, damaged, Mode.Repair, scrap);
-        BuildCards(salvageRow, exhausted, Mode.Salvage, scrap);
+        float repairH = BuildCards(repairRow, damaged, Mode.Repair, scrap);
+        float salvageH = BuildCards(salvageRow, exhausted, Mode.Salvage, scrap);
 
         // Empty rows get an explicit line rather than nothing. With both sections empty the old
         // screen was a blank field with two headings floating in it and no explanation.
         if (damaged.Count == 0) AddEmptyNote(repairRow, "Every card is at full charges.");
         if (exhausted.Count == 0) AddEmptyNote(salvageRow, "Nothing has burned out yet.");
 
-        LayoutSections(damaged.Count > 0, exhausted.Count > 0);
+        LayoutSections(repairH, salvageH);
 
         UpdateConfirmBar(scrap);
     }
@@ -444,28 +473,38 @@ public class ScrapForgeScreen : MonoBehaviour
     // rendering failure. Sits inside the row's layout group, so it lines up with where cards would.
     private void AddEmptyNote(Transform row, string message)
     {
+        // ⚠️ The row's GridLayoutGroup would force this line into a single card-sized cell and clip
+        // it. A grid controls its children's size unconditionally — a LayoutElement can't opt out —
+        // so the group is switched off while the section is empty and back on in BuildCards.
+        GridLayoutGroup g = row.GetComponent<GridLayoutGroup>();
+        if (g != null) g.enabled = false;
+
         RectTransform rt = AddPoint(row, "Empty", new Vector2(0f, 1f), Vector2.zero, new Vector2(ROW_W - 8f, EMPTY_ROW_H));
-        LayoutElement le = rt.gameObject.AddComponent<LayoutElement>();
-        le.preferredWidth = ROW_W - 8f; le.preferredHeight = EMPTY_ROW_H;
+        rt.anchoredPosition = new Vector2(4f, 0f);
 
         TMP_Text t = AddText(rt, "Text", new Vector2(0f, 1f), new Vector2(2f, -4f), new Vector2(ROW_W - 12f, 28f),
             message, 16f, FontStyles.Italic, FlatUI.TextDisabled, TextAlignmentOptions.TopLeft);
     }
 
-    private void BuildCards(Transform row, List<RuntimeCard> cards, Mode mode, int scrap)
+    // Returns how tall the section ended up, so LayoutSections can place what follows it.
+    private float BuildCards(Transform row, List<RuntimeCard> cards, Mode mode, int scrap)
     {
-        if (cards.Count == 0) return;
+        if (cards.Count == 0) return EMPTY_ROW_H;
 
-        // Shrink to fit rather than overflow — a deck with a lot of damaged cards still lays out
-        // on one centred line.
-        float w = Mathf.Min(CARD_W_MAX, (ROW_W - CARD_GAP * (cards.Count - 1)) / cards.Count);
-        float h = Mathf.Min(CARD_H_MAX, w / CARD_W_MAX * CARD_H_MAX);
+        Vector2 cell; int columns;
+        GridCell(cards.Count, out cell, out columns);
+
+        GridLayoutGroup g = row.GetComponent<GridLayoutGroup>();
+        if (g != null) { g.enabled = true; g.cellSize = cell; g.constraintCount = columns; }
 
         foreach (RuntimeCard card in cards)
         {
             int cost = mode == Mode.Repair ? ScrapEconomy.RechargeCost(card) : ScrapEconomy.SALVAGE_COST;
-            BuildCardChip(row, card, mode, w, h, cost, scrap >= cost);
+            BuildCardChip(row, card, mode, cell.x, cell.y, cost, scrap >= cost);
         }
+
+        int rows = Mathf.CeilToInt((float)cards.Count / columns);
+        return rows * cell.y + (rows - 1) * CARD_GAP;
     }
 
     private void BuildCardChip(Transform parent, RuntimeCard card, Mode mode, float w, float h, int cost, bool affordable)

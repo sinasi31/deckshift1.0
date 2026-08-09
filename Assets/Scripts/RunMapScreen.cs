@@ -25,8 +25,10 @@ public class RunMapScreen : MonoBehaviour
 {
     private static RunMapScreen instance;
 
-    private const float WIN_W = 1100f;
-    private const float WIN_H = 820f;
+    // Sized to fill most of a 1920x1080 screen. The chart is the run's map of itself and the player
+    // now sees it on every room change, so it gets the room to be read rather than squinted at.
+    private const float WIN_W = 1560f;
+    private const float WIN_H = 980f;
     private const float CHAMFER = 10f;
 
     // Map drawing area, inset inside the window. The insets are generous on purpose: nodes are
