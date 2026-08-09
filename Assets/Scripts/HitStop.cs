@@ -23,6 +23,12 @@ public class HitStop : MonoBehaviour
     {
         if (isWaiting) return;
 
+        // Scaled by the player's Freeze Frames setting, at the one chokepoint all 8 callers go
+        // through. At 0 we must return BEFORE touching timeScale — a zero-length freeze would still
+        // set timeScale to 0 and only restore it a frame later, which is a visible hitch.
+        duration *= GameSettings.HitStopStrength;
+        if (duration <= 0f) return;
+
         // Zaman� durdur
         Time.timeScale = 0.0f;
         StartCoroutine(Wait(duration));

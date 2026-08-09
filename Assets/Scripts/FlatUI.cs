@@ -27,6 +27,7 @@ public static class FlatUI
     private static Sprite plateLarge, plateSmall, outlineLarge, outlineSmall;
     private static Sprite softGlow, verticalFade, horizontalFade, bottomGlow, fadedRule, rivet, pixel;
     private static Sprite emberDot, fourPointStar, arcaneSigil, arcaneSeal;
+    private static Sprite calibrationMark, sweepLine;
     private static Sprite[] raritySigils;   // one glyph per Rarity — see RaritySigil
 
     // Solid chamfered plate. chamfer 10 = windows, 5 = cards and buttons.
@@ -331,6 +332,74 @@ public static class FlatUI
         return arcaneSeal;
     }
 
+    // A registration/calibration mark: a crosshair with a GAP at the centre, ringed. The Apparatus
+    // theme's answer to the Forge's rivet and Blompo's star — where those are fasteners and points
+    // of light, this is a measuring mark, which is what a control panel is covered in.
+    //
+    // The centre gap is the whole reason it reads as an instrument rather than as a plus sign: a
+    // solid cross is a symbol, an interrupted one is an alignment target.
+    public static Sprite CalibrationMark()
+    {
+        if (calibrationMark != null) return calibrationMark;
+
+        const int S = 64;
+        Texture2D tex = NewTex(S);
+        float c = (S - 1) * 0.5f;
+
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+            {
+                float dx = (x - c) / c, dy = (y - c) / c;
+                float d = Mathf.Sqrt(dx * dx + dy * dy);
+                if (d > 1f) { tex.SetPixel(x, y, Clear); continue; }
+
+                // Crosshair arms, interrupted between 0.22 and 0.52 of the radius.
+                float armH = Mathf.Clamp01(1f - Mathf.Abs(dy) / 0.045f);
+                float armV = Mathf.Clamp01(1f - Mathf.Abs(dx) / 0.045f);
+                float band = (d > 0.22f && d < 0.95f) ? 1f : 0f;
+                float arms = Mathf.Max(armH, armV) * band;
+
+                float ring = Mathf.Clamp01(1f - Mathf.Abs(d - 0.52f) / 0.045f);
+                float dot = Mathf.Clamp01(1f - d / 0.09f);
+
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, Mathf.Clamp01(arms + ring * 0.8f + dot)));
+            }
+        tex.Apply();
+        calibrationMark = Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), 100f);
+        return calibrationMark;
+    }
+
+    // A horizontal line of light with a SYMMETRIC vertical falloff and faded ends — the travelling
+    // scan sweep on the Apparatus panel.
+    //
+    // Not BottomGlow: that one is anchored at its bottom edge, so a sweep built from it would look
+    // like light welling up from a floor rather than a line passing across glass.
+    public static Sprite SweepLine()
+    {
+        if (sweepLine != null) return sweepLine;
+
+        const int W = 96, H = 32;
+        Texture2D tex = NewTex(W, H);
+        float cy = (H - 1) * 0.5f;
+
+        for (int y = 0; y < H; y++)
+        {
+            float dy = Mathf.Abs(y - cy) / cy;
+            float core = Mathf.Clamp01(1f - dy / 0.09f);       // the hairline itself
+            float halo = Mathf.Pow(Mathf.Clamp01(1f - dy), 2.4f) * 0.42f;
+            for (int x = 0; x < W; x++)
+            {
+                float t = (float)x / (W - 1);
+                float hx = Mathf.Clamp01(Mathf.Min(t, 1f - t) / 0.18f);
+                hx = hx * hx * (3f - 2f * hx);
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, Mathf.Clamp01(core + halo) * hx));
+            }
+        }
+        tex.Apply();
+        sweepLine = Sprite.Create(tex, new Rect(0, 0, W, H), new Vector2(0.5f, 0.5f), 100f);
+        return sweepLine;
+    }
+
     private static readonly Color Clear = new Color(0f, 0f, 0f, 0f);
 
     // Ray brightness: full near the centre, tapering to nothing at `reach`.
@@ -610,6 +679,45 @@ public static class FlatUI
         TextBody = new Color(0.729f, 0.784f, 0.843f, 1f),
         TextMuted = new Color(0.451f, 0.510f, 0.580f, 1f),
         TextDisabled = new Color(0.290f, 0.337f, 0.396f, 1f),
+    };
+
+    // APPARATUS — the settings screen.
+    //
+    // Every other theme dresses something INSIDE the fiction: a workbench, a grove, a stall, a
+    // chart, the moment you stopped. Settings is the one screen that reaches back OUT of the game
+    // and changes how it feels to the person holding the mouse. It is the machine's own control
+    // panel, so it should not pretend to be a room in the Oxidation District — it should look like
+    // an instrument.
+    //
+    // The inversions:
+    //   LIGHT      is EMITTED BY THE CONTENT. Iron is lit from below, Arcane from above, Halt from
+    //              the edges, Verdigris not at all — here the linework and the values glow, and the
+    //              plate around them is unlit smoked glass. The information is the light source.
+    //   MOTION     is a single scan SWEEP travelling down the plate. Not rising, settling,
+    //              suspended, or absent: a measuring pass.
+    //   MARKS      are calibration crosshairs (FlatUI.CalibrationMark) rather than rivets or stars.
+    //              Fasteners hold a workbench together; measuring marks are what a control panel is
+    //              covered in.
+    //
+    // Cyan-teal, at high saturation on a NEUTRAL dark surface, is the last clearly unclaimed hue —
+    // and it is deliberately clinical, because being slightly outside the world's palette is itself
+    // the signal that this screen is not part of the world. It is kept well clear of Halt's frost
+    // blue on all three channels (hue ~175 vs ~210, far higher saturation, and a neutral rather
+    // than blue-tinted surface), for the same reason the rarity colours had to separate on more
+    // than hue.
+    public static readonly Theme Apparatus = new Theme
+    {
+        Backdrop = new Color(0.008f, 0.012f, 0.013f, 0.94f),
+        Surface = new Color(0.043f, 0.058f, 0.060f, 0.99f),
+        SurfaceRaised = new Color(0.071f, 0.092f, 0.094f, 1f),
+        Border = new Color(0.145f, 0.235f, 0.235f, 1f),
+        BorderSoft = new Color(0.102f, 0.169f, 0.169f, 1f),
+        EdgeLight = new Color(0.290f, 0.470f, 0.463f, 1f),
+        Accent = new Color(0.204f, 0.898f, 0.831f, 1f),   // arc-cyan, the readout's own light
+        TextBright = new Color(0.878f, 0.945f, 0.941f, 1f),
+        TextBody = new Color(0.690f, 0.784f, 0.780f, 1f),
+        TextMuted = new Color(0.420f, 0.514f, 0.510f, 1f),
+        TextDisabled = new Color(0.267f, 0.337f, 0.333f, 1f),
     };
 
     // Rarity colours tuned to read on a DARK surface. The old chrome carried rarity on a gem set

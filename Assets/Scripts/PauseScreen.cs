@@ -96,6 +96,10 @@ public class PauseScreen : MonoBehaviour
     // itself — which is how both of the old panels dismiss, so we don't have to rewire them.
     private GameObject subPanel;
 
+    // A procedural sub-screen (SettingsScreen) has the display. Unlike `subPanel` it tells us when
+    // it closes, so there is nothing to poll — but Update must still stand down while it is up.
+    private bool subScreenOpen;
+
     private GameObject cachedHud;
     private bool hudWasActive;
 
@@ -411,7 +415,7 @@ public class PauseScreen : MonoBehaviour
         br.raycastTarget = false;
 
         AddEntry("RESUME", null, Close);
-        AddEntry("SETTINGS", null, () => OpenSubPanel("SettingsPanel"));
+        AddEntry("SETTINGS", null, OpenSettings);
         AddEntry("HOW TO PLAY", null, () => OpenSubPanel("TutorialPanel"));
         AddEntry("ABANDON RUN", "ABANDON RUN?  CONFIRM", AbandonRun);
         AddEntry("QUIT TO DESKTOP", "QUIT TO DESKTOP?  CONFIRM", QuitGame);
@@ -632,8 +636,12 @@ public class PauseScreen : MonoBehaviour
             return;
         }
 
-        // A sub-screen owns the display. Watch for it dismissing itself — both of the existing
-        // panels close via their own button, so polling activeSelf works without rewiring them.
+        // SettingsScreen owns the display and will call us back; it also handles its own Escape,
+        // so we must not act on that key while it is up.
+        if (subScreenOpen) return;
+
+        // The legacy How To Play panel owns the display. Watch for it dismissing itself — it closes
+        // via its own button, so polling activeSelf works without rewiring it.
         if (subPanel != null)
         {
             if (!subPanel.activeSelf) { subPanel = null; SetContentVisible(true); }
@@ -855,9 +863,22 @@ public class PauseScreen : MonoBehaviour
 
     // ---- sub-panels ------------------------------------------------------------------------------
 
-    // Settings and How To Play still use the pre-existing panels. They are next on the list to be
-    // rebuilt; until then the pause screen hands the display over and takes it back, rather than
-    // this screen's rebuild being blocked on theirs.
+    // SettingsScreen is a proper procedural screen with its own callback, so it needs none of the
+    // activeSelf polling the legacy panel below does.
+    private void OpenSettings()
+    {
+        subScreenOpen = true;
+        SetContentVisible(false);
+        SettingsScreen.Open(() =>
+        {
+            subScreenOpen = false;
+            SetContentVisible(true);
+        });
+    }
+
+    // How To Play still uses its pre-existing panel. It is next on the list to be rebuilt; until
+    // then the pause screen hands the display over and takes it back, rather than this screen being
+    // blocked on it.
     private void OpenSubPanel(string objectName)
     {
         Canvas canvas = FindRootCanvas();

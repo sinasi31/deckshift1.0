@@ -24,6 +24,11 @@ public class CameraShake : MonoBehaviour
 
     public void Shake(float intensity, float duration)
     {
+        // Scaled by the player's Screen Shake setting. Applied HERE rather than at the 23 call
+        // sites: one chokepoint means a new shake can never forget to respect the setting.
+        intensity *= GameSettings.ScreenShake;
+        if (intensity <= 0f) return;
+
         shakeIntensity = intensity;
         shakeDuration = duration;
         shakeTimer = duration;

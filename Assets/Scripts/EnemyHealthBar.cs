@@ -51,13 +51,18 @@ public class EnemyHealthBar : MonoBehaviour
 
     void Start()
     {
-        SettingsMenu.OnShowNumbersChanged += SetNumbersVisible;
-        SetNumbersVisible(PlayerPrefs.GetInt("ShowEnemyNumbers", 1) == 1);
+        GameSettings.OnChanged += ApplyNumbersSetting;
+        ApplyNumbersSetting();
     }
 
     void OnDestroy()
     {
-        SettingsMenu.OnShowNumbersChanged -= SetNumbersVisible;
+        GameSettings.OnChanged -= ApplyNumbersSetting;
+    }
+
+    void ApplyNumbersSetting()
+    {
+        SetNumbersVisible(GameSettings.EnemyHealthNumbers);
     }
 
     void LateUpdate()

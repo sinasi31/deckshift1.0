@@ -590,16 +590,18 @@ Lessons already paid for, don't re-learn them:
 
 `FlatUI.Theme` is the mechanism — a colour set (`Surface`, `Border`, `EdgeLight`, `Accent`, text ramp) picked per screen:
 
-| | **Iron** (`ScrapForgeScreen`) | **Arcane** (`BlompoScreen`) | **Loadout** (`RelicHUD`, `RelicIcon`, `RelicTooltip`) | **Halt** (`PauseScreen`) |
-|---|---|---|---|---|
-| What it is | a workbench you repair cards at | a mythic creature granting a blessing | what you're **carrying** | the **moment** you stopped |
-| Palette | warm charcoal (rust district) | cold indigo | near-**colourless** | cold blue-black (frost) |
-| Light | fire from **below** | descends from **above** | none — it's not a place | from the **edges inward** |
-| Particles | embers **rising**, fast | motes **settling**, slow, twinkling | none | **suspended**, shivering in place |
-| Corner marks | **rivets** (fasteners) | **four-point stars** (light) | none | none — it has no corners |
-| Surface | scuffed and worn | pristine | plain, recessed sockets | **crazed** (hairline fractures) |
+| | **Iron** (`ScrapForgeScreen`) | **Arcane** (`BlompoScreen`) | **Loadout** (`RelicHUD`, `RelicIcon`, `RelicTooltip`) | **Halt** (`PauseScreen`) | **Apparatus** (`SettingsScreen`) |
+|---|---|---|---|---|---|
+| What it is | a workbench you repair cards at | a mythic creature granting a blessing | what you're **carrying** | the **moment** you stopped | the **machine's own control panel** |
+| Palette | warm charcoal (rust district) | cold indigo | near-**colourless** | cold blue-black (frost) | smoked glass + arc-**cyan** |
+| Light | fire from **below** | descends from **above** | none — it's not a place | from the **edges inward** | **emitted by the content itself** |
+| Particles | embers **rising**, fast | motes **settling**, slow, twinkling | none | **suspended**, shivering in place | none — one **scan sweep** instead |
+| Corner marks | **rivets** (fasteners) | **four-point stars** (light) | none | none — it has no corners | **calibration crosshairs** |
+| Surface | scuffed and worn | pristine | plain, recessed sockets | **crazed** (hairline fractures) | unblemished glass |
 
-**The inversions are the point.** Warm/cold, below/above, rising/falling, worn/clean, and now still/moving. When adding a screen, pick a material and invert something — **do not just retint Iron**.
+**The inversions are the point.** Warm/cold, below/above, rising/falling, worn/clean, still/moving, and — with Apparatus — inside/outside the fiction. When adding a screen, pick a material and invert something — **do not just retint Iron**.
+
+⚠️ **The hue budget is nearly spent.** Claimed: orange (Iron), violet (Arcane), no-hue (Loadout), verdigris green + copper (map), warm wood/amber (shop), frost blue (Halt), arc-cyan (Apparatus). Roughly magenta, yellow and deep red remain. When those run out, **stop reaching for a new colour and invert a different axis instead** — light direction, motion vocabulary and surface treatment separate these screens at least as much as hue does, and Loadout proves a theme can carry no hue at all.
 
 **The Marketplace (`ShopScreenUI`) keeps its own material** — warm wood, striped canvas awning, lamplight — and was already bespoke rather than old chrome. What it needed wasn't a reskin but a PERSON; see "The keeper talks back" below.
 
@@ -641,7 +643,7 @@ The designer's brief for the shop was **"make the player feel like they are talk
 
 ⚠️ `ShopScreenUI` already had an `Update()`. The keeper's idle bob is a `TickKeeperIdle()` called from it, **not a second `Update`** — and it skips while a mood coroutine owns the transform, or the two fight over `anchoredPosition`.
 
-**Status: converted —** `ScrapForgeScreen`, `ScrapHUD`, `BlompoScreen`, `RelicHUD`, `RelicIcon`, `RelicTooltip`, `RelicManagePanel`, `RelicSwapScreen`, `ResourceBarUI`/`ResourcePanelHUD`, `ShopScreenUI`, `CardUI`, `PauseScreen`. **The pass is complete.** (`PixelUI` remains and is fine as-is — the shop uses it for grain/frames.)
+**Status: converted —** `ScrapForgeScreen`, `ScrapHUD`, `BlompoScreen`, `RelicHUD`, `RelicIcon`, `RelicTooltip`, `RelicManagePanel`, `RelicSwapScreen`, `ResourceBarUI`/`ResourcePanelHUD`, `ShopScreenUI`, `CardUI`, `PauseScreen`, `SettingsScreen`. **The pass is complete.** (`PixelUI` remains and is fine as-is — the shop uses it for grain/frames.)
 
 ### The pause screen (`PauseScreen.cs`, rebuilt from scratch 2026-08-09)
 
@@ -660,6 +662,30 @@ The **suspended mote field** is the signature and the one thing to preserve: mot
 Destructive entries (**ABANDON RUN**, **QUIT**) are two-step: the first activation arms and relabels, the second commits, and moving the selection away or 4s of silence disarms. Sitting one keypress below RESUME, they need it.
 
 **Settings and How To Play still open the OLD panels** (`SettingsPanel` / `TutorialPanel` under the Canvas). `PauseScreen` hides its own furniture, keeps its pause held, and **polls the panel's `activeSelf`** to know when it closed — both panels dismiss via their own buttons, so this needed no rewiring of either. They are next to be rebuilt; this handover exists so the pause rebuild wasn't blocked on theirs.
+
+### Settings — `GameSettings.cs` + `SettingsScreen.cs` (rebuilt 2026-08-09)
+
+**`GameSettings` is THE single source of truth for every player setting**, PlayerPrefs-backed, loaded through `SceneBootstrap` so it re-applies on every scene load. `SettingsMenu.cs` and both `SettingsPanel` objects (SampleScene *and* MainMenu) plus `Assets/LevelSinasi/SettingsPanel.prefab` are **DELETED**.
+
+⚠️ **THE MAIN MENU AND THE PAUSE MENU NOW OPEN THE SAME SCREEN.** There used to be two settings panels, one per scene; with two copies every new setting has to be added twice and they drift apart the first time one is missed. `MainMenuController.OpenSettings()` calls `SettingsScreen.Open()` and its `settingsPanel` field is gone.
+
+⚠️ **A SETTING MUST DO SOMETHING.** Never add a row without a consumer — a slider that moves and changes nothing is worse than an absent feature, because the player then stops trusting the ones that work. Every property in `GameSettings` names its consumer in a comment. The eleven live settings and where they land:
+
+| Setting | Consumer |
+|---|---|
+| Master / Music / SFX volume | `AudioListener.volume`, `MusicManager.SetVolume`, `SfxManager.SetVolume` |
+| **Screen Shake** | `CameraShake.Shake` scales intensity; 0 refuses the call outright |
+| **Freeze Frames** | `HitStop.Stop` scales duration; **0 must return BEFORE touching `timeScale`**, or a zero-length freeze still sets it to 0 for a frame — a visible hitch |
+| Damage Numbers | `EnemyHealth`'s popup spawn |
+| Enemy Health Numbers | `EnemyHealthBar` (bars always draw; only the text toggles) |
+| Card Aim Preview | `CardAimIndicator.LateUpdate` |
+| Display Mode / VSync / Frame Cap | `Screen.fullScreenMode`, `QualitySettings.vSyncCount`, `Application.targetFrameRate` |
+
+**Screen Shake and Freeze Frames are scaled at the ONE chokepoint each**, not at the 23 and 8 call sites — so a shake added later cannot forget to respect the setting.
+
+`ApplyDisplayMode` is deliberately `#if !UNITY_EDITOR`: `Screen.fullScreenMode` in the editor resizes the actual **editor window**, which is alarming and has to be undone by hand.
+
+Screen details worth keeping: the value is re-read from `GameSettings` on every `RefreshAll` rather than mirrored in widget state (rows affect each other — VSync greys out Frame Cap — and RESET changes all eleven at once); keyboard navigation **skips disabled rows** so it never parks on a control that ignores input; a slider click anywhere on the track jumps the value there (grabbing a 3px handle would be miserable); and there is **one shared hint line** describing the selected row rather than eleven permanent captions burying the controls.
 
 Three procedural sounds in `ProcSfx`: `PauseHalt`, `PauseRelease`, `PauseTick`. They are a **fourth sound family**, defined by their ENVELOPE rather than their spectrum (magic = harmonic bell partials, metal = inharmonic bar modes, stone = noise + sub). The halt is the only sound in the game that gets **choked** — a damper clamps the ring away over 180ms instead of letting it decay. A sound that fades out says "ending"; a sound cut short says "held". Release is its inverse and is allowed to run out naturally.
 
@@ -1127,6 +1153,16 @@ Known property support (verified by dumping `ShaderUtil.GetPropertyCount`):
 **Rules:** on the PLAYER rig, tint via **`_Alpha`** — the one handle every Cainos rig shader shares. On ENEMIES, `_Color` is fine (verified across every enemy prefab). When writing any new material-property effect, **dump the shader's property list first** rather than assuming, and prefer `HasProperty` + an explicit fallback over `HasProperty` + silently skipping (a guarded skip still produces "nothing happens", which is the bug).
 
 Also beware the inverse: `BreakableWall.cs` checks `HasProperty("_Color")` when *caching* the original colour but not when *setting* it — an asymmetry worth copying nowhere.
+
+### "The project renders in LINEAR colour space, so low alphas composite far brighter than the number reads" (2026-08-09)
+
+Verified: `QualitySettings.activeColorSpace == Linear`. A small alpha of a bright, saturated colour over a dark panel therefore lands **much** higher in sRGB than the arithmetic suggests — the settings screen's selection plate at **alpha 0.065** of arc-cyan measured out near **0.36 sRGB** on screen and filled the whole selected row with a solid teal slab. It had to drop to 0.03.
+
+This is the mechanism behind two rules already in this file — "atmosphere effects want roughly half the alpha you first reach for" and "tint darker than you think and you'll get a black hole" — and it explains why they keep being right. **Consequences:**
+
+- **A tint that looks correct in the numbers is not correct.** Pick every subtle alpha by screenshot, never by reasoning about the value.
+- **The brighter and more saturated the colour, the worse the gap.** Halt's frost blue at 0.07 reads as a restrained plate; Apparatus's cyan at 0.065 read as a slab. The same alpha is not the same weight in a different theme, so do not copy an alpha across themes.
+- The inverse of the deep-rock lesson: there, a 0.5-intensity Light2D *halved* the value and made a dark tint a pit. Same underlying point — **measure the pixels, don't compute them**.
 
 ### "A UI raycast test must let a FRAME PASS after building the UI" (2026-08-09)
 
