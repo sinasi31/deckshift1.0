@@ -28,6 +28,8 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     [Header("Flip")]
     [Tooltip("Seconds for the card to turn over on hover.")]
     [SerializeField] private float flipDuration = 0.22f;
+    [Tooltip("How much the card grows while turned over. The back is a page of text on a small card, so the one you are reading comes forward. Kept under the hand's card spacing so it never overlaps a neighbour.")]
+    [SerializeField] private float flipZoom = 1.2f;
 
     private RuntimeCard myCard;
     private int myIndex;
@@ -433,7 +435,10 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
 
         // Name the blessing on the back, under the card's own text. The mark says a card is
         // blessed; only this says which one.
-        bodyText = $"{myCard.cardData.description}\n\n" +
+        // Single break, not a blank line: a blessed card carries two extra lines of text on a face
+        // that is already full, and the spare line was enough to push the longest combinations past
+        // the box. The colour change is what separates the sections; it doesn't need whitespace too.
+        bodyText = $"{myCard.cardData.description}\n" +
                    $"<color=#6BE6D1><b>{CardEnhancements.Name(card.enhancement)}</b></color>\n" +
                    $"{CardEnhancements.Description(card.enhancement)}";
     }
@@ -579,9 +584,16 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         bool isSelected = myCard.isSelected;
         if (selectionFrame != null) selectionFrame.SetActive(isSelected);
 
-        Vector3 targetScale = isSelected ? originalScale * 1.1f : originalScale;
+        // The flip zoom composes with the selection bump rather than replacing it, so a selected
+        // card you hover does both instead of one silently winning.
+        float zoom = Mathf.Lerp(1f, flipZoom, flipT);
+        Vector3 targetScale = originalScale * (isSelected ? 1.1f : 1f) * zoom;
         float targetY = isSelected ? selectionLiftAmount : 0f;
-        float speed = Time.deltaTime * 15f;
+
+        // ⚠️ UNSCALED. This used to lerp on Time.deltaTime, which is ZERO on every screen that
+        // pauses the game — so a reward card, the one place reading a description matters most,
+        // would flip over without ever growing.
+        float speed = Time.unscaledDeltaTime * 15f;
 
         transform.localScale = Vector3.Lerp(transform.localScale, targetScale, speed);
 

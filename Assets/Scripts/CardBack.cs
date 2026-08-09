@@ -131,28 +131,42 @@ public class CardBack : MonoBehaviour
         keyHint = AddText(root, "KeyHint", LABEL, 6f, 11f, TextAlignmentOptions.Center);
         Anchor(keyHint.rectTransform, MARGIN, 0.895f, 1f - MARGIN, 0.955f);
 
-        title = AddText(root, "Title", GOLD, 10f, 18f, TextAlignmentOptions.Center);
+        title = AddText(root, "Title", GOLD, 12f, 22f, TextAlignmentOptions.Center);
         Anchor(title.rectTransform, MARGIN, 0.805f, 1f - MARGIN, 0.895f);
 
         AddRule(root, "RuleTop", 0.792f);
 
         // --- Body: the description, which is what the player actually hovered for. ---
-        body = AddText(root, "Body", BODY, 7f, 13f, TextAlignmentOptions.Center);
+        //
+        // ⚠️ THE RANGE IS NARROW ON PURPOSE, AND THE CEILING IS THE POINT. The first pass capped it
+        // at 13pt while the box was two-thirds empty, so the descriptions came out unreadably small
+        // for no reason — nothing was constraining them except the cap. The box is ~170x168 units,
+        // which fits every current description at 21pt with room to spare.
+        //
+        // The CEILING is the design; the floor is only a safety net. 14 of the 15 cards settle at
+        // exactly 21pt so they look identical, the longest (Glass Parry) steps to 19, and the floor
+        // exists for the rare BLESSED long card, which carries two extra lines of blessing text on
+        // an already-full face — at a 16pt floor three blessings clipped straight out of the box.
+        //
+        // Do NOT widen the ceiling to give short cards bigger text: a one-line card rendering at
+        // twice the size of a wordy one reads as broken, not as emphasis. If a card can't reach 21,
+        // shorten the card's text.
+        body = AddText(root, "Body", BODY, 12f, 21f, TextAlignmentOptions.Center);
         body.enableWordWrapping = true;
-        body.lineSpacing = -6f;   // CCBattleScarred sets a loose default line height for a card
-        Anchor(body.rectTransform, MARGIN + 0.02f, 0.215f, 1f - MARGIN - 0.02f, 0.775f);
+        body.lineSpacing = -12f;   // CCBattleScarred sets a loose default line height for a card
+        Anchor(body.rectTransform, MARGIN + 0.01f, 0.215f, 1f - MARGIN - 0.01f, 0.775f);
 
         // --- Footer: two stat columns. ---
         AddRule(root, "RuleBottom", 0.195f);
 
-        costLabel = AddText(root, "CostLabel", LABEL, 7f, 10f, TextAlignmentOptions.Center);
+        costLabel = AddText(root, "CostLabel", LABEL, 9f, 12f, TextAlignmentOptions.Center);
         Anchor(costLabel.rectTransform, MARGIN, 0.120f, 0.5f, 0.180f);
-        costValue = AddText(root, "CostValue", SHIFT_BLUE, 10f, 17f, TextAlignmentOptions.Center);
+        costValue = AddText(root, "CostValue", SHIFT_BLUE, 13f, 20f, TextAlignmentOptions.Center);
         Anchor(costValue.rectTransform, MARGIN, 0.042f, 0.5f, 0.122f);
 
-        chargeLabel = AddText(root, "ChargeLabel", LABEL, 7f, 10f, TextAlignmentOptions.Center);
+        chargeLabel = AddText(root, "ChargeLabel", LABEL, 9f, 12f, TextAlignmentOptions.Center);
         Anchor(chargeLabel.rectTransform, 0.5f, 0.120f, 1f - MARGIN, 0.180f);
-        chargeValue = AddText(root, "ChargeValue", CHARGE_BLUE, 10f, 17f, TextAlignmentOptions.Center);
+        chargeValue = AddText(root, "ChargeValue", CHARGE_BLUE, 13f, 20f, TextAlignmentOptions.Center);
         Anchor(chargeValue.rectTransform, 0.5f, 0.042f, 1f - MARGIN, 0.122f);
 
         // Track the two small labels out. At this size the card font's letterforms crowd into each

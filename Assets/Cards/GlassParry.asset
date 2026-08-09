@@ -13,9 +13,8 @@ MonoBehaviour:
   m_Name: GlassParry
   m_EditorClassIdentifier: 
   cardName: Glass Parry
-  description: Brace for half a second. A hit landing in that window does nothing,
-    gives the charge back, and shatters into 25 damage around you. Nothing hits you
-    and the charge is wasted.
+  description: Brace for half a second. A hit in that instant is blocked, refunds
+    the charge, and shatters for 25 damage nearby. Miss and the charge is gone.
   cardArt: {fileID: -858288936149798443, guid: f8d8183212d299a4497d8c2d363cae5d, type: 3}
   nameIsPaintedIntoArt: 1
   actionType: 16
