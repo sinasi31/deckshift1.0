@@ -181,11 +181,7 @@ public class ShopScreenUI : MonoBehaviour
 
     private void Update()
     {
-        if (isOpen && Input.GetKeyDown(KeyCode.Escape))
-        {
-            ShopManager.escapeConsumedFrame = Time.frameCount;
-            Hide();
-        }
+        if (isOpen && Input.GetKeyDown(KeyCode.Escape)) Hide();
         if (isOpen) RefreshAffordability();
         if (isOpen) TickKeeperIdle();
     }

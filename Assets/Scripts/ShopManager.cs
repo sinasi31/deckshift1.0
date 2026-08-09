@@ -40,8 +40,8 @@ public class ShopManager : MonoBehaviour
         currentShopkeeper = null;
     }
 
-    // Frame on which the shop consumed the Escape press. PauseMenu checks this so a
-    // single ESC can't both close the shop and open the pause menu (audit High 1.6).
-    // ShopScreenUI sets this when it closes on Escape.
-    public static int escapeConsumedFrame = -1;
+    // (Removed 2026-08-09: `escapeConsumedFrame`, a stamp the old PauseMenu read so one Escape
+    // couldn't both close the stall and open the pause menu. PauseScreen now solves that for EVERY
+    // screen at once by refusing to open if any UI held the pause on the previous frame, so a
+    // per-screen stamp is both dead and misleading — it only ever protected this one screen.)
 }

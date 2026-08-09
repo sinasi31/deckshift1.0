@@ -337,7 +337,7 @@ There are 13+ singleton managers. This is a known architectural smell flagged in
 - **ShopManager** — in-game shop UI and purchases
 - **SlotMachineUI** — gambling system (planned to be replaced with Dice Broker — see deferred work). ⚠️ **There is NO `SlotMachineManager` type** — verified 2026-07-18; an earlier version of this file listed one. Only `SlotMachineUI` exists.
 - **AchievementManager** — achievement tracking
-- **PauseMenu** / **MainMenuController** — menu systems. ⚠️ **There is NO `MenuManager` type** (verified 2026-07-18); it was listed here in error.
+- **MainMenuController** — the main-menu scene. ⚠️ **`PauseMenu` was DELETED 2026-08-09** along with its `MenuManager` GameObject and the `PauseMenuPanel` hierarchy; the pause screen is now `PauseScreen`, a self-bootstrapping procedural screen (see UI System). Do not re-create a scene-placed pause panel. There is also no `MenuManager` *type* and never was.
 - ⚠️ **`EffectManager` DOES NOT EXIST as a type** (verified 2026-07-18) — this entry was a phantom. Confusingly there IS a GameObject *named* "EffectManager" in SampleScene, but it carries **HitStop**, not an EffectManager component. VFX are spawned ad-hoc by the callers (e.g. `Instantiate` of a VFX prefab) and by house-pattern procedural classes (`DashAfterimage`, `ShockwaveVFX`, `SpitGlob`, `CardAimIndicator`).
 - **MusicManager** — background music
 - **CameraShake**, **HitStop** — game-feel singletons (camera shake + freeze frames)
@@ -366,7 +366,11 @@ GameManager.instance.ReleasePause();   // decrements depth, sets timeScale=1 if 
 Exceptions that intentionally bypass the counter:
 - `HitStop.Stop()` — sets timeScale=0 briefly for hit freezes. Not a "pause" semantically.
 - `PlayerController.AdrenalineSlowMoRoutine` — slow motion at timeScale=0.4f. Not a pause.
-- `PauseMenu.LoadMenu()` — hard reset before scene transition.
+- `PauseScreen.AbandonRun()` / `QuitGame()` — hard reset before a scene transition.
+
+**`GameManager.IsUIPaused` (added 2026-08-09) is the single honest "is another screen already up?" test.** Every modal in the project routes through `RequestPause` — shop, map, forge, Blompo, chests, quest board, relic panels — so one property covers all of them and cannot fall behind when a screen is added. `PauseScreen` uses it to decide whether Escape belongs to it. **Prefer this over a hand-kept list of `SomeScreen.IsOpen` flags**, which is the exact pattern that has rotted twice in this project (`ShopManager.allRelicsPool`, `Chest`'s per-tier lists).
+
+⚠️ **And it needs a ONE-FRAME MEMORY, not just a live read.** Script execution order is undefined, so on the frame the shop closes on Escape it may release its pause *before* the pause screen's `Update` runs — leaving Escape still down, nothing paused, and the pause screen opening instantly behind the screen the player just dismissed. `ShopManager` used to carry an `escapeConsumedFrame` stamp for precisely this (now deleted), but a stamp only ever protected the one screen that remembered to set it. `PauseScreen` instead refuses to open if any UI held the pause on the **previous** frame, which covers every Escape-handling screen and requires nothing from any of them.
 
 ### Known Manager Issues
 
@@ -545,7 +549,7 @@ All the shared sprites live in **`RelicUISprites`** (`GoldBorder()`, `StonePanel
 SampleScene's main Canvas contains:
 - **`GameplayHUD`** — contains all in-game HUD elements (gold, health, shift counter, recall button, deck/discard/exhaust pile buttons, hand drawer trigger zone, **RelicHUD**, **QuestTracker**). Toggle with `SetActive(false)` to hide HUD during full-screen UI.
 - **`QuestBoardOverlay`** — quest board panel (full-screen).
-- Various menu panels (PauseMenu, ShopUI, SlotMachineUI, RewardScreen, etc.) as direct children of Canvas.
+- Various menu panels (ShopUI, SettingsPanel, TutorialPanel, etc.) as direct children of Canvas. **Procedural screens (`PauseScreen`, `RunMapScreen`, `ScrapForgeScreen`, `BlompoScreen`…) create themselves under this Canvas at runtime and are NOT in the scene file** — do not go looking for them in the hierarchy at edit time.
 
 **When adding new full-screen UI panels**, hide GameplayHUD when they open by adding a `[SerializeField] GameObject gameplayHUD;` reference and toggling SetActive. ShopManager, SlotMachineUI, and QuestSystem already follow this pattern.
 
@@ -586,16 +590,16 @@ Lessons already paid for, don't re-learn them:
 
 `FlatUI.Theme` is the mechanism — a colour set (`Surface`, `Border`, `EdgeLight`, `Accent`, text ramp) picked per screen:
 
-| | **Iron** (`ScrapForgeScreen`) | **Arcane** (`BlompoScreen`) | **Loadout** (`RelicHUD`, `RelicIcon`, `RelicTooltip`) |
-|---|---|---|---|
-| What it is | a workbench you repair cards at | a mythic creature granting a blessing | what you're **carrying** |
-| Palette | warm charcoal (rust district) | cold indigo | near-**colourless** |
-| Light | fire from **below** | descends from **above** | none — it's not a place |
-| Particles | embers **rising**, fast | motes **settling**, slow, twinkling | none |
-| Corner marks | **rivets** (fasteners) | **four-point stars** (light) | none |
-| Surface | scuffed and worn | pristine | plain, recessed sockets |
+| | **Iron** (`ScrapForgeScreen`) | **Arcane** (`BlompoScreen`) | **Loadout** (`RelicHUD`, `RelicIcon`, `RelicTooltip`) | **Halt** (`PauseScreen`) |
+|---|---|---|---|---|
+| What it is | a workbench you repair cards at | a mythic creature granting a blessing | what you're **carrying** | the **moment** you stopped |
+| Palette | warm charcoal (rust district) | cold indigo | near-**colourless** | cold blue-black (frost) |
+| Light | fire from **below** | descends from **above** | none — it's not a place | from the **edges inward** |
+| Particles | embers **rising**, fast | motes **settling**, slow, twinkling | none | **suspended**, shivering in place |
+| Corner marks | **rivets** (fasteners) | **four-point stars** (light) | none | none — it has no corners |
+| Surface | scuffed and worn | pristine | plain, recessed sockets | **crazed** (hairline fractures) |
 
-**The inversions are the point.** Warm/cold, below/above, rising/falling, worn/clean. When adding a screen, pick a material and invert something — **do not just retint Iron**.
+**The inversions are the point.** Warm/cold, below/above, rising/falling, worn/clean, and now still/moving. When adding a screen, pick a material and invert something — **do not just retint Iron**.
 
 **The Marketplace (`ShopScreenUI`) keeps its own material** — warm wood, striped canvas awning, lamplight — and was already bespoke rather than old chrome. What it needed wasn't a reskin but a PERSON; see "The keeper talks back" below.
 
@@ -637,7 +641,27 @@ The designer's brief for the shop was **"make the player feel like they are talk
 
 ⚠️ `ShopScreenUI` already had an `Update()`. The keeper's idle bob is a `TickKeeperIdle()` called from it, **not a second `Update`** — and it skips while a mood coroutine owns the transform, or the two fight over `anchoredPosition`.
 
-**Status: converted —** `ScrapForgeScreen`, `ScrapHUD`, `BlompoScreen`, `RelicHUD`, `RelicIcon`, `RelicTooltip`, `RelicManagePanel`, `RelicSwapScreen`, `ResourceBarUI`/`ResourcePanelHUD`, `ShopScreenUI`, `CardUI`. **The pass is complete.** (`PixelUI` remains and is fine as-is — the shop uses it for grain/frames.)
+**Status: converted —** `ScrapForgeScreen`, `ScrapHUD`, `BlompoScreen`, `RelicHUD`, `RelicIcon`, `RelicTooltip`, `RelicManagePanel`, `RelicSwapScreen`, `ResourceBarUI`/`ResourcePanelHUD`, `ShopScreenUI`, `CardUI`, `PauseScreen`. **The pass is complete.** (`PixelUI` remains and is fine as-is — the shop uses it for grain/frames.)
+
+### The pause screen (`PauseScreen.cs`, rebuilt from scratch 2026-08-09)
+
+Escape. **The old `PauseMenu` + `PauseMenuPanel` + `MenuManager` are DELETED** at the designer's word — do not resurrect a scene-placed pause panel. (For the record, the old one also had a wiring bug nobody had noticed: its `settingsPanel` field pointed at **TutorialPanel**, so the Settings button opened the how-to-play text, and `CloseSettings` then closed a different object than the one it had opened.)
+
+**It is the only screen with NO window plate, and that is structural, not decorative.** Every other screen is a place you walked to inside the world, so each is a panel sitting on top of the game. Pause is not somewhere you go — it is the world being stopped — so it takes the whole frame. That choice separates it from every other screen before a single colour is picked.
+
+The **suspended mote field** is the signature and the one thing to preserve: motes hang dead still, each still dragging the streak it had when the clock stopped, shivering about a pixel against it. It says "time is held" before a word has been read.
+
+⚠️ **The streak must be SHORT and the dot must lead.** The first pass ran 16–52px streaks behind a 3–6px dot and the screen read as **rain**, or worse as scratches on the lens — a long thin line is a line first and a particle second. A mote has to read as a POINT that happens to be smeared; the instant the smear is the bigger half, the idea is gone. Same reason the hairline fractures had to drop to a third of the motes' brightness and move out into the margins: at equal value the two effects collapse into one look and the whole screen just looks like a dirty lens.
+
+⚠️ **The root GameObject stays ACTIVE; only its `Content` child toggles.** `Update` has to run to catch the Escape that *opens* the screen, and a deactivated GameObject gets no `Update`. Same reason `SetContentVisible` (used while a sub-panel borrows the display) drops the CanvasGroup's alpha rather than deactivating anything.
+
+**It doubles as the run's status readout** — floor, HP, Shift, gold, scrap, relics, deck, exhausted, recall cost, and the next Stagger price (red once it exceeds current HP, mirroring the card's own rule). Several of those numbers are visible **nowhere else in the game**, and it is the one screen that can afford to show everything at once. That is what makes it worth its space; four buttons on a dark rectangle is not.
+
+Destructive entries (**ABANDON RUN**, **QUIT**) are two-step: the first activation arms and relabels, the second commits, and moving the selection away or 4s of silence disarms. Sitting one keypress below RESUME, they need it.
+
+**Settings and How To Play still open the OLD panels** (`SettingsPanel` / `TutorialPanel` under the Canvas). `PauseScreen` hides its own furniture, keeps its pause held, and **polls the panel's `activeSelf`** to know when it closed — both panels dismiss via their own buttons, so this needed no rewiring of either. They are next to be rebuilt; this handover exists so the pause rebuild wasn't blocked on theirs.
+
+Three procedural sounds in `ProcSfx`: `PauseHalt`, `PauseRelease`, `PauseTick`. They are a **fourth sound family**, defined by their ENVELOPE rather than their spectrum (magic = harmonic bell partials, metal = inharmonic bar modes, stone = noise + sub). The halt is the only sound in the game that gets **choked** — a damper clamps the ring away over 180ms instead of letting it decay. A sound that fades out says "ending"; a sound cut short says "held". Release is its inverse and is allowed to run out naturally.
 
 ### Cards: rarity colour is the ART's job, not the UI's (designer 2026-08-06)
 
@@ -1103,6 +1127,16 @@ Known property support (verified by dumping `ShaderUtil.GetPropertyCount`):
 **Rules:** on the PLAYER rig, tint via **`_Alpha`** — the one handle every Cainos rig shader shares. On ENEMIES, `_Color` is fine (verified across every enemy prefab). When writing any new material-property effect, **dump the shader's property list first** rather than assuming, and prefer `HasProperty` + an explicit fallback over `HasProperty` + silently skipping (a guarded skip still produces "nothing happens", which is the bug).
 
 Also beware the inverse: `BreakableWall.cs` checks `HasProperty("_Color")` when *caching* the original colour but not when *setting* it — an asymmetry worth copying nowhere.
+
+### "A UI raycast test must let a FRAME PASS after building the UI" (2026-08-09)
+
+`GraphicRaycaster` skips any graphic whose **`Graphic.depth == -1`**, and `depth` is only assigned when the canvas performs a render pass. So a UI built (or shown) inside an `execute_code` call is **invisible to `EventSystem.RaycastAll` in that same call** — every hit test returns `<nothing>`, including against a full-screen backdrop that plainly covers the point.
+
+This produced a completely convincing false negative while verifying the pause menu's rows: five MISSes with correct geometry, correct `blocksRaycasts`, correct sibling order, nothing culled. The tell was `depth == -1` on a graphic that was demonstrably on screen.
+
+**Open the screen in one tool call and raycast in the NEXT** — the same split already required for `ScreenCapture.CaptureScreenshot`, and for the same underlying reason. Re-run after the split: all five rows hit.
+
+(This does NOT retire the standing rule that pointer behaviour must be verified geometrically rather than by invoking `OnPointerEnter` yourself — see the card-flip entry. Both traps are live; this one is about *when* you measure, that one about *what* you measure.)
 
 ### "First diagnostics can be wrong; always verify"
 

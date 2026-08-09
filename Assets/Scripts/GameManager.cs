@@ -29,6 +29,19 @@ public class GameManager : MonoBehaviour
 
     private int pauseDepth = 0;
 
+    // True while ANY UI is holding the game paused.
+    //
+    // This is the honest "is another screen already up?" test, and it is what PauseScreen uses to
+    // decide whether Escape belongs to it. Every modal in the project routes through RequestPause —
+    // the shop, the map, the forge, Blompo, chests, the quest board, the relic panels — so one
+    // check covers all of them and cannot fall behind when a new screen is added. The alternative
+    // (a hand-kept list of `SomeScreen.IsOpen` flags) is the exact pattern that has rotted twice
+    // already in this project.
+    //
+    // HitStop and Adrenaline's slow-motion deliberately bypass the counter, so they do not register
+    // here — which is correct: neither of them is a screen, and Escape should still work during one.
+    public bool IsUIPaused => pauseDepth > 0;
+
     public void RequestPause()
     {
         pauseDepth++;

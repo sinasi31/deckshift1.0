@@ -25,7 +25,7 @@ using UnityEngine;
 public static class FlatUI
 {
     private static Sprite plateLarge, plateSmall, outlineLarge, outlineSmall;
-    private static Sprite softGlow, verticalFade, bottomGlow, fadedRule, rivet, pixel;
+    private static Sprite softGlow, verticalFade, horizontalFade, bottomGlow, fadedRule, rivet, pixel;
     private static Sprite emberDot, fourPointStar, arcaneSigil, arcaneSeal;
     private static Sprite[] raritySigils;   // one glyph per Rarity — see RaritySigil
 
@@ -147,6 +147,27 @@ public static class FlatUI
         tex.Apply();
         bottomGlow = Sprite.Create(tex, new Rect(0, 0, W, H), new Vector2(0.5f, 0.5f), 100f);
         return bottomGlow;
+    }
+
+    // Opaque at the LEFT fading to nothing rightward — VerticalFade's other axis.
+    //
+    // Exists so an effect can hug a vertical edge. You cannot get there by rotating VerticalFade:
+    // rotating a stretched RectTransform turns the whole strip out of the screen. Mirror this one
+    // with localScale.x = -1 (on a centred pivot) for the right-hand edge.
+    public static Sprite HorizontalFade()
+    {
+        if (horizontalFade != null) return horizontalFade;
+
+        const int W = 64;
+        Texture2D tex = NewTex(W, 1);
+        for (int x = 0; x < W; x++)
+        {
+            float t = 1f - (float)x / (W - 1);
+            tex.SetPixel(x, 0, new Color(1f, 1f, 1f, t * t));
+        }
+        tex.Apply();
+        horizontalFade = Sprite.Create(tex, new Rect(0, 0, W, 1), new Vector2(0.5f, 0.5f), 100f);
+        return horizontalFade;
     }
 
     // Opaque at the top fading to nothing downward. Used for the top-lip sheen.
@@ -553,6 +574,42 @@ public static class FlatUI
         TextBody = new Color(0.706f, 0.780f, 0.755f, 1f),
         TextMuted = new Color(0.478f, 0.545f, 0.522f, 1f),
         TextDisabled = new Color(0.310f, 0.365f, 0.349f, 1f),
+    };
+
+    // HALT — the pause screen.
+    //
+    // Every other theme dresses a PLACE (a workbench, a grove, a stall) or a THING (your loadout,
+    // the chart). This one dresses a MOMENT: the one the player just stopped. In a game whose whole
+    // thesis is "Movement is a Resource", pause is the total absence of movement, and that is what
+    // the material has to say.
+    //
+    // The inversions, against everything already here:
+    //   LIGHT      comes from the EDGES INWARD — frost creeping in from the borders of the screen.
+    //              Iron is lit from below, Arcane from above, Verdigris not at all. This is a
+    //              fourth direction, and an enclosing one: the picture is being closed in on.
+    //   PARTICLES  are SUSPENDED. Not rising, not settling, not absent — hanging dead still, each
+    //              still dragging the motion streak it had when the clock stopped. They only
+    //              shiver, sub-pixel, straining against it. That single detail says "time stopped"
+    //              faster than any amount of text.
+    //   SURFACE    is CRAZED — a few hairline fractures across the frame. Iron is worn by use and
+    //              Arcane is pristine; this stopped hard enough to crack.
+    //
+    // The accent is Shift-blue EXACTLY (FlatUI.Charges). Shift is the movement resource, so lighting
+    // the screen where movement has stopped with the colour of movement itself is the point, and
+    // there are no charge counts on this screen for it to collide with.
+    public static readonly Theme Halt = new Theme
+    {
+        Backdrop = new Color(0.010f, 0.014f, 0.022f, 0.94f),
+        Surface = new Color(0.043f, 0.055f, 0.075f, 0.99f),
+        SurfaceRaised = new Color(0.070f, 0.086f, 0.114f, 1f),
+        Border = new Color(0.180f, 0.220f, 0.280f, 1f),
+        BorderSoft = new Color(0.130f, 0.163f, 0.212f, 1f),
+        EdgeLight = new Color(0.560f, 0.680f, 0.800f, 1f),   // pale frost rim — here it IS the light
+        Accent = Charges,                                    // Shift-blue, deliberately
+        TextBright = new Color(0.902f, 0.933f, 0.965f, 1f),
+        TextBody = new Color(0.729f, 0.784f, 0.843f, 1f),
+        TextMuted = new Color(0.451f, 0.510f, 0.580f, 1f),
+        TextDisabled = new Color(0.290f, 0.337f, 0.396f, 1f),
     };
 
     // Rarity colours tuned to read on a DARK surface. The old chrome carried rarity on a gem set
