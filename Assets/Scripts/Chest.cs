@@ -107,8 +107,9 @@ public class Chest : MonoBehaviour, IInteractable
 
     private RelicData PickRandomRelic()
     {
-        // Mirrors SlotMachineUI.CheckRewards tier logic exactly.
-        // Dice 1-7 (skull value 0 excluded) so a chest always grants a relic.
+        // Three dice, 1-7 each (the skull's 0 face is excluded so a chest always grants something).
+        // This used to be described as mirroring SlotMachineUI's tier logic; the slot machine has
+        // been deleted, so this is now the only copy of these thresholds.
         int r1 = Random.Range(1, 8);
         int r2 = Random.Range(1, 8);
         int r3 = Random.Range(1, 8);

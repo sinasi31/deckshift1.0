@@ -65,7 +65,7 @@ public static class LevelTextImporter
         { 'W', "Assets/YeniLeveller/BreakableWall_Bookshelf.prefab" },
         { '+', "Assets/Prefabs/ShiftCrystal.prefab" },
         { 'g', "Assets/YeniLeveller/Gold New.prefab" },
-        { 'C', "Assets/YeniLeveller/Chest.prefab" },
+        { 'C', "Assets/YeniLeveller/RelicChest.prefab" },   // renamed from Chest.prefab now that card chests exist
         // Card chest — the ONLY source of cards in a level now that the between-rooms reward screen
         // is gone. Counts as loot exactly like 'C' does, so mind the per-tier chest budget.
         { 'D', "Assets/YeniLeveller/CardChest.prefab" },
