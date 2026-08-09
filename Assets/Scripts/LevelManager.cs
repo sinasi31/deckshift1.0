@@ -208,6 +208,25 @@ public class LevelManager : MonoBehaviour
         return PickNextRoomPrefabWithoutMap();
     }
 
+    // Leaving a room through the ExitDoor. THE MAP IS THE ONLY THING THAT OPENS HERE.
+    //
+    // ⚠️ This logic used to live in RewardManager.FinishReward, because a card reward screen was
+    // forced on the player between every pair of rooms and the map choice was bolted onto the end of
+    // it. That screen is gone (designer 2026-08-09: cards come from chests placed in levels, so
+    // taking one is a decision the player makes, not a toll they pay). The map hook had to move with
+    // it — left in RewardManager it would simply have stopped running, and a missing route choice
+    // does not error, it silently falls back to random room order.
+    //
+    // The map is skipped when the act offers only one way on, or when the player already planned a
+    // branch with M: a forced screen with a single button is ceremony, not a decision.
+    public void AdvanceToNextRoom()
+    {
+        if (RunMapManager.instance != null && RunMapManager.instance.NeedsRouteChoice)
+            RunMapScreen.OpenForChoice(SpawnNextRoom);
+        else
+            SpawnNextRoom();
+    }
+
     public void SpawnNextRoom()
     {
         // Room-end Held payoffs (Dead Weight): fire while the ending room's hand still

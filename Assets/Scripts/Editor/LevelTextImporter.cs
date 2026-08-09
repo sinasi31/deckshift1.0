@@ -66,6 +66,9 @@ public static class LevelTextImporter
         { '+', "Assets/Prefabs/ShiftCrystal.prefab" },
         { 'g', "Assets/YeniLeveller/Gold New.prefab" },
         { 'C', "Assets/YeniLeveller/Chest.prefab" },
+        // Card chest — the ONLY source of cards in a level now that the between-rooms reward screen
+        // is gone. Counts as loot exactly like 'C' does, so mind the per-tier chest budget.
+        { 'D', "Assets/YeniLeveller/CardChest.prefab" },
         // mechanics (added for GenLevel3):
         // Village elevator (designer's pick 2026-08-07) — reads better than the dungeon one.
         { 'E', "Assets/Cainos/Pixel Art Platformer - Village Props/Prefab/PF Village Props - Elevator.prefab" }, // moving platform; tune travel in Inspector
@@ -97,7 +100,7 @@ public static class LevelTextImporter
     // by hand in the Inspector.
     private static readonly HashSet<char> GroundedMarkers = new HashSet<char>
     {
-        'X', 'm', 'r', 'l', 'M', 'z', 'Z', 's', 'C', '^', 'W', 'T', 'F', 'w', 'c', 't', '$', 'B', 'L',
+        'X', 'm', 'r', 'l', 'M', 'z', 'Z', 's', 'C', 'D', '^', 'W', 'T', 'F', 'w', 'c', 't', '$', 'B', 'L',
     };
 
     // ---- Tile roles ---------------------------------------------------------------------------

@@ -101,7 +101,10 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         myIndex = index;
 
         if (cardArtImage != null) cardArtImage.sprite = card.cardData.cardArt;
-        if (keyHintText != null) keyHintText.text = $"[{index + 1}]";
+        // A NEGATIVE index means the card isn't in the hand — the deck view, the play/discard ghosts
+        // and the card-chest offer all pass -1. There is no key to press, and "[0]" is a lie. (The
+        // card's BACK already guarded this; the front did not, so every chest offer read "[0]".)
+        if (keyHintText != null) keyHintText.text = index >= 0 ? $"[{index + 1}]" : "";
 
         // The description lives on the card's BACK now; the title is up there as a header, so the
         // body is just the effect text. RefreshBlessingBadge/TickCardFace may extend it below.
