@@ -741,14 +741,25 @@ public class ShopScreenUI : MonoBehaviour
         Offer captured = o; Tile capturedTile = tile;
         tile.buyBtn.onClick.AddListener(() => TryBuy(capturedTile));
 
+        // ⚠️ CARDS GET NO TOOLTIP. Hovering a card now turns it over, and its back already carries
+        // the name, the effect text and the cost/charges — the tooltip was saying the same thing a
+        // second time, in a box beside the card that was showing it. Relics and services keep it:
+        // they have no back to turn to. The keeper's browse bark stays on both, because that is
+        // flavour rather than information.
+        bool tileIsCard = isCard;
+
         ShopTileHover hov = root.gameObject.AddComponent<ShopTileHover>();
         hov.onEnter = () =>
         {
-            ShowTooltip(capturedTile, captured.desc);
+            if (!tileIsCard) ShowTooltip(capturedTile, captured.desc);
             HoverScale(capturedTile, 1.05f);
             BarkOnBrowse(capturedTile);
         };
-        hov.onExit  = () => { HideTooltip(); HoverScale(capturedTile, 1f); };
+        hov.onExit  = () =>
+        {
+            if (!tileIsCard) HideTooltip();
+            HoverScale(capturedTile, 1f);
+        };
 
         tile.soldStamp = BuildSoldStamp(root);
         ApplySold(tile);
