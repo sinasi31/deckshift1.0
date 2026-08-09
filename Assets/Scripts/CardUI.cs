@@ -537,11 +537,29 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     // Awake. Other systems parent things onto a card AFTER it is built: RewardScreenFX hangs a
     // "+1 SHIFT" bonus badge on the offered card, and a snapshot taken in Awake left that badge
     // showing THROUGH the flip, rendering mirrored ("+1 TFIHS") because it is a child of the
-    // rotating root and nothing had pre-rotated it. Anything added later is now handled for free.
+    // rotating root and nothing had pre-rotated it. Anything added later is handled for free.
+    //
+    // ⚠️ AND IT ONLY RE-SHOWS WHAT IT ITSELF HID. Turning every child back ON is not the inverse of
+    // hiding them: three children are meant to be OFF. The prefab ships `Image` and
+    // `ShiftCostContainer` disabled (dead leftovers), and Awake retires the legacy `Hover_Panel` —
+    // so a flip out and back RESURRECTED all three, and the card came back wearing a grey overlay
+    // reading "New Text". Hiding records what was actually visible; showing restores exactly that.
     //
     // This only walks the children on the two frames where the face actually changes.
+    private readonly System.Collections.Generic.List<Transform> hiddenFront =
+        new System.Collections.Generic.List<Transform>();
+
     private void SetFrontVisible(bool visible)
     {
+        if (visible)
+        {
+            for (int i = 0; i < hiddenFront.Count; i++)
+                if (hiddenFront[i] != null) hiddenFront[i].gameObject.SetActive(true);
+            hiddenFront.Clear();
+            return;
+        }
+
+        hiddenFront.Clear();
         Transform backT = back != null ? back.transform : null;
         for (int i = 0; i < transform.childCount; i++)
         {
@@ -549,7 +567,10 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
             // The back is the other face; the hit target belongs to neither and must stay live for
             // the whole flip, or disabling it mid-turn recreates the exact bug it exists to prevent.
             if (child == backT || child == hoverTarget) continue;
-            child.gameObject.SetActive(visible);
+            if (!child.gameObject.activeSelf) continue;   // already off — leave it off
+
+            child.gameObject.SetActive(false);
+            hiddenFront.Add(child);
         }
     }
 
