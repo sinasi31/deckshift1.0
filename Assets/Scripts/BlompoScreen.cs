@@ -50,7 +50,8 @@ public class BlompoScreen : MonoBehaviour
     // shrank — at 900 there was ~200px of dead panel under them. Still tall enough for the forging
     // stage, which needs room for a 1.55x card struck at the centre.
     private const float WIN_W = 1600f, WIN_H = 762f;
-    private const float CARD_W = 200f, CARD_H = 286f;
+    // 2:3, the card art's real aspect (1024x1536), so a chip IS a card face with nothing letterboxed.
+    private const float CARD_W = 200f, CARD_H = 300f;
     // Shorter than the original 560: the ornate chrome used to fill the lower third, and without
     // it the chip was mostly empty space under the description.
     private const float OFFER_W = 380f, OFFER_H = 470f;
@@ -500,51 +501,21 @@ public class BlompoScreen : MonoBehaviour
         // Scaled, so a shrunk card actually reserves less room in the layout group.
         le.preferredWidth = CARD_W * scale; le.preferredHeight = CARD_H * scale;
 
+        // ⚠️ THE CHIP IS THE CARD. It used to be a FlatUI plate with the art squeezed into a SQUARE
+        // box — which letterboxed the whole 2:3 painted face down small enough that its own cost and
+        // charge medallions were unreadable, which is why this screen re-printed the name, SHIFT and
+        // CHARGES underneath. They are all on the card already. The face is drawn at true aspect and
+        // the duplicates are gone; hovering turns it over for the effect text.
+        //
+        // A transparent hit plate keeps the whole chip clickable — an Image only raycasts within its
+        // RECT, and the card art carries its own transparent margins.
         Image bg = rt.gameObject.AddComponent<Image>();
-        bg.sprite = FlatUI.Panel(5);
-        bg.type = Image.Type.Sliced;
-        bg.color = T.SurfaceRaised;
+        bg.color = new Color(0f, 0f, 0f, 0f);
         bg.raycastTarget = true;
 
-        Image frame = AddImage(rt, "Frame", FlatUI.Outline(5, 1), T.Border, false);
-        frame.type = Image.Type.Sliced;
-        Stretch(frame.rectTransform);
-
-        if (card.cardData != null && card.cardData.cardArt != null)
-        {
-            Image art = AddImage(rt, "Art", card.cardData.cardArt, Color.white, false);
-            art.preserveAspect = true;
-            art.rectTransform.anchorMin = art.rectTransform.anchorMax = new Vector2(0.5f, 1f);
-            art.rectTransform.pivot = new Vector2(0.5f, 1f);
-            art.rectTransform.anchoredPosition = new Vector2(0f, -16f);
-            art.rectTransform.sizeDelta = new Vector2(CARD_W - 46f, CARD_W - 46f);
-        }
-
-        // Two lines of room so long names ("Create Platform") wrap clear of the art above.
-        TMP_Text nameText = AddText(rt, "Name", new Vector2(0.5f, 0f), new Vector2(0f, 62f), new Vector2(CARD_W - 20f, 52f),
-            card.cardData != null ? card.cardData.cardName : "?", 19f, FontStyles.Bold,
-            T.TextBody, TextAlignmentOptions.Bottom);
-        nameText.enableWordWrapping = true;
-        nameText.enableAutoSizing = true;
-        nameText.fontSizeMin = 13f; nameText.fontSizeMax = 19f;
-
-        // The card's actual stats. The chip used to show a bare charge count and no Shift cost at
-        // all, which made this step a guess — you were picking which card to permanently alter
-        // without being able to see what it currently costs or how much life it has left in it.
-        int maxUses = card.cardData != null ? card.cardData.maxUses : 0;
-        int cost = card.cardData != null ? card.cardData.shiftCost : 0;
-
-        Image rule = AddImage(rt, "StatRule", FlatUI.FadedRule(), T.BorderSoft, false);
-        rule.rectTransform.anchorMin = rule.rectTransform.anchorMax = new Vector2(0.5f, 0f);
-        rule.rectTransform.pivot = new Vector2(0.5f, 0f);
-        rule.rectTransform.anchoredPosition = new Vector2(0f, 52f);
-        rule.rectTransform.sizeDelta = new Vector2(CARD_W - 44f, 1f);
-
-        float half = (CARD_W - 20f) * 0.5f;
-        BuildStat(rt, "Cost", -half * 0.5f, "SHIFT",
-            card.enhancement == CardEnhancement.OnTheHouse ? "0" : cost.ToString(), FlatUI.Charges);
-        BuildStat(rt, "Uses", half * 0.5f, "CHARGES",
-            card.isInfinite ? "∞" : $"{card.currentUses}/{maxUses}", FlatUI.Charges);
+        // Face plus its medallion numbers — drawing cardArt alone leaves the cost and charge circles
+        // empty, because those digits are TMP fields on the card prefab rather than painted art.
+        CardFace.Build(rt, card);
 
         if (card.enhancement != CardEnhancement.None)
         {
@@ -558,15 +529,6 @@ public class BlompoScreen : MonoBehaviour
         CardHoverFlip.Attach(rt).Bind(card);
 
         return rt.gameObject;
-    }
-
-    // One labelled stat under a card chip: a small muted caption over the value.
-    private void BuildStat(RectTransform card, string name, float x, string label, string value, Color valueColor)
-    {
-        AddText(card, name + "Label", new Vector2(0.5f, 0f), new Vector2(x, 30f), new Vector2(96f, 18f),
-            label, 11f, FontStyles.Bold, T.TextMuted, TextAlignmentOptions.Center);
-        AddText(card, name, new Vector2(0.5f, 0f), new Vector2(x, 8f), new Vector2(96f, 26f),
-            value, 19f, FontStyles.Bold, valueColor, TextAlignmentOptions.Center);
     }
 
     private GameObject BuildOfferChip(Transform parent, CardEnhancement e, bool playable = true)

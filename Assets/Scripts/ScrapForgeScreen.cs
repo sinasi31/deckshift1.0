@@ -54,7 +54,15 @@ public class ScrapForgeScreen : MonoBehaviour
     private const float WIN_W = 1180f;
     private const float PAD = 44f;
     private const float ROW_W = WIN_W - PAD * 2f, ROW_H = 205f, EMPTY_ROW_H = 38f;
-    private const float CARD_W_MAX = 140f, CARD_H_MAX = 205f, CARD_GAP = 16f;
+    // A chip is now THE CARD FACE plus a price strip under it, so the cost and charges the player
+    // reads here are the ones painted on the card itself — the same object they hold in hand.
+    // Face height is locked to the art's real 2:3 so nothing letterboxes; the strip carries the one
+    // number that is NOT on a card, the repair price.
+    private const float CARD_W_MAX = 140f;
+    private const float FACE_ASPECT = 1.5f;             // 1024x1536 card art
+    private const float COST_STRIP = 36f;
+    private const float CARD_H_MAX = CARD_W_MAX * FACE_ASPECT + COST_STRIP;
+    private const float CARD_GAP = 16f;
 
     // Vertical rhythm, all measured downward from the window's top edge.
     private const float HEADER_RULE_Y = 96f;   // hairline under the title
@@ -526,45 +534,47 @@ public class ScrapForgeScreen : MonoBehaviour
             glow.rectTransform.offsetMax = new Vector2(26f, 26f);
         }
 
+        // ⚠️ THE CHIP IS THE CARD. It used to be a FlatUI plate with the card art squeezed into a
+        // SQUARE box, which letterboxed the whole 2:3 painted face down to something too small to
+        // read — which is exactly why this screen then printed the name, the charges and the Shift
+        // cost as separate text underneath. All three of those are already painted on the card. The
+        // face is now drawn at its true aspect and the duplicated readouts are gone; the only thing
+        // left is the repair price, which is the one number a card does NOT carry.
+        //
+        // A transparent hit plate keeps the whole chip clickable — the card art has its own
+        // transparent margins, and an Image only raycasts where the RECT is, so this must exist.
         Image bg = rt.gameObject.AddComponent<Image>();
-        bg.sprite = FlatUI.Panel(5);
-        bg.type = Image.Type.Sliced;
-        bg.color = isSelected ? new Color(0.165f, 0.180f, 0.204f, 1f) : FlatUI.SurfaceRaised;
+        bg.color = new Color(0f, 0f, 0f, 0f);
         bg.raycastTarget = true;
 
-        Image frame = AddImage(rt, "Frame", FlatUI.Outline(5, isSelected ? 2 : 1), isSelected ? accent : FlatUI.Border, false);
-        frame.type = Image.Type.Sliced;
-        Stretch(frame.rectTransform);
+        float faceH = w * FACE_ASPECT;
 
-        if (card.cardData != null && card.cardData.cardArt != null)
+        // The face and its two medallion numbers, drawn by CardFace so this reads exactly like the
+        // card in hand. Drawing cardArt directly would leave the cost and charge circles EMPTY —
+        // the digits are TMP fields on the card prefab, not part of the painted art.
+        RectTransform face = AddPoint(rt, "CardFace", new Vector2(0.5f, 1f), Vector2.zero, new Vector2(w, faceH));
+        face.pivot = new Vector2(0.5f, 1f);
+        CardFace.Build(face, card);
+
+        // Selection reads as a border around the card itself rather than around a plate.
+        if (isSelected)
         {
-            Image art = AddImage(rt, "Art", card.cardData.cardArt, Color.white, false);
-            art.preserveAspect = true;
-            art.rectTransform.anchorMin = art.rectTransform.anchorMax = new Vector2(0.5f, 1f);
-            art.rectTransform.anchoredPosition = new Vector2(0f, -14f);
-            art.rectTransform.sizeDelta = new Vector2(w - 34f, w - 34f);
-            art.rectTransform.pivot = new Vector2(0.5f, 1f);
+            Image frame = AddImage(rt, "Frame", FlatUI.Outline(5, 2), accent, false);
+            frame.type = Image.Type.Sliced;
+            frame.rectTransform.anchorMin = frame.rectTransform.anchorMax = new Vector2(0.5f, 1f);
+            frame.rectTransform.pivot = new Vector2(0.5f, 1f);
+            frame.rectTransform.anchoredPosition = Vector2.zero;
+            frame.rectTransform.sizeDelta = new Vector2(w + 6f, faceH + 6f);
         }
 
-        TMP_Text nameText = AddText(rt, "Name", new Vector2(0.5f, 0f), new Vector2(0f, 62f), new Vector2(w - 16f, 42f),
-            card.cardData != null ? card.cardData.cardName : "?", 15f, FontStyles.Bold,
-            FlatUI.TextBody, TextAlignmentOptions.Bottom);
-        nameText.enableWordWrapping = true;
-        nameText.enableAutoSizing = true;
-        nameText.fontSizeMin = 11f; nameText.fontSizeMax = 15f;
-
-        // Charges: current out of max, so the player can see exactly what they're buying back.
-        int max = card.cardData != null ? card.cardData.maxUses : 0;
-        string charges = card.isInfinite ? "∞" : $"{card.currentUses}/{max}";
-        AddText(rt, "Charges", new Vector2(0.5f, 0f), new Vector2(0f, 40f), new Vector2(w - 16f, 24f),
-            charges, 16f, FontStyles.Bold, FlatUI.Charges, TextAlignmentOptions.Center);
-
-        // Cost as plain accent-coloured text. A shard icon was tried here at 17px and read as a
-        // smudge fused to the first digit — at this size the accent colour alone carries "scrap",
-        // and the section header already states the unit.
+        // The price, on a strip under the card. A shard icon was tried at 17px and read as a smudge
+        // fused to the first digit — the accent colour carries "scrap", and the section header
+        // already states the unit.
         Color costCol = affordable ? accent : new Color(0.50f, 0.33f, 0.30f);
-        AddText(rt, "Cost", new Vector2(0.5f, 0f), new Vector2(0f, 12f), new Vector2(w - 16f, 26f),
+        TMP_Text costText = AddText(rt, "Cost", new Vector2(0.5f, 0f), new Vector2(0f, 4f), new Vector2(w, COST_STRIP - 6f),
             $"{cost}", 20f, FontStyles.Bold, costCol, TextAlignmentOptions.Center);
+        costText.enableAutoSizing = true;
+        costText.fontSizeMin = 12f; costText.fontSizeMax = 20f;
 
         if (!affordable) rt.gameObject.AddComponent<CanvasGroup>().alpha = 0.40f;
 
@@ -576,9 +586,8 @@ public class ScrapForgeScreen : MonoBehaviour
         Mode capturedMode = mode;
         btn.onClick.AddListener(() => OnCardClicked(captured, capturedMode));
 
-        // Hovering a chip turns it over, exactly as it does in the hand. The chip face is a name, a
-        // charge count and a price — everything about WHAT THE CARD DOES was missing, so choosing
-        // what to repair meant remembering it. Same component, same back, so the two never diverge.
+        // Hovering turns it over for the effect text, exactly as in the hand. Same component, same
+        // back, so the two can never diverge.
         CardHoverFlip.Attach(rt).Bind(card);
     }
 

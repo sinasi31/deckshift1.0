@@ -16,7 +16,7 @@ MonoBehaviour:
   description: Brace for 0.5 seconds. If you get hit, damage is blocked, a charge
     is refunded and you deal 25 damage nearby.
   cardArt: {fileID: -858288936149798443, guid: f8d8183212d299a4497d8c2d363cae5d, type: 3}
-  nameIsPaintedIntoArt: 1
+  nameIsPaintedIntoArt: 0
   actionType: 16
   actionValue: 25
   singleUse: 0
