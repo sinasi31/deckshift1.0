@@ -30,6 +30,8 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     [SerializeField] private float flipDuration = 0.22f;
     [Tooltip("How much the card grows while turned over. The back is a page of text on a small card, so the one you are reading comes forward. Kept under the hand's card spacing so it never overlaps a neighbour.")]
     [SerializeField] private float flipZoom = 1.2f;
+    [Tooltip("How far the card rises while turned over, so the bottom of the back clears the screen edge. See the note in UpdateSelectionVisual for the measurement.")]
+    [SerializeField] private float flipLift = 40f;
 
     private RuntimeCard myCard;
     private int myIndex;
@@ -588,7 +590,15 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         // card you hover does both instead of one silently winning.
         float zoom = Mathf.Lerp(1f, flipZoom, flipT);
         Vector3 targetScale = originalScale * (isSelected ? 1.1f : 1f) * zoom;
-        float targetY = isSelected ? selectionLiftAmount : 0f;
+
+        // ⚠️ THE FLIP MUST LIFT AS WELL AS GROW, OR THE BACK'S FOOTER FALLS OFF THE SCREEN.
+        //
+        // The hand sits at the bottom edge and a card's art already overhangs it: measured, the
+        // card's bottom is 6px BELOW the screen at rest, and the 1.2x zoom grows about the root's
+        // pivot so that becomes 22px. The Shift/charges row lives in the lowest 12% of the back, so
+        // it was the part that got cut. 40 clears the overhang with ~18px to spare, and a card that
+        // rises as it turns towards you is the right read anyway.
+        float targetY = (isSelected ? selectionLiftAmount : 0f) + flipLift * flipT;
 
         // ⚠️ UNSCALED. This used to lerp on Time.deltaTime, which is ZERO on every screen that
         // pauses the game — so a reward card, the one place reading a description matters most,
