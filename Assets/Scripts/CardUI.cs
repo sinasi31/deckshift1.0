@@ -44,6 +44,22 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     private bool showingBack;
     private string bodyText = "";     // what the back's description reads; composed in Setup
 
+    // ⚠️ THE THING THAT DETECTS THE HOVER MUST NOT TURN WITH THE CARD.
+    //
+    // A rotating card's raycast rect narrows exactly as its picture does. Halfway through the flip
+    // the card is a one-pixel sliver, the pointer is no longer inside any of its graphics, the event
+    // system fires OnPointerExit, the card starts turning back, widens, fires OnPointerEnter — and
+    // settles edge-on, flapping. That is not a subtle failure: the card just becomes a vertical
+    // line under the cursor. (It survived testing because the tests invoked OnPointerEnter directly
+    // and so never produced a real exit. Pointer behaviour has to be verified geometrically.)
+    //
+    // So hovering is detected by an invisible full-size child that COUNTER-ROTATES, cancelling the
+    // root's turn and holding a stable, card-sized rect under the cursor for the whole animation.
+    // Pointer events bubble from it up to this component, and clicks bubble to the root's Button,
+    // so nothing else has to change. Its centre sits on the root's rotation axis, which is what
+    // makes the cancellation exact rather than approximate.
+    private RectTransform hoverTarget;
+
     public RuntimeCard GetCard()
     {
         return myCard;
@@ -59,6 +75,20 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         if (descriptionPanel != null) descriptionPanel.SetActive(false);
 
         back = CardBack.Build(rectTransform);
+        BuildHoverTarget();
+    }
+
+    private void BuildHoverTarget()
+    {
+        GameObject go = new GameObject("HoverTarget", typeof(RectTransform));
+        hoverTarget = go.GetComponent<RectTransform>();
+        hoverTarget.SetParent(rectTransform, false);
+
+        Image hit = go.AddComponent<Image>();
+        hit.color = new Color(0f, 0f, 0f, 0f);   // invisible, but still raycast-hit
+        hit.raycastTarget = true;
+
+        hoverTarget.SetAsLastSibling();
     }
 
     public void Setup(RuntimeCard card, int index)
@@ -103,8 +133,13 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         if (back == null || card == null || card.cardData == null) return;
 
         // Re-copied on every Setup rather than once at build: the hand's layout group has not run
-        // when Awake fires, and DeckViewUI reuses this prefab at a different size.
-        if (cardArtImage != null) back.MatchTo(cardArtImage.rectTransform);
+        // when Awake fires, and DeckViewUI reuses this prefab at a different size. The hover target
+        // is sized from the same rect so it covers exactly the card the player can see.
+        if (cardArtImage != null)
+        {
+            back.MatchTo(cardArtImage.rectTransform);
+            MatchRect(hoverTarget, cardArtImage.rectTransform);
+        }
 
         string charges = card.isInfinite ? "∞"
                                          : $"{card.currentUses} / {card.cardData.maxUses}";
@@ -130,6 +165,16 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         back.SetContent(card, bodyText, key,
                         "SHIFT", card.cardData.shiftCost.ToString(), SHIFT_COST_COLOR,
                         "CHARGES", charges);
+    }
+
+    private static void MatchRect(RectTransform target, RectTransform source)
+    {
+        if (target == null || source == null) return;
+        target.anchorMin = source.anchorMin;
+        target.anchorMax = source.anchorMax;
+        target.pivot = source.pivot;
+        target.sizeDelta = source.sizeDelta;
+        target.anchoredPosition = source.anchoredPosition;
     }
 
     // --- Procedural card face -------------------------------------------------------------------
@@ -471,7 +516,13 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         // Ease so the card leaves and arrives softly but crosses the edge-on point quickly — a
         // linear turn reads mechanical, and lingering side-on reads as a glitch.
         float eased = flipT * flipT * (3f - 2f * flipT);
-        transform.localRotation = Quaternion.Euler(0f, eased * 180f, 0f);
+        float angle = eased * 180f;
+        transform.localRotation = Quaternion.Euler(0f, angle, 0f);
+
+        // Undo the card's turn on the hit target so it keeps a full-width, axis-aligned rect under
+        // the cursor. Without this the pointer falls off the card at the halfway point and the flip
+        // flaps around edge-on — see the note on hoverTarget.
+        if (hoverTarget != null) hoverTarget.localRotation = Quaternion.Euler(0f, -angle, 0f);
 
         bool wantBack = eased > 0.5f;
         if (wantBack != showingBack)
@@ -495,7 +546,9 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         for (int i = 0; i < transform.childCount; i++)
         {
             Transform child = transform.GetChild(i);
-            if (child == backT) continue;
+            // The back is the other face; the hit target belongs to neither and must stay live for
+            // the whole flip, or disabling it mid-turn recreates the exact bug it exists to prevent.
+            if (child == backT || child == hoverTarget) continue;
             child.gameObject.SetActive(visible);
         }
     }
