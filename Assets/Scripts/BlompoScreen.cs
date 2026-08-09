@@ -352,21 +352,53 @@ public class BlompoScreen : MonoBehaviour
         List<RuntimeCard> valid = CardEnhancements.CardsFor(chosenOffer, CollectDeck());
         promptText.text = $"<b>{CardEnhancements.Name(chosenOffer)}</b> — {CardEnhancements.Description(chosenOffer)}  Choose a card.";
 
-        int max = Mathf.Min(valid.Count, 8);
-
-        // Shrink to fit. Eight cards at full size need ~1780px against a 1440px row, so a full
-        // spread used to run off both ends of the window — only invisible today because decks are
-        // small. Scale is applied to the LayoutElement too, or the layout group keeps reserving
-        // the unscaled width.
+        // ⚠️ THIS USED TO CAP AT EIGHT CARDS AND SILENTLY DROP THE REST. With a deck of fifteen you
+        // simply could not bless anything after the eighth valid card, and nothing on screen said
+        // so — the same "content hidden with no indication" shape as the forge overflowing.
+        //
+        // Cards now WRAP onto rows at full size, exactly like the forge, and only shrink once the
+        // spread would need more than MAX_ROWS. The row's height is set from the result so the
+        // window still frames it.
         const float ROW_SPACING = 26f;
+        const int MAX_ROWS = 2;
         float rowW = WIN_W - 160f;
-        float needed = max * CARD_W + Mathf.Max(0, max - 1) * ROW_SPACING;
-        float fit = needed > rowW ? rowW / needed : 1f;
 
-        for (int i = 0; i < max; i++)
+        int columns = Mathf.Max(1, Mathf.FloorToInt((rowW + ROW_SPACING) / (CARD_W + ROW_SPACING)));
+        float fit = 1f;
+        if (Mathf.CeilToInt((float)valid.Count / columns) > MAX_ROWS)
+        {
+            int needed = Mathf.CeilToInt((float)valid.Count / MAX_ROWS);
+            float w = Mathf.Max(96f, (rowW - ROW_SPACING * (needed - 1)) / needed);
+            fit = w / CARD_W;
+            columns = Mathf.Max(1, Mathf.FloorToInt((rowW + ROW_SPACING) / (w + ROW_SPACING)));
+        }
+
+        // ⚠️ PLACED BY HAND, NOT BY A LAYOUT GROUP. BuildCardChip shrinks a chip with localScale
+        // (its children sit at fixed offsets derived from CARD_W, so scaling the rect alone would
+        // scatter them). A GridLayoutGroup drives the child's RECT, which would then fight that
+        // scale and shrink everything twice. The row's own HorizontalLayoutGroup is switched off
+        // here for the same reason.
+        HorizontalLayoutGroup hlg = cardRow.GetComponent<HorizontalLayoutGroup>();
+        if (hlg != null) hlg.enabled = false;
+
+        float cellW = CARD_W * fit + ROW_SPACING;
+        float cellH = CARD_H * fit + ROW_SPACING;
+        int rows = Mathf.CeilToInt((float)valid.Count / columns);
+        ((RectTransform)cardRow).sizeDelta = new Vector2(rowW, rows * cellH - ROW_SPACING);
+
+        for (int i = 0; i < valid.Count; i++)
         {
             RuntimeCard card = valid[i];
             GameObject chip = BuildCardChip(cardRow, card, fit);
+
+            int col = i % columns, row = i / columns;
+            // Last row is centred on whatever it holds rather than left-aligned under a full row.
+            int inThisRow = Mathf.Min(columns, valid.Count - row * columns);
+            RectTransform crt = (RectTransform)chip.transform;
+            crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 1f);
+            crt.pivot = new Vector2(0.5f, 1f);
+            crt.anchoredPosition = new Vector2((col - (inThisRow - 1) * 0.5f) * cellW, -row * cellH);
+
             Button b = chip.AddComponent<Button>();
             b.transition = Selectable.Transition.None;
             RuntimeCard captured = card;
@@ -520,6 +552,11 @@ public class BlompoScreen : MonoBehaviour
             AddText(rt, "Badge", new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(CARD_W - 16f, 26f),
                 CardEnhancements.Name(card.enhancement), 15f, FontStyles.Bold, gem, TextAlignmentOptions.Center);
         }
+
+        // Hovering turns the chip over, exactly as in the hand. You are choosing which card to
+        // PERMANENTLY alter, so being able to read what it does first is the whole point.
+        CardHoverFlip.Attach(rt).Bind(card);
+
         return rt.gameObject;
     }
 

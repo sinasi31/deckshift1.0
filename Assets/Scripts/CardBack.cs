@@ -85,6 +85,17 @@ public class CardBack : MonoBehaviour
         if (art == null) return;
 
         RectTransform rt = (RectTransform)transform;
+
+        // When the geometry IS our parent — the forge and Blompo build their chips at the size the
+        // player sees — copying the parent's own anchors onto a child is meaningless. Fill it.
+        if (rt.parent == art)
+        {
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+            return;
+        }
+
         rt.anchorMin = art.anchorMin;
         rt.anchorMax = art.anchorMax;
         rt.pivot = art.pivot;
@@ -174,6 +185,28 @@ public class CardBack : MonoBehaviour
         // labels rather than as a smudge.
         costLabel.characterSpacing = 8f;
         chargeLabel.characterSpacing = 8f;
+    }
+
+    // The ordinary fill: card text, Shift cost, charges. Used by every screen that shows a card —
+    // the hand, the Scrap Forge and Blompo — so they all read identically. CardUI overrides it for
+    // Stagger, whose footer says something else entirely.
+    //
+    // A blessing is named here too. The mark on the front says a card is blessed; only this says
+    // which one, so a forge or Blompo chip that omitted it would be hiding what the player came for.
+    public void BindStandard(RuntimeCard card, string keyHint = "")
+    {
+        if (card == null || card.cardData == null) return;
+
+        string body = card.cardData.description;
+        if (card.enhancement != CardEnhancement.None)
+            body += $"\n<color=#6BE6D1><b>{CardEnhancements.Name(card.enhancement)}</b></color>\n" +
+                    CardEnhancements.Description(card.enhancement);
+
+        string charges = card.isInfinite ? "∞" : $"{card.currentUses} / {card.cardData.maxUses}";
+
+        SetContent(card, body, keyHint,
+                   "SHIFT", card.cardData.shiftCost.ToString(), SHIFT_BLUE,
+                   "CHARGES", charges);
     }
 
     // Fills the face. `costOverride` exists for Stagger, whose price is HP and changes every play.

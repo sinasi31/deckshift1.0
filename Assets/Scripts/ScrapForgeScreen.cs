@@ -575,6 +575,11 @@ public class ScrapForgeScreen : MonoBehaviour
         RuntimeCard captured = card;
         Mode capturedMode = mode;
         btn.onClick.AddListener(() => OnCardClicked(captured, capturedMode));
+
+        // Hovering a chip turns it over, exactly as it does in the hand. The chip face is a name, a
+        // charge count and a price — everything about WHAT THE CARD DOES was missing, so choosing
+        // what to repair meant remembering it. Same component, same back, so the two never diverge.
+        CardHoverFlip.Attach(rt).Bind(card);
     }
 
     private void OnCardClicked(RuntimeCard card, Mode mode)

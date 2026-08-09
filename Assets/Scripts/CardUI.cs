@@ -4,7 +4,7 @@ using UnityEngine.UI;
 using TMPro;
 using UnityEngine.EventSystems;
 
-public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
+public class CardUI : MonoBehaviour, IPointerClickHandler
 {
     [Header("Görseller")]
     public Image cardArtImage;
@@ -26,8 +26,6 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     public float selectionLiftAmount = 50f;
 
     [Header("Flip")]
-    [Tooltip("Seconds for the card to turn over on hover.")]
-    [SerializeField] private float flipDuration = 0.22f;
     [Tooltip("How much the card grows while turned over. The back is a page of text on a small card, so the one you are reading comes forward. Kept under the hand's card spacing so it never overlaps a neighbour.")]
     [SerializeField] private float flipZoom = 1.2f;
     [Tooltip("How far the card rises while turned over, so the bottom of the back clears the screen edge. See the note in UpdateSelectionVisual for the measurement.")]
@@ -39,30 +37,14 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     private RectTransform rectTransform;
 
     // --- Hover flip ---------------------------------------------------------------------------
-    // Screen Space Overlay is an ORTHOGRAPHIC projection, so rotating a card on Y renders as a
-    // horizontal squash to nothing and back out again — which is exactly what a card turning over
-    // looks like, for the cost of one Quaternion per frame. No perspective canvas, no shader.
-    private CardBack back;
-    private float flipT;              // 0 = front, 1 = back
-    private bool hovered;
-    private bool showingBack;
+    // The mechanics live in CardHoverFlip, shared with the Scrap Forge and Blompo so all three
+    // screens turn a card over the same way. This class only adds what is specific to a card in the
+    // HAND: the zoom and lift, and Stagger's bespoke footer.
+    private CardHoverFlip flip;
     private string bodyText = "";     // what the back's description reads; composed in Setup
 
-    // ⚠️ THE THING THAT DETECTS THE HOVER MUST NOT TURN WITH THE CARD.
-    //
-    // A rotating card's raycast rect narrows exactly as its picture does. Halfway through the flip
-    // the card is a one-pixel sliver, the pointer is no longer inside any of its graphics, the event
-    // system fires OnPointerExit, the card starts turning back, widens, fires OnPointerEnter — and
-    // settles edge-on, flapping. That is not a subtle failure: the card just becomes a vertical
-    // line under the cursor. (It survived testing because the tests invoked OnPointerEnter directly
-    // and so never produced a real exit. Pointer behaviour has to be verified geometrically.)
-    //
-    // So hovering is detected by an invisible full-size child that COUNTER-ROTATES, cancelling the
-    // root's turn and holding a stable, card-sized rect under the cursor for the whole animation.
-    // Pointer events bubble from it up to this component, and clicks bubble to the root's Button,
-    // so nothing else has to change. Its centre sits on the root's rotation axis, which is what
-    // makes the cancellation exact rather than approximate.
-    private RectTransform hoverTarget;
+    private CardBack back => flip != null ? flip.Back : null;
+    private float flipT => flip != null ? flip.Progress : 0f;
 
     public RuntimeCard GetCard()
     {
@@ -78,21 +60,11 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         // text box that every real description overflowed. Switched off rather than deleted.
         if (descriptionPanel != null) descriptionPanel.SetActive(false);
 
-        back = CardBack.Build(rectTransform);
-        BuildHoverTarget();
-    }
-
-    private void BuildHoverTarget()
-    {
-        GameObject go = new GameObject("HoverTarget", typeof(RectTransform));
-        hoverTarget = go.GetComponent<RectTransform>();
-        hoverTarget.SetParent(rectTransform, false);
-
-        Image hit = go.AddComponent<Image>();
-        hit.color = new Color(0f, 0f, 0f, 0f);   // invisible, but still raycast-hit
-        hit.raycastTarget = true;
-
-        hoverTarget.SetAsLastSibling();
+        // ⚠️ The geometry source is cardArtImage, NOT this root. The root carries a LayoutElement
+        // and the hand's layout group rewrites it to 200x100 at runtime — nothing like the 200x300
+        // the prefab shows. Sizing the back off it put it over the card's bottom third.
+        flip = CardHoverFlip.Attach(rectTransform,
+                                    cardArtImage != null ? cardArtImage.rectTransform : rectTransform);
     }
 
     public void Setup(RuntimeCard card, int index)
@@ -137,51 +109,30 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     // passes, because both can add lines to bodyText.
     private void RefreshBack(RuntimeCard card, int index)
     {
-        if (back == null || card == null || card.cardData == null) return;
-
-        // Re-copied on every Setup rather than once at build: the hand's layout group has not run
-        // when Awake fires, and DeckViewUI reuses this prefab at a different size. The hover target
-        // is sized from the same rect so it covers exactly the card the player can see.
-        if (cardArtImage != null)
-        {
-            back.MatchTo(cardArtImage.rectTransform);
-            MatchRect(hoverTarget, cardArtImage.rectTransform);
-        }
-
-        string charges = card.isInfinite ? "∞"
-                                         : $"{card.currentUses} / {card.cardData.maxUses}";
+        if (flip == null || back == null || card == null || card.cardData == null) return;
 
         // DeckViewUI passes -1: those cards are not in the hand, so there is no key to press and a
         // literal "[0]" would be a lie.
         string key = index >= 0 ? $"[{index + 1}]" : "";
 
-        if (isStaggerCard)
-        {
-            // Stagger's price is HP and it rises every play, so its footer says something entirely
-            // different from every other card's. TickCardFace keeps the number live.
-            PlayerController p = GameManager.instance != null ? GameManager.instance.player : null;
-            float cost = p != null ? p.NextStaggerCost : 0f;
-            bool lethal = p != null && cost >= p.CurrentHealth;
-            back.SetContent(card, bodyText, key,
-                            "HEALTH", Mathf.RoundToInt(cost).ToString(),
-                            lethal ? STAGGER_LETHAL_COLOR : STAGGER_COST_COLOR,
-                            "GIVES", $"+{(p != null ? p.staggerShiftGain : 2)}");
-            return;
-        }
+        // Re-bound on every Setup rather than once at build: the hand's layout group has not run
+        // when Awake fires, and DeckViewUI reuses this prefab at a different size.
+        flip.Bind(card, key);
 
+        // Blompo's blessing line is appended by RefreshBlessingBadge into bodyText; BindStandard
+        // composes the same thing, so the normal case is already correct by here. Only Stagger
+        // needs a different footer.
+        if (!isStaggerCard) return;
+
+        // Stagger's price is HP and it rises every play, so its footer says something entirely
+        // different from every other card's. TickCardFace keeps the number live.
+        PlayerController p = GameManager.instance != null ? GameManager.instance.player : null;
+        float cost = p != null ? p.NextStaggerCost : 0f;
+        bool lethal = p != null && cost >= p.CurrentHealth;
         back.SetContent(card, bodyText, key,
-                        "SHIFT", card.cardData.shiftCost.ToString(), SHIFT_COST_COLOR,
-                        "CHARGES", charges);
-    }
-
-    private static void MatchRect(RectTransform target, RectTransform source)
-    {
-        if (target == null || source == null) return;
-        target.anchorMin = source.anchorMin;
-        target.anchorMax = source.anchorMax;
-        target.pivot = source.pivot;
-        target.sizeDelta = source.sizeDelta;
-        target.anchoredPosition = source.anchoredPosition;
+                        "HEALTH", Mathf.RoundToInt(cost).ToString(),
+                        lethal ? STAGGER_LETHAL_COLOR : STAGGER_COST_COLOR,
+                        "GIVES", $"+{(p != null ? p.staggerShiftGain : 2)}");
     }
 
     // --- Procedural card face -------------------------------------------------------------------
@@ -502,86 +453,6 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         UpdateSelectionVisual();
         TickBlessMark();
         TickCardFace();
-        TickFlip();
-    }
-
-    // Turns the card over on hover and back on exit.
-    //
-    // Unscaled time throughout: cards are on screen during the reward screen and the deck view,
-    // both of which hold the game at timeScale 0, and a flip frozen at 43% is worse than no flip.
-    //
-    // The swap happens at the halfway point, where the card is edge-on and a hair wide, so neither
-    // face is ever seen mirrored or overlapping the other.
-    private void TickFlip()
-    {
-        if (back == null) return;
-
-        float target = hovered ? 1f : 0f;
-        if (!Mathf.Approximately(flipT, target))
-        {
-            float step = Time.unscaledDeltaTime / Mathf.Max(0.01f, flipDuration);
-            flipT = Mathf.MoveTowards(flipT, target, step);
-        }
-
-        // Ease so the card leaves and arrives softly but crosses the edge-on point quickly — a
-        // linear turn reads mechanical, and lingering side-on reads as a glitch.
-        float eased = flipT * flipT * (3f - 2f * flipT);
-        float angle = eased * 180f;
-        transform.localRotation = Quaternion.Euler(0f, angle, 0f);
-
-        // Undo the card's turn on the hit target so it keeps a full-width, axis-aligned rect under
-        // the cursor. Without this the pointer falls off the card at the halfway point and the flip
-        // flaps around edge-on — see the note on hoverTarget.
-        if (hoverTarget != null) hoverTarget.localRotation = Quaternion.Euler(0f, -angle, 0f);
-
-        bool wantBack = eased > 0.5f;
-        if (wantBack != showingBack)
-        {
-            showingBack = wantBack;
-            SetFrontVisible(!wantBack);
-            back.gameObject.SetActive(wantBack);
-        }
-    }
-
-    // ⚠️ THE FRONT IS "EVERY CHILD THAT ISN'T THE BACK", RE-READ EACH TIME — not a list captured in
-    // Awake. Other systems parent things onto a card AFTER it is built: RewardScreenFX hangs a
-    // "+1 SHIFT" bonus badge on the offered card, and a snapshot taken in Awake left that badge
-    // showing THROUGH the flip, rendering mirrored ("+1 TFIHS") because it is a child of the
-    // rotating root and nothing had pre-rotated it. Anything added later is handled for free.
-    //
-    // ⚠️ AND IT ONLY RE-SHOWS WHAT IT ITSELF HID. Turning every child back ON is not the inverse of
-    // hiding them: three children are meant to be OFF. The prefab ships `Image` and
-    // `ShiftCostContainer` disabled (dead leftovers), and Awake retires the legacy `Hover_Panel` —
-    // so a flip out and back RESURRECTED all three, and the card came back wearing a grey overlay
-    // reading "New Text". Hiding records what was actually visible; showing restores exactly that.
-    //
-    // This only walks the children on the two frames where the face actually changes.
-    private readonly System.Collections.Generic.List<Transform> hiddenFront =
-        new System.Collections.Generic.List<Transform>();
-
-    private void SetFrontVisible(bool visible)
-    {
-        if (visible)
-        {
-            for (int i = 0; i < hiddenFront.Count; i++)
-                if (hiddenFront[i] != null) hiddenFront[i].gameObject.SetActive(true);
-            hiddenFront.Clear();
-            return;
-        }
-
-        hiddenFront.Clear();
-        Transform backT = back != null ? back.transform : null;
-        for (int i = 0; i < transform.childCount; i++)
-        {
-            Transform child = transform.GetChild(i);
-            // The back is the other face; the hit target belongs to neither and must stay live for
-            // the whole flip, or disabling it mid-turn recreates the exact bug it exists to prevent.
-            if (child == backT || child == hoverTarget) continue;
-            if (!child.gameObject.activeSelf) continue;   // already off — leave it off
-
-            child.gameObject.SetActive(false);
-            hiddenFront.Add(child);
-        }
     }
 
     private void UpdateSelectionVisual()
@@ -626,10 +497,6 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         }
     }
 
-    // ⚠️ THE HOVER TARGET IS THE ROOT, WHICH DOES NOT ROTATE OUT FROM UNDER THE POINTER — the whole
-    // card turns, so the raycast rect turns with it and stays under the cursor for the entire flip.
-    // If the back is ever built as a SIBLING of the card instead of a child, this stops being true
-    // and the card will flap: exit fires mid-turn, which flips it straight back.
-    public void OnPointerEnter(PointerEventData eventData) => hovered = true;
-    public void OnPointerExit(PointerEventData eventData) => hovered = false;
+    // Hover itself is handled by CardHoverFlip on this same GameObject — it owns the flip, the
+    // counter-rotating hit target and the face swap. Nothing to do here.
 }
