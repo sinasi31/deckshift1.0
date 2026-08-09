@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: VampiricBite
   m_EditorClassIdentifier: 
   cardName: Vampiric Bite
-  description: Deal damage in close range and heal yourself for 10 HP.
+  description: Bite an enemy beside you for 20 damage and heal 10. Does nothing if
+    nothing is in reach.
   cardArt: {fileID: 2141060765154517041, guid: 2151a52b9719a1748a80969f2937012c, type: 3}
   nameIsPaintedIntoArt: 1
   actionType: 9

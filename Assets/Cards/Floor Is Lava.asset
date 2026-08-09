@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Floor Is Lava
   m_EditorClassIdentifier: 
   cardName: Floor is Lava
-  description: Reverses gravity for 5 seconds
+  description: Gravity flips for 5 seconds. You fall upward and walk on the ceiling.
   cardArt: {fileID: 2009918283491603417, guid: 62c9b2396e547224d89fff46d2814fa7, type: 3}
   nameIsPaintedIntoArt: 1
   actionType: 15

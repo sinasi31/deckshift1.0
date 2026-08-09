@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: GlassParry
   m_EditorClassIdentifier: 
   cardName: Glass Parry
-  description: 'For 0.5s, the next hit shatters harmlessly on you: this charge is
-    refunded and glass shards deal 25 damage to everything nearby. Miss the window
-    and the charge is gone.'
+  description: Brace for half a second. A hit landing in that window does nothing,
+    gives the charge back, and shatters into 25 damage around you. Nothing hits you
+    and the charge is wasted.
   cardArt: {fileID: -858288936149798443, guid: f8d8183212d299a4497d8c2d363cae5d, type: 3}
   nameIsPaintedIntoArt: 1
   actionType: 16

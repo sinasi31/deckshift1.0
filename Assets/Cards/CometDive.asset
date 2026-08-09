@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: CometDive
   m_EditorClassIdentifier: 
   cardName: Comet Dive
-  description: Dive down and deal 20 damage to enemies in a radius.
+  description: Slam straight down. Everything near where you land takes 40 damage.
+    Only works in the air.
   cardArt: {fileID: -6264566646456649978, guid: 82da3f8f21bd06c41842722cd5bef0ac, type: 3}
   nameIsPaintedIntoArt: 1
   actionType: 12

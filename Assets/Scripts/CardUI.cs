@@ -19,20 +19,30 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     public float pointSpacing = 20f; // Noktalar arası boşluk (Bunu Inspector'dan değiştirebilirsin)
 
     [Header("Hover")]
+    [Tooltip("LEGACY. The old flat grey overlay — permanently switched off; the card turns over instead. Kept assigned so the change is one line to back out.")]
     public GameObject descriptionPanel;
+    [Tooltip("LEGACY. Text of the old overlay. The description now goes on the card's back.")]
     public TextMeshProUGUI descriptionText;
     public float selectionLiftAmount = 50f;
 
-    [Header("Hover Art Fade")]
-    [SerializeField] private float hoverFadeTargetAlpha = 0.12f;
-    [SerializeField] private float hoverFadeDuration = 0.15f;
-
-    private Coroutine artFadeCoroutine;
+    [Header("Flip")]
+    [Tooltip("Seconds for the card to turn over on hover.")]
+    [SerializeField] private float flipDuration = 0.22f;
 
     private RuntimeCard myCard;
     private int myIndex;
     private Vector3 originalScale;
     private RectTransform rectTransform;
+
+    // --- Hover flip ---------------------------------------------------------------------------
+    // Screen Space Overlay is an ORTHOGRAPHIC projection, so rotating a card on Y renders as a
+    // horizontal squash to nothing and back out again — which is exactly what a card turning over
+    // looks like, for the cost of one Quaternion per frame. No perspective canvas, no shader.
+    private CardBack back;
+    private float flipT;              // 0 = front, 1 = back
+    private bool hovered;
+    private bool showingBack;
+    private string bodyText = "";     // what the back's description reads; composed in Setup
 
     public RuntimeCard GetCard()
     {
@@ -43,6 +53,12 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     {
         rectTransform = GetComponent<RectTransform>();
         originalScale = transform.localScale;
+
+        // The old hover overlay is retired: a flat grey rectangle over the artwork with a 140x50
+        // text box that every real description overflowed. Switched off rather than deleted.
+        if (descriptionPanel != null) descriptionPanel.SetActive(false);
+
+        back = CardBack.Build(rectTransform);
     }
 
     public void Setup(RuntimeCard card, int index)
@@ -53,13 +69,9 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         if (cardArtImage != null) cardArtImage.sprite = card.cardData.cardArt;
         if (keyHintText != null) keyHintText.text = $"[{index + 1}]";
 
-        // Açıklama
-        if (descriptionPanel != null)
-        {
-            descriptionPanel.SetActive(false);
-            if (descriptionText != null)
-                descriptionText.text = $"<b>{card.cardData.cardName}</b>\n\n{card.cardData.description}";
-        }
+        // The description lives on the card's BACK now; the title is up there as a header, so the
+        // body is just the effect text. RefreshBlessingBadge/TickCardFace may extend it below.
+        bodyText = card.cardData.description;
 
         // Uses
         if (usesText != null)
@@ -79,8 +91,45 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
 
         RefreshBlessingBadge(card);
         RefreshCardFace(card);
+        RefreshBack(card, index);
 
         UpdateSelectionVisual();
+    }
+
+    // Pushes the finished text and the stat footer onto the back. Called after the badge and face
+    // passes, because both can add lines to bodyText.
+    private void RefreshBack(RuntimeCard card, int index)
+    {
+        if (back == null || card == null || card.cardData == null) return;
+
+        // Re-copied on every Setup rather than once at build: the hand's layout group has not run
+        // when Awake fires, and DeckViewUI reuses this prefab at a different size.
+        if (cardArtImage != null) back.MatchTo(cardArtImage.rectTransform);
+
+        string charges = card.isInfinite ? "∞"
+                                         : $"{card.currentUses} / {card.cardData.maxUses}";
+
+        // DeckViewUI passes -1: those cards are not in the hand, so there is no key to press and a
+        // literal "[0]" would be a lie.
+        string key = index >= 0 ? $"[{index + 1}]" : "";
+
+        if (isStaggerCard)
+        {
+            // Stagger's price is HP and it rises every play, so its footer says something entirely
+            // different from every other card's. TickCardFace keeps the number live.
+            PlayerController p = GameManager.instance != null ? GameManager.instance.player : null;
+            float cost = p != null ? p.NextStaggerCost : 0f;
+            bool lethal = p != null && cost >= p.CurrentHealth;
+            back.SetContent(card, bodyText, key,
+                            "HEALTH", Mathf.RoundToInt(cost).ToString(),
+                            lethal ? STAGGER_LETHAL_COLOR : STAGGER_COST_COLOR,
+                            "GIVES", $"+{(p != null ? p.staggerShiftGain : 2)}");
+            return;
+        }
+
+        back.SetContent(card, bodyText, key,
+                        "SHIFT", card.cardData.shiftCost.ToString(), SHIFT_COST_COLOR,
+                        "CHARGES", charges);
     }
 
     // --- Procedural card face -------------------------------------------------------------------
@@ -130,6 +179,10 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
     private const float PLATE_H = 16f / 205f;
     // The set's title gold, matching the plates painted into the legacy art.
     private static readonly Color NAME_COLOR = new Color(0.85f, 0.72f, 0.36f, 1f);
+
+    // The Shift blue used by the resource bar, so a cost on a card back and a cost in the HUD are
+    // recognisably the same currency.
+    private static readonly Color SHIFT_COST_COLOR = new Color(0.55f, 0.52f, 0.96f, 1f);
 
     private static readonly Color STAGGER_COST_COLOR = new Color(0.98f, 0.90f, 0.87f, 1f);
     // Shown when the next Stagger costs at least as much HP as the player has left. This is the
@@ -249,14 +302,12 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         Color want = cost >= p.CurrentHealth ? STAGGER_LETHAL_COLOR : STAGGER_COST_COLOR;
         if (staggerCostText.color != want) staggerCostText.color = want;
 
-        // Say the trade out loud on hover — the heart shows the price, but not what it buys.
-        if (descriptionText != null && myCard != null)
+        // The back's footer shows the same price, so it has to track the same way — the card can be
+        // flipped when the player takes a hit and crosses the lethal threshold.
+        if (back != null && back.costValue != null)
         {
-            string text = $"<b>{myCard.cardData.cardName}</b>\n\n" +
-                          $"Pay <b>{label} HP</b> to claw back <b>{p.staggerShiftGain} Shift</b>.\n" +
-                          $"The price rises by {Mathf.RoundToInt(p.staggerHealthStep)} every time you use it. " +
-                          $"It cannot be discarded.";
-            if (descriptionText.text != text) descriptionText.text = text;
+            if (back.costValue.text != label) back.costValue.text = label;
+            if (back.costValue.color != want) back.costValue.color = want;
         }
     }
 
@@ -335,11 +386,11 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         blessGlow.color = new Color(BLESSED_COLOR.r, BLESSED_COLOR.g, BLESSED_COLOR.b, blessGlowAlpha);
         blessSigil.color = BLESSED_COLOR;
 
-        // Say what it does on hover, alongside the card's own text.
-        if (descriptionText != null)
-            descriptionText.text =
-                $"<b>{card.cardData.cardName}</b>\n\n{card.cardData.description}\n\n" +
-                $"<b>{CardEnhancements.Name(card.enhancement)}</b> — {CardEnhancements.Description(card.enhancement)}";
+        // Name the blessing on the back, under the card's own text. The mark says a card is
+        // blessed; only this says which one.
+        bodyText = $"{myCard.cardData.description}\n\n" +
+                   $"<color=#6BE6D1><b>{CardEnhancements.Name(card.enhancement)}</b></color>\n" +
+                   $"{CardEnhancements.Description(card.enhancement)}";
     }
 
     private void EnsureBlessMark()
@@ -396,6 +447,57 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         UpdateSelectionVisual();
         TickBlessMark();
         TickCardFace();
+        TickFlip();
+    }
+
+    // Turns the card over on hover and back on exit.
+    //
+    // Unscaled time throughout: cards are on screen during the reward screen and the deck view,
+    // both of which hold the game at timeScale 0, and a flip frozen at 43% is worse than no flip.
+    //
+    // The swap happens at the halfway point, where the card is edge-on and a hair wide, so neither
+    // face is ever seen mirrored or overlapping the other.
+    private void TickFlip()
+    {
+        if (back == null) return;
+
+        float target = hovered ? 1f : 0f;
+        if (!Mathf.Approximately(flipT, target))
+        {
+            float step = Time.unscaledDeltaTime / Mathf.Max(0.01f, flipDuration);
+            flipT = Mathf.MoveTowards(flipT, target, step);
+        }
+
+        // Ease so the card leaves and arrives softly but crosses the edge-on point quickly — a
+        // linear turn reads mechanical, and lingering side-on reads as a glitch.
+        float eased = flipT * flipT * (3f - 2f * flipT);
+        transform.localRotation = Quaternion.Euler(0f, eased * 180f, 0f);
+
+        bool wantBack = eased > 0.5f;
+        if (wantBack != showingBack)
+        {
+            showingBack = wantBack;
+            SetFrontVisible(!wantBack);
+            back.gameObject.SetActive(wantBack);
+        }
+    }
+
+    // ⚠️ THE FRONT IS "EVERY CHILD THAT ISN'T THE BACK", RE-READ EACH TIME — not a list captured in
+    // Awake. Other systems parent things onto a card AFTER it is built: RewardScreenFX hangs a
+    // "+1 SHIFT" bonus badge on the offered card, and a snapshot taken in Awake left that badge
+    // showing THROUGH the flip, rendering mirrored ("+1 TFIHS") because it is a child of the
+    // rotating root and nothing had pre-rotated it. Anything added later is now handled for free.
+    //
+    // This only walks the children on the two frames where the face actually changes.
+    private void SetFrontVisible(bool visible)
+    {
+        Transform backT = back != null ? back.transform : null;
+        for (int i = 0; i < transform.childCount; i++)
+        {
+            Transform child = transform.GetChild(i);
+            if (child == backT) continue;
+            child.gameObject.SetActive(visible);
+        }
     }
 
     private void UpdateSelectionVisual()
@@ -425,55 +527,10 @@ public class CardUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, 
         }
     }
 
-    public void OnPointerEnter(PointerEventData eventData)
-    {
-        if (descriptionPanel != null)
-        {
-            descriptionPanel.SetActive(true);
-            descriptionPanel.transform.SetAsLastSibling();
-        }
-        StartArtFade(hoverFadeTargetAlpha);
-    }
-
-    public void OnPointerExit(PointerEventData eventData)
-    {
-        if (descriptionPanel != null) descriptionPanel.SetActive(false);
-        StartArtFade(1f);
-    }
-
-    // Cleanly (re)starts the artwork alpha fade so rapid enter/exit can't leave it stuck.
-    private void StartArtFade(float targetAlpha)
-    {
-        if (cardArtImage == null) return;
-        if (artFadeCoroutine != null) StopCoroutine(artFadeCoroutine);
-        artFadeCoroutine = StartCoroutine(FadeArtAlpha(targetAlpha));
-    }
-
-    private IEnumerator FadeArtAlpha(float targetAlpha)
-    {
-        Color c = cardArtImage.color;
-        float startAlpha = c.a;
-
-        if (hoverFadeDuration <= 0f)
-        {
-            c.a = targetAlpha;
-            cardArtImage.color = c;
-            artFadeCoroutine = null;
-            yield break;
-        }
-
-        float elapsed = 0f;
-        while (elapsed < hoverFadeDuration)
-        {
-            elapsed += Time.unscaledDeltaTime;
-            float t = Mathf.Clamp01(elapsed / hoverFadeDuration);
-            c.a = Mathf.Lerp(startAlpha, targetAlpha, t);
-            cardArtImage.color = c;
-            yield return null;
-        }
-
-        c.a = targetAlpha;
-        cardArtImage.color = c;
-        artFadeCoroutine = null;
-    }
+    // ⚠️ THE HOVER TARGET IS THE ROOT, WHICH DOES NOT ROTATE OUT FROM UNDER THE POINTER — the whole
+    // card turns, so the raycast rect turns with it and stays under the cursor for the entire flip.
+    // If the back is ever built as a SIBLING of the card instead of a child, this stops being true
+    // and the card will flap: exit fires mid-turn, which flips it straight back.
+    public void OnPointerEnter(PointerEventData eventData) => hovered = true;
+    public void OnPointerExit(PointerEventData eventData) => hovered = false;
 }
