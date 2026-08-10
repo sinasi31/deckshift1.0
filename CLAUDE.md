@@ -264,6 +264,21 @@ Composed from stock Cainos props, so it costs no art:
 
 ⚠️ **The trigger collider must be on the SAME GameObject as the `ScrapForge` component** — `PlayerController` does `OverlapCircleAll(...)` then `hit.GetComponent<IInteractable>()`, so a collider on a child is invisible to it. Layer **Interactable (12)**. Verified reachable from both sides.
 
+It carries an `InteractPrompt` child (the "press E" keycap) at local **(0, 3.45)**, ~0.3 above the chimney — the same relationship the chests use to their lids. ⚠️ **The trigger box must track the ART.** When the designer's pass removed the bucket and bin, the collider still had the original wide layout's `size 5.6 / offset 0.85`, so the zone — and therefore the prompt — reached ~3 units out into bare floor. Resized to `3.6 x 2.8` at offset `(-0.3, 1.2)`. **Re-check the trigger whenever the prop's contents change.**
+
+### The "press E" prompt: one-shot interactables must guard `OnTriggerEnter2D` (2026-08-09)
+
+`InteractPrompt` is driven purely by the interactable's own `SetActive(true/false)` on trigger enter/exit. That is fine for **repeatable** stations (`ScrapForge`, `Lever`, `SimpleInteract`/QuestBoard — always offer the prompt), but a **one-shot** interactable needs two extra lines or the keycap lies:
+
+- **hide it in `Interact()`**, because the player is still standing inside the trigger when it fires and nothing else would take it down;
+- **guard `OnTriggerEnter2D` with the spent flag**, or it returns every time the player walks back past a thing they already used.
+
+`Chest` (the golden relic chest) had neither, so its prompt sat over an opened chest and came back on re-entry, inviting an `Interact()` that returns immediately. `CardChest` and `BlompoNPC` were already correct; `Chest` now matches them.
+
+⚠️ **A wired `InteractPrompt` child does not mean a working prompt.** `CardChest` (the **silver** chest — same `Chest Golden` sprite tinted blue `0.66, 0.78, 1.0`) shipped with an `InteractPrompt` child sitting in the prefab and its `prompt` **field left null**, so it silently never showed one. Check the field, not just the hierarchy.
+
+`ShiftAltar` deliberately has no prompt — its floating "N SHIFT" cost label is its affordance.
+
 **Placing it needs THREE clearances, not one** — the assembly is ~5.6 wide and the hearth is **3.13 tall**:
 1. floor to stand it on,
 2. ~5.6 units of horizontal room,

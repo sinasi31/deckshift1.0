@@ -317,7 +317,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   animatorBoolParam: IsOpened
   openSound: {fileID: 8300000, guid: 8f967f68d5211954b99c73f6acf25fa7, type: 3}
-  prompt: {fileID: 0}
+  prompt: {fileID: 3411865167544342154}
 --- !u!1001 &8201949146355179647
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -422,5 +422,10 @@ PrefabInstance:
 --- !u!224 &3411865167544342153 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 6812340957612340982, guid: c4e9a1b7d2f83e56a9b0c1d2e3f4a5b6, type: 3}
+  m_PrefabInstance: {fileID: 8201949146355179647}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &3411865167544342154 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6812340957612340981, guid: c4e9a1b7d2f83e56a9b0c1d2e3f4a5b6, type: 3}
   m_PrefabInstance: {fileID: 8201949146355179647}
   m_PrefabAsset: {fileID: 0}
