@@ -28,6 +28,7 @@ public static class FlatUI
     private static Sprite softGlow, verticalFade, horizontalFade, bottomGlow, fadedRule, rivet, pixel;
     private static Sprite emberDot, fourPointStar, arcaneSigil, arcaneSeal;
     private static Sprite calibrationMark, sweepLine;
+    private static Sprite pinTack, waxSeal;
     private static Sprite[] raritySigils;   // one glyph per Rarity — see RaritySigil
 
     // Solid chamfered plate. chamfer 10 = windows, 5 = cards and buttons.
@@ -400,6 +401,106 @@ public static class FlatUI
         return sweepLine;
     }
 
+    // A brass tack head — the Bulletin theme's fastener, the counterpart to Iron's rivet.
+    //
+    // It is lit from the upper LEFT, because that theme's light rakes across the board from the
+    // left; a rivet lit from the other side on the same screen would read as a mistake before the
+    // player could say why. The shading also runs a wider value range than the rivet's, so a tack
+    // reads as a rounded dome catching a lamp rather than as a flush fastener.
+    //
+    // NOTE it carries no cast shadow. The sprite is tinted brass by Image.color, and tinting can
+    // only darken toward the tint — never toward black — so a baked shadow would come out as dark
+    // brass. Shadows are drawn separately with SoftGlow (see QuestBoardScreen).
+    public static Sprite PinTack()
+    {
+        if (pinTack != null) return pinTack;
+
+        const int S = 48;
+        Texture2D tex = NewTex(S);
+        float c = (S - 1) * 0.5f;
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+            {
+                float dx = (x - c) / c, dy = (y - c) / c;
+                float d = Mathf.Sqrt(dx * dx + dy * dy);
+                if (d > 1f) { tex.SetPixel(x, y, Clear); continue; }
+
+                // Dome shading: bright toward the upper-left, falling away to the lower-right.
+                float lit = Mathf.Clamp01(0.52f + (-dx * 0.62f + dy * 0.42f));
+                float v = Mathf.Lerp(0.26f, 1f, lit * lit);
+
+                // Specular pip, offset toward the light.
+                float sx = dx + 0.34f, sy = dy - 0.34f;
+                v += Mathf.Clamp01(1f - Mathf.Sqrt(sx * sx + sy * sy) / 0.26f) * 0.55f;
+
+                // Darkened rim so the head has an edge instead of dissolving into the paper.
+                v *= Mathf.Lerp(0.55f, 1f, Mathf.Clamp01((1f - d) / 0.22f));
+
+                float a = Mathf.Clamp01((1f - d) * 7f);
+                tex.SetPixel(x, y, new Color(Mathf.Clamp01(v), Mathf.Clamp01(v), Mathf.Clamp01(v), a));
+            }
+        tex.Apply();
+        pinTack = Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), 100f);
+        return pinTack;
+    }
+
+    // A blob of sealing wax with a sigil pressed into it — the mark on an accepted contract.
+    //
+    // The edge is deliberately IRREGULAR (three sine harmonics of the angle). A circle reads as a
+    // button; only the uneven rim says "this was poured and then squashed". The pressed impression
+    // is rendered DARKER rather than brighter, which is what a recess in a glossy material actually
+    // does, and it survives tinting: a darker white stays a darker red.
+    public static Sprite WaxSeal()
+    {
+        if (waxSeal != null) return waxSeal;
+
+        const int S = 160;
+        Texture2D tex = NewTex(S);
+        float c = (S - 1) * 0.5f;
+
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+            {
+                float dx = (x - c) / c, dy = (y - c) / c;
+                float d = Mathf.Sqrt(dx * dx + dy * dy);
+                float ang = Mathf.Atan2(dy, dx);
+
+                // Wobbly outline.
+                float R = 0.86f
+                        + 0.055f * Mathf.Sin(3f * ang + 0.7f)
+                        + 0.038f * Mathf.Sin(5f * ang + 2.1f)
+                        + 0.022f * Mathf.Sin(7f * ang + 4.4f);
+
+                float a = Mathf.Clamp01((R - d) * 12f);
+                if (a <= 0f) { tex.SetPixel(x, y, Clear); continue; }
+
+                // Domed wax, lit from the upper left like everything else on this board.
+                float lit = Mathf.Clamp01(0.55f + (-dx * 0.42f + dy * 0.30f));
+                float v = Mathf.Lerp(0.62f, 1.12f, lit);
+
+                // The pressed sigil: a ring, four short spokes on the DIAGONALS, and a centre pip.
+                //
+                // ⚠️ Four, not six, and they must not reach the ring. Six evenly spaced spokes
+                // running from the centre out to a ring is a citrus slice — that is genuinely what
+                // the first version looked like. Keeping the count low and leaving a clear gap
+                // between the spoke tips and the ring is what makes it read as something pressed
+                // into wax rather than as a wheel.
+                float ring = Mathf.Clamp01(1f - Mathf.Abs(d - 0.54f) / 0.055f);
+                float spokeBand = (d > 0.17f && d < 0.42f) ? 1f : 0f;
+                float spokes = spokeBand * Mathf.Pow(Mathf.Abs(Mathf.Cos(2f * (ang - Mathf.PI * 0.25f))), 34f);
+                float pip = Mathf.Clamp01(1f - d / 0.11f);
+                v -= (ring * 0.40f + spokes * 0.26f + pip * 0.28f);
+
+                // Squashed-out lip: slightly darker right at the rim.
+                v *= Mathf.Lerp(0.68f, 1f, Mathf.Clamp01((R - d) / 0.16f));
+
+                tex.SetPixel(x, y, new Color(Mathf.Clamp01(v), Mathf.Clamp01(v), Mathf.Clamp01(v), a));
+            }
+        tex.Apply();
+        waxSeal = Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), 100f);
+        return waxSeal;
+    }
+
     private static readonly Color Clear = new Color(0f, 0f, 0f, 0f);
 
     // Ray brightness: full near the centre, tapering to nothing at `reach`.
@@ -718,6 +819,56 @@ public static class FlatUI
         TextBody = new Color(0.690f, 0.784f, 0.780f, 1f),
         TextMuted = new Color(0.420f, 0.514f, 0.510f, 1f),
         TextDisabled = new Color(0.267f, 0.337f, 0.333f, 1f),
+    };
+
+    // BULLETIN — the quest board.
+    //
+    // ⚠️ THIS THEME'S VALUE STRUCTURE IS INVERTED, AND THAT IS THE POINT. Every other screen here is
+    // a dark plate with light text on it. This one is a dark board with PALE PAPER pinned to it, and
+    // its text ramp is therefore INK — dark, reading on the paper rather than on the surface. It is
+    // the only theme where TextBright is nearly black. A label that has to sit on the BOARD itself
+    // (a heading, a footer hint) uses EdgeLight instead.
+    //
+    // That single inversion does more than any hue could: at a glance the board has a completely
+    // different silhouette from the forge, the map or the pause screen, because the bright areas and
+    // the dark areas have swapped places. It is also the honest material — every other screen is
+    // fabricated (iron, glass, patina, copper); the board is the one place the game hands you PAPER.
+    //
+    // The rest of the inversions, against everything already here:
+    //   LIGHT      RAKES IN FROM THE LEFT. Iron is lit from below, Arcane from above, Halt from the
+    //              edges inward, Apparatus from its own content, Verdigris not at all. Sideways is
+    //              the unclaimed direction, and it is what a board on a wall beside a lamp looks
+    //              like. Every slip's shadow therefore falls to the RIGHT — see PinTack, which is
+    //              shaded to match, and get this backwards and the screen reads as wrong before
+    //              anyone can say why.
+    //   MOTION     lives in the CONTENT, not the air. There is no particle field at all: the slips
+    //              themselves sway a fraction of a degree on their pins, as if there were a draught
+    //              in the room. Verdigris also has no particles, but its motion is in the
+    //              INFORMATION (routes pulsing); this one's is physical, objects moving.
+    //   SURFACE    is PERFORATED — hundreds of old pin holes from contracts taken long before yours.
+    //              Iron is scuffed by use and Halt is crazed by force; this one is worn by OTHER
+    //              PEOPLE, which is the only wear on any screen that tells you something about the
+    //              world rather than about the object.
+    //   MARKS      are brass tacks, and unlike every other theme's corner marks they are on the
+    //              CONTENT (one per slip) rather than on the frame — because a fastener here is
+    //              holding something up, not holding a panel together.
+    //
+    // The accent is deep sealing-wax red, taken from the last of the unclaimed hue budget. It is
+    // reserved almost entirely for the wax seal on an accepted contract, so red on this screen means
+    // exactly one thing: you have promised to do that.
+    public static readonly Theme Bulletin = new Theme
+    {
+        Backdrop = new Color(0.014f, 0.012f, 0.010f, 0.94f),
+        Surface = new Color(0.072f, 0.060f, 0.049f, 0.99f),      // the board: dark oiled wood
+        SurfaceRaised = new Color(0.780f, 0.741f, 0.659f, 1f),   // AGED PAPER — the inversion
+        Border = new Color(0.196f, 0.161f, 0.129f, 1f),
+        BorderSoft = new Color(0.145f, 0.118f, 0.094f, 1f),
+        EdgeLight = new Color(0.510f, 0.435f, 0.345f, 1f),       // raking lamplight; also board text
+        Accent = new Color(0.694f, 0.157f, 0.145f, 1f),          // sealing wax
+        TextBright = new Color(0.129f, 0.106f, 0.086f, 1f),      // ink
+        TextBody = new Color(0.220f, 0.184f, 0.149f, 1f),
+        TextMuted = new Color(0.404f, 0.353f, 0.294f, 1f),
+        TextDisabled = new Color(0.565f, 0.518f, 0.451f, 1f),
     };
 
     // Rarity colours tuned to read on a DARK surface. The old chrome carried rarity on a gem set

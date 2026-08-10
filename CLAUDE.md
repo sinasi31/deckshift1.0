@@ -438,14 +438,15 @@ The quest system is **functional**: data model, accept/progress/complete events,
 ### QuestSystem Singleton
 
 Located on a `QuestSystem` GameObject in SampleScene. Holds:
-- `allQuests` — list of QuestData assets the board can pull from (currently the 3 above).
+- `allQuests` — list of QuestData assets the board can pull from (⚠️ **3 of the 4 assets are wired in** — `Scrooge` is not in the list).
 - `activeQuests` — `List<ActiveQuest>` (inner serializable class). Each `ActiveQuest` has `data` (QuestData), `currentAmount` (int), `isCompleted` (bool).
-- Serialized fields: `overlayPanel` (GameObject), `container` (Transform), `paperPrefab` (GameObject).
+- **No serialized UI fields any more** — see Quest Board UI.
 
 Key methods:
-- `ToggleBoard()` / `CloseBoard()` — opens/closes the QuestBoardOverlay UI; uses `RequestPause`/`ReleasePause`.
-- `GenerateQuests()` — spawns up to 3 QuestPaper prefabs into the container. **Currently always picks the first 3 in `allQuests` — no randomization.**
-- `AcceptQuest(QuestData)` — adds to `activeQuests` (deduplicates by data reference), fires `OnQuestAccepted`.
+- `ToggleBoard()` / `CloseBoard()` — one-liners onto `QuestBoardScreen`, which owns the pause and the HUD hide.
+- `Offer` / `EnsureOffer()` — the pinned contracts, shuffled and rolled **once per run**.
+- `AcceptQuest(QuestData)` — **returns bool**; refuses duplicates and refuses past `MaxActiveQuests`. Fires `OnQuestAccepted` only on a real acceptance.
+- `FindActive(QuestData)` / `ActiveCount` — what the board reads to draw each slip's state.
 - `ReportEvent(QuestType, int)` — iterates activeQuests, increments `currentAmount` on matching quests, fires `OnQuestProgress`, then calls `CheckCompletion`.
 - `CheckCompletion(ActiveQuest)` — if `currentAmount >= targetAmount`, sets `isCompleted = true`, fires `OnQuestCompleted`, calls `GiveReward`.
 - `GiveReward(QuestData)` — delivers reward immediately. **Not deferred to level-end yet** (on the deferred list).
@@ -458,9 +459,27 @@ public event System.Action<ActiveQuest> OnQuestProgress;   // fired after curren
 public event System.Action<ActiveQuest> OnQuestCompleted;  // fired after isCompleted=true, before GiveReward
 ```
 
-### Quest Board UI
+### Quest Board UI — `QuestBoardScreen.cs` (rebuilt from scratch 2026-08-10)
 
-Lives under `Canvas` as `QuestBoardOverlay` → `Panel` → (`QuestContainer`, `LeaveButton`). The board uses a hand-painted background sprite with three painted parchment slots and three painted ACCEPT buttons; the spawned `QuestItemTemplate` prefabs (one per quest) sit inside those painted slots with transparent backgrounds, and the invisible Accept buttons inside each QuestPaper are sized to overlay the painted ACCEPT graphics. The Leave button is also an invisible button over a painted graphic.
+⚠️ **THE PAINTED BOARD IS GONE.** The designer disliked the artwork, so `QuestBoardOverlay` (and its `Panel`/`QuestContainer`/`LeaveButton` hierarchy), `QuestItemTemplate.prefab`, `QuestPaper.cs` and `QuestBoardFX.cs` were all **deleted**, along with QuestSystem's `overlayPanel` / `container` / `paperPrefab` fields. **QuestSystem now holds no UI references at all** — `ToggleBoard()`/`CloseBoard()` are one-liners onto the procedural screen, which builds itself on demand under the Canvas. Do not re-create a scene-placed quest board. (The old background sprite `Slide_16_9_-_5_0` still exists as an asset; nothing points at it.)
+
+The theme is **Bulletin** — see UI System → Themes for why it's the one screen whose value structure is inverted. Mechanically:
+
+- **The rotation pivot of each slip sits under its TACK** (`SLIP_PIVOT_Y = 0.94`), not at its centre. That is the whole reason the sway reads as paper hanging from a pin rather than a card wobbling in space, and it costs one line.
+- **Hovering a slip STOPS its sway** and lifts it off the board. Stillness is the selection signal — it's the only motionless thing on the board, which is clearer than any highlight. (No flip-flop risk: the slip grows on hover, so the cursor stays inside it.)
+- ⚠️ **The wax seal goes in the TOP-RIGHT corner of a slip, not the bottom.** The bottom holds the payout block and the progress bar — the two numbers that only start mattering once a contract is actually taken — and a 100px blob dropped there covers both. The top corner is the only region empty at every content length.
+- ⚠️ **A dark dot cannot mark anything on a surface this dark.** The pin holes are readable because of the pale crescent on the side away from the lamp, drawn OVER a wider dark smudge. Rim-only reads as dust or stars; dark-only is invisible. Same family of lesson as "hairlines need to be brighter than theory says" — the header rule was invisible at `T.Border` and had to move to `EdgeLight`.
+- ⚠️ **Grain/wear lines must land in bands the layout leaves EMPTY.** One placed between the hint and the LEAVE button instantly reads as a divider rule nobody asked for.
+- `FlatUI.WaxSeal()`'s impression is **four diagonal spokes that stop short of the ring**. Six evenly spaced spokes running out to a ring is a citrus slice — that is genuinely what the first version looked like.
+- Two new sounds, `ProcSfx.PaperRustle` and `ProcSfx.WaxStamp`. They are the only sounds in the game with **no pitched component at all**, which is what makes paper a distinct family rather than a variant of the stone hits. The stamp's three layers decay in the order the physical action happens (wax squashes, seal bottoms out, sheet creases last).
+
+**Behaviour fixed in the same pass, because the old board was dishonest about its own state:**
+
+- **The offer is rolled ONCE per run** (`QuestSystem.Offer`), not regenerated on every open. The old board rebuilt its slips each time it was opened, so with a pool bigger than three, closing and reopening would have been a free reroll.
+- It **shuffles** instead of always taking `allQuests[0..2]`, so quests past the third could never be offered before.
+- **`AcceptQuest` returns bool and enforces `MaxActiveQuests`.** It used to silently no-op on a duplicate and had no cap at all.
+- Accepted / completed contracts now **show as accepted** (seal, status line, live progress bar) instead of looking fresh and swallowing the click.
+- ⚠️ **`BoardSlots` and `MaxActiveQuests` are deliberately SEPARATE numbers.** A board offering exactly as many jobs as you can carry is a checklist, not a decision. Both are 3 today only because three quest assets exist; the "no room, greyed out" state is already drawn and becomes reachable the moment `BoardSlots` is raised (which also needs `BOARD_W` widened — the slips are one row).
 
 The QuestBoard in `Assets/LevelEfeS/hub.prefab` has a `SimpleInteract` component on it (implements `IInteractable`) that calls `QuestSystem.ToggleBoard()` on player interact (press E within `interactionRange`). The board's Layer must be in PlayerController's `interactableLayer` mask. ✅ **VERIFIED 2026-07-18** (this was previously an open "someone please check" item): `interactableLayer` = **4096 = layer 12**, layer 12 **is** named `Interactable`, and the hub's `QuestBoard` object is on layer 12 with a `SimpleInteract` component. The wiring is correct — no action needed.
 
@@ -629,18 +648,20 @@ Lessons already paid for, don't re-learn them:
 
 `FlatUI.Theme` is the mechanism — a colour set (`Surface`, `Border`, `EdgeLight`, `Accent`, text ramp) picked per screen:
 
-| | **Iron** (`ScrapForgeScreen`) | **Arcane** (`BlompoScreen`) | **Loadout** (`RelicHUD`, `RelicIcon`, `RelicTooltip`) | **Halt** (`PauseScreen`) | **Apparatus** (`SettingsScreen`) |
-|---|---|---|---|---|---|
-| What it is | a workbench you repair cards at | a mythic creature granting a blessing | what you're **carrying** | the **moment** you stopped | the **machine's own control panel** |
-| Palette | warm charcoal (rust district) | cold indigo | near-**colourless** | cold blue-black (frost) | smoked glass + arc-**cyan** |
-| Light | fire from **below** | descends from **above** | none — it's not a place | from the **edges inward** | **emitted by the content itself** |
-| Particles | embers **rising**, fast | motes **settling**, slow, twinkling | none | **suspended**, shivering in place | none — one **scan sweep** instead |
-| Corner marks | **rivets** (fasteners) | **four-point stars** (light) | none | none — it has no corners | **calibration crosshairs** |
-| Surface | scuffed and worn | pristine | plain, recessed sockets | **crazed** (hairline fractures) | unblemished glass |
+| | **Iron** (`ScrapForgeScreen`) | **Arcane** (`BlompoScreen`) | **Loadout** (`RelicHUD`, `RelicIcon`, `RelicTooltip`) | **Halt** (`PauseScreen`) | **Apparatus** (`SettingsScreen`) | **Bulletin** (`QuestBoardScreen`) |
+|---|---|---|---|---|---|---|
+| What it is | a workbench you repair cards at | a mythic creature granting a blessing | what you're **carrying** | the **moment** you stopped | the **machine's own control panel** | a board of **contracts** you promise to do |
+| Palette | warm charcoal (rust district) | cold indigo | near-**colourless** | cold blue-black (frost) | smoked glass + arc-**cyan** | dark wood + **pale paper** + wax red |
+| Light | fire from **below** | descends from **above** | none — it's not a place | from the **edges inward** | **emitted by the content itself** | **rakes in from the LEFT** |
+| Particles | embers **rising**, fast | motes **settling**, slow, twinkling | none | **suspended**, shivering in place | none — one **scan sweep** instead | none — **the content itself sways** |
+| Corner marks | **rivets** (fasteners) | **four-point stars** (light) | none | none — it has no corners | **calibration crosshairs** | **brass tacks**, on the content not the frame |
+| Surface | scuffed and worn | pristine | plain, recessed sockets | **crazed** (hairline fractures) | unblemished glass | **perforated** (old pin holes) |
 
 **The inversions are the point.** Warm/cold, below/above, rising/falling, worn/clean, still/moving, and — with Apparatus — inside/outside the fiction. When adding a screen, pick a material and invert something — **do not just retint Iron**.
 
-⚠️ **The hue budget is nearly spent.** Claimed: orange (Iron), violet (Arcane), no-hue (Loadout), verdigris green + copper (map), warm wood/amber (shop), frost blue (Halt), arc-cyan (Apparatus). Roughly magenta, yellow and deep red remain. When those run out, **stop reaching for a new colour and invert a different axis instead** — light direction, motion vocabulary and surface treatment separate these screens at least as much as hue does, and Loadout proves a theme can carry no hue at all.
+⚠️ **Bulletin proves the strongest available inversion is VALUE, not hue.** Every other screen is a dark plate with light text on it; the quest board is a dark board with **pale paper pinned to it**, so its text ramp is INK (`TextBright` is nearly black) and the bright/dark areas have swapped places. That single structural choice makes it unmistakable at a glance while claiming almost no colour. Its wear is also the only wear in the game that says something about the **world** (other people took contracts here) rather than about the object. **Reach for this before reaching for another hue.**
+
+⚠️ **The hue budget is nearly spent.** Claimed: orange (Iron), violet (Arcane), no-hue (Loadout), verdigris green + copper (map), warm wood/amber (shop), frost blue (Halt), arc-cyan (Apparatus), deep wax red (Bulletin). Roughly magenta and yellow remain. When those run out, **stop reaching for a new colour and invert a different axis instead** — light direction, motion vocabulary, surface treatment and now value structure separate these screens at least as much as hue does, and Loadout proves a theme can carry no hue at all.
 
 **The Marketplace (`ShopScreenUI`) keeps its own material** — warm wood, striped canvas awning, lamplight — and was already bespoke rather than old chrome. What it needed wasn't a reskin but a PERSON; see "The keeper talks back" below.
 
@@ -1380,10 +1401,9 @@ Use this liberally to verify visual changes, diagnose "it looks wrong" reports, 
 - Wire `GoldAccumulate` and `UseCardCount` quest types similarly.
 - Add card-reward type. Currently only Gold/Heal/ShiftCharge are supported.
 - **Rich Man's Dagger card** — a card that deals damage based on current player gold. Was discussed as a quest reward. Needs design pass: damage formula, balance against scaling gold pools, mid-fight gold loss interaction.
-- Defer reward delivery to **level-end** instead of firing immediately on quest completion. Hook point identified: `RewardManager.SelectCard()` just before `SpawnNextRoom()`.
-- Add randomization to `GenerateQuests()` — currently always shows the first 3 in `allQuests`. As content grows, this becomes a real problem.
-- Enforce the 3-quest cap on `AcceptQuest`. Currently you can accept more than 3.
-- Visual feedback on quest accept (button flash, "ACCEPTED" overlay, hide accepted quests from board).
+- Defer reward delivery to **level-end** instead of firing immediately on quest completion (see also Quest banking, below).
+- ~~Randomize the offer~~ · ~~enforce the 3-quest cap~~ · ~~visual feedback on accept~~ — **all done 2026-08-10** with the board rebuild.
+- **AUTHOR MORE QUESTS.** Only 4 assets exist, one of them (`Scrooge`) is unfinished — it pays `rewardAmount` 0 and isn't in `allQuests`. The board is built to offer more contracts than you can carry, which is what makes taking one a decision; with three assets it can't. This is now the quest system's binding constraint, not the UI.
 - Wire the "press E" prompt GameObject on the QuestBoard's `SimpleInteract.prompt` field (currently null — no hover hint appears).
 
 ### Scene Flow (deferred)
