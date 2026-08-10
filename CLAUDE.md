@@ -427,8 +427,31 @@ The quest system is **functional**: data model, accept/progress/complete events,
 ### Data
 
 - **`QuestData`** (ScriptableObject) — quest templates. Fields: `questName`, `description`, `type` (QuestType enum), `targetAmount`, `rewardText`, `rewardType` (RewardType enum), `rewardAmount`.
-- **`QuestType` enum:** `GoldAccumulate`, `KillEnemy`, `AirKill`, `NoDamageRoom`, `UseCardCount`. **Re-verified 2026-08-03: FOUR of the five now fire** — `KillEnemy` + `AirKill` (`EnemyHealth.Die()`), `NoDamageRoom` (`ExitDoor.PerformExit`), `GoldAccumulate` (`PlayerController.AddGold`). **Only `UseCardCount` is still unwired.** (An earlier version of this file claimed only the first two worked — that was stale and understated the state.)
-- **`RewardType` enum:** `Gold`, `ShiftCharge`, `Heal`. All three are wired in `QuestSystem.GiveReward`.
+- **`QuestType` enum:** `GoldAccumulate`, `KillEnemy`, `AirKill`, `NoDamageRoom`, `UseCardCount`, plus the four **oaths** added 2026-08-10 (`NoCardsRoom`, `NoRecallRoom`, `LowShiftRoom`, `NoStaggerRoom`). **Eight of nine fire; only `UseCardCount` is still unwired.**
+- **`RewardType` enum:** `Gold`, `ShiftCharge`, `Heal`, plus `Card`, `Scrap`, `MaxHealth` (2026-08-10). All six are wired in `QuestSystem.GiveReward`. ⚠️ **`MaxHealth` goes through `PlayerHealth.IncreaseBaseMaxHealth`, which raises `baseMaxHealth` and re-runs `RelicManager.RecomputePassives()`** — writing to `maxHealth` directly would be silently erased the next time the player gained or sold any relic, since passives are always rebuilt from the base.
+- **`QuestData.objectiveParam`** — a second number for objectives whose target is a count. Only `LowShiftRoom` reads it (the per-room Shift ceiling). **`QuestData.rewardCard`** — only read when `rewardType` is `Card`; empty draws at random from `CardPool`.
+
+### Oaths — the per-room streak contracts (2026-08-10)
+
+Four quest types share one recorder in `QuestSystem` (`BeginRoom` / `NoteCardPlayed` / `NoteRecall` / `NoteShiftSpent` / `EndRoom`), so **adding a fifth oath is a switch case, not a system**. `BeginRoom` is hooked in `PlayerController.OnNewRoomEnter`; `EndRoom` in `ExitDoor.PerformExit`.
+
+⚠️ **They are STREAKS, not tallies.** Clearing a room inside the oath adds one; breaking it resets the count to **zero**. That is what makes them read as a commitment rather than a checklist, and it is also why a break can never dead-end a run — the next room starts clean, so the contract stays winnable. Verified: 2/3 → break → 0/3 → next clean room → 1/3.
+
+Design rules baked in, each because the obvious alternative is wrong:
+- ⚠️ **`EndRoom` is called OUTSIDE the flawless-clear block in `ExitDoor`.** Nested inside it (where the `NoDamageRoom` report lives) an oath would only ever be scored on rooms that also happened to be damage-free.
+- ⚠️ **Hub-excluded.** Nothing is spent in the sandbox, so every oath would pass there for free.
+- **Nothing is judged until the room is LEFT.** A violation isn't final until then. The tracker HUD shows the break live so it isn't sprung on the player at the door, but the reset happens once, at the exit.
+- **`NoteCardPlayed` fires on `success` alone**, not inside the `!keepInHand` branch — a card that stays in hand (Portal's first placement) has still been played. Blocked/failed plays don't count; refusing a card must not break an oath.
+- **`NoteRecall` sits after every early return in `TryRecall`**, so a refused recall (not enough Shift) doesn't break No Take-Backs — the player didn't get one.
+- **`NoteShiftSpent` hangs off `PlayerController.SpendShift`**, the single funnel every Shift cost in the game passes through, so Featherweight gets a complete per-room total from one hook.
+
+⚠️ **COMPLETED CONTRACTS DO NOT OCCUPY A SLOT** (fixed 2026-08-10). `ActiveCount` counts only *incomplete* quests. Counting the whole `activeQuests` list capped the player at three contracts for the **entire run** — finish three and the board silently refuses every further offer. `activeQuests` remains the full record so the board can still draw finished contracts as COMPLETE.
+
+**The four authored oath assets** (`Assets/Quests/Oath_*.asset`): Deck's Closed (3 rooms, no cards → a card) · No Take-Backs (3 rooms, no Recall → +4 max Shift) · Featherweight (3 rooms, ≤8 Shift each → +6 max Shift) · Sober Streak (4 rooms, no Stagger → +10 max HP). ⚠️ **The permanent-stat numbers are deliberately set about a third below what the design pitched** — permanent max Shift is the strongest thing in the game and these want to be felt in a real run before being raised. One Inspector field each.
+
+⚠️ **`Scrooge` is deliberately NOT in `allQuests`.** Its `rewardAmount` is 0, so it would appear on the board as a contract that pays nothing. It is waiting on **Rich Man's Dagger** (the card whose damage scales with held gold) and on `GoldAccumulate` becoming a peak/hold check rather than a running total.
+
+**Payout rule (designer-set):** *quests pay in things the shop doesn't sell.* Gold is the buying currency, so paying gold is just handing out a discount — it's reserved for the lightest contracts, if at all. The tighter form is **pay in the thing the oath was made of**: gave up cards → paid a card; gave up Recall and spending → paid Shift capacity; avoided Stagger (which charges HP) → paid HP.
 - **Four quest assets exist** at `Assets/Quests/` (re-verified 2026-07-18 — an earlier version of this file said three):
   - `New Quest 1` — "Invincible" — NoDamageRoom (1) → 300 Gold. **Objective type not wired, won't progress yet.**
   - `New Quest 2` — "Hit a Clip" — AirKill (3) → +10 ShiftCharge. Fully functional.
@@ -483,16 +506,19 @@ The theme is **Bulletin** — see UI System → Themes for why it's the one scre
 
 The QuestBoard in `Assets/LevelEfeS/hub.prefab` has a `SimpleInteract` component on it (implements `IInteractable`) that calls `QuestSystem.ToggleBoard()` on player interact (press E within `interactionRange`). The board's Layer must be in PlayerController's `interactableLayer` mask. ✅ **VERIFIED 2026-07-18** (this was previously an open "someone please check" item): `interactableLayer` = **4096 = layer 12**, layer 12 **is** named `Interactable`, and the hub's `QuestBoard` object is on layer 12 with a `SimpleInteract` component. The wiring is correct — no action needed.
 
-### Live Tracker HUD (QuestTrackerHUD)
+### Live Tracker HUD — `QuestTrackerHUD.cs` (rebuilt 2026-08-10)
 
-`Assets/Scripts/QuestTrackerHUD.cs`, attached to a `QuestTracker` GameObject under `Canvas/GameplayHUD/`, top-right of screen. Subscribes to the three QuestSystem events. Maintains a `Dictionary<ActiveQuest, GameObject>` mapping quests to their instantiated row GameObjects.
+On the `QuestTracker` GameObject under `Canvas/GameplayHUD/`, so it still inherits the HUD auto-hide when a full-screen panel opens. **`QuestRowPrefab.prefab` and `QuestTrackerRow.cs` were DELETED** — it is fully procedural now and needs no prefab.
 
-- Row prefab: `Assets/Prefabs/QuestRowPrefab.prefab`. Two TMP children named exactly `Title` and `Progress` (case-sensitive).
-- On accept: instantiate row, set Title to quest name, set Progress to "0/X".
-- On progress: update the row's Progress text to "current/target".
-- On complete: destroy the row.
+The rows are **slips off the quest board**: same Bulletin material, pale paper, brass tack, ink text, wax seal on completion. Nothing else in the HUD is made of paper, so the corner of the screen identifies itself before a word is read. Deliberately quieter than the board (narrow strips, a third of the sway, no grain/fold/perforation) per the Loadout rule that a permanent overlay must not compete with the game behind it.
 
-Because the tracker is parented under GameplayHUD, it inherits the auto-hide behavior when Shop / SlotMachine / QuestBoard open.
+- **The live break warning is the point.** `QuestSystem.IsOathBroken` drives a wax-red edge flag, a red title and a "BROKEN THIS ROOM" caption. This is the only place in the game that tells you an oath is already lost for the room you are **standing in** — the board can only ever say so afterwards.
+- The progress fill **eases** toward its target, so a collapsing streak visibly *drains* instead of snapping to zero.
+- Completion stamps the seal, holds, then the slip comes **off the pin and falls away** — a contract that merely faded would read as the tracker forgetting it.
+
+⚠️ **The scene object still carries a `VerticalLayoutGroup` + `ContentSizeFitter` from the old prefab tracker, and `Start()` disables both.** They relaid every slip *and every slip's shadow* as separate list items, spacing rows at 84+4+84+4 = **176 instead of 94** and shoving them sideways. Rows here are pivoted at their pin and rotated every frame, so a layout group can never own them. Slips are also built into a dedicated `Slips` child layer with no layout components, so this stays correct if anyone re-adds one.
+
+⚠️ **`anchoredPosition` places the PIVOT, and this pivot is the pin in the top-left corner.** Positioning rows at x = 0 hung 90% of each strip to the right of the anchor and pushed them 74px off the screen, cutting the counts in half. `RowRest()` backs that offset out. Same reason the title is indented — a full-width title box runs its first two characters under the tack.
 
 ### Known Quest Pitfall (Resolved)
 
@@ -1125,9 +1151,18 @@ Two consequences, both load-bearing:
 
 **Be aware of this when adding new enemies — pick a layer and stick with it, or use the EnemyHealth-component approach.** (Note: `PF Knight - Moss` is the raw Cainos prefab at 600 HP and is not the encounter; the real boss is `MossKnightBoss` at 300.)
 
-### Head Bounce (Pogo Boots Relic)
+### Head Bounce (Pogo Boots Relic) — REBALANCED 2026-08-10
 
-- 8 damage, `defaultJumpForce * 0.7f` upward force, 0.1s camera shake, 0.3s cooldown.
+⚠️ **It used to grant `AddShift(1)` on every bounce, which this file never recorded.** With a 0.3s cooldown that made Pogo Boots **the only free Shift regeneration in the game** — in a game whose stated identity is that Shift does not regenerate on its own and carries over for the whole run. It quietly turned any room with enemies into a refuelling station: a 40 HP melee enemy is five bounces at 8 damage, so a room of six was worth roughly half a full Shift bar for nothing. The designer flagged the relic as overpowered; this was the mechanism.
+
+Three changes, meant to work together (see `PlayerController.TriggerHeadBounce`):
+- **No Shift refund at all.** The boots are a movement toy; movement is what they pay in.
+- **One bounce per enemy per airtime** (`_bouncedThisAirtime`, cleared the moment `isGrounded`). Camping a single slime until it died was both the degenerate line and the boring one; chaining ACROSS several enemies is the trick worth rewarding, and it's the only thing still allowed.
+- **Decaying chain height** — `pogoChainFalloff` (0.70 / 0.55 / 0.42 / 0.32, Inspector-tunable on the Player), so a chain can't sustain itself across a dense room.
+
+Verified: two bounces on the same enemy in one airtime deal 8 damage total (not 16), a second distinct enemy is still accepted, and Shift is unchanged across both.
+
+- 8 damage, `defaultJumpForce * pogoChainFalloff[n]` upward force, 0.1s camera shake, 0.3s cooldown.
 - Gated behind `RelicManager.HasRelic("PogoBoots")`.
 - Uses both `OnCollisionEnter2D` and `OnTriggerEnter2D` (AeroBat has trigger collider, others have solid).
 - Contact normal check: `contact.normal.y > 0.7`.

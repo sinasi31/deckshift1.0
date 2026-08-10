@@ -62,6 +62,15 @@ public static class CardPool
         return result;
     }
 
+    // One card, at random, from whatever may legitimately be offered. Null only if the project has
+    // no offerable cards at all.
+    public static CardData PickRewardable(IReadOnlyList<CardData> restrictTo = null)
+    {
+        List<CardData> pool = Offerable(restrictTo);
+        if (pool.Count == 0) return null;
+        return pool[Random.Range(0, pool.Count)];
+    }
+
     // Draw up to `count` DISTINCT cards — for a reward screen or a shop shelf.
     public static List<CardData> DrawDistinct(int count, IReadOnlyList<CardData> restrictTo = null)
     {

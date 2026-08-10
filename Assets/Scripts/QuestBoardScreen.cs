@@ -38,10 +38,18 @@ public class QuestBoardScreen : MonoBehaviour
     private static readonly Color WAX = new Color(0.596f, 0.135f, 0.125f, 1f);
     private static readonly Color WAX_SPENT = new Color(0.380f, 0.145f, 0.135f, 0.92f);
 
-    // The board sits well inside the canvas at every supported aspect (the narrowest, 4:3, is still
-    // 1440 logical px wide against this 1280), so unlike the map and settings windows it needs no
-    // fit pass.
-    private const float BOARD_W = 1280f;
+    // The board WIDENS with the number of contracts pinned to it, so raising QuestSystem.BoardSlots
+    // is genuinely a one-number change rather than a layout job. At the current 3 slots this comes
+    // out to exactly the 1280 the board was hand-tuned at, so nothing moved.
+    private static float BoardW
+    {
+        get
+        {
+            int slots = Mathf.Max(1, QuestSystem.BoardSlots);
+            return Mathf.Max(1280f, slots * (SLIP_W + SLIP_GAP) + 110f);
+        }
+    }
+
     private const float BOARD_H = 740f;
 
     private const float SLIP_W = 356f;
@@ -65,6 +73,7 @@ public class QuestBoardScreen : MonoBehaviour
 
     private readonly List<Slip> slips = new List<Slip>();
     private bool isOpen;
+    private float fitScale = 1f;
     private GameState prevState;
     private GameObject cachedHud;
     private bool hudWasActive;
@@ -156,7 +165,7 @@ public class QuestBoardScreen : MonoBehaviour
         Stretch(backdrop.rectTransform);
         AddClick(backdrop.gameObject, Hide);
 
-        board = AddPoint(transform, "Board", Vector2.zero, new Vector2(BOARD_W, BOARD_H));
+        board = AddPoint(transform, "Board", Vector2.zero, new Vector2(BoardW, BOARD_H));
 
         BuildBoardSurface();
         BuildHeader();
@@ -189,7 +198,7 @@ public class QuestBoardScreen : MonoBehaviour
             Color g = T.EdgeLight;
             g.a = grainA[i];
             Image line = AddImage(board, "Grain" + i, FlatUI.FadedRule(), g, false);
-            line.rectTransform.sizeDelta = new Vector2(BOARD_W * Random.Range(0.55f, 0.86f), 2f);
+            line.rectTransform.sizeDelta = new Vector2(BoardW * Random.Range(0.55f, 0.86f), 2f);
             line.rectTransform.anchoredPosition = new Vector2(Random.Range(-120f, 120f), grainY[i]);
         }
 
@@ -226,13 +235,13 @@ public class QuestBoardScreen : MonoBehaviour
     private void BuildPinHoles()
     {
         const int HOLES = 130;
-        RectTransform layer = AddPoint(board, "PinHoles", Vector2.zero, new Vector2(BOARD_W, BOARD_H));
+        RectTransform layer = AddPoint(board, "PinHoles", Vector2.zero, new Vector2(BoardW, BOARD_H));
 
         for (int i = 0; i < HOLES; i++)
         {
             float sz = Random.Range(4.5f, 8.5f);
             Vector2 at = new Vector2(
-                Random.Range(-BOARD_W * 0.5f + 34f, BOARD_W * 0.5f - 34f),
+                Random.Range(-BoardW * 0.5f + 34f, BoardW * 0.5f - 34f),
                 Random.Range(-BOARD_H * 0.5f + 34f, BOARD_H * 0.5f - 34f));
 
             // ⚠️ The LIT RIM is what makes this read, not the dark centre. A dark dot on a surface
@@ -262,18 +271,18 @@ public class QuestBoardScreen : MonoBehaviour
         title.fontStyle = FontStyles.Bold;
         title.characterSpacing = 14f;
         title.rectTransform.sizeDelta = new Vector2(700f, 54f);
-        title.rectTransform.anchoredPosition = new Vector2(-BOARD_W * 0.5f + 56f + 350f, TITLE_Y);
+        title.rectTransform.anchoredPosition = new Vector2(-BoardW * 0.5f + 56f + 350f, TITLE_Y);
 
         takenLabel = AddText(board, "Taken", "", 20f, T.TextMuted, TextAlignmentOptions.Right);
         takenLabel.characterSpacing = 8f;
         takenLabel.rectTransform.sizeDelta = new Vector2(460f, 40f);
-        takenLabel.rectTransform.anchoredPosition = new Vector2(BOARD_W * 0.5f - 56f - 230f, TITLE_Y - 2f);
+        takenLabel.rectTransform.anchoredPosition = new Vector2(BoardW * 0.5f - 56f - 230f, TITLE_Y - 2f);
 
         // Hairlines have to be brighter than the palette suggests or they don't register at all on a
         // dark surface — T.Border, which is the "correct" colour for a rule here, was invisible.
         Color r = T.EdgeLight; r.a = 0.55f;
         Image rule = AddImage(board, "HeaderRule", FlatUI.FadedRule(), r, false);
-        rule.rectTransform.sizeDelta = new Vector2(BOARD_W - 112f, 2f);
+        rule.rectTransform.sizeDelta = new Vector2(BoardW - 112f, 2f);
         rule.rectTransform.anchoredPosition = new Vector2(0f, RULE_Y);
     }
 
@@ -281,7 +290,7 @@ public class QuestBoardScreen : MonoBehaviour
     {
         hintLabel = AddText(board, "Hint", "", 17f, T.TextMuted, TextAlignmentOptions.Center);
         hintLabel.characterSpacing = 6f;
-        hintLabel.rectTransform.sizeDelta = new Vector2(BOARD_W - 140f, 30f);
+        hintLabel.rectTransform.sizeDelta = new Vector2(BoardW - 140f, 30f);
         hintLabel.rectTransform.anchoredPosition = new Vector2(0f, HINT_Y);
 
         // LEAVE reads as a nailed-up sign rather than a button: the board has no chrome anywhere
@@ -662,6 +671,7 @@ public class QuestBoardScreen : MonoBehaviour
         if (hudWasActive && HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(true);
 
         Refresh();
+        FitScale();
 
         SfxManager.PlayOn(audioSource, ProcSfx.PaperRustle, 0.7f);
 
@@ -699,13 +709,32 @@ public class QuestBoardScreen : MonoBehaviour
             float n = Mathf.Clamp01(t / DUR);
             group.alpha = n;
             float e = 1f - Mathf.Pow(1f - n, 3f);
-            board.localScale = Vector3.one * Mathf.Lerp(0.965f, 1f, e);
+            board.localScale = Vector3.one * (fitScale * Mathf.Lerp(0.965f, 1f, e));
             board.anchoredPosition = new Vector2(0f, Mathf.Lerp(26f, 0f, e));
             yield return null;
         }
         group.alpha = 1f;
-        board.localScale = Vector3.one;
+        board.localScale = Vector3.one * fitScale;
         board.anchoredPosition = Vector2.zero;
+    }
+
+    // A board too wide for the canvas is SCALED down uniformly, never reflowed: its header, footer
+    // and slip row all sit at fixed offsets from the centre, so resizing the plate would leave the
+    // contents overlapping. Same choice BlompoScreen and SettingsScreen make, and for the same
+    // reason. Never scales above 1 — a small board on a big screen keeps its authored size.
+    //
+    // A no-op today (1280x740 fits the narrowest supported canvas, 1440x1080 at 4:3). It exists so
+    // that raising QuestSystem.BoardSlots, which widens the board, can't quietly push the frame off
+    // the side of the screen on anything narrower than 16:9.
+    private void FitScale()
+    {
+        RectTransform canvasRect = transform.parent as RectTransform;
+        if (canvasRect == null || board == null) { fitScale = 1f; return; }
+
+        float sx = canvasRect.rect.width / (BoardW + 80f);
+        float sy = canvasRect.rect.height / (BOARD_H + 80f);
+        fitScale = Mathf.Min(1f, sx, sy);
+        board.localScale = Vector3.one * fitScale;
     }
 
     // ---- life -------------------------------------------------------------------------------------
@@ -773,6 +802,15 @@ public class QuestBoardScreen : MonoBehaviour
             case QuestType.NoDamageRoom: return "TRIAL";
             case QuestType.GoldAccumulate: return "HAUL";
             case QuestType.UseCardCount: return "DRILL";
+
+            // The four streak contracts all read OATH, and that caption is load-bearing: it is the
+            // one word telling the player this is a thing they must keep doing rather than a total
+            // that only climbs. The progress bar collapsing on a break confirms it afterwards.
+            case QuestType.NoCardsRoom:
+            case QuestType.NoRecallRoom:
+            case QuestType.LowShiftRoom:
+            case QuestType.NoStaggerRoom: return "OATH";
+
             default: return "CONTRACT";
         }
     }
@@ -784,12 +822,19 @@ public class QuestBoardScreen : MonoBehaviour
     // the same rule the card aim indicator follows.
     private static string RewardLine(QuestData d)
     {
+        // A card is the one payout with no amount attached, so it is checked before the
+        // "pays nothing" guard — otherwise every card contract would advertise NOTHING.
+        if (d.rewardType == RewardType.Card)
+            return d.rewardCard != null ? d.rewardCard.cardName.ToUpperInvariant() : "A CARD";
+
         if (d.rewardAmount <= 0) return "NOTHING";
         switch (d.rewardType)
         {
             case RewardType.Gold: return d.rewardAmount + " GOLD";
             case RewardType.ShiftCharge: return "+" + d.rewardAmount + " MAX SHIFT";
             case RewardType.Heal: return d.rewardAmount + " HEALTH";
+            case RewardType.Scrap: return d.rewardAmount + " SCRAP";
+            case RewardType.MaxHealth: return "+" + d.rewardAmount + " MAX HP";
             default: return d.rewardAmount.ToString();
         }
     }

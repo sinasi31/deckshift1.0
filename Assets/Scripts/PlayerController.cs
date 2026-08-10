@@ -57,6 +57,16 @@ public class PlayerController : MonoBehaviour
 
     private float _headBounceCooldown;
 
+    // Pogo Boots chain state, both cleared the moment the player touches the ground.
+    // See TriggerHeadBounce for why these exist.
+    private readonly HashSet<int> _bouncedThisAirtime = new HashSet<int>();
+    private int _bounceChain;
+
+    [Header("Pogo Boots (head bounce)")]
+    [Tooltip("Upward impulse per bounce as a fraction of a normal jump, by position in the chain. " +
+             "The last value repeats once the chain runs past the end of the array.")]
+    public float[] pogoChainFalloff = { 0.70f, 0.55f, 0.42f, 0.32f };
+
     [Header("Gold Settings")]
     public int currentGold = 0;
     public event System.Action<int> OnGoldChanged;
@@ -373,6 +383,8 @@ public class PlayerController : MonoBehaviour
         {
             currentAirJumps = 0;
             freeAirJumpUsed = false;
+            _bouncedThisAirtime.Clear();
+            _bounceChain = 0;
         }
         isWallDetected = WallCheck();
 
@@ -865,6 +877,11 @@ public class PlayerController : MonoBehaviour
     {
         tookDamageThisRoom = false;
         ResetFallTracking();
+
+        // Starts the oath recorder for this room (no-cards / no-recall / low-shift / no-stagger).
+        // Hooked here rather than in LevelManager so it can't be missed by any path that puts the
+        // player into a room.
+        if (QuestSystem.instance != null) QuestSystem.instance.BeginRoom();
     }
 
     // Clears Meteor Greaves fall tracking so a teleport (fall-respawn, room spawn) isn't
@@ -1032,6 +1049,11 @@ public class PlayerController : MonoBehaviour
     {
         if (amount <= 0) return;
         currentShift = Mathf.Max(0, currentShift - amount);
+
+        // Every Shift cost in the game funnels through here — jumps, cards, recall, portals — so
+        // the Featherweight oath gets a complete per-room total from one hook. Callers already gate
+        // this on the hub rule, so sandbox spending is never counted.
+        if (QuestSystem.instance != null) QuestSystem.instance.NoteShiftSpent(amount);
     }
 
     internal bool TryPlacePortal(out bool keepCard, int shiftCost)
@@ -1407,17 +1429,43 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    // Pogo Boots. REBALANCED 2026-08-10 — read this before touching the numbers.
+    //
+    // The old version granted `AddShift(1)` on every bounce with only a 0.3s cooldown, which made
+    // this the ONLY free Shift regeneration in the game. In a game whose stated identity is that
+    // Shift does not regenerate on its own and carries over for the whole run, that quietly turned
+    // every room containing enemies into a refuelling station: a 40 HP melee enemy is five bounces
+    // at 8 damage each, so a room of six was worth roughly half a full Shift bar for nothing.
+    //
+    // Three changes, and they are meant to work together:
+    //   NO SHIFT REFUND    — the hole in the core resource, closed. The boots are a movement toy;
+    //                        movement is what they pay in.
+    //   ONE BOUNCE PER ENEMY PER AIRTIME — camping a single slime until it dies was the degenerate
+    //                        line and it was also the boring one. Chaining ACROSS several enemies
+    //                        is the trick worth rewarding, so that is the only thing still allowed.
+    //   DECAYING CHAIN     — each successive bounce before touching the ground lifts less, so a
+    //                        chain can't sustain itself indefinitely across a dense room.
     private void TriggerHeadBounce(EnemyHealth eHealth)
     {
         if (!eHealth.canBeHeadBounced) return;
         if (Time.time < _headBounceCooldown) return;
 
+        // HashSet.Add returns false when the enemy is already in the set, so this is both the
+        // "have I bounced this one already?" test and the record of it.
+        if (!_bouncedThisAirtime.Add(eHealth.GetInstanceID())) return;
+
         _headBounceCooldown = Time.time + 0.3f;
         eHealth.TakeDamage(8f);
+
+        float lift = 0.70f;
+        if (pogoChainFalloff != null && pogoChainFalloff.Length > 0)
+            lift = pogoChainFalloff[Mathf.Min(_bounceChain, pogoChainFalloff.Length - 1)];
+        _bounceChain++;
+
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0f);
         float bounceDir = isGravityReversed ? -1f : 1f;
-        rb.AddForce(Vector2.up * defaultJumpForce * 0.7f * bounceDir, ForceMode2D.Impulse);
-        AddShift(1);
+        rb.AddForce(Vector2.up * defaultJumpForce * lift * bounceDir, ForceMode2D.Impulse);
+
         if (CameraShake.instance != null) CameraShake.instance.Shake(0.1f, 0.2f);
     }
 

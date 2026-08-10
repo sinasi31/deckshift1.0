@@ -71,6 +71,23 @@ public class PlayerHealth : MonoBehaviour
         currentHealth = Mathf.Clamp(currentHealth, 1f, maxHealth);
     }
 
+    // A PERMANENT max-HP gain (quest rewards). ⚠️ It has to raise `baseMaxHealth`, not `maxHealth`:
+    // RelicManager.RecomputePassives rebuilds maxHealth from the base every time the loadout
+    // changes, so a bonus written straight onto maxHealth would silently vanish the next time the
+    // player gained or sold any relic. Recomputing here keeps HP relics (Reinforced Plating, Glass
+    // Heart) stacking correctly on top of the new base.
+    public void IncreaseBaseMaxHealth(float amount)
+    {
+        if (amount <= 0f) return;
+
+        baseMaxHealth += amount;
+        if (RelicManager.instance != null) RelicManager.instance.RecomputePassives();
+        else SetMaxHealth(maxHealth + amount);
+
+        // The gain arrives as usable health, not just a bigger empty bar.
+        Heal(amount);
+    }
+
     void Start()
     {
         currentHealth = maxHealth;

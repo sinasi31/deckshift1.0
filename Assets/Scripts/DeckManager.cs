@@ -138,6 +138,13 @@ public class DeckManager : MonoBehaviour
                 player.SpendShift(cost);
         }
 
+        // Oath tracking. Noted on `success` alone rather than inside the !keepInHand branch below,
+        // because a card that stays in hand (Portal's first placement) has still been PLAYED as far
+        // as "clear a room without playing a card" is concerned. Blocked and failed plays don't
+        // count — nothing happened, and refusing a card shouldn't break an oath.
+        if (success && QuestSystem.instance != null)
+            QuestSystem.instance.NoteCardPlayed(IsStagger(playedCard));
+
         if (success && !keepInHand)
         {
             OnCardPlayed?.Invoke(index);
@@ -394,6 +401,10 @@ public class DeckManager : MonoBehaviour
                 OnRecallCostChanged?.Invoke(currentRecallCost);
             }
         }
+
+        // Oath tracking, placed after every early-return above so a REFUSED recall (not enough
+        // Shift) doesn't break the No Take-Backs oath — the player didn't get one.
+        if (QuestSystem.instance != null) QuestSystem.instance.NoteRecall();
 
         // 5. Asıl işlemi başlat
         ReloadHand();
