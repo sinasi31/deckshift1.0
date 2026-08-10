@@ -82,13 +82,17 @@ public static class LevelTextImporter
         { 'L', "Assets/YeniLeveller/Lever.prefab" },          // lever; importer wires it to the NEAREST gate (On=Open, Off=Close)
     };
 
+    // 'A' Shift Altar. It is NOT in MarkerPrefabs because it needs post-processing the generic path
+    // doesn't do — it gets collected and wired to the nearest gate. It IS a real prefab though, so
+    // its look and collider live in one place instead of being re-declared here.
+    private const string AltarPrefabPath = "Assets/YeniLeveller/ShiftAltar.prefab";
+
     // Non-prefab structural markers, built procedurally:
     //   '=' one-way platform tiles (jump up through, land on top)
     //   'G' gate cell — vertical runs of G become one sliding Gate (portcullis)
-    //   'A' Shift Altar — pay Shift, fires OnPaid (wired to the nearest gate)
     private const string PropsTexturePath = "Assets/Cainos/Pixel Art Platformer - Dungeon/Texture/TX Dungeon Props.png";
     private const string GateSpriteName = "TX Dungeon Props - Gate 01";
-    private const string AltarSpriteName = "TX Dungeon Props - Wall Altar 01 Lit";
+    // (AltarSpriteName removed 2026-08-09 — the altar's sprite now lives on ShiftAltar.prefab.)
     private const int InteractableLayer = 12; // "Interactable" (PlayerController.interactableLayer)
 
     // Markers that stand ON the ground: after spawning, the instance is shifted
@@ -550,9 +554,10 @@ public static class LevelTextImporter
         if (camBoundsPrefab == null) missing.Add($"CameraBounds -> {CameraBoundsPrefabPath}");
 
         Sprite gateSprite = LoadPropSprite(GateSpriteName);
-        Sprite altarSprite = LoadPropSprite(AltarSpriteName);
         if (hasGate && gateSprite == null) missing.Add($"'G' gate sprite '{GateSpriteName}' in {PropsTexturePath}");
-        if (hasAltar && altarSprite == null) missing.Add($"'A' altar sprite '{AltarSpriteName}' in {PropsTexturePath}");
+
+        var altarPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AltarPrefabPath);
+        if (hasAltar && altarPrefab == null) missing.Add($"'A' -> {AltarPrefabPath}");
 
         if (missing.Count > 0)
             throw new Exception("Prefab paths in LevelTextImporter are stale, fix them:\n" + string.Join("\n", missing));
@@ -748,18 +753,13 @@ public static class LevelTextImporter
 
                     if (c == 'A')
                     {
-                        var altarGo = new GameObject("ShiftAltar");
+                        // Instantiated from the prefab rather than assembled here, so the altar's
+                        // sprite, sorting order, layer and trigger box are defined once.
+                        var altarGo = (GameObject)PrefabUtility.InstantiatePrefab(altarPrefab);
+                        altarGo.name = "ShiftAltar";
                         altarGo.transform.SetParent(root.transform);
                         altarGo.transform.position = worldPos;
-                        altarGo.layer = InteractableLayer;
-                        var asr = altarGo.AddComponent<SpriteRenderer>();
-                        asr.sprite = altarSprite;
-                        asr.sortingOrder = 2;
-                        var trigger = altarGo.AddComponent<BoxCollider2D>();
-                        trigger.isTrigger = true;
-                        trigger.size = new Vector2(1.2f, 1.7f);
-                        trigger.offset = new Vector2(0f, 0.55f);
-                        altars.Add(altarGo.AddComponent<ShiftAltar>());
+                        altars.Add(altarGo.GetComponent<ShiftAltar>());
                         GroundToSurface(altarGo, cellY);
                         entityCounts.TryGetValue("ShiftAltar", out int na);
                         entityCounts["ShiftAltar"] = na + 1;
