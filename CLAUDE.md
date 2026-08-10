@@ -245,9 +245,33 @@ It is also load-bearing for the **planned difficulty tiers** (see Deferred Work 
 - **Scrap spending is NOT hub-exempt.** The umbrella "free in hub" rule covers resources the sandbox *drains* from you; a forge repair is a purchase that permanently improves the run, exactly like a shop buy (which the hub already charges for). Free repairs in the hub = infinite deck refills.
 - Both `DeckManager.TryRechargeCard` / `TrySalvageCard` are **all-or-nothing** — verified by test that a refused operation never charges the player.
 
-### Setup still needed in Unity (designer step)
+### The forge prop — `Assets/Prefabs/ScrapForge.prefab` (built 2026-08-09)
 
-The scrap *system* is live and needs no wiring — enemies drop it, the HUD appears, exhausting a card pays the rebate. **What doesn't exist yet is a placed `ScrapForge` object**, so there's currently nowhere to spend it. To add one: put the `ScrapForge` component on a prop, set its layer to **Interactable (12)**, give it a trigger `Collider2D` slightly wider than `PlayerController.interactionRange`, and optionally assign an `InteractPrompt` instance to `prompt`. Same recipe as `BlompoNPC`.
+**There is now a real forge prefab; drop it into any room.** Before this the only forge in the game was the hub's `PF Dungeon Props - Chimney 01` — a wall chimney with hanging chains — with the `ScrapForge` script bolted onto it. It looked nothing like a forge because it wasn't one.
+
+Composed from stock Cainos props, so it costs no art:
+
+| piece | source |
+|---|---|
+| **Hearth** | `PF Dungeon Props - Fireplace 01`, nested so it keeps its own **fire, sparks and glow particles** |
+| **Anvil** | `PF Village Props - Anvil 01` |
+| Hammer / Bucket / ScrapBin | raw sprites (`TX Village Props - Hammer`, `Dungeon Bucket 01`, `Dungeon Metal Basket 01`) |
+| **ForgeGlow** | a `Light2D` **added by us** |
+
+⚠️ **The Cainos fireplace's own `Light` is a 3D `Light`, which the URP 2D renderer ignores** — its fire throws no light at all. The warm `Light2D` point light is what actually makes it read as lit, and it spills onto the surrounding tiles.
+
+⚠️ **Pivots are NOT consistent across the Cainos props.** Hearth and Anvil are bottom-centre (`pivot.y = 0`), so local y=0 puts them on the floor — but **`Bucket 01` and `Metal Basket 01` are CENTRE-pivoted** and sink half their height into the floor at y=0. Check `sprite.pivot` before placing a new piece.
+
+⚠️ **The trigger collider must be on the SAME GameObject as the `ScrapForge` component** — `PlayerController` does `OverlapCircleAll(...)` then `hit.GetComponent<IInteractable>()`, so a collider on a child is invisible to it. Layer **Interactable (12)**. Verified reachable from both sides.
+
+**Placing it needs THREE clearances, not one** — the assembly is ~5.6 wide and the hearth is **3.13 tall**:
+1. floor to stand it on,
+2. ~5.6 units of horizontal room,
+3. **3.2 units of headroom** — this is the one that bites. In the hub, ray-casting up from the floor showed open headroom only at x 15–19; a stone shelf overhangs x 19.5–21.25 at y 11.65. The forge sits at hub-local **(18.40, 10.65)** with the chimney in the open slot and the anvil/bucket/bin under the shelf.
+
+⚠️ **The hub's floor is at y = 10.65; the old chimney hung on the WALL at 12.59.** Reusing the old prop's position put the whole forge in mid-air. Measure the floor with a downward raycast on the Ground layer — don't inherit a decorative prop's transform.
+
+**Still true: this is the only forge in the game, and it is in the hub** — the first room of every run, visited once, before you have any scrap or any damaged cards. Scrap therefore still has nowhere to be spent mid-run. Now that it's a prefab, fixing that is a drag-and-drop into combat rooms, or into the unbuilt Foundry recharge room (`LevelManager.foundryRoomPrefab`, still empty).
 
 ### Card Effect Conflict Class of Bug (KNOWN)
 
