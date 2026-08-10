@@ -242,6 +242,8 @@ public class RunMapScreen : MonoBehaviour
         if (cachedHud != null) cachedHud.SetActive(false);
         if (hudWasActive && HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(true);
 
+        FitWindowToCanvas();
+
         Refresh();
 
         StopAllCoroutines();
@@ -263,6 +265,34 @@ public class RunMapScreen : MonoBehaviour
         if (hudWasActive && HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(false);
 
         gameObject.SetActive(false);
+    }
+
+    // Shrinks the window if the canvas is narrower or shorter than its design size.
+    //
+    // ⚠️ This is the WIDEST window in the game (1560), so it is the first thing to run off the edge
+    // on a narrow display. With the canvas matching HEIGHT, its logical width is 1080 * aspect —
+    // which is 1920 at 16:9 and 2560 at 21:9, but only 1440 at 4:3, and the frame then hangs off
+    // both sides. Measured at 1440x1080: the chart itself stayed readable but the panel had no
+    // visible left or right edge.
+    //
+    // Only the map does this. The chart is laid out inside `area`, which is anchored to the
+    // window's corners with insets, so it genuinely reflows into whatever size it is given. The
+    // other screens position their content at fixed offsets from the window centre, so shrinking
+    // THEM would overlap their columns rather than reflow — for those, a smaller window is worse
+    // than an overhanging one. (Settings, the next widest at 1240, still fits any aspect down to
+    // 1.15 — narrower than any display in use.)
+    private void FitWindowToCanvas()
+    {
+        RectTransform parent = transform as RectTransform;
+        if (parent == null) return;
+
+        Rect r = parent.rect;
+        if (r.width <= 1f || r.height <= 1f) return;   // not laid out yet
+
+        const float MARGIN = 40f;
+        float w = Mathf.Min(WIN_W, r.width - MARGIN);
+        float h = Mathf.Min(WIN_H, r.height - MARGIN);
+        window.sizeDelta = new Vector2(w, h);
     }
 
     private IEnumerator OpenAnim()

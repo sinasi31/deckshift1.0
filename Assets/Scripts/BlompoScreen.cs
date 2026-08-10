@@ -35,6 +35,7 @@ public class BlompoScreen : MonoBehaviour
     private System.Action onBlessed;
     private CardEnhancement chosenOffer = CardEnhancement.None;
     private bool isOpen, blessingSpent;
+    private float fitScale = 1f;   // <1 when the canvas is narrower than the panel — see FitScale
 
     private GameState prevState;
     private GameObject cachedHud;
@@ -255,6 +256,8 @@ public class BlompoScreen : MonoBehaviour
         if (cachedHud != null) cachedHud.SetActive(false);
         if (hudWasActive && HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(true);
 
+        fitScale = FitScale();
+
         ShowOfferStep();
 
         StopAllCoroutines();
@@ -285,6 +288,27 @@ public class BlompoScreen : MonoBehaviour
         }
     }
 
+    // Shrinks the whole panel if the canvas is smaller than its design size. At 1600 wide this is
+    // the second-widest window in the game, so it is the first after the map to run off the edge on
+    // a narrow display: the canvas is 1080 * aspect logical px wide, which is 1920 at 16:9 but only
+    // 1440 at 4:3.
+    //
+    // A UNIFORM SCALE, not a resize — unlike the map, this panel places its card and offer rows by
+    // hand at absolute offsets (see the "PLACED BY HAND, NOT BY A LAYOUT GROUP" note below), so a
+    // narrower window would overlap its own content rather than reflow. Scaling keeps the tuned
+    // layout exactly and just makes it smaller. Same trick ShopScreenUI uses.
+    //
+    // Never scales UP: the panel was tuned at this size, and blowing it up on an ultrawide would
+    // make it the only screen in the game that grows with the monitor.
+    private float FitScale()
+    {
+        RectTransform parent = transform as RectTransform;
+        if (parent == null) return 1f;
+        Rect r = parent.rect;
+        if (r.width <= 1f || r.height <= 1f) return 1f;
+        return Mathf.Clamp(Mathf.Min(r.width * 0.97f / WIN_W, r.height * 0.97f / WIN_H), 0.4f, 1f);
+    }
+
     private IEnumerator OpenAnim()
     {
         float t = 0f; const float dur = 0.22f;
@@ -293,11 +317,11 @@ public class BlompoScreen : MonoBehaviour
             t += Time.unscaledDeltaTime;
             float n = Mathf.Clamp01(t / dur);
             group.alpha = n;
-            window.localScale = Vector3.one * (0.92f + 0.08f * EaseOutBack(n));
+            window.localScale = Vector3.one * fitScale * (0.92f + 0.08f * EaseOutBack(n));
             yield return null;
         }
         group.alpha = 1f;
-        window.localScale = Vector3.one;
+        window.localScale = Vector3.one * fitScale;
     }
 
     // ---- step 1: pick a blessing ----

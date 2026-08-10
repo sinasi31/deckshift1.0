@@ -769,6 +769,30 @@ The mark deliberately does **not** say which of the seven blessings it is — th
 
 Verified in play mode across the hand and the deck view: blessed cards mark, unblessed cards build no mark at all.
 
+### Resolution independence (2026-08-09) — the game is NOT 1920x1080-only
+
+The project was believed to be locked to 1920x1080. It never was: `defaultIsNativeResolution` is **on**, so a build launches at the player's native resolution and the 1920x1080 in ProjectSettings is only the *windowed fallback* size. What was actually wrong was three settings.
+
+⚠️ **EVERY CanvasScaler IS `ScaleWithScreenSize`, ref 1920x1080, `matchWidthOrHeight = 1` (HEIGHT). Do not change the match value.**
+
+**Match HEIGHT because the camera is height-anchored.** `Camera.main.orthographicSize = 7` means the view is exactly **14 world units tall at every aspect**, with the width flexing (`halfW = orthoSize * aspect`, which `CameraFollow` already computes correctly). Matching *width* made the UI do the opposite of the camera: on a 21:9 display the canvas became only **810** logical px tall instead of 1080, which clipped 170px off the run map (980 tall) and 130px off settings (940 tall). With match=height the canvas is always 1080 tall and its width is `1080 * aspect` — 1440 at 4:3, 1728 at 16:10, 1920 at 16:9, 2560 at 21:9.
+
+Also fixed: **MainMenu and GameOverScene were `ConstantPixelSize`**, so their UI did not scale at all (measured: at 2560x1440 the menu rendered at its authored pixel size and looked shrunken). And `resizableWindow` was off, so windowed mode could not be dragged.
+
+⚠️ **AN ACTIVE BUILD PROFILE OVERRIDES ProjectSettings, AND `PlayerSettings.*` WRITES TO THE PROFILE.** Setting `PlayerSettings.resizableWindow = true` changed `Assets/Settings/Build Profiles/New Windows Profile.asset` and left `ProjectSettings/ProjectSettings.asset` still reading `resizableWindow: 0`. Both are now set. **When changing a player setting, check which of the two actually moved** — a value set only in the profile silently reverts for any build made without it, and reading `PlayerSettings.x` back gives you the profile's value, so it looks correct either way.
+
+⚠️ **A UI element that sits at a screen EDGE must be anchored to that edge.** With the canvas width now varying, a centre-anchored element at a large offset drifts. Audited every `GameplayHUD` child; exactly one was wrong — **`RecallButton`** was anchored to centre `(0.5, 0.5)` at `x = -859.2`, which put it 5px from the left edge on a 1728-wide canvas and cut it in half. Re-anchored to `(0, 0.5)` at `x = 100.8`, which is the identical position at 1920 and correct everywhere else. Everything else was already edge-anchored.
+
+**Oversized windows now fit themselves**, and the two mechanisms are NOT interchangeable:
+- **`RunMapScreen.FitWindowToCanvas()` RESIZES** the window (1560x980, the widest in the game). Its chart lives in `area`, anchored to the window corners with insets, so it genuinely reflows into a smaller box.
+- **`BlompoScreen` (1600) and `SettingsScreen` (1240) SCALE** uniformly instead, via `FitScale()`, never above 1. Their content sits at fixed offsets from the window centre, so *resizing* them would overlap their own columns — shrinking is only safe as a uniform scale. `ShopScreenUI` already did this.
+
+**Verified by screenshot at 4:3 (1440x1080), 16:10 (1920x1200), 16:9 (1920x1080, 2560x1440) and 21:9 (2560x1080):** zero visible graphics off-screen in SampleScene or GameOverScene at any of them, and every change is a **no-op at 1920x1080** (canvas scaleFactor 1, RecallButton on the same pixels, both windows at full size).
+
+**Camera vs room width — measured, no action needed up to 21:9.** A room's CameraBounds zone must be at least `14 * aspect` wide or the clamp inverts. Need is 24.9 at 16:9 and **33.2 at 21:9**; the pool's rooms are 42.8–68 wide, so all clear it. Only `EfeVrl5`'s narrow sub-zone (25.9) inverts at 21:9, and its art still covers the overshoot, so nothing is visibly wrong. **32:9 super-ultrawide needs 49.8 and most rooms fail it** — that's the line to draw.
+
+Known cosmetic nit at 21:9: `GameOverScene`'s background art doesn't reach the edges, leaving plain grey strips. Scene art, not UI.
+
 ### Never Scale UI Containers — Resize Them
 
 When a UI element needs to be bigger or smaller, **change Width and Height in the RectTransform, not Scale.** Scaling a UI container cascades to children and fights with Layout Groups, producing wildly incorrect sizes (twice during the last session we hit this — once with the RelicHUD container scaled 5.44× on Y, once nearly happened with the QuestBoardOverlay). The honest fix is always Width/Height, sometimes anchor/pivot. Leave Scale at (1, 1, 1) on UI elements.
