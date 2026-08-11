@@ -32,7 +32,9 @@ public class QuestTrackerHUD : MonoBehaviour
     private const float ROW_H = 84f;
     private const float ROW_GAP = 10f;
     private const float MARGIN_X = 26f;
-    private const float MARGIN_Y = 150f;   // clears the relic bar, which is top-centre
+    // Pinned right to the top edge. The relic bar sits top-CENTRE and the tracker is top-RIGHT, so
+    // there is nothing up here to clear — the old 150 inset just left the corner looking unused.
+    private const float MARGIN_Y = 24f;
 
     // The pin sits near the TOP-LEFT corner, and everything rotates about it — a strip pinned by one
     // corner, rather than the board's slips which hang from a tack at their top centre. Same idea,
@@ -139,8 +141,15 @@ public class QuestTrackerHUD : MonoBehaviour
 
         // Shadow first so it sits behind. Light rakes from the left on this material, so it falls
         // to the lower right — the same direction as every shadow on the board.
+        //
+        // ⚠️ THE SHADOW MUST BE ANCHORED EXACTLY LIKE THE SLIP. AddImage anchors to the parent's
+        // CENTRE while AddPoint anchors to its TOP, so the two shared an anchoredPosition but
+        // measured it from different origins — every shadow rendered ~300px below its slip as a
+        // free-floating black rectangle in the middle of the screen. Two objects that track each
+        // other by position must agree on their anchors first.
         Image sh = AddImage(slipLayer, "RowShadow", FlatUI.Panel(4), new Color(0f, 0f, 0f, 0.40f), false);
         sh.type = Image.Type.Sliced;
+        sh.rectTransform.anchorMin = sh.rectTransform.anchorMax = new Vector2(0.5f, 1f);
         sh.rectTransform.pivot = PIN;
         sh.rectTransform.sizeDelta = new Vector2(ROW_W, ROW_H);
         r.shadow = sh.rectTransform;

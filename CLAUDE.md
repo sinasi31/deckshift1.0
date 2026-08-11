@@ -520,6 +520,8 @@ The rows are **slips off the quest board**: same Bulletin material, pale paper, 
 
 ⚠️ **`anchoredPosition` places the PIVOT, and this pivot is the pin in the top-left corner.** Positioning rows at x = 0 hung 90% of each strip to the right of the anchor and pushed them 74px off the screen, cutting the counts in half. `RowRest()` backs that offset out. Same reason the title is indented — a full-width title box runs its first two characters under the tack.
 
+⚠️ **A slip's drop shadow must be ANCHORED exactly like the slip**, not merely positioned to match it. The local `AddImage` helper anchors to the parent's CENTRE while `AddPoint` anchors to its TOP, so the two shared an `anchoredPosition` but measured it from origins 300px apart — every shadow rendered as a free-floating black rectangle in the middle of the screen, well away from the slip it belonged to. Reported by the designer as "a black overlay completely not in the right place". **Two objects that track each other by position must agree on their anchors first**; copying the position is not enough.
+
 ### Known Quest Pitfall (Resolved)
 
 `QuestPaper.OnAccept` previously crashed at line 32 trying to assign text to a TextMeshProUGUI child that didn't exist on the Accept button (the button was stripped of its text label during UI styling). The crash happened BEFORE `QuestSystem.AcceptQuest` was called, so the quest never actually got added and the event never fired. Fixed by null-guarding the GetComponentInChildren result. If you ever see a quest accept silently fail again, check the error trace for `QuestPaper.OnAccept` first.
