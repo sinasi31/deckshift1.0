@@ -11,6 +11,7 @@ public class EnemyHealthBar : MonoBehaviour
 
     private Transform followTarget;
     private Vector3 worldOffset;
+    private bool initialized;
 
     private Canvas canvas;
     private CanvasGroup canvasGroup;
@@ -71,8 +72,25 @@ public class EnemyHealthBar : MonoBehaviour
 
     void LateUpdate()
     {
-        if (followTarget != null)
-            transform.position = followTarget.position + worldOffset;
+        // ⚠️ THE BAR OUTLIVES ITS ENEMY UNLESS IT CLEANS ITSELF UP. It is instantiated with NO
+        // PARENT (it has to be, so it can sit in front of the enemy in Z without inheriting its
+        // scale or flips), which makes it a scene-root object. EnemyHealth.Die() destroys it — but
+        // an enemy that vanishes any OTHER way never runs Die(), and the commonest of those is the
+        // room itself being destroyed at a room change. The bars then hung around in world space
+        // forever and turned up floating in the next room, and in the hub.
+        //
+        // Owning its own lifetime here fixes every such path at once, including ones that don't
+        // exist yet, which a cleanup list in LevelManager could not.
+        // The `initialized` guard matters: Initialize() is called from EnemyHealth.Start(), a beat
+        // after this object is instantiated. Without it, a bar whose owner hasn't wired it up yet
+        // would delete itself on its very first frame.
+        if (initialized && followTarget == null)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        transform.position = followTarget.position + worldOffset;
 
         // Alt katman (delayed fill) mevcut HP'ye smooth lerp ile yaklaşır
         if (!Mathf.Approximately(delayedFill, targetFill))
@@ -86,6 +104,7 @@ public class EnemyHealthBar : MonoBehaviour
     public void Initialize(Transform enemy, Vector2 offset, float worldWidth)
     {
         followTarget = enemy;
+        initialized = true;
         SetBarWidth(worldWidth);
 
         // Match the enemy's own renderer for sorting. Prefer a SpriteRenderer; Cainos monsters

@@ -1286,11 +1286,7 @@ public class PlayerController : MonoBehaviour
             yield return new WaitForSeconds(0.1f);
             extensionTime += 0.1f;
         }
-        if (IsCollidingWithGround())
-        {
-            float ejectDir = isGravityReversed ? -1f : 1f;
-            transform.position += new Vector3(0, 0.5f * ejectDir, 0);
-        }
+        if (IsCollidingWithGround()) EjectFromGeometry();
 
         if (phaseVisualCoroutine != null) { StopCoroutine(phaseVisualCoroutine); phaseVisualCoroutine = null; }
         RestorePhaseVisuals();
@@ -1344,12 +1340,115 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    // Getting the player OUT of solid geometry when Phase expires inside a wall.
+    //
+    // ⚠️ THE OLD VERSION NUDGED 0.5 UNITS UP AND HOPED. It never checked that the destination was
+    // free, and half a unit does not clear a 2-thick wall, so a player who ran Phase out deep inside
+    // rock stayed embedded and could not move at all — a dead run with no way to recover. The
+    // designer hit exactly that.
+    //
+    // This searches outward in rings for a position the capsule actually FITS in, nearest first,
+    // and only then moves. Because it verifies the destination, it cannot leave the player somewhere
+    // still solid; because it fans out in every direction it handles walls and ceilings, not just
+    // floors; and because it ends in a guaranteed fallback the player can never be stuck for good.
+    private void EjectFromGeometry()
+    {
+        Vector3 safe;
+        if (TryFindSafePosition(out safe))
+        {
+            transform.position = safe;
+        }
+        else
+        {
+            // Nothing within the search radius — a pocket sealed on every side, which shouldn't
+            // happen but must not be a lost run if it does. The room's entry point is the one
+            // position guaranteed to be standable, and it's the same recovery a fall uses.
+            transform.position = currentRoomEntryPoint;
+            Debug.LogWarning("[Phase] No free space near the player; recovered to the room entry point.");
+        }
+
+        // Kill the velocity that carried them in. Ejecting upward while still travelling downward
+        // fast enough can tunnel straight back into the same geometry on the next physics step.
+        if (rb != null) rb.linearVelocity = Vector2.zero;
+    }
+
+    // Rings outward from the player, nearest first. Within each ring the directions are ordered by
+    // how close they are to "up" (or down, under reversed gravity), so given two equally near exits
+    // the player surfaces ON TOP of the geometry, which is what they expect.
+    private bool TryFindSafePosition(out Vector3 result)
+    {
+        result = transform.position;
+
+        const float STEP = 0.25f;
+        const int RINGS = 28;                       // reaches 7 units — wider than any wall in the pool
+        float flip = isGravityReversed ? -1f : 1f;
+
+        for (int r = 1; r <= RINGS; r++)
+        {
+            float radius = r * STEP;
+            for (int i = 0; i < EjectDirections.Length; i++)
+            {
+                Vector2 d = EjectDirections[i];
+                Vector3 candidate = transform.position
+                                  + new Vector3(d.x * radius, d.y * radius * flip, 0f);
+                if (IsPositionClear(candidate))
+                {
+                    result = candidate;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // Straight up first, then fanning symmetrically out to the sides, with straight down last.
+    private static readonly Vector2[] EjectDirections = BuildEjectDirections();
+
+    private static Vector2[] BuildEjectDirections()
+    {
+        const float STEP_DEG = 22.5f;
+        List<Vector2> dirs = new List<Vector2> { Vector2.up };
+        for (float a = STEP_DEG; a < 180f; a += STEP_DEG)
+        {
+            float rad = a * Mathf.Deg2Rad;
+            float s = Mathf.Sin(rad), c = Mathf.Cos(rad);
+            dirs.Add(new Vector2(s, c));    // lean right
+            dirs.Add(new Vector2(-s, c));   // mirror left
+        }
+        dirs.Add(Vector2.down);
+        return dirs.ToArray();
+    }
+
+    // Would the capsule be free of solid geometry if it stood here? Deliberately uses the SAME box
+    // and mask as IsCollidingWithGround, so a position this call approves is one that call agrees is
+    // not stuck — otherwise the search could "succeed" somewhere still considered embedded.
+    private bool IsPositionClear(Vector3 worldPos)
+    {
+        if (capsuleCollider == null) return true;
+        return !Physics2D.OverlapBox(CapsuleCenterAt(worldPos), capsuleCollider.size * 0.9f, 0f, groundLayer);
+    }
+
     private bool IsCollidingWithGround()
     {
         if (capsuleCollider == null) return false;
-        Bounds b = capsuleCollider.bounds;
         // 0.9f shrink avoids a false positive from the player barely touching the floor normally
-        return Physics2D.OverlapBox(b.center, b.size * 0.9f, 0f, groundLayer);
+        return Physics2D.OverlapBox(CapsuleCenterAt(transform.position), capsuleCollider.size * 0.9f, 0f, groundLayer);
+    }
+
+    // Where the player's capsule would sit if the transform were at `worldPos`.
+    //
+    // ⚠️ DERIVED FROM THE TRANSFORM, NOT FROM `capsuleCollider.bounds`. Unity's
+    // `Physics2D.autoSyncTransforms` is OFF by default, so a collider's `bounds` still report the
+    // player's PREVIOUS position until the next physics step — and the whole point of the eject is
+    // to test positions the player has not moved to yet, then move and re-check. Reading `bounds`
+    // made the search measure every candidate from a stale origin, so it "found" a clear spot,
+    // teleported there, and left the player just as embedded as before.
+    //
+    // This is exact because the player root is guaranteed to be scale (1,1,1) — a hard project rule
+    // (see the Facing System: facing is applied to visualModel, never to the root).
+    private Vector2 CapsuleCenterAt(Vector3 worldPos)
+    {
+        return (Vector2)worldPos + capsuleCollider.offset;
     }
 
     // Re-enables the layer pairs PhaseRoutine ignores. Runs unconditionally on death:
