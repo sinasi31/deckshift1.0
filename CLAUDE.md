@@ -512,7 +512,8 @@ On the `QuestTracker` GameObject under `Canvas/GameplayHUD/`, so it still inheri
 
 The rows are **slips off the quest board**: same Bulletin material, pale paper, brass tack, ink text, wax seal on completion. Nothing else in the HUD is made of paper, so the corner of the screen identifies itself before a word is read. Deliberately quieter than the board (narrow strips, a third of the sway, no grain/fold/perforation) per the Loadout rule that a permanent overlay must not compete with the game behind it.
 
-- **The live break warning is the point.** `QuestSystem.IsOathBroken` drives a wax-red edge flag, a red title and a "BROKEN THIS ROOM" caption. This is the only place in the game that tells you an oath is already lost for the room you are **standing in** — the board can only ever say so afterwards.
+- Each slip carries **the contract's requirement**, read straight from `QuestData.description` rather than derived from the type — so it can never drift from what the board says, and editing a quest's text updates the HUD for free.
+- **The live break warning is the point.** `QuestSystem.IsOathBroken` drives a wax-red edge flag and a red title, and **replaces the requirement line** with "BROKEN THIS ROOM" in wax red. This is the only place in the game that tells you an oath is already lost for the room you are **standing in** — the board can only ever say so afterwards. It swaps rather than stacking: once the oath is broken the requirement is no longer the thing you need to read, and it keeps the strip a line shorter.
 - The progress fill **eases** toward its target, so a collapsing streak visibly *drains* instead of snapping to zero.
 - Completion stamps the seal, holds, then the slip comes **off the pin and falls away** — a contract that merely faded would read as the tracker forgetting it.
 

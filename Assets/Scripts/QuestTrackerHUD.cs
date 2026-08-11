@@ -29,7 +29,7 @@ public class QuestTrackerHUD : MonoBehaviour
     // Layout, in canvas reference units. Anchored to the TOP-RIGHT edge, because with the canvas
     // width varying by aspect ratio anything at a screen edge must be anchored to that edge.
     private const float ROW_W = 300f;
-    private const float ROW_H = 84f;
+    private const float ROW_H = 104f;   // room for the requirement line under the title
     private const float ROW_GAP = 10f;
     private const float MARGIN_X = 26f;
     // Pinned right to the top edge. The relic bar sits top-CENTRE and the tracker is top-RIGHT, so
@@ -46,8 +46,9 @@ public class QuestTrackerHUD : MonoBehaviour
         public QuestSystem.ActiveQuest quest;
         public RectTransform rt, shadow;
         public CanvasGroup cg;
-        public TextMeshProUGUI title, count, broken;
+        public TextMeshProUGUI title, count, info;
         public Image fill, edgeFlag, seal;
+        public string requirement;   // the quest's own description, shown on the info line
         public float baseAngle, swaySpeed, swayPhase, swayAmp;
         public float fillShown, fillTarget;
         public float jolt;          // decaying shake, driven on progress and on a break
@@ -182,23 +183,34 @@ public class QuestTrackerHUD : MonoBehaviour
         // the title is left-aligned on the same line, so the default full-width box ran the first
         // two characters straight underneath it.
         r.title.rectTransform.sizeDelta = new Vector2(168f, 26f);
-        r.title.rectTransform.anchoredPosition = new Vector2(-16f, 22f);
+        r.title.rectTransform.anchoredPosition = new Vector2(-16f, 34f);
 
         r.count = AddText(rt, "Count", "", 17f, T.TextBody, TextAlignmentOptions.Right);
         r.count.fontStyle = FontStyles.Bold;
         r.count.rectTransform.sizeDelta = new Vector2(70f, 26f);
-        r.count.rectTransform.anchoredPosition = new Vector2(110f, 22f);
+        r.count.rectTransform.anchoredPosition = new Vector2(110f, 34f);
 
-        r.broken = AddText(rt, "Broken", "BROKEN THIS ROOM", 11f, WAX, TextAlignmentOptions.Left);
-        r.broken.characterSpacing = 6f;
-        r.broken.rectTransform.sizeDelta = new Vector2(200f, 16f);
-        r.broken.rectTransform.anchoredPosition = new Vector2(0f, 1f);
-        r.broken.gameObject.SetActive(false);
+        // WHAT THE CONTRACT ACTUALLY ASKS OF YOU. Taken straight from QuestData.description rather
+        // than derived from the type, so it can never drift from what the board says and editing a
+        // quest's text updates the HUD for free.
+        //
+        // It doubles as the break warning: when the oath is broken this room the line is REPLACED by
+        // "BROKEN THIS ROOM" in wax red, because at that moment the requirement is not the thing the
+        // player needs to read — and swapping keeps the strip one line shorter than carrying both.
+        r.requirement = string.IsNullOrEmpty(quest.data.description) ? "" : quest.data.description;
+        r.info = AddText(rt, "Info", r.requirement, 13f, T.TextMuted, TextAlignmentOptions.TopLeft);
+        r.info.enableAutoSizing = true;
+        r.info.fontSizeMin = 10f;
+        r.info.fontSizeMax = 13f;
+        r.info.enableWordWrapping = true;
+        r.info.overflowMode = TextOverflowModes.Ellipsis;
+        r.info.rectTransform.sizeDelta = new Vector2(268f, 34f);
+        r.info.rectTransform.anchoredPosition = new Vector2(0f, 2f);
 
         Image track = AddImage(rt, "Track", FlatUI.Panel(2), new Color(0.42f, 0.37f, 0.30f, 0.45f), false);
         track.type = Image.Type.Sliced;
         track.rectTransform.sizeDelta = new Vector2(264f, 6f);
-        track.rectTransform.anchoredPosition = new Vector2(0f, -24f);
+        track.rectTransform.anchoredPosition = new Vector2(0f, -38f);
 
         // Left-anchored so a fill of zero has no width, rather than collapsing about its centre.
         r.fill = AddImage(track.rectTransform, "Fill", FlatUI.Panel(2), T.TextBright, false);
@@ -292,8 +304,9 @@ public class QuestTrackerHUD : MonoBehaviour
             if (r.edgeFlag.gameObject.activeSelf != broken)
             {
                 r.edgeFlag.gameObject.SetActive(broken);
-                r.broken.gameObject.SetActive(broken);
                 r.title.color = broken ? WAX : T.TextBright;
+                r.info.text = broken ? "BROKEN THIS ROOM" : r.requirement;
+                r.info.color = broken ? WAX : T.TextMuted;
                 if (broken) r.jolt = 1f;
             }
 
@@ -372,8 +385,9 @@ public class QuestTrackerHUD : MonoBehaviour
         r.fill.color = WAX;
         r.count.color = WAX;
         r.edgeFlag.gameObject.SetActive(false);
-        r.broken.gameObject.SetActive(false);
         r.title.color = T.TextBright;
+        r.info.text = r.requirement;
+        r.info.color = T.TextMuted;
 
         r.seal.gameObject.SetActive(true);
         float t = 0f;
