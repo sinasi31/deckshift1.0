@@ -87,7 +87,7 @@ Transform:
   m_GameObject: {fileID: 5046179867843327484}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.00975, z: 0}
+  m_LocalPosition: {x: 0, y: 0.84233874, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -220,6 +220,9 @@ MonoBehaviour:
   groundLayer:
     serializedVersion: 2
     m_Bits: 2056
+  terrainLayer:
+    serializedVersion: 2
+    m_Bits: 8
   maxAirJumps: 0
   platformPrefab: {fileID: 2884497646027804218, guid: 0c30a27df86ca3d4485ef29c36533548, type: 3}
   swimSpeed: 5
@@ -227,6 +230,11 @@ MonoBehaviour:
   swimSurfaceOffset: 1.2
   swimSettleStrength: 8
   swimExitDuration: 0.35
+  pogoChainFalloff:
+  - 0.7
+  - 0.55
+  - 0.42
+  - 0.32
   currentGold: 500
   currentScrap: 0
   audioSource: {fileID: 7872518250570301061}
@@ -267,7 +275,7 @@ MonoBehaviour:
   portalPrefab: {fileID: 908333651306973326, guid: 794d2df75acd43b45bb5028c806b3b7e, type: 3}
   portalMaxRange: 15
   wallCheck: {fileID: 182352444585531103}
-  wallCheckDistance: 0.5
+  wallCheckDistance: 0.32
   wallSlideSpeed: 2
   wallJumpForce: {x: 10, y: 15}
   moveSpeed: 8
@@ -1218,6 +1226,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 4376744426795614935, guid: 5509adfb025d9e44294a6087e6be0cfe, type: 3}
+    - {fileID: 9092304220377807177, guid: 5509adfb025d9e44294a6087e6be0cfe, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:

@@ -132,6 +132,12 @@ The player has check Transforms parented to the player root (NOT to visualModel)
 
 `IsGroundedCheck()` switches probe based on `isGravityReversed`. The original implementation used a mirror-math formula (`2 * pivot - groundCheck.position`) but that was fragile (only 0.16 units of overlap margin); the dedicated `ceilingCheck` Transform replaced it.
 
+⚠️ **`wallCheck` MOVED TO MID-BODY (0, 0.8423) and `wallCheckDistance` cut 0.5 → 0.32 (2026-08-11).** It used to sit at local y **−0.0098**, i.e. just *below* the capsule's bottom — and `Physics2D.queriesStartInColliders` is ON by default, so the ray started INSIDE the floor tile the player was standing on and returned a hit at distance 0.000. Measured: `WallCheck()` returned **true while standing on open, flat ground**. The old 0.5 length also reached a quarter of a unit past the body; 0.32 is the body half-width (0.254) plus a small margin.
+
+⚠️ **The wall check uses a NEW `terrainLayer` (Ground only), NOT `groundLayer`.** `groundLayer` deliberately contains Enemy so the player can land on heads (Pogo Boots), but that made every Enemy-layer enemy count as a *wall* — you could wall-slide off some enemies and not others purely by which layer that prefab happened to be authored on.
+
+⚠️ **The disabled `PF Skeleton - Mage` child's leftover `BoxCollider2D` has been DELETED (2026-08-11).** It was solid, enabled, and inert only because the GameObject was off — re-enabling that skeleton as an enemy would have silently given the player a second solid collider. The caveat that used to live here is resolved; don't re-add it.
+
 `groundLayer` mask is **`2056` = layer 3 (`Ground`) + layer 11 (`Enemy`)** — verified against Player.prefab 2026-07-18. (An earlier version of this file claimed `2057` including layer 0 `Default`; that was WRONG — Default is NOT in the mask.) Consequences worth knowing: level geometry is on layer 3, and because layer 11 `Enemy` IS in the mask, the player can **stand on / ground-check against every Enemy-layer enemy**. See "Layer Convention Mismatch" under Enemy System for the verified per-enemy layer split — it is inconsistent and decides which enemies are walkable. This is a known issue but currently load-bearing.
 
 ### Gravity Reversal System
@@ -586,7 +592,7 @@ Grant paths:
 
 Fields: `relicID` (string, used for `HasRelic` polling), `relicName`, `description`, `relicArt` (Sprite, used by the HUD), `rarity` (enum).
 
-**Relic roster — re-audited 2026-07-18. There are 18 relics and ALL are wired.** (An earlier version of this file listed only 7, including `New Relic 1` / "Oops! All 7's" and `Helly` — those are gone, and the "only 5 are functional" claim was badly stale.) The roster was renamed to the playful house voice (see Tone & Voice), so **asset filename ≠ display name ≠ `relicID`** — always poll by `relicID`:
+**Relic roster — 19 relics as of 2026-08-11 (GeckoGloves added), all wired.** (An earlier version of this file listed only 7, including `New Relic 1` / "Oops! All 7's" and `Helly` — those are gone, and the "only 5 are functional" claim was badly stale.) The roster was renamed to the playful house voice (see Tone & Voice), so **asset filename ≠ display name ≠ `relicID`** — always poll by `relicID`:
 
 | Asset file | `relicID` | Display name | Rarity |
 |---|---|---|---|
@@ -1133,6 +1139,22 @@ All card and enemy numbers derive from the anchor table in **`CardAnchors.md`** 
 - **ShieldEnemy has no sprite** → it's unused in levels. Compose one from the Cainos packs (armored humanoid + shield prop) when convenient. The enemy *logic* works; it's purely missing art.
 - ~~**Fireball sails over short enemies**~~ **FIXED 2026-07-16.** The Fireball prefab's tiny 0.137 `CircleCollider2D` is now a vertical `CapsuleCollider2D` reaching from wand height down to ~0.30 above the floor (world hitbox F+0.30→F+1.55), so it hits slimes/mimics without detonating on ground tiles. Launch height unchanged; sprite still casts from the wand. See `CardAnchors.md` §7.
 
+### ⚠️ Melee hits go through `EnemyMelee`, never through a distance check (rebuilt 2026-08-11)
+
+Every melee enemy used to resolve its swing as `Vector2.Distance(transform.position, player.position) <= attackRange + 0.5f` — a **circle centred on the attacker's FEET tested against a single point at the player's FEET**. `MeleeEnemyAI`, `SlimeAI` and `MimicAI` all shared it, all with the same hidden `+0.5`. Three things were wrong, and together they are what made combat feel unfair:
+
+- **It reached BEHIND the enemy.** No facing was involved, so standing behind something swinging the other way still hit you.
+- **It largely ignored height.** Measured on MeleeEnemy: the player was hit with their feet up to **2 units** above the enemy's — on a ledge, or mid-jump clearly overhead.
+- **The range was secretly 33% larger than authored.** The `+0.5` was applied at strike time while `OnDrawGizmos` drew `attackRange`, so tuning 1.5 shipped 2.0 and the editor said 1.5. That circle is **~8× the player's width**.
+
+And the player's carefully-placed capsule was **never consulted** for any of it.
+
+`EnemyMelee.TryHit(attacker, dirX, reach, damage, knockback, height)` replaces it with a box in FRONT of the attacker, tested against the player's real collider via `OverlapBox` on the Player layer. `EnemyMelee.DrawGizmo` draws that same box, so the editor now tells the truth. Per-enemy `attackHeight` is exposed (humanoid 1.8, slime 1.2, mimic 1.3).
+
+- ⚠️ **`dirX` is the direction committed to when the swing STARTED**, not the facing at impact. A swing is a commitment, so a player who gets behind the enemy during the wind-up is missed — that is the fix, not a side effect.
+- **Verified:** in front HIT · behind miss · 2.5 above miss · 0.6 above HIT · 2.2 away miss.
+- **The Moss Knight is deliberately NOT converted.** Its slam is a radius AoE and its charge is a body-check, so circles are the honest shape there. Revisit only if being clipped by its back reads badly.
+
 ### Pattern
 
 - **`EnemyHealth`** base script — handles damage, flash, death, and (since 2026-08-03) **scrap drops**. ⚠️ Before that date this file claimed it "handles drops" and it did not — there was no drop logic of any kind, which is exactly why kills paid nothing. Drops now go through `scrapDropOverride` (−1 = auto-tier from `maxHealth`); the override is the hook for shift-infused elites. **Currently the only callsite that reports KillEnemy/AirKill to QuestSystem.** `Die()` calls `RelicManager.OnEnemyKilled()`, `QuestSystem.ReportEvent(QuestType.KillEnemy, 1)`, and (if airborne) `QuestSystem.ReportEvent(QuestType.AirKill, 1)`. It now also exposes C# events: **`OnDamaged`**, **`OnDamagedAmount(float)`** (carries the hit size — the boss flinches on big hits), and **`OnDied`** (fired inside `Die()` right before the GameObject is destroyed — the boss uses it to hand music back and to spawn its death VFX). **CRITICAL: `Die()` fires `OnDied` and then `Destroy(gameObject)` in the SAME frame**, so an `OnDied` handler must NOT rely on the enemy surviving — anything that needs to outlive the death (VFX, loot) has to run on its own separate object (see `BossDeathVFX`). Non-event death consequences are still direct calls inside `Die()`.
@@ -1153,6 +1175,22 @@ Two consequences, both load-bearing:
 2. **`groundLayer` (2056) includes layer 11**, so the player can **stand on** MeleeEnemy / RangedEnemy / SlimeEnemy / Taret / PatrolEnemy / MossKnightBoss — but **not** on the zombies, bats, Mimic or ShieldEnemy. That asymmetry is accidental, not designed.
 
 **Be aware of this when adding new enemies — pick a layer and stick with it, or use the EnemyHealth-component approach.** (Note: `PF Knight - Moss` is the raw Cainos prefab at 600 HP and is not the encounter; the real boss is `MossKnightBoss` at 300.)
+
+### Wall Slide — a RELIC, not a base ability (built 2026-08-11)
+
+**`PlayerState.WallSliding` was dead code for the whole project's life.** It was handled in three places (jump input, fall-speed clamp, state exit), had a `wallCheck` transform and `wallSlideSpeed` / `wallJumpForce` tuned on the prefab — and **nothing anywhere ever entered the state**, so wall-jumping had never existed in the game. That made it free to hand out as a pickup instead of a base move.
+
+**Relic: `GeckoGloves` — "Gecko Gloves", Rare** (`Assets/Relics/GeckoGloves.asset`). Gated via `PlayerController.WallSlideRelicID`; the state can neither be entered nor sustained without it.
+
+⚠️ **THE SLIDE IS FREE, THE WALL JUMP COSTS SHIFT (1, hub-exempt).** Sliding only ever slows a fall, so it's pure utility. A *free* wall jump is an unlimited climb — exactly the hole Pogo Boots' Shift refund opened, and a wall is far easier to find than an enemy to bounce on. Refused outright at 0 Shift rather than granted free.
+
+Entry needs: the relic · airborne · **falling** (you catch a wall on the way down, never on the way up) · **pushing into it**. Exit on `!pushingIntoWall` — ⚠️ not `moveInput == 0` as the original code had it, or actively steering *away* from a wall left you stuck to it and walls behaved like flypaper.
+
+**The animation is borrowed, not authored.** The Cainos pack has no wall-slide clip, but its **Ladder Climb** layer is already a character pressed flat against a vertical surface with both arms up. `IsClimbingLadder = true` plus **`ClimbingSpeedMul = 0`** freezes it on one frame, turning a climb cycle into a grip. That one parameter is the whole difference between "climbing an invisible ladder" and "holding a wall". Facing already points into the wall, since the slide can only start while pushing toward the wall the sensor found.
+
+`WallScrapeVFX` supplies the motion cue — a frozen pose alone reads as being *stuck* to the wall, with nothing saying which way you're travelling. Procedural grit at the contact point, drifting up because the player is going down. ⚠️ Pitched much brighter than "dust" suggests: these render through the scene's 0.5-intensity global `Light2D` like every world sprite, and a plausible dust value came back at half strength against dark rock and read as dirt on the lens.
+
+**Still open:** the relic borrows Pogo Boots' boot icon, because a relic with no art draws as an empty socket. Swap it when there's an icon to swap in.
 
 ### Head Bounce (Pogo Boots Relic) — REBALANCED 2026-08-10
 

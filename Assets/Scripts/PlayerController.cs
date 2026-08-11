@@ -26,7 +26,13 @@ public class PlayerController : MonoBehaviour
     public float groundCheckRadius = 0.2f;
     public Transform ceilingCheck;
     public float ceilingCheckRadius = 0.2f;
+
+    // Ground + Enemy. Enemies are in here on purpose so the player can land on their heads (see
+    // Pogo Boots), but that makes it the WRONG mask for anything asking "is there terrain here".
     public LayerMask groundLayer;
+
+    [Tooltip("Terrain only. Used where an enemy must NOT count as level geometry — the wall check.")]
+    public LayerMask terrainLayer = 1 << 3;   // Ground
 
     [Header("Air Settings")]
     public int maxAirJumps = 1;
@@ -142,6 +148,18 @@ public class PlayerController : MonoBehaviour
     public Vector2 wallJumpForce = new Vector2(10f, 15f);
     private bool isWallDetected;
     private bool isWallSliding;
+    private bool wallSlideAnimActive;
+    private float nextScrapeTime;
+
+    // Wall sliding is a RELIC, not a base ability (designer 2026-08-11). The state machine, the
+    // sensor and the tuning fields all existed but nothing ever entered the state, so wall-jumping
+    // has never been in the game — which makes it free to hand out as a pickup instead.
+    public const string WallSlideRelicID = "GeckoGloves";
+
+    private bool CanWallSlide()
+    {
+        return RelicManager.instance != null && RelicManager.instance.HasRelic(WallSlideRelicID);
+    }
 
     [Header("Quest Tracking")]
     private bool tookDamageThisRoom = false;
@@ -588,6 +606,54 @@ public class PlayerController : MonoBehaviour
 
         animator.SetFloat("VelocityY", rb.linearVelocity.y);
         animator.SetBool("IsGrounded", isGrounded);
+
+        UpdateWallSlideAnimation();
+    }
+
+    // The wall-slide pose, borrowed from the Cainos pack's LADDER CLIMB layer.
+    //
+    // There is no wall-slide clip in the pack and commissioning one isn't on the table, but the
+    // ladder-climb pose is already a character pressed flat against a vertical surface with both
+    // arms up — which is exactly the read we want. Setting ClimbingSpeedMul to 0 FREEZES it on a
+    // single frame, turning a climb cycle into a hold. That one parameter is the difference between
+    // "climbing an invisible ladder" and "gripping a wall".
+    //
+    // Facing already points into the wall: the slide can only start while pushing toward the wall
+    // the sensor found, and the sensor casts along `isFacingRight`.
+    private void UpdateWallSlideAnimation()
+    {
+        bool sliding = currentState == PlayerState.WallSliding;
+
+        if (sliding != wallSlideAnimActive)
+        {
+            wallSlideAnimActive = sliding;
+            animator.SetBool("IsClimbingLadder", sliding);
+            animator.SetFloat("ClimbingSpeedMul", sliding ? 0f : 1f);
+        }
+
+        if (sliding) EmitWallScrape();
+    }
+
+    // Grit scraped off the wall. The frozen pose alone reads as being STUCK to the wall — nothing
+    // says which way you're travelling — so this supplies the motion cue.
+    private void EmitWallScrape()
+    {
+        if (Time.time < nextScrapeTime) return;
+        nextScrapeTime = Time.time + 0.045f;
+
+        float dirX = isFacingRight ? 1f : -1f;
+        float halfWidth = capsuleCollider != null ? capsuleCollider.size.x * 0.5f : 0.25f;
+
+        // On the wall face, at a random height up the body, so it looks like a contact patch rather
+        // than a single emitter point.
+        Vector2 at = (Vector2)transform.position
+                   + new Vector2(dirX * halfWidth, Random.Range(0.25f, 1.45f));
+
+        int layerID = 0, order = 5;
+        SpriteRenderer any = GetComponentInChildren<SpriteRenderer>();
+        if (any != null) { layerID = any.sortingLayerID; order = any.sortingOrder + 1; }
+
+        WallScrapeVFX.Spawn(at, dirX, layerID, order);
     }
 
     // Feeds the Cainos swim blend tree so it picks the forward / backward / up / down
@@ -699,7 +765,29 @@ public class PlayerController : MonoBehaviour
 
     private void HandleStateTransitions()
     {
-        if (currentState == PlayerState.WallSliding && (!isWallDetected || moveInput == 0))
+        // ---- wall slide ----------------------------------------------------------------------
+        // ENTRY. This is what never existed: WallSliding was handled in three places and set in
+        // none, so the whole mechanic was unreachable. Conditions, and why each is here:
+        //   · the relic          — it's a pickup, not a base ability
+        //   · airborne + falling — you catch a wall on the way DOWN, never on the way up
+        //   · pushing into it    — holding away should drop you, or walls become flypaper
+        //   · not mid-action     — a dash or a dive through a corridor must not snag on the wall
+        bool fallingNow = isGravityReversed ? rb.linearVelocity.y > 0f : rb.linearVelocity.y < 0f;
+        bool pushingIntoWall = moveInput != 0f && (moveInput > 0f) == isFacingRight;
+
+        if (currentState != PlayerState.WallSliding
+            && !isGrounded && isWallDetected && fallingNow && pushingIntoWall && CanWallSlide()
+            && currentState != PlayerState.Dashing
+            && currentState != PlayerState.CometDiving
+            && currentState != PlayerState.KnockedBack)
+        {
+            ChangeState(PlayerState.WallSliding);
+        }
+
+        // EXIT. Note this tests `!pushingIntoWall`, not `moveInput == 0` as it originally did:
+        // letting go drops you, but so does actively holding AWAY from the wall. Without that,
+        // steering off a wall left you still stuck to it and walls behaved like flypaper.
+        if (currentState == PlayerState.WallSliding && (!isWallDetected || !pushingIntoWall || !CanWallSlide()))
             ChangeState(PlayerState.Jumping);
 
         if (isGrounded && (currentState == PlayerState.Jumping || currentState == PlayerState.KnockedBack || currentState == PlayerState.WallSliding))
@@ -804,8 +892,12 @@ public class PlayerController : MonoBehaviour
                 SfxManager.PlayOn(audioSource, jumpSound);
                 audioSource.pitch = 1f;
             }
+            // ⚠️ Through SpendShift, NOT `currentShift--`. Jumping is the single largest Shift
+            // expense in the game, and decrementing the field directly skipped the quest hook that
+            // hangs off SpendShift — so the Featherweight oath ("spend 8 Shift or less in a room")
+            // was silently not counting jumps at all.
             if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
-                currentShift--;
+                SpendShift(1);
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
             float jumpDir = isGravityReversed ? -1f : 1f;
             rb.AddForce(new Vector2(moveInput * jumpForce * 1f, jumpDir * jumpForce), ForceMode2D.Impulse);
@@ -932,16 +1024,49 @@ public class PlayerController : MonoBehaviour
         return Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
     }
 
+    // ⚠️ A WALL JUMP COSTS SHIFT, exactly like an ordinary jump.
+    //
+    // The relic grants the SLIDE for free — that's the utility, and it only ever slows a fall. The
+    // JUMP has to be paid for. Deckshift's whole thesis is that vertical movement is a resource, and
+    // a free wall jump is an unlimited climb: exactly the hole Pogo Boots' Shift refund opened, and
+    // a wall is far easier to find than an enemy to bounce on.
     private void PerformWallJump()
     {
+        if (currentShift <= 0) return;
+
+        if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
+            SpendShift(1);
+
         Flip();
-        rb.linearVelocity = new Vector2(wallJumpForce.x * (isFacingRight ? 1f : -1f), wallJumpForce.y);
+        float jumpDir = isGravityReversed ? -1f : 1f;
+        rb.linearVelocity = new Vector2(wallJumpForce.x * (isFacingRight ? 1f : -1f),
+                                        wallJumpForce.y * jumpDir);
         ChangeState(PlayerState.Jumping);
+
+        if (audioSource != null && jumpSound != null)
+        {
+            audioSource.pitch = Random.Range(0.9f, 1.0f);   // a shade lower than a ground jump
+            SfxManager.PlayOn(audioSource, jumpSound);
+            audioSource.pitch = 1f;
+        }
     }
 
+    // ⚠️ TERRAIN ONLY, and deliberately NOT `groundLayer`.
+    //
+    // `groundLayer` is Ground + Enemy, so this used to treat any Enemy-layer enemy as a wall — you
+    // could wall-slide and wall-jump off some enemies and not others, purely by which layer that
+    // prefab happened to be authored on. A wall is a wall.
+    //
+    // The origin also used to sit at local y = -0.0098, i.e. just BELOW the capsule's bottom. With
+    // Physics2D.queriesStartInColliders on (it is, by default) the ray therefore started INSIDE the
+    // floor tile the player was standing on and reported a hit at distance 0 — measured: WallCheck()
+    // returned true while standing on open, flat ground. The sensor now sits at mid-body, where a
+    // wall check belongs.
     private bool WallCheck()
     {
-        return Physics2D.Raycast(wallCheck.position, Vector2.right * (isFacingRight ? 1f : -1f), wallCheckDistance, groundLayer);
+        if (wallCheck == null) return false;
+        return Physics2D.Raycast(wallCheck.position, Vector2.right * (isFacingRight ? 1f : -1f),
+                                 wallCheckDistance, terrainLayer);
     }
 
     private void OnDrawGizmos()
