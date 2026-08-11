@@ -25,7 +25,11 @@ public static class GameSettings
     private const string K_MASTER = "MasterVolume";
     private const string K_MUSIC = "MusicVolume";
     private const string K_SFX = "SfxVolume";            // written by SfxManager historically
-    private const string K_ENEMY_NUMBERS = "ShowEnemyNumbers";   // inherited spelling
+    // ⚠️ A NEW KEY, not the inherited "ShowEnemyNumbers". That one meant "show the HP text on the
+    // bar"; this one means "show the bar at all". Reusing it would have silently turned the bars OFF
+    // for any existing player who had only turned the numbers off — a saved preference answering a
+    // question nobody asked them. When a setting's MEANING changes, take a new key.
+    private const string K_ENEMY_BARS = "ShowEnemyHealthBars";
     private const string K_DAMAGE_NUMBERS = "ShowDamageNumbers";
     private const string K_SHAKE = "ScreenShake";
     private const string K_HITSTOP = "HitStopStrength";
@@ -108,12 +112,13 @@ public static class GameSettings
         set { EnsureLoaded(); damageNumbers = value; Save(K_DAMAGE_NUMBERS, value); }
     }
 
-    private static bool enemyHealthNumbers = true;
-    // Consumer: EnemyHealthBar's text label (the bar itself always draws).
-    public static bool EnemyHealthNumbers
+    private static bool enemyHealthBars = true;
+    // Consumer: EnemyHealthBar — switches its whole Canvas. On, the bar and its HP text are visible
+    // the entire time the enemy is alive; off, nothing draws at all.
+    public static bool EnemyHealthBars
     {
-        get { EnsureLoaded(); return enemyHealthNumbers; }
-        set { EnsureLoaded(); enemyHealthNumbers = value; Save(K_ENEMY_NUMBERS, value); }
+        get { EnsureLoaded(); return enemyHealthBars; }
+        set { EnsureLoaded(); enemyHealthBars = value; Save(K_ENEMY_BARS, value); }
     }
 
     private static bool cardPreview = true;
@@ -173,7 +178,7 @@ public static class GameSettings
         shake = PlayerPrefs.GetFloat(K_SHAKE, 1f);
         hitStop = PlayerPrefs.GetFloat(K_HITSTOP, 1f);
         damageNumbers = PlayerPrefs.GetInt(K_DAMAGE_NUMBERS, 1) == 1;
-        enemyHealthNumbers = PlayerPrefs.GetInt(K_ENEMY_NUMBERS, 1) == 1;
+        enemyHealthBars = PlayerPrefs.GetInt(K_ENEMY_BARS, 1) == 1;
         cardPreview = PlayerPrefs.GetInt(K_CARD_PREVIEW, 1) == 1;
 
         displayMode = PlayerPrefs.GetInt(K_DISPLAY_MODE, 0);
@@ -230,7 +235,7 @@ public static class GameSettings
         ScreenShake = 1f;
         HitStopStrength = 1f;
         DamageNumbers = true;
-        EnemyHealthNumbers = true;
+        EnemyHealthBars = true;
         CardAimPreview = true;
         DisplayMode = 0;
         VSync = true;

@@ -20,8 +20,6 @@ public class EnemyHealthBar : MonoBehaviour
 
     private float targetFill = 1f;
     private float delayedFill = 1f;
-    private float fadeTimer = 0f;
-    private bool isDamaged = false;
     private float currentHP, maxHP;
 
     private static Sprite cachedWhiteSprite;
@@ -41,8 +39,6 @@ public class EnemyHealthBar : MonoBehaviour
     const float CANVAS_SCALE = 0.01f;
     const float BAR_HEIGHT_PX = 24f;
     const float DELAYED_SPEED = 2f;
-    const float FADE_DELAY = 3f;
-    const float FADE_SPEED = 2f;
 
     void Awake()
     {
@@ -51,18 +47,26 @@ public class EnemyHealthBar : MonoBehaviour
 
     void Start()
     {
-        GameSettings.OnChanged += ApplyNumbersSetting;
-        ApplyNumbersSetting();
+        GameSettings.OnChanged += ApplyVisibility;
+        ApplyVisibility();
     }
 
     void OnDestroy()
     {
-        GameSettings.OnChanged -= ApplyNumbersSetting;
+        GameSettings.OnChanged -= ApplyVisibility;
     }
 
-    void ApplyNumbersSetting()
+    // ⚠️ THE BAR IS ALWAYS ON, OR ENTIRELY OFF — there is no in-between and no fade (designer
+    // 2026-08-11). It used to start invisible, appear only when the enemy was damaged, and fade out
+    // three seconds later; the only setting toggled the NUMBERS on top of it. That is the opposite
+    // of what was wanted: the bar is meant to be readable at a glance the whole time, and the switch
+    // is meant to remove it completely for players who find it cluttered.
+    //
+    // Disabling the Canvas rather than zeroing the CanvasGroup means a hidden bar costs no draw
+    // calls at all, which matters with one of these per enemy in the room.
+    void ApplyVisibility()
     {
-        SetNumbersVisible(GameSettings.EnemyHealthNumbers);
+        if (canvas != null) canvas.enabled = GameSettings.EnemyHealthBars;
     }
 
     void LateUpdate()
@@ -76,17 +80,6 @@ public class EnemyHealthBar : MonoBehaviour
             delayedFill = Mathf.Lerp(delayedFill, targetFill, Time.deltaTime * DELAYED_SPEED);
             if (Mathf.Abs(delayedFill - targetFill) < 0.001f) delayedFill = targetFill;
             fillDelayed.fillAmount = delayedFill;
-        }
-
-        // Son hasardan FADE_DELAY saniye sonra yavaşça kaybol
-        if (isDamaged)
-        {
-            fadeTimer -= Time.deltaTime;
-            if (fadeTimer <= 0f) isDamaged = false;
-        }
-        else if (canvasGroup.alpha > 0f)
-        {
-            canvasGroup.alpha = Mathf.MoveTowards(canvasGroup.alpha, 0f, Time.deltaTime * FADE_SPEED);
         }
     }
 
@@ -129,14 +122,6 @@ public class EnemyHealthBar : MonoBehaviour
         targetFill = ratio;
         fillImmediate.fillAmount = ratio;
 
-        // Tam canda bar görünmez kalsın
-        if (current < max)
-        {
-            canvasGroup.alpha = 1f;
-            fadeTimer = FADE_DELAY;
-            isDamaged = true;
-        }
-
         UpdateText();
     }
 
@@ -152,12 +137,6 @@ public class EnemyHealthBar : MonoBehaviour
             healthText.text = $"{Mathf.CeilToInt(currentHP)} / {Mathf.CeilToInt(maxHP)}";
     }
 
-    void SetNumbersVisible(bool visible)
-    {
-        if (healthText != null)
-            healthText.gameObject.SetActive(visible);
-    }
-
     void BuildCanvas()
     {
         canvas = gameObject.AddComponent<Canvas>();
@@ -169,7 +148,7 @@ public class EnemyHealthBar : MonoBehaviour
         canvasGroup = gameObject.AddComponent<CanvasGroup>();
         canvasGroup.interactable = false;
         canvasGroup.blocksRaycasts = false;
-        canvasGroup.alpha = 0f;
+        canvasGroup.alpha = 1f;   // always visible; the setting switches the whole Canvas instead
 
         RectTransform rootRT = GetComponent<RectTransform>();
         rootRT.sizeDelta = new Vector2(120f, BAR_HEIGHT_PX);

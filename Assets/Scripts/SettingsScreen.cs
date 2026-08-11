@@ -265,8 +265,8 @@ public class SettingsScreen : MonoBehaviour
                   () => GameSettings.HitStopStrength, v => GameSettings.HitStopStrength = v);
         AddToggle("DAMAGE NUMBERS", "Show the damage dealt floating off each enemy you hit.",
                   () => GameSettings.DamageNumbers, v => GameSettings.DamageNumbers = v);
-        AddToggle("ENEMY HEALTH NUMBERS", "Show exact HP on enemy health bars. The bars stay either way.",
-                  () => GameSettings.EnemyHealthNumbers, v => GameSettings.EnemyHealthNumbers = v);
+        AddToggle("ENEMY HEALTH BARS", "Show a health bar above every enemy, with its exact HP.",
+                  () => GameSettings.EnemyHealthBars, v => GameSettings.EnemyHealthBars = v);
         AddToggle("CARD AIM PREVIEW", "Show where a selected card will land before you play it.",
                   () => GameSettings.CardAimPreview, v => GameSettings.CardAimPreview = v);
 
