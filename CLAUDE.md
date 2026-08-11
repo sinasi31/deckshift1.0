@@ -10,7 +10,7 @@ This file is loaded automatically into Claude Code at the start of every session
 
 **Core concept:** "Movement is a Resource." Jumping consumes **Shift**, which does not regenerate on its own — and **Shift CARRIES OVER between rooms** (designer-confirmed 2026-07-13: it is a run-long resource, and this persistence is "the whole identity of the game" — spending Shift now means having less for the rest of the run). Do NOT describe or implement Shift as a per-room resource. Most other actions (attacks, special movement, utility) are delivered via cards. Cards have **charges**; when charges deplete the card moves to the exhaust pile and must be recovered via scrap.
 
-**Current state:** Act 1 (Oxidation District) prototype. **7 combat levels in the run pool** (+ hub + boss room; ~15 more contract-valid rooms exist unused — see Room Pool), **16 CardData assets in `Assets/Cards/` and 18 relics** (re-verified 2026-07-26; note 2 of the 16 are not normal reward cards — `Stagger` is the fail-state card and `AnaKartVeritabanı` is the card *database* asset, so the real playable pool is ~14). Two acts (Vapor Stratum, Final Forge) planned but not started. Target: 45-50 minute run length, 60+ cards total at content-complete.
+**Current state:** Act 1 (Oxidation District) prototype. **10 combat levels in the run pool** (+ hub + boss room; ~15 more contract-valid rooms exist unused — see Room Pool), **16 CardData assets in `Assets/Cards/`, 19 relics, and 8 quest assets** (relics/quests re-verified 2026-08-11; note 2 of the 16 cards are not normal reward cards — `Stagger` is the fail-state card and `AnaKartVeritabanı` is the card *database* asset, so the real playable pool is ~14). Two acts (Vapor Stratum, Final Forge) planned but not started. Target: 45-50 minute run length, 60+ cards total at content-complete.
 
 ⚠️ **Content is the project's real bottleneck, and it gates the two biggest planned systems.** The run map is explicitly blocked on level count (it's mediocre at ~7 rooms, sings at ~30), and card *enhancements* ("Blompo") are a multiplier on the card pool — both want more content underneath them before they pay off. When choosing between "build another system" and "author more cards/levels", the honest answer is usually the latter.
 
@@ -77,7 +77,7 @@ This is a large script (~1,200 lines). It currently handles movement, jumping, c
 
 - **Active visual model:** `PF Pixel Character - Mage M` at `Assets/Cainos/Customizable Pixel Character/Prefab/Character Preset/PF Pixel Character - Mage M.prefab`. This is a child of the Player root and is assigned to `PlayerController.visualModel`.
 - **Disabled fallback:** `PF Skeleton - Mage` is still parented under Player but disabled (checkbox off). Kept as backup and for future reuse as an enemy.
-- **Physics collider:** `CapsuleCollider2D` on the Player root with **Offset (-0.0053, 0.8423) and Size (0.5075, 1.6848)**. Direction: Vertical. A `BoxCollider2D` was previously present but disabled and has been removed. Do not re-add it. **This capsule is the player's only ACTIVE solid collider (2026-07-16):** the Cainos rig's leftover bone colliders (capsules on `Rig Spine1`/`Rig Spine2`, circle on `Rig Head`) and the magic staff's `Rigidbody2D` + trigger `PolygonCollider2D` were removed from the prefab — they made the hitbox animation-dependent and cost physics rebakes every frame. Do not re-add them. **CAVEAT verified 2026-07-18:** a second solid (non-trigger, component-enabled) `BoxCollider2D` still exists on the **disabled** `PF Skeleton - Mage` child. It is inert only because that GameObject is inactive — **if you ever re-enable the skeleton (the doc below suggests reusing it as an enemy), the player instantly gains a second solid collider on its Rigidbody2D.** Delete that BoxCollider2D before re-enabling, or reuse the skeleton as a separate prefab rather than by re-activating this child. The root Rigidbody2D is confirmed the only Rigidbody2D in the prefab.
+- **Physics collider:** `CapsuleCollider2D` on the Player root with **Offset (-0.0053, 0.8423) and Size (0.5075, 1.6848)**. Direction: Vertical. A `BoxCollider2D` was previously present but disabled and has been removed. Do not re-add it. **This capsule is the player's only ACTIVE solid collider (2026-07-16):** the Cainos rig's leftover bone colliders (capsules on `Rig Spine1`/`Rig Spine2`, circle on `Rig Head`) and the magic staff's `Rigidbody2D` + trigger `PolygonCollider2D` were removed from the prefab — they made the hitbox animation-dependent and cost physics rebakes every frame. Do not re-add them. **The capsule is now genuinely the only solid collider in the prefab, active or not (2026-08-11):** the `PF Skeleton - Mage` child's leftover solid `BoxCollider2D` — inert only because that GameObject was disabled, and a live landmine the moment anyone re-enabled the skeleton as an enemy — has been deleted. The root Rigidbody2D is confirmed the only Rigidbody2D in the prefab.
 - **Rigidbody2D:** Dynamic. Gravity scale flips sign during gravity reversal — do NOT modify `Physics2D.gravity` globally.
 - **Player root Transform:** Position (0, 0, 0), Rotation (0, 0, 0), **Scale (1, 1, 1)**. This is now a hard rule again — the prior non-(1,1,1) scale was an accidental drift that compounded into a real bug. Do not modify the root scale to adjust character size; scale `visualModel` instead.
 
@@ -126,7 +126,7 @@ The animation will self-exit even if the bool isn't released, but releasing it e
 The player has check Transforms parented to the player root (NOT to visualModel). Post-refactor honest values:
 
 - **`groundCheck`** at local (0, 0.015, 0). Used for normal grounded detection via `Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer)`.
-- **`wallCheck`** at local (0, -0.00975, 0). For horizontal collision detection.
+- **`wallCheck`** at local (0, 0.8423, 0) — mid-body, on the capsule's centre. `wallCheckDistance` 0.32. See the warning below for why it is NOT down at the feet.
 - **`ceilingCheck`** at local (0, 1.725, 0) — added during gravity reversal work. Used when `isGravityReversed` is true.
 - **`firepoint`** at local Position (0.499, 1.263, 0), Scale (1, 1, 1). Fireball/bite origin point.
 
@@ -375,12 +375,12 @@ There are 13+ singleton managers. This is a known architectural smell flagged in
 - **GameManager** — top-level state, player reference, centralized pause counter
 - **DeckManager** — card piles, draw/discard logic
 - **LevelManager** — room spawning, transitions, zone/camera setup, first-room-is-hub logic
-- **RewardManager** — end-of-level card selection screen
+- ⚠️ **RewardManager** — the end-of-level card selection screen. **ORPHANED (verified 2026-08-11): the script and its `RewardScreenFX` still exist, but NOTHING CALLS IT.** The screen was removed 2026-08-09 and its route-choice hook moved to `LevelManager.AdvanceToNextRoom`. Cards now come from chests, the shop and quest payouts. Either delete it or re-wire it deliberately — don't assume it runs.
 - **RelicManager** — owned relics, `HasRelic(string id)` polling pattern, `OnRelicAdded` event
 - **SkillManager**, **SkillRewardManager** — skill tree / skill selection
 - **QuestSystem** — quest tracking, board UI, accept/progress/complete events
 - **ShopManager** — in-game shop UI and purchases
-- **SlotMachineUI** — gambling system (planned to be replaced with Dice Broker — see deferred work). ⚠️ **There is NO `SlotMachineManager` type** — verified 2026-07-18; an earlier version of this file listed one. Only `SlotMachineUI` exists.
+- ⚠️ **`SlotMachineUI` IS DELETED (verified 2026-08-11)** — the script is gone and nothing in any scene or prefab references it. The gambling system no longer exists in the game at all. The "Dice Broker" idea in Deferred Work is now a from-scratch build, not a reskin. (There was never a `SlotMachineManager` type either.)
 - **AchievementManager** — achievement tracking
 - **MainMenuController** — the main-menu scene. ⚠️ **`PauseMenu` was DELETED 2026-08-09** along with its `MenuManager` GameObject and the `PauseMenuPanel` hierarchy; the pause screen is now `PauseScreen`, a self-bootstrapping procedural screen (see UI System). Do not re-create a scene-placed pause panel. There is also no `MenuManager` *type* and never was.
 - ⚠️ **`EffectManager` DOES NOT EXIST as a type** (verified 2026-07-18) — this entry was a phantom. Confusingly there IS a GameObject *named* "EffectManager" in SampleScene, but it carries **HitStop**, not an EffectManager component. VFX are spawned ad-hoc by the callers (e.g. `Instantiate` of a VFX prefab) and by house-pattern procedural classes (`DashAfterimage`, `ShockwaveVFX`, `SpitGlob`, `CardAimIndicator`).
@@ -508,7 +508,7 @@ The theme is **Bulletin** — see UI System → Themes for why it's the one scre
 - It **shuffles** instead of always taking `allQuests[0..2]`, so quests past the third could never be offered before.
 - **`AcceptQuest` returns bool and enforces `MaxActiveQuests`.** It used to silently no-op on a duplicate and had no cap at all.
 - Accepted / completed contracts now **show as accepted** (seal, status line, live progress bar) instead of looking fresh and swallowing the click.
-- ⚠️ **`BoardSlots` and `MaxActiveQuests` are deliberately SEPARATE numbers.** A board offering exactly as many jobs as you can carry is a checklist, not a decision. Both are 3 today only because three quest assets exist; the "no room, greyed out" state is already drawn and becomes reachable the moment `BoardSlots` is raised (which also needs `BOARD_W` widened — the slips are one row).
+- ⚠️ **`BoardSlots` and `MaxActiveQuests` are deliberately SEPARATE numbers.** A board offering exactly as many jobs as you can carry is a checklist, not a decision. Both are 3 today only because the offer would otherwise exceed what you can carry; the "no room, greyed out" state is already drawn and becomes reachable the moment `BoardSlots` is raised (which also needs `BOARD_W` widened — the slips are one row).
 
 The QuestBoard in `Assets/LevelEfeS/hub.prefab` has a `SimpleInteract` component on it (implements `IInteractable`) that calls `QuestSystem.ToggleBoard()` on player interact (press E within `interactionRange`). The board's Layer must be in PlayerController's `interactableLayer` mask. ✅ **VERIFIED 2026-07-18** (this was previously an open "someone please check" item): `interactableLayer` = **4096 = layer 12**, layer 12 **is** named `Interactable`, and the hub's `QuestBoard` object is on layer 12 with a `SimpleInteract` component. The wiring is correct — no action needed.
 
@@ -529,9 +529,11 @@ The rows are **slips off the quest board**: same Bulletin material, pale paper, 
 
 ⚠️ **A slip's drop shadow must be ANCHORED exactly like the slip**, not merely positioned to match it. The local `AddImage` helper anchors to the parent's CENTRE while `AddPoint` anchors to its TOP, so the two shared an `anchoredPosition` but measured it from origins 300px apart — every shadow rendered as a free-floating black rectangle in the middle of the screen, well away from the slip it belonged to. Reported by the designer as "a black overlay completely not in the right place". **Two objects that track each other by position must agree on their anchors first**; copying the position is not enough.
 
-### Known Quest Pitfall (Resolved)
+### Quest content — the system's binding constraint
 
-`QuestPaper.OnAccept` previously crashed at line 32 trying to assign text to a TextMeshProUGUI child that didn't exist on the Accept button (the button was stripped of its text label during UI styling). The crash happened BEFORE `QuestSystem.AcceptQuest` was called, so the quest never actually got added and the event never fired. Fixed by null-guarding the GetComponentInChildren result. If you ever see a quest accept silently fail again, check the error trace for `QuestPaper.OnAccept` first.
+**8 quest assets exist; 7 are offered.** Three originals (`Invincible` NoDamageRoom, `Hit a Clip` AirKill, `Bounty Hunter` KillEnemy) plus the four oaths. `Scrooge` is authored but deliberately **not** in `allQuests` — see the oath section for why.
+
+The board is built to offer more contracts than you can carry, which is what makes taking one a decision — but `BoardSlots` and `MaxActiveQuests` are both 3, so today you can still take everything offered. **Raising `BoardSlots` is now a one-number change**: the board widens itself from the slot count and scales down if it would overflow a narrow aspect. Whether to raise it (and whether to lower the carry cap to 1–2) is an open DESIGN decision the designer had not settled — see the fifteen-quest list discussed 2026-08-11, of which only the four oaths were built.
 
 ---
 
@@ -546,7 +548,7 @@ What exists today:
 
 **Passive recomputation rule (important):** `RecomputePassives()` recalculates stat relics from the player's BASE stats every time the loadout changes, so selling reverses exactly. **Never add/subtract stats incrementally** — that breaks the moment relics stack (Reinforced Plating + Glass Heart) or are sold out of order.
 
-Still open (see deferred work): rebalancing the 18 relics *for* a slot economy — they were authored as small always-on Slay-the-Spire bonuses, which is the wrong shape for a 5-slot loadout where each pick should be a real decision.
+Still open (see deferred work): rebalancing the 19 relics *for* a slot economy — they were authored as small always-on Slay-the-Spire bonuses, which is the wrong shape for a 5-slot loadout where each pick should be a real decision.
 
 ### Card offer pool — `CardCatalogue` + `CardPool` (2026-08-09)
 
@@ -583,7 +585,7 @@ Singleton. Holds:
 Grant paths:
 - `TryGrantRelic(relic, onAcquired)` — **the entry point everything should use** (handles the full-slot swap flow).
 - `ShopItemUI` — buying a shop item with a relic reference.
-- `SlotMachineUI` — slot machine payout.
+- (`SlotMachineUI` used to grant relics here; it has been deleted.)
 - `DebugTools.cs` F1 key — debug only.
 
 **No starting-relic infrastructure exists yet.** Every run begins with zero relics. Adding a starting relic system (e.g., a wizard who begins with a Fireball relic) is on the deferred list.
@@ -614,6 +616,7 @@ Fields: `relicID` (string, used for `HasRelic` polling), `relicName`, `descripti
 | **SpikedCarapac** | **`SpikedCarapace`** ⚠️ | Do Not Pet | Rare |
 | VampireTooth | `VampireTooth` | Snack Fangs | Common |
 | Whetstone | `Whetstone` | Whetstone | Common |
+| GeckoGloves | `GeckoGloves` | Gecko Gloves | Rare |
 
 ⚠️ **Two filename/ID traps:** the asset named `Kinetic` has `relicID` **`KineticCapacitor`**, and `SpikedCarapac` (no trailing "e") has `relicID` **`SpikedCarapace`** (with "e"). Using the filename in `HasRelic()` will silently never match.
 
@@ -641,10 +644,9 @@ All the shared sprites live in **`RelicUISprites`** (`GoldBorder()`, `StonePanel
 
 SampleScene's main Canvas contains:
 - **`GameplayHUD`** — contains all in-game HUD elements (gold, health, shift counter, recall button, deck/discard/exhaust pile buttons, hand drawer trigger zone, **RelicHUD**, **QuestTracker**). Toggle with `SetActive(false)` to hide HUD during full-screen UI.
-- **`QuestBoardOverlay`** — quest board panel (full-screen).
-- Various menu panels (ShopUI, SettingsPanel, TutorialPanel, etc.) as direct children of Canvas. **Procedural screens (`PauseScreen`, `RunMapScreen`, `ScrapForgeScreen`, `BlompoScreen`…) create themselves under this Canvas at runtime and are NOT in the scene file** — do not go looking for them in the hierarchy at edit time.
+- Various menu panels (ShopUI, TutorialPanel, etc.) as direct children of Canvas. **Procedural screens (`PauseScreen`, `RunMapScreen`, `ScrapForgeScreen`, `BlompoScreen`, `QuestBoardScreen`, `SettingsScreen`…) create themselves under this Canvas at runtime and are NOT in the scene file** — do not go looking for them in the hierarchy at edit time. (`QuestBoardOverlay` and both `SettingsPanel`s were deleted; only `TutorialPanel` remains as a scene-placed panel.)
 
-**When adding new full-screen UI panels**, hide GameplayHUD when they open by adding a `[SerializeField] GameObject gameplayHUD;` reference and toggling SetActive. ShopManager, SlotMachineUI, and QuestSystem already follow this pattern.
+**When adding new full-screen UI panels**, hide GameplayHUD when they open by adding a `[SerializeField] GameObject gameplayHUD;` reference and toggling SetActive. ShopManager and QuestBoardScreen already follow this pattern.
 
 ### `FlatUI.cs` — the new UI direction (2026-08-03)
 
@@ -902,7 +904,7 @@ The hand drawer at the bottom of the screen auto-slides up on hover and down whe
 - Sets `isHovered = false`
 - **Toggles `raycastTarget` on the Image component** so the drawer stops absorbing clicks when locked.
 
-**When opening any full-screen UI panel, call `HandUIDrawer.instance.SetLocked(true)`** and `SetLocked(false)` when closing. ShopManager, SlotMachineUI, and DeckViewUI already do this.
+**When opening any full-screen UI panel, call `HandUIDrawer.instance.SetLocked(true)`** and `SetLocked(false)` when closing. ShopManager, QuestBoardScreen and DeckViewUI already do this.
 
 ---
 
@@ -1465,7 +1467,7 @@ Use this liberally to verify visual changes, diagnose "it looks wrong" reports, 
 ✅ **THE MECHANICAL REDESIGN IS DONE (corrected 2026-07-26).** This section spent months describing a "future direction" that had in fact already shipped. What actually exists now is documented under **Relic System** above: 5 slots, rarity-based sell values, `TryGrantRelic` + the forced full-slot swap screen, a manage panel, and hover tooltips. **Do not re-plan or re-build any of that.**
 
 **What genuinely remains is BALANCE, not code:**
-- **Rebalance the 18 relics for a slot economy.** They were authored as small always-on Slay-the-Spire bonuses (+5 HP on kill, +2 Shift on kill). In a 5-slot loadout where every pick costs you another relic, small passive trickles are the wrong shape — slot-constrained systems want **bigger, more interactive, more build-defining** effects that change how you play, not just numbers that tick up. This is the real outstanding work and it is a **design pass, not an engineering one**.
+- **Rebalance the 19 relics for a slot economy.** They were authored as small always-on Slay-the-Spire bonuses (+5 HP on kill, +2 Shift on kill). In a 5-slot loadout where every pick costs you another relic, small passive trickles are the wrong shape — slot-constrained systems want **bigger, more interactive, more build-defining** effects that change how you play, not just numbers that tick up. This is the real outstanding work and it is a **design pass, not an engineering one**.
 - **Economy tuning** — sell refunds are currently flat by rarity (150/90/50/25) and untuned against a 45-50 min run and the actual rate relics are offered.
 - **Possibly** distinguish acquisition sources (shop vs. pack vs. voucher).
 
@@ -1573,9 +1575,9 @@ The `CardTemplate` prefab has fundamental scale corruption: root scale is non-un
 
 ### Replace SlotMachine with "Dice Broker"
 
-A character-driven gambling NPC replacing the current slot machine. Same gameplay outcome (random relic from a dice roll) but rethemed:
+A character-driven gambling NPC. ⚠️ The slot machine it was meant to replace is now DELETED, so this is a from-scratch build, not a reskin. Same intended outcome (random relic from a dice roll):
 - A grimy character (sprite needed) who shakes a dice cup
-- Reuses RewardManager's relic-grant flow
+- Should route through `RelicManager.TryGrantRelic` (RewardManager is orphaned; see Manager Layer)
 - Implementation note: **roll the result in code first, then play an animation that ends on the correct face**. Don't depend on physics simulation.
 - Dice animation: sprite-sheet of 6-12 tumble frames ending on each face (cheaper and more readable than physics dice).
 - Voice/banter potential — give the broker personality.

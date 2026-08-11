@@ -1,5 +1,16 @@
 # Unity Editor-Side Audit — Deckshift
 
+> ## ⚠️ HISTORICAL SNAPSHOT — 2026-06-10. DO NOT PLAN FROM THIS FILE.
+>
+> A dated point-in-time report, **not** a live issue list. The scene has changed substantially
+> since: the quest board overlay, both settings panels, the pause menu and the slot machine are all
+> **deleted**, and most screens are now procedural objects that don't exist in the scene file at
+> edit time. Player prefab findings are also stale — the collider set was cleaned up on 2026-07-16
+> and again on 2026-08-11.
+>
+> **`CLAUDE.md` is the current source of truth**, and `Deckshift → Audit Prefab Overrides` is the
+> live tool for the override class of bug this report was chasing.
+
 **Date:** 2026-06-10
 **Scope:** Editor data only — active scene, prefabs, asset import settings, project settings. Script *code* quality is covered by `audit_report.md` and is not repeated here.
 **Method:** Read-only inspection via Unity MCP (scene walks, serialized-property scans, import-setting queries) plus direct reads of `ProjectSettings/` YAML and git history. **Nothing in the project was created, modified, or deleted. Play mode was never entered.**

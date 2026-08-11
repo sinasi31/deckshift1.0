@@ -2,7 +2,7 @@
 
 *A 2D pixel-art roguelike deckbuilder platformer where movement itself is the resource you spend.*
 
-**Version:** 1.0 (living document) · **Last compiled:** 2026-07-02
+**Version:** 1.1 (living document) · **Last compiled:** 2026-08-11
 **Engine:** Unity 6.0+ (URP, 2D Renderer) · **Platform:** PC (Steam) · **Team:** Solo developer, designer-first
 
 > **Status legend used throughout this document**
@@ -18,11 +18,11 @@
 
 In most deckbuilders you spend *energy* to play cards. In most platformers you jump for free. Deckshift asks one question that reframes both: **what if jumping cost you something?**
 
-Every jump spends **Shift** — a resource that does *not* regenerate over time and refills only when you enter a new room. Your cards — attacks, dashes, utility, movement tech — also cost Shift and carry limited charges. So every room becomes a spatial puzzle *and* a hand-management puzzle at the same time: reach the exit, kill what needs killing, and don't run your movement dry doing it.
+Every jump spends **Shift** — a resource that does *not* regenerate over time and CARRIES OVER from room to room for the whole run. Your cards — attacks, dashes, utility, movement tech — also cost Shift and carry limited charges. So every room becomes a spatial puzzle *and* a hand-management puzzle at the same time: reach the exit, kill what needs killing, and don't run your movement dry doing it.
 
 - **Genre:** Roguelike deckbuilder × precision platformer
 - **Session length:** A full run targets **45–50 minutes** `[PLANNED target]`
-- **Comparables (for positioning, not imitation):** *Slay the Spire* (deck construction, run structure) × *Celeste / Dead Cells* (2D movement feel) × *Balatro* (the resource-as-decision philosophy behind the planned relic redesign)
+- **Comparables (for positioning, not imitation):** *Slay the Spire* (deck construction, run structure) × *Celeste / Dead Cells* (2D movement feel) × *Balatro* (the resource-as-decision philosophy behind the slot-constrained relic loadout)
 - **Hook in one line:** *"Movement is a resource. Spend it well or die stranded."*
 
 ---
@@ -35,7 +35,7 @@ Everything in Deckshift is measured against three pillars. If a feature doesn't 
 Shift is the spine of the game. Because jumping and cards draw from the same non-regenerating pool, the player is *constantly* trading traversal against combat. Running out of Shift isn't a soft failure — it triggers the **Stagger** death spiral (§5.4). Every system in the game is designed to press on this tension: hazards that force movement, bosses that tax your platforms, relics that pay out in Shift.
 
 ### Pillar 2 — Every Choice Is a Resource Choice
-Cards have finite charges. Relics (post-redesign) will occupy finite slots. Recall costs escalate. Gold, scrap, and Shift are all scarce. The player is never given a free lunch; they are given a **curated pool they must manage**. The planned Balatro-style relic overhaul (§7) exists specifically to extend Pillar 1's logic to permanent upgrades.
+Cards have finite charges. Relics occupy 5 finite slots. Recall costs escalate. Gold, scrap, and Shift are all scarce. The player is never given a free lunch; they are given a **curated pool they must manage**. The Balatro-style slotted loadout (§6.3) exists specifically to extend Pillar 1's logic to permanent upgrades.
 
 ### Pillar 3 — Feel First
 A deckbuilder can be spreadsheet-dry. A platformer cannot afford to be. Deckshift invests heavily in game feel — hitstop, camera shake, screen flashes, procedural VFX, slow-motion punctuation, animated UI juice — so that spending a card *feels* as good as it reads. The house style is **art-free procedural VFX** built in code, which keeps a solo, low-budget project visually rich without commissioning art.
@@ -64,24 +64,25 @@ The wizard's toolkit (fireball, phasing, gravity manipulation, vampiric bite) is
 
 ```
    ┌─────────────────────────────────────────────────────────────┐
-   │  HUB (sandbox, no consumption) — test cards, read quest board │
+   │  HUB (sandbox, no consumption) — test cards, take contracts   │
    └───────────────────────────┬─────────────────────────────────┘
                                ▼
         ┌──────────────────────────────────────────┐
-        │  COMBAT ROOM  (Shift refills on entry)     │
+        │  RUN MAP — pick your branch                │
+        │  • Skirmish / Fight / Elite                │
+        │  • Recharge rooms hang off Fight & Elite   │
+        └───────────────┬───────────────────────────┘
+                        ▼
+        ┌──────────────────────────────────────────┐
+        │  COMBAT ROOM  (Shift does NOT refill)      │
         │  • Traverse the platforming space          │
         │  • Fight enemies / avoid hazards            │
         │  • Spend Shift on jumps + cards             │
         │  • Manage hand: play, Recall, watch charges │
+        │  • Kills drop scrap; piles hold gold        │
         └───────────────┬───────────────────────────┘
                         ▼
-        ┌──────────────────────────────────────────┐
-        │  EXIT DOOR → REWARD SCREEN                  │
-        │  • Choose 1 of 3 cards to add to deck      │
-        │  • One offered card carries a +1 Shift bonus│
-        └───────────────┬───────────────────────────┘
-                        ▼
-     (repeat: each combat level once, random order, no repeats)
+     (repeat: the map decides the route, one floor at a time)
                         ▼
         ┌──────────────────────────────────────────┐
         │  BOSS ROOM (run finale)                    │
@@ -90,9 +91,9 @@ The wizard's toolkit (fireball, phasing, gravity manipulation, vampiric bite) is
                   (loop back to HUB)
 ```
 
-**Run structure `[BUILT]`:** A run is **Hub → each combat level once, in random order → Boss → loop to Hub**. The hub is always the first room. The boss room is the finale, reached only after every pool level is cleared. This is a finite, structured run (the old endless-refill loop that repeated levels forever was removed).
+**Run structure `[BUILT]`:** A run is **Hub → a routed series of levels → Boss → loop to Hub**. The hub is always the first room. The route is chosen on the **run map** (§6.7); the old "every level once in random order" shuffle survives only as a fallback if the map manager is missing.
 
-**Interstitial economy stops `[BUILT / PARTIAL]`:** Between and within the run the player encounters a **Shop**, a **gambling NPC** (currently a Slot Machine, planned to become the **Dice Broker** — §7.4), a **quest board** (hub), and **card / skill reward screens**.
+**Interstitial economy stops:** a **Shop** and **Blompo** placed as NPCs in rooms, a **Scrap Forge**, and the **quest board** in the hub. *(Gambling has been removed — see §6.6.)*
 
 ---
 
@@ -100,12 +101,13 @@ The wizard's toolkit (fireball, phasing, gravity manipulation, vampiric bite) is
 
 ### 5.1 Shift — The Movement Resource `[BUILT]`
 
-- **Non-regenerating per room.** Shift refills when the player enters a new room, then only depletes.
+- ⚠️ **Shift CARRIES OVER between rooms and does not regenerate on its own.** It is a **run-long** resource, not a per-room budget — spending it now means having less for the rest of the run. This persistence is the whole identity of the game; describing Shift as refilling each room gets the design exactly backwards.
 - **Jumping costs Shift.** Traversal is a spend.
 - **Cards cost Shift** (each card has a `shiftCost`).
 - **Placing a portal's second endpoint costs Shift.**
-- **Shift Crystals** are collectible pickups that grant Shift (dropped by the boss, the crusher trap, and as rewards).
-- The end-of-level reward screen always offers one card carrying a **+1 Shift bonus**, surfaced with a dedicated badge so the player can weigh the bonus against the card itself.
+- **Shift Crystals** are collectible pickups that grant Shift (dropped by the boss, the crusher trap, and placed in levels).
+- Other sources are deliberately scarce: a few relics, and quest payouts that raise your **maximum** permanently.
+- The player starts a run with **40 Shift**. Lowering that starting pool is the planned ascension difficulty knob — it makes every Shift cost in the game bite harder without rebalancing a single card.
 
 Shift is the single most important number on screen. The entire difficulty curve is a Shift-scarcity curve.
 
@@ -128,15 +130,17 @@ Shift is the single most important number on screen. The entire difficulty curve
 | **Discard** | Played/discarded cards, reshuffled into draw |
 | **Exhaust** | Depleted cards, recovered only via scrap |
 
-A **Deck View** popup `[BUILT]` lets the player inspect any pile (or the full combined deck) at any time — a procedurally built, framed, scrollable card grid, reachable even from the reward screen.
+A **Deck View** popup `[BUILT]` lets the player inspect any pile (or the full combined deck) at any time — a procedurally built, framed, scrollable card grid.
 
 ### 5.3 Recall `[BUILT]`
 
 **Recall (R key)** is the player's manual hand-refresh: it redraws the hand for a **Shift cost that escalates with each use within a level**. Recall is the pressure valve — you *can* dig for the card you need, but every dig taxes the resource you're already short on.
 
-### 5.4 Stagger — The Fail-State Spiral `[BUILT]`
+### 5.4 Stagger — Buying Shift With Blood `[BUILT — redesigned 2026-08-09]`
 
-When the player has **0 Shift AND no playable cards**, a **Stagger card** is automatically forced into the hand. **Three Stagger plays in a single run = death.** Stagger converts "I mismanaged my movement" into a concrete, escalating consequence rather than a soft stall. It is the mechanical teeth behind Pillar 1.
+A **Stagger card** appears in the hand the moment Shift hits **0** — that alone, nothing else. Playing it pays **+2 Shift** and charges **HP: 8, then 16, 24, 32, 40…**, escalating for the whole run with no cap and no per-room reset.
+
+It is **no longer a three-strikes death sentence**. The run ends when the next bill is bigger than your health bar, which means Stagger is a pump you *choose* to reach for rather than a counter ticking toward a loss. Three rules make it work: it can never be discarded (Recall would otherwise be the dodge), it enters no pile (it is conjured on empty and evaporates when spent — it is not a card you own), and it can never be offered as a reward. It remains the mechanical teeth behind Pillar 1.
 
 ### 5.5 Movement & Platformer Tech `[BUILT]`
 
@@ -145,15 +149,17 @@ Beyond the baseline run/jump, the deck grants movement and utility spells. Curre
 | Card | Effect | Notes |
 |------|--------|-------|
 | **Dash** | Burst horizontal movement | Grants brief invincibility during the dash |
-| **Phase** | Pass through geometry temporarily | Known edge case: can stick if it ends inside a wall |
+| **Phase** | Pass through geometry temporarily | Ending inside a wall now ejects you to the nearest position that actually fits |
 | **Adrenaline** | Speed + slow-motion buff | Duration buff |
 | **Fireball** | Ranged projectile attack | Cast animation, timed projectile release (the wizard's signature) |
 | **Floor is Lava** (Reverse Gravity) | Flips the player's gravity for 5s | Warning cue before expiry |
 | **Glass Wail** | Shockwave that stuns enemies | Part of the planned **Glass archetype** |
 | **Vampiric Bite** | Bite attack with lifesteal feel | Part of the **Vampiric archetype** |
-| **Comet Dive** | Downward dive attack | Currently overlaps head-bounce — flagged for redesign |
+| **Comet Dive** | Downward dive **AoE blast** | Redesigned — no longer overlaps head-bounce |
 | **Portal** | Two-point teleport | Second placement costs Shift |
 | **Jump** (baseline) | Core traversal | Costs Shift |
+
+**Wall sliding** exists but is **not a base ability** — it is a relic (*Gecko Gloves*). The slide is free; the wall jump costs Shift like any other jump, because free vertical movement would contradict Pillar 1.
 
 **Planned archetypes `[PLANNED]`:** **Glass** (high-risk/high-reward, cards exist in theory only) and an expanded **Vampiric** line. Archetypes are how the 60-card content push stays coherent rather than becoming a grab-bag.
 
@@ -165,62 +171,70 @@ The hub is a **consequence-free sandbox** — the always-first room of every run
 
 ## 6. Progression & Economy
 
-### 6.1 Currencies
+### 6.1 Currencies `[BUILT]`
 | Currency | Source | Sink |
 |----------|--------|------|
-| **Shift** | Room entry, crystals, reward bonus | Jumps, cards, portals, Recall |
-| **Gold** `[BUILT]` | Enemy drops, boss, quests | Shop, gambling |
-| **Scrap** `[BUILT concept]` | (recovery resource) | Recover exhausted cards |
+| **Shift** | Crystals, relics, quest payouts | Jumps, cards, portals, Recall |
+| **Gold** | Piles placed in levels (exploration) | Shop — buys NEW power |
+| **Scrap** | Enemy kills, plus a rebate when a card exhausts | Scrap Forge — buys SUSTAIN (charges, salvaging exhausted cards) |
 
-### 6.2 Card Rewards `[BUILT]`
-After each level, a **reward screen** offers **3 cards, choose 1**, with one card flagged for a **+1 Shift bonus**. The screen is fully juiced (atmosphere, staggered "dealt" reveal, selection burst) and the deck stays inspectable via a View Deck button.
+**The gold/scrap split is load-bearing and must never blur.** Given one wallet, players buy the shiny relic over repairing a card every time, and the exhaust problem stays unsolved. Scrap also exists to make combat *pay*: before it, killing an enemy returned literally nothing, so skipping every fight was optimal in a game built around a deck of attack cards.
 
-### 6.3 Relics `[BUILT — pending major redesign]`
-Currently a **Slay-the-Spire-style additive system**: unlimited relics, each a small passive bonus, no slot limits. Functional relics today:
-- **Vampire Tooth** — kills heal HP
-- **Kinetic** — kills grant +2 Shift
-- **Spiked Carapace** — taking damage reflects to nearby enemies
-- **Pogo Boots** — head-bounce on enemies
-- **Lava Boots** — immunity to hazard zones (acid/lava)
+### 6.2 Card Acquisition `[BUILT]`
+Cards come from **chests, the shop, and quest payouts**. The old per-level "3 cards, choose 1" reward screen has been **removed** — the route choice that followed it moved to the run map.
 
-> **⚠ Major planned direction — Slot-Constrained Relics (§7.1).** The additive system is slated for a Balatro-style overhaul. New relic content and relic UX are deliberately frozen until then.
+### 6.3 Relics `[BUILT — slot-constrained]`
+A **Balatro-style slotted loadout**: **5 slots**, 19 relics. Acquiring one while full raises a forced sell-or-decline decision, so a loadout is curated rather than accumulated. Selling refunds by rarity and returns the relic to the offer pool. Stat relics are always recomputed from base values, so selling reverses exactly.
 
-### 6.4 Quests `[BUILT]`
-A **quest board** in the hub offers up to 3 quests; a **live tracker HUD** (top-right) shows progress with animated rows and completion celebrations.
-- **Quest types:** `KillEnemy` and `AirKill` fully wired; `GoldAccumulate`, `NoDamageRoom`, `UseCardCount` defined but not yet firing `[PLANNED]`.
-- **Reward types:** Gold, Shift charge, Heal (all wired); card rewards `[PLANNED]`.
-- Reward delivery is currently immediate; deferring to level-end is planned.
+> **⚠ What remains is BALANCE, not code (§7.1).** The relics were authored as small always-on bonuses, which is the wrong shape for a 5-slot economy where every pick costs you another relic.
 
-### 6.5 Skills `[BUILT — system present]`
-A **skill tree / skill selection** layer exists (`SkillManager`, `SkillRewardManager`, a skill reward screen). This is a secondary progression track alongside cards and relics.
+### 6.4 Quests & Oaths `[BUILT]`
+A **quest board** in the hub, and a **live tracker HUD** (top-right) made of the same pinned paper.
+- **Contracts:** 8 authored, 7 offered. Three are ordinary objectives (kill counts, a flawless room); four are **oaths** — streak contracts asking you to give something up: no cards for three rooms, no Recall, a Shift budget per room, no Stagger for four rooms.
+- **Oaths are streaks, not tallies.** Breaking one resets it to zero, but the next room starts clean, so a contract can never dead-end. The tracker shows a break *live*, in the room you're standing in.
+- **Reward types:** Gold, Shift charge, Heal, Card, Scrap, MaxHealth — all wired. The rule is *quests pay in things the shop doesn't sell*.
+- Reward delivery is immediate; banking payouts to a board at the start of the next act is still `[PLANNED]`.
 
-### 6.6 Shop & Gambling `[BUILT — gambling to be re-themed]`
-- **Shop** — buy cards/relics for gold.
-- **Slot Machine** — pay gold for a random relic. **Planned replacement: the Dice Broker** (§7.4), a character-driven NPC with the same payout but far more personality.
+### 6.5 Skills `[BUILT — system present, slated for repurposing]`
+A **skill tree / skill selection** layer exists (`SkillManager`, `SkillRewardManager`). The plan is to repurpose these global passives into **per-card enhancements** granted by Blompo `[PLANNED]`.
+
+### 6.6 Shop `[BUILT]`
+Buy cards, relics and services for gold from a **shopkeeper who talks back** — barks split by event (browsing a card, a relic, being too poor, buying, leaving), typed out a character at a time, with small body language.
+
+**Gambling has been removed.** The slot machine is deleted from the project entirely; the Dice Broker (§7.4) is now a from-scratch build rather than a reskin.
+
+### 6.7 The Run Map `[BUILT]`
+A branching, whole-act graph opened with **`M`**, in the Slay-the-Spire shape: you plan a route rather than picking one door at a time.
+- **Difficulty IS the node type** — Skirmish / Fight / Elite, ascending cost and reward. One node, one icon, one promise.
+- **Recharge rooms** (Foundry / Market / Well) hang off a route as attachments rather than floors, and are **only ever reachable from Fight or Elite nodes** — that restriction *is* the run economy. `[PLANNED]`: the three room prefabs don't exist yet, so no recharge rooms appear.
+- The governing law for authoring: **a room's loot scales to the Shift it costs to cross.**
 
 ---
 
 ## 7. Major Planned Directions
 
-### 7.1 Slot-Constrained Relic Redesign `[PLANNED — highest design priority]`
-Replace the additive relic model with a **Balatro-style slotted system**:
-- **Fixed relic slots** (starting ~5, tunable).
-- **To acquire when full, you must sell an existing relic** — every acquisition becomes a real trade-off.
-- Relics get **bigger, more interactive effects** (small passive bonuses don't shine under scarcity).
-- **15–25 new relics** to make slot decisions meaningful; economy tuning for the 45–50 min run.
+### 7.1 Relic Rebalance for the Slot Economy `[PLANNED — highest design priority]`
+The slotted system itself is **BUILT** (§6.3). What remains is a **design pass, not an engineering one**:
+- Relics were authored as small always-on Slay-the-Spire trickles (+5 HP on kill, +2 Shift on kill). Under scarcity those are the wrong shape — a 5-slot loadout wants **bigger, more interactive, build-defining** effects that change how you play.
+- **More relics**, authored at slot-worthy power, so the choice has depth.
+- Economy tuning: sell refunds are flat by rarity and untuned against a 45–50 min run.
 
-**Why it matters to the pitch:** this is the design move that makes Deckshift's identity *complete* — it extends "Movement is a Resource" to *"everything is a curated resource you manage."* It's the connective tissue between the platformer core and the deckbuilder metagame.
+**Why it matters to the pitch:** the slotted loadout is what extends "Movement is a Resource" into *"everything is a curated resource you manage."* Building it was half the job; making each pick feel like a real decision is the other half.
 
-### 7.2 Content Scale-Up `[PLANNED]`
-- **60+ cards** (from ~10), organized by archetype (Glass, Vampiric, movement, utility).
+### 7.2 Content Scale-Up `[PLANNED — the project's real bottleneck]`
+- **60+ cards** (from ~14 playable), organized by archetype (Glass, Vampiric, movement, utility).
+- **More quests.** The board is built to offer more contracts than you can carry — with 7 it can't yet.
+- **More rooms.** The run map is mediocre at ~10 and sings at ~30; ~15 contract-valid rooms already exist unused and need correction passes rather than authoring from scratch.
 - **Three-act structure** fully built (Acts 2 & 3).
 - **3 bosses per act**, randomly selected from a pool (Act 1's Moss Knight is the first).
+
+> **This gates the two biggest planned systems.** Both the run map and card enhancements are multipliers on content that doesn't exist yet. When choosing between "build another system" and "author more cards/levels/quests", the honest answer is usually the latter.
 
 ### 7.3 Chunk-Based Levels `[PLANNED]`
 Move from hand-crafted levels to a **chunk/module-based level system** for replayable, roguelike-appropriate variety.
 
 ### 7.4 The Dice Broker `[PLANNED]`
-A grimy, characterful gambling NPC replacing the slot machine. Rolls the result **in code first, then plays a sprite-sheet dice animation that lands on the correct face** (no physics dependency). Voice/banter potential.
+A grimy, characterful gambling NPC. The slot machine it was meant to replace is now deleted, so this is a from-scratch build. Rolls the result **in code first, then plays a sprite-sheet dice animation that lands on the correct face** (no physics dependency). Voice/banter potential.
 
 ### 7.5 Proper Scene Flow `[PLANNED]`
 Real hub→run→hub scene transitions (currently the hub is faked as room 0 of a single scene). Requires a manager-lifetime review.
@@ -280,14 +294,30 @@ The **Moss Knight** is the Oxidation District finale and the reference design fo
 ### 10.1 Art Direction `[BUILT]`
 - **Pixel art**, built on **Cainos asset packs** (character, monsters, environment, water). Solo-budget constraint: **no commissioned art** — work within existing packs and pixel conventions.
 - **Procedural VFX is the house style.** Effects are generated in code (sprites baked at runtime, cached) — shockwaves, auras, bite fangs, chest bursts, boss death, reward-screen atmosphere, UI juice. This keeps the game visually rich and *consistent* without an art budget, and every effect is Inspector-tunable.
-- **Rarity colour language** is unified across the game (Common = pale, Rare = blue, Epic = purple, Legendary = gold) — chest bursts, relic HUD chips, and reward screens all speak it, so the player reads drop quality instantly.
+- **Rarity colour language** is unified across the game (rarity separates on hue, luminance AND glyph, so it survives greyscale and colour-blindness) — chest bursts, relic sockets and Blompo offers all speak it, so the player reads drop quality instantly.
+
+### 10.1b Screen Design — One Ideology, Never One Skin `[BUILT]`
+
+Every full-screen panel is procedural (no prefabs, no art files) and shares an ideology — flat cut plates, restraint, directional light, a subtle particle drift, one meaningful accent. **But no two screens share a skin.** Each gets its own material, and *the material says what the place does*:
+
+| Screen | What it is | The inversion |
+|---|---|---|
+| **Scrap Forge** | a workbench | warm charcoal, fire from **below**, embers rising, rivets, scuffed |
+| **Blompo** | a creature granting a blessing | cold indigo, light from **above**, motes settling, pristine |
+| **Relic bar** | what you're **carrying** | near-colourless — a permanent overlay must not compete with the game |
+| **Run map** | a chart you **read**, not a place | flat and unlit; motion lives in the information |
+| **Pause** | the **moment** you stopped | no window plate at all; motes hang dead still, dragging frozen streaks |
+| **Settings** | the **machine's** control panel | light emitted by the content; deliberately outside the fiction |
+| **Quest board** | **contracts** you promise to do | dark board, **pale paper** pinned to it — the value structure inverts |
+
+The hue budget is nearly spent, which is the point: **value structure, light direction, motion vocabulary and surface treatment separate these screens at least as much as colour does.** The relic bar proves a theme can carry no hue at all.
 
 ### 10.2 Game-Feel Toolkit `[BUILT]`
 - **Hitstop** — brief freeze-frames on impact.
 - **Camera Shake** — custom (no Cinemachine), pushes past bounds for punch.
 - **Camera Peek** — hold Left Ctrl to look ahead toward the mouse.
 - **Slow-motion** — used as punctuation (Adrenaline, boss death).
-- **UI juice everywhere** — animated reward screens, quest board pop-ins with an "ACCEPTED" stamp, quest tracker completion celebrations, interact prompts with a beveled keycap, relic icons that pop in.
+- **UI juice everywhere** — quest slips that sway on their pins and take a wax seal when accepted, cards that flip to their back on hover, interact prompts with a beveled keycap, relic icons that pop in.
 
 ### 10.3 Camera `[BUILT]`
 Custom `CameraFollow` with per-level `LevelBounds` zones and hysteresis zone transitions. Cinemachine was removed early (confiner issues with multi-shape rooms); the custom system is the standard.
@@ -316,8 +346,8 @@ Full engineering context, pitfalls, and conventions live in `CLAUDE.md`.
 These are unresolved and deliberately flagged rather than papered over:
 1. **Narrative depth** — is there a plot, or does Deckshift stay mechanics-first with light district flavour? Currently the latter.
 2. **Act 2 / Act 3 themes** — Vapor Stratum and Final Forge need concrete hazard/enemy/boss identities.
-3. **Relic redesign specifics** — final slot count, sell-refund %, offer frequency (paper design first).
-4. **Scrap economy** — full definition of scrap acquisition and exhaust-recovery costs.
+3. **Relic power level** — the slotted system is built; what shape should a slot-worthy relic take? (paper design first)
+4. **Quest carry cap** — the board can offer more contracts than you can hold, but the cap is still 3 of 3. Should holding drop to 1–2 so accepting is a real choice?
 5. **Skill tree scope** — how the skill track interlocks with cards and relics long-term.
 6. **Difficulty / meta-progression** — is there any between-run persistence, or is it pure roguelike?
 7. **Monetization / pricing** — Steam price point and launch scope. `[TBD]`
@@ -326,15 +356,19 @@ These are unresolved and deliberately flagged rather than papered over:
 
 ## 13. Development Roadmap (Priority Order)
 
-1. **Slot-constrained relic redesign** (paper → code) — the identity-completing system.
-2. **Card content push** toward 60+, with archetypes fully realized (Glass, Vampiric).
-3. **Complete the Act 1 boss arena** (acid pools + platforms + reward hook).
-4. **Card-effect conflict-flag enforcement** (the top engineering fix).
-5. **Chunk-based level system** for real roguelike variety.
-6. **Acts 2 & 3** (Vapor Stratum, Final Forge) — themes, enemies, boss pools.
-7. **Dice Broker** replaces the slot machine.
-8. **Proper scene flow** (hub → run → hub) and manager-lifetime pass.
-9. **Quest system expansion** (wire remaining types, card rewards, randomization, 3-quest cap).
+*Reordered 2026-08-11. Items 1, 4 and much of 9 from the previous list are now **done** — the slotted relic system, conflict-flag enforcement, and the quest board rebuild (randomised offer, carry cap, card/scrap/HP rewards, oaths).*
+
+1. **Content push — the real bottleneck.** Cards toward 60+, more quests than you can carry, more rooms. Everything else is a multiplier on this.
+2. **Relic rebalance for the slot economy** (§7.1) — paper design first.
+3. **The three recharge rooms** (Foundry / Market / Well). Until they exist the run map draws no recharge icons and scrap has nowhere to be spent mid-run.
+4. **Place Scrap Forges in combat rooms** — the only forge in the game is in the hub, visited once, before you have any scrap or any damaged cards.
+5. **Complete the Act 1 boss arena** (acid pools + platforms + reward hook).
+6. **Card enhancements via Blompo** — repurpose the skill passives into per-card upgrades.
+7. **Chunk-based level system** for real roguelike variety.
+8. **Acts 2 & 3** (Vapor Stratum, Final Forge) — themes, enemies, boss pools.
+9. **Proper scene flow** (hub → run → hub) and manager-lifetime pass.
+10. **Dice Broker** — now a from-scratch build; the slot machine is deleted.
+11. **Tutorial / How To Play screen** — the last screen still using the legacy scene panel.
 
 ---
 
@@ -344,4 +378,4 @@ These are unresolved and deliberately flagged rather than papered over:
 
 ---
 
-*Sources: `CLAUDE.md` (architecture, current through 2026-07-02), `BossDesign_MossKnight.md`, and the project's design memory. Implementation status tags reflect the state of the codebase as documented; verify against the live project before treating any `[BUILT]` claim as final.*
+*Sources: `CLAUDE.md` (architecture, current through 2026-08-11), `BossDesign_MossKnight.md`, and the project's design memory. Implementation status tags reflect the state of the codebase as documented; verify against the live project before treating any `[BUILT]` claim as final.*

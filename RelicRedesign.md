@@ -1,11 +1,22 @@
 # Relic Redesign — Slot-Constrained Loadout
 
 Paper design for replacing Deckshift's additive (Slay-the-Spire-style) relic system
-with a **Balatro-style slot-constrained loadout**. Started 2026-07-09. This is the
-anchor doc — keep it in sync as the build progresses across sessions.
+with a **Balatro-style slot-constrained loadout**. Started 2026-07-09.
 
-Companion context: see `CLAUDE.md` → "Relic System" and "Future: Slot-Constrained
-Relic Redesign". Memory: [[project-deckshift]].
+> ## ⚠️ STATUS 2026-08-11 — THE MECHANICS IN THIS DOC ARE BUILT. DO NOT RE-PLAN THEM.
+>
+> Shipped and live: **5 slots**, rarity-based sell values, `TryGrantRelic` with the forced
+> full-slot swap screen, a manage/inspect panel, hover tooltips, and a `RelicCatalogue` /
+> `RelicPool` so no offer list is ever hand-maintained again. 19 relics.
+>
+> **What actually remains is BALANCE, not code:** the relics were authored as small always-on
+> bonuses, which is the wrong shape for an economy where every pick costs you another relic.
+> Read the sections below as the *reasoning behind* the built system, not as a to-do list.
+>
+> Also note the **scrap system is built** (it was "planned" when this was written), which
+> resolves the open questions here about exhaust recovery.
+
+Companion context: see `CLAUDE.md` → "Relic System". Memory: [[project-deckshift]].
 
 ---
 
@@ -41,7 +52,7 @@ before anything is finalized**:
 
 - **Paid source (shop):** clicking buy while full opens the Swap Screen *first*. Take
   it → pay for the new relic AND pocket the sell gold. Leave it → **no charge at all.**
-- **Free source (chest, boss, slot machine):** Swap Screen; leaving it simply declines
+- **Free source (chest, boss):** Swap Screen; leaving it simply declines
   the relic at no cost.
 
 There is never a "I paid and lost it" moment.
@@ -68,7 +79,7 @@ There is never a "I paid and lost it" moment.
 ### 3. Swap Screen (acquire-when-full decision)
 - Triggered by a grant while full. Shows the incoming relic + the loadout as
   click-to-sell targets. "Take it" (after selecting one to sell) / "Leave it".
-- Wired into every grant path (shop, chest, boss death, slot machine).
+- Wired into every grant path (shop, chest, boss death).
 
 The Manage panel and Swap Screen share a clickable-loadout widget; build it once.
 
@@ -92,7 +103,7 @@ Sell value is derived from rarity, not stored per-asset.
 ## Grant-path integration (Stage 3)
 
 Current grant paths call `RelicManager.AddRelic(relic)` directly:
-`ShopItemUI`, `SlotMachineUI`, `DebugTools` (F1). Boss death loot drops real pickups,
+`ShopItemUI`, `DebugTools` (F1). Boss death loot drops real pickups,
 not relics (no relic grant there yet).
 
 Stage 3 routes grants through a single **`TryGrantRelic(relic, context)`** entry point:

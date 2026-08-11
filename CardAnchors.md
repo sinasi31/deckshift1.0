@@ -8,6 +8,15 @@ Status: **v1 draft, 2026-07-15.** Numbers grounded in the current game, not inve
 
 ---
 
+> ⚠️ **UPDATE 2026-08-11 — how enemy melee damage LANDS changed, though the numbers below did not.**
+> Every melee enemy used to resolve its hit as a distance between transform origins, i.e. a circle on
+> the attacker's feet tested against a point at the player's feet, plus a hidden `+0.5` the gizmo
+> never drew. It reached behind the enemy, hit a player two units overhead, and ran 33% longer than
+> authored. It is now `EnemyMelee.TryHit` — a box in FRONT of the attacker tested against the
+> player's real capsule. **The `attackRange` values in this doc are now honest**: what you type is
+> what connects, so a range that felt right before will feel ~33% shorter and wants re-checking in
+> play. See CLAUDE.md → Enemy System.
+
 ## 1. The two economies (read this first)
 
 Cards are limited on **two independent axes**, and they mean different things:

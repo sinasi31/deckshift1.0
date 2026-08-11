@@ -1,4 +1,17 @@
 # Deckshift — Full Codebase Audit
+
+> ## ⚠️ HISTORICAL SNAPSHOT — 2026-06-10. DO NOT PLAN FROM THIS FILE.
+>
+> This is a dated point-in-time report, **not** a live issue list. Two months of work have landed
+> since, and **many findings here are fixed** — including the card-effect conflict class, the
+> CameraPeek rebuild, the shield-block damage leak, spike knockback, fall damage (removed
+> entirely), and the QuestSystem `DontDestroyOnLoad` problem. Several files it audits no longer
+> exist (`SlotMachineUI`, `PauseMenu`, `SettingsMenu`, `QuestPaper`, `QuestBoardFX`).
+>
+> **`CLAUDE.md` is the current source of truth.** Check any finding against the code before acting
+> on it. The value of this file now is the *reasoning*, and the Critical items it explains that are
+> still referenced by comments in the codebase.
+
 **Date:** 2026-06-10 · **Scope:** all 105 scripts in `Assets/Scripts/` (read in full), CLAUDE.md, relic/quest assets, build settings, package manifest, prefab naming. Read-only audit — no code was changed.
 
 **How to read severity:**

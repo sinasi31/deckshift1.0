@@ -123,7 +123,7 @@ Current state: tilemap geometry + the Crusher (PressHead/Chain/ChainAnchor) + a 
 - **Crusher:** fully baitable; boss never avoids it. ✔
 - **Acid:** static pools → rising tide flood in P3. ✔
 - **Numbers (starting):** HP ~600; Cleave 15 / Slam 20+acid / Charge 18 / contact 10; ~90–120s fight. ✔ (playtest-tune) — superseded: HP is now ~300 (see §6), phases cut.
-- **Reward:** as of 2026-07-02 the kill drops **real collectible gold + shift crystals** (see the Death entry in §8) — that's the current payoff. A `RewardManager` card-pick + bonus scrap + guaranteed Act-1-boss relic screen is still a later add on top.
+- **Reward:** as of 2026-07-02 the kill drops **real collectible gold + shift crystals** (see the Death entry in §8) — that's the current payoff. A card-pick + bonus scrap + guaranteed Act-1-boss relic screen is still a later add on top — note `RewardManager` is ORPHANED as of 2026-08-11 (nothing calls it), so that screen is a rebuild, not a re-wire.
 - **Run placement (2026-07-02):** the boss room is the **run finale**. `LevelManager` runs hub → every pool level once (random, no repeats) → the boss room (a separate `bossRoomPrefab` slot) → loops back to the hub. The BossRoom prefab must keep the room contract (`CameraBounds` + `GirisNoktasi` children). ✔
 
 **Remaining (tune in-engine, not blocking the build):** exact HP/damage, lever vs. kill-zone spacing, platform count/positions, acid-rise rate + max height, slime spit cadence.
