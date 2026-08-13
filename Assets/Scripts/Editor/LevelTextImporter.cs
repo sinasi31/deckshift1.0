@@ -98,13 +98,18 @@ public static class LevelTextImporter
     // Markers that stand ON the ground: after spawning, the instance is shifted
     // so the bottom of its measured visual bounds sits exactly on the cell floor.
     // (Enemies here don't fall — most have kinematic physics — so placement must
-    // be exact.) Floaty pickups ('+', 'g') and flyers ('b') stay at cell center.
-    // 'E' (elevator) and 'K' (wrecking ball) are NOT grounded: they stay at cell
-    // center — the elevator's rest position and the ball's hang point are tuned
-    // by hand in the Inspector.
+    // be exact.)
+    //
+    // ⚠️ GOLD ('g') IS GROUNDED, SHIFT CRYSTALS ('+') ARE NOT — designer 2026-08-13. A pile of coins
+    // hovering at a cell centre reads as a bug; a Shift crystal hovering reads as magic. This is a
+    // per-object judgement about what the thing IS, not a technical distinction, so it lives here
+    // rather than being derived from anything.
+    //
+    // Flyers ('b') stay at cell centre. 'E' (elevator) and 'K' (wrecking ball) are NOT grounded
+    // either: the elevator's rest position and the ball's hang point are tuned by hand.
     private static readonly HashSet<char> GroundedMarkers = new HashSet<char>
     {
-        'X', 'm', 'r', 'l', 'M', 'z', 'Z', 's', 'C', 'D', '^', 'W', 'T', 'F', 'w', 'c', 't', '$', 'B', 'L',
+        'X', 'm', 'r', 'l', 'M', 'z', 'Z', 's', 'C', 'D', 'g', '^', 'W', 'T', 'F', 'w', 'c', 't', '$', 'B', 'L',
     };
 
     // ---- Tile roles ---------------------------------------------------------------------------
@@ -858,6 +863,7 @@ public static class LevelTextImporter
             // painter below leaves them alone.
             var consumed = new bool[width, height];
             int tileCount = StampPlatformShapes(tilemap, width, height, At, Resolve, consumed);
+            var spikeDone = new bool[width, height];   // a '^' run is spawned once, at its left end
 
             var entityCounts = new Dictionary<string, int>();
             var gateColumns = new Dictionary<int, List<int>>(); // col -> rows with 'G'
@@ -1009,6 +1015,38 @@ public static class LevelTextImporter
                         spawn.transform.SetParent(root.transform); // must be a DIRECT child of the room root
                         spawn.transform.position = worldPos;
                         GroundToSurface(spawn, cellY); // player pivot is at the feet; spawn at floor level
+                        continue;
+                    }
+
+                    // ⚠️ SPIKES ARE WIDER THAN A CELL, SO ONE PER CELL MAKES THEM OVERLAP.
+                    // The spikers prefab measures 1.55 units across; dropping one on every '^' cell
+                    // spaced them 1.0 apart, so each sat a third of the way inside its neighbour and
+                    // the bed read as a mangled pile rather than a row of spikes. A run of '^' is now
+                    // laid end-to-end: as many as fit at the prefab's real width, spread evenly so
+                    // the run is covered edge to edge without any two intersecting.
+                    if (c == '^' && prefabCache.ContainsKey('^'))
+                    {
+                        if (spikeDone[col, row]) continue;
+
+                        int cEnd = col;
+                        while (cEnd + 1 < width && At(cEnd + 1, row) == '^') cEnd++;
+                        for (int cc = col; cc <= cEnd; cc++) spikeDone[cc, row] = true;
+
+                        GameObject spikePrefab = prefabCache['^'];
+                        float runW = cEnd - col + 1;
+                        float spikeW = Mathf.Max(0.05f, MeasuredSize(spikePrefab).x);
+                        int count = Mathf.Max(1, Mathf.FloorToInt(runW / spikeW + 0.001f));
+                        float pitch = runW / count;
+
+                        for (int i = 0; i < count; i++)
+                        {
+                            var sp = (GameObject)PrefabUtility.InstantiatePrefab(spikePrefab);
+                            sp.transform.SetParent(root.transform);
+                            sp.transform.position = new Vector3(col + pitch * (i + 0.5f), cellY + 0.5f, 0f);
+                            GroundToSurface(sp, cellY);
+                            entityCounts.TryGetValue(spikePrefab.name, out int sn);
+                            entityCounts[spikePrefab.name] = sn + 1;
+                        }
                         continue;
                     }
 
@@ -1209,6 +1247,26 @@ public static class LevelTextImporter
 
         float dy = surfaceY - b.Value.min.y;
         go.transform.position += new Vector3(0f, dy, 0f);
+    }
+
+    // Combined visual size of a prefab, ignoring particles/trails — the same measurement
+    // GroundToSurface uses, exposed so placement can space objects by how wide they really are.
+    private static Vector2 MeasuredSize(GameObject go)
+    {
+        Bounds? b = null;
+        void Add(Bounds nb)
+        {
+            if (b == null) { b = nb; return; }
+            var bb = b.Value; bb.Encapsulate(nb); b = bb;
+        }
+        foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+        {
+            if (r is ParticleSystemRenderer || r is TrailRenderer) continue;
+            Add(r.bounds);
+        }
+        if (b == null)
+            foreach (var c in go.GetComponentsInChildren<Collider2D>(true)) Add(c.bounds);
+        return b == null ? Vector2.one : new Vector2(b.Value.size.x, b.Value.size.y);
     }
 
     private static Sprite LoadPropSprite(string spriteName)
