@@ -146,7 +146,17 @@ public class CardAimIndicator : MonoBehaviour
     // --- Return Anchor visuals ---
     private GameObject anchorRoot;
     private LineRenderer anchorTether;         // player -> anchor, so you can find it from anywhere
-    private SpriteRenderer anchorMark;         // where the anchor is (or would be dropped)
+    private LineRenderer anchorDecal;          // the small flat spot on the ground
+    private LineRenderer[] anchorRings;        // contracting rings — the "you come back here" motion
+    private SpriteRenderer anchorCore;
+    private const int ANCHOR_SEGMENTS = 40;
+    // ⚠️ FLAT ENOUGH TO BE ON THE FLOOR. At 0.4 the outer ring reached the player's waist and read as
+    // a hoop AROUND the character instead of a mark beneath them — a ground decal in a side-on game
+    // has to be much flatter than the maths suggests before the eye puts it on the floor plane.
+    private const float ANCHOR_FLATTEN = 0.24f;
+    private const float ANCHOR_SPOT_R = 0.62f; // where the rings land, and the size of the decal
+    private const float ANCHOR_RING_START = 1.8f;
+    private const float ANCHOR_RING_PERIOD = 1.5f;
 
     // --- Glass Wail visuals ---
     private GameObject wailRoot;
@@ -842,42 +852,92 @@ public class CardAimIndicator : MonoBehaviour
 
         anchorRoot = MakeContainer("Aim_Anchor");
 
-        anchorTether = MakeLineChild(anchorRoot.transform, "Tether", 0.05f, sortingOrder - 1);
+        anchorTether = MakeLineChild(anchorRoot.transform, "Tether", 0.045f, sortingOrder - 2);
         anchorTether.positionCount = 2;
 
-        anchorMark = MakeSpriteChild(anchorRoot.transform, "Mark", GetRingSprite(), sortingOrder);
+        anchorCore = MakeSpriteChild(anchorRoot.transform, "Core", GetDotSprite(), sortingOrder - 1);
+
+        anchorDecal = MakeLineChild(anchorRoot.transform, "Decal", 0.05f, sortingOrder + 1);
+        anchorDecal.loop = true;
+        anchorDecal.positionCount = ANCHOR_SEGMENTS;
+
+        anchorRings = new LineRenderer[2];
+        for (int i = 0; i < anchorRings.Length; i++)
+        {
+            anchorRings[i] = MakeLineChild(anchorRoot.transform, "Ring" + i, 0.055f, sortingOrder);
+            anchorRings[i].loop = true;
+            anchorRings[i].positionCount = ANCHOR_SEGMENTS;
+        }
     }
 
-    // Two states, and the SECOND is the one that matters: once an anchor exists the card's whole
-    // decision is "do I want to be back THERE right now?", which is unanswerable if you can't see
-    // where "there" is. The tether runs from the player to the anchor so it can be found from
-    // anywhere in the room — the card has no range limit, so the anchor is often off-screen.
+    // ⚠️ THE MOTION IS THE DESCRIPTION. A first pass drew one fat soft ring around the player and the
+    // designer called it out: an enclosing ring reads as an area-of-effect, which is the wrong idea
+    // entirely — the card marks a POINT and later pulls you back to it. So the rings now CONTRACT
+    // inward and snuff out on the spot, which is the card's whole sentence in one gesture, and it is
+    // deliberately the inverse of Glass Wail's expanding ripples and of the Phase bubble's static
+    // boundary. Nothing else in the game moves inward.
+    //
+    // It is also much smaller than before. The old ring was 3.4 units wide and sat around the
+    // player's own legs, so it claimed an area AND was occluded by the character standing in it. A
+    // tight decal says "this exact spot" and leaves the player readable.
+    //
+    // Two states, and the second matters most: once an anchor exists the decision is "do I want to
+    // be back THERE?", which is unanswerable without seeing where "there" is. The tether covers that
+    // — the card has no range limit, so the anchor is regularly off-screen.
     private void UpdateAnchor(float dim)
     {
         if (anchorRoot == null) return;
 
         bool placed = player.HasReturnAnchor;
         Vector2 target = placed ? player.ReturnAnchorPos : (Vector2)transform.position;
+        Vector3 c = new Vector3(target.x, target.y + 0.12f, 0f);
 
-        float pulse = 0.7f + 0.3f * Mathf.Sin(Time.unscaledTime * 4f);
-        Color c = anchorColor;
-        c.a *= pulse * dim;
+        float breathe = 0.75f + 0.25f * Mathf.Sin(Time.unscaledTime * 3f);
 
-        // Flattened, like the real marker: this is a place on the floor, not an object in the air.
-        anchorMark.transform.position = new Vector3(target.x, target.y + 0.12f, 0f);
-        anchorMark.transform.localScale = new Vector3(1.7f / 0.41f, 1.7f * 0.42f / 0.41f, 1f);
-        anchorMark.color = c;
+        SetEllipse(anchorDecal, c, ANCHOR_SPOT_R, ANCHOR_SPOT_R * ANCHOR_FLATTEN);
+        Color dc = anchorColor;
+        dc.a *= breathe * dim;
+        anchorDecal.startColor = anchorDecal.endColor = dc;
 
-        // No tether before placement — the marker lands at the player's own feet, so a line to
-        // themselves would be noise.
+        for (int i = 0; i < anchorRings.Length; i++)
+        {
+            float t = Mathf.Repeat(Time.unscaledTime / ANCHOR_RING_PERIOD + (float)i / anchorRings.Length, 1f);
+            float r = Mathf.Lerp(ANCHOR_RING_START, ANCHOR_SPOT_R, t * t);   // accelerates as it arrives
+            SetEllipse(anchorRings[i], c, r, r * ANCHOR_FLATTEN);
+
+            // Zero at both ends so the loop point is invisible — a ring snapping back out would
+            // undo the inward reading the whole effect depends on.
+            float fade = Mathf.Clamp01(t / 0.25f) * Mathf.Clamp01((1f - t) / 0.2f);
+            Color rc = anchorColor;
+            rc.a *= fade * 0.85f * dim;
+            anchorRings[i].startColor = anchorRings[i].endColor = rc;
+        }
+
+        anchorCore.transform.position = c;
+        anchorCore.transform.localScale = new Vector3(ANCHOR_SPOT_R * 2.4f, ANCHOR_SPOT_R * 2.4f * ANCHOR_FLATTEN, 1f);
+        anchorCore.color = new Color(anchorColor.r, anchorColor.g, anchorColor.b, 0.12f * breathe * dim);
+
+        // No tether before placement — the marker lands at the player's own feet, so a line from
+        // them to themselves would be noise.
         anchorTether.enabled = placed;
         if (placed)
         {
             anchorTether.SetPosition(0, new Vector3(transform.position.x, transform.position.y + 0.5f, 0f));
-            anchorTether.SetPosition(1, new Vector3(target.x, target.y + 0.12f, 0f));
+            anchorTether.SetPosition(1, c);
             Color tc = anchorColor;
-            tc.a *= 0.35f * pulse * dim;
+            tc.a *= 0.3f * breathe * dim;
             anchorTether.startColor = anchorTether.endColor = tc;
+        }
+    }
+
+    // Flattened ring on the ground plane. Shared by the decal and the contracting rings so they
+    // can never disagree about what "on the floor" looks like.
+    private static void SetEllipse(LineRenderer lr, Vector3 center, float rx, float ry)
+    {
+        for (int i = 0; i < lr.positionCount; i++)
+        {
+            float a = (float)i / lr.positionCount * Mathf.PI * 2f;
+            lr.SetPosition(i, new Vector3(center.x + Mathf.Cos(a) * rx, center.y + Mathf.Sin(a) * ry, center.z));
         }
     }
 
