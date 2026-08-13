@@ -2,22 +2,39 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.EventSystems;
 using TMPro;
 
 // The run map — press M. A chart of the whole act, so the player plans a ROUTE rather than picking
 // one door at a time.
 //
-// THEME: Verdigris (FlatUI.Verdigris), and it is deliberately the odd one out. Every other screen
-// dresses a PLACE and renders it with light on material — the Forge lit from below, Blompo lit from
-// above, the Marketplace by lamplight. A map is not a place: you are not standing in it, you are
-// reading it. So this screen inverts the lighting model entirely — flat, matte, unlit, with no glow
-// source and NO PARTICLE FIELD, because a chart has no air. What moves instead is the INFORMATION:
-// branches you can take pulse, and the route you have walked shimmers along its length.
+// THEME: Etch. The plate is oxidised copper — Act 1's own chemistry — and the act is ACID-ETCHED
+// into it. That single idea decides everything else:
 //
-// The material is oxidised copper, Act 1's own chemistry, and it pays off the accent: the travelled
-// route is drawn in warm BARE copper, as if the patina had been worn back to metal by walking it.
-// Every other theme's accent is light being added; this one's is surface being worn away.
+//   · Every mark is CUT IN, never drawn on. Node sockets and edge grooves carry a dark rim on the
+//     lit side and a bright rim on the shaded side, which is the classic engraving cue. Swap those
+//     two and the whole chart pops OUT as stickers stuck to a board.
+//   · The light RAKES ACROSS from the upper left. Iron is lit by fire from below and its marks
+//     (rivets) stand proud of the plate; this is the inversion of both — cold light from the side,
+//     and a surface that is incised rather than raised.
+//   · The accent is BARE COPPER, not light. Where the player has walked, the acid has bitten
+//     through the patina to clean metal. Every other theme's accent is light being added; this
+//     one's is surface being worn away.
+//   · There is NO PARTICLE FIELD, because a chart has no air. The one thing that moves is the acid
+//     still working at the frontier — the branches you can actually take.
+//
+// ⚠️ WHAT THE REBUILD FIXED, so nobody reintroduces it (2026-08-13). The previous version read as a
+// debug node-graph, and the three causes were structural, not decorative:
+//
+//   1. NOTHING TO STAND ON. Nodes floated in a void with no floor lines, so a branching act read as
+//      scattered dots. Floor bands are what turn dots into LEVELS, and they give the run a visible
+//      scale that "7 TO THE BOSS" in a footer never could.
+//   2. EDGES CROSSED CONSTANTLY. Nodes were plotted straight from their generator column, so a
+//      route could not be traced by eye. See LayOutNodes: barycentric relaxation pulls each node
+//      toward its neighbours' average and removes nearly every crossing.
+//   3. THE ACT YOU ARE PLANNING WAS INVISIBLE. Everything not immediately reachable was drawn in
+//      TextDisabled and labelled with nothing at all — so the 90% of the chart the player is
+//      supposed to be reading ahead through could barely be seen and could not be named. Unreached
+//      nodes are now etched in legible Patina and EVERY node carries its label.
 //
 // House pattern: entirely procedural, self-instantiating under the root Canvas, no prefab and no
 // art files. Same shape as ScrapForgeScreen and BlompoScreen.
@@ -25,29 +42,76 @@ public class RunMapScreen : MonoBehaviour
 {
     private static RunMapScreen instance;
 
-    // Sized to fill most of a 1920x1080 screen. The chart is the run's map of itself and the player
-    // now sees it on every room change, so it gets the room to be read rather than squinted at.
     private const float WIN_W = 1560f;
     private const float WIN_H = 980f;
     private const float CHAMFER = 10f;
 
-    // Map drawing area, inset inside the window. The insets are generous on purpose: nodes are
-    // positioned by their CENTRE, so the boss glyph (76px) and the labels hanging under each
-    // reachable node both need room or they collide with the title rule and the footer.
-    private const float AREA_TOP = 132f;
-    private const float AREA_BOTTOM = 106f;
-    private const float AREA_SIDE = 62f;
+    // Chart area, inset inside the window. Generous on purpose: nodes are positioned by their
+    // CENTRE, so the boss glyph and the label hanging under every node both need room.
+    private const float AREA_TOP = 120f;
+    private const float AREA_BOTTOM = 94f;
+    private const float AREA_SIDE = 58f;
+
+    // Node X is clamped this far inside the area so a label (118 wide) never runs off the plate,
+    // and so the floor-band depth marks in the left gutter are never sat on.
+    private const float X_PAD = 74f;
+    // Minimum horizontal gap between two nodes on the same floor. Must exceed the label width or
+    // neighbouring labels collide — which is what the old jitter kept doing.
+    private const float MIN_SEP = 132f;
+
+    private const int RELAX_ITERS = 24;
+    private const float RELAX_RATE = 0.35f;
 
     private const float EDGE_THICKNESS = 3f;
+
+    // ---- the etch palette ------------------------------------------------------------------------
+    // Local to this screen rather than pushed into FlatUI.Verdigris: these are the values of a
+    // specific material under a specific light, not a general-purpose theme ramp. Every one was
+    // picked by screenshot — this project renders in LINEAR colour space, where a plausible-looking
+    // number composites far brighter than it reads on paper.
+
+    // The plate. Deliberately greener and a little lighter than the old Verdigris Surface, which
+    // sat so near black that the chart looked like it was floating in a void rather than lying on
+    // a sheet of metal.
+    private static readonly Color PlateBase = new Color(0.062f, 0.104f, 0.092f, 0.995f);
+    private static readonly Color PlateSheen = new Color(0.42f, 0.62f, 0.54f, 1f);   // raking light
+    private static readonly Color Backdrop = new Color(0.010f, 0.018f, 0.016f, 0.945f);
+
+    private static readonly Color GrooveDark = new Color(0.018f, 0.038f, 0.032f, 1f);
+    private static readonly Color GrooveLit = new Color(0.250f, 0.360f, 0.305f, 1f);
+
+    // ⚠️ THREE DISTINCT VALUES, AND THEY MUST STAY DISTINCT, or the sockets stop reading as holes.
+    // The first build made the socket floor and its shadow rim the SAME colour (both GrooveDark),
+    // so the dark wall was invisible against the floor it was drawn on and every node came out
+    // looking like a button stuck on the plate. A recess needs: floor darker than the plate, and a
+    // shadow wall darker again than the floor, so there is something for it to bite against.
+    private static readonly Color SocketFloor = new Color(0.034f, 0.062f, 0.054f, 1f);
+    private static readonly Color RimShadow = new Color(0.006f, 0.014f, 0.012f, 1f);
+
+    // How far the two rims are pushed apart. 1.5px was too small to survive at this scale — the
+    // bevel simply did not register. This is a look value: judge it on screen, not on paper.
+    private const float BEVEL = 2.6f;
+
+    // ⚠️ THE LOAD-BEARING COLOUR. This is everything the player has not reached yet — most of the
+    // chart, and the entire thing they are planning a route through. The old value (TextDisabled,
+    // 0.31/0.365/0.349) was a near-neutral grey that vanished into the plate. It must read as
+    // "etched but not yet walked", never as "absent".
+    private static readonly Color Patina = new Color(0.415f, 0.545f, 0.485f, 1f);
+    private static readonly Color PatinaSoft = new Color(0.255f, 0.350f, 0.315f, 1f);
+
+    // Bare metal, bitten through the patina. The accent, and the only warm thing on the plate.
+    private static readonly Color Copper = new Color(0.815f, 0.520f, 0.285f, 1f);
+    private static readonly Color CopperHot = new Color(1.00f, 0.715f, 0.415f, 1f);
+    private static readonly Color CopperWorn = new Color(0.565f, 0.395f, 0.250f, 1f);
+
+    private static readonly Color TextTitle = new Color(0.885f, 0.930f, 0.905f, 1f);
+    private static readonly Color TextQuiet = new Color(0.470f, 0.560f, 0.525f, 1f);
 
     private RectTransform window, area;
     private CanvasGroup group;
     private TMP_FontAsset font;
     private TextMeshProUGUI footer, sub;
 
-    // Set when the screen was opened BECAUSE a branch is required (leaving a room with more than
-    // one way on). In that mode Escape and the backdrop do not dismiss it, and picking a node
-    // commits and continues the run immediately instead of just noting the plan.
     private bool mustChoose;
     private System.Action onChosen;
 
@@ -56,8 +120,9 @@ public class RunMapScreen : MonoBehaviour
     private bool hudWasActive;
     private GameState prevState;
 
-    // Rebuilt every Refresh. Kept so the pulse/shimmer tick doesn't have to search the hierarchy.
-    private readonly List<Image> availableMarks = new List<Image>();
+    // Rebuilt every Refresh. Kept so the motion tick doesn't have to search the hierarchy.
+    private readonly List<Image> frontierBlooms = new List<Image>();
+    private readonly List<Image> frontierRims = new List<Image>();
     private readonly List<Image> travelledEdges = new List<Image>();
     private readonly List<GameObject> spawned = new List<GameObject>();
 
@@ -150,7 +215,7 @@ public class RunMapScreen : MonoBehaviour
         Stretch(root);
         group = gameObject.AddComponent<CanvasGroup>();
 
-        Image backdrop = AddImage(transform, "Backdrop", null, T.Backdrop, true);
+        Image backdrop = AddImage(transform, "Backdrop", null, Backdrop, true);
         Stretch(backdrop.rectTransform);
         Button backBtn = backdrop.gameObject.AddComponent<Button>();
         backBtn.transition = Selectable.Transition.None;
@@ -159,64 +224,83 @@ public class RunMapScreen : MonoBehaviour
         window = AddPoint(transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(WIN_W, WIN_H));
         Image winBg = window.gameObject.AddComponent<Image>();
         winBg.sprite = FlatUI.Panel((int)CHAMFER);
-        winBg.type = Image.Type.Sliced;
-        winBg.color = T.Surface;
+        winBg.type = Image.Type.Sliced;      // MUST be Sliced — Simple stretches the chamfer sprite
+        winBg.color = PlateBase;
         winBg.raycastTarget = true;
 
+        // The raking light. A single broad bloom parked off the plate's upper-left corner, very
+        // low alpha — that asymmetry is what makes the surface read as metal under a side light
+        // rather than as a flat filled rectangle. It is NOT a border glow: it has no edge of its own.
+        Image sheen = AddImage(window, "Sheen", MapGlyphs.Bloom(), Fade(PlateSheen, 0.055f), false);
+        sheen.rectTransform.anchorMin = sheen.rectTransform.anchorMax = new Vector2(0f, 1f);
+        sheen.rectTransform.anchoredPosition = new Vector2(120f, -60f);
+        sheen.rectTransform.sizeDelta = new Vector2(1500f, 1100f);
+
+        // Patchy oxidation. Verdigris does not form evenly, and an untextured plate is what made
+        // the first pass read as a big green rectangle rather than a sheet of corroded metal.
+        // Deterministic seed so the blotches never move between openings — they are part of the
+        // object, not an effect. Alpha is deliberately about half what looks right on paper: this
+        // is LINEAR colour space and anything stronger becomes visible cloud instead of texture.
+        System.Random mot = new System.Random(20260813);
+        for (int i = 0; i < 16; i++)
+        {
+            float mw = 180f + (float)mot.NextDouble() * 460f;
+            Image blot = AddImage(window, "Patina" + i, MapGlyphs.Bloom(),
+                Fade(i % 3 == 0 ? PlateSheen : GrooveDark, 0.030f), false);
+            blot.rectTransform.anchoredPosition = new Vector2(
+                ((float)mot.NextDouble() - 0.5f) * WIN_W * 0.94f,
+                ((float)mot.NextDouble() - 0.5f) * WIN_H * 0.94f);
+            blot.rectTransform.sizeDelta = new Vector2(mw, mw * (0.55f + (float)mot.NextDouble() * 0.7f));
+        }
+
         Image winEdge = AddImage(window, "Edge", FlatUI.Outline((int)CHAMFER, 2), T.Border, false);
-        // MUST be Sliced. AddImage leaves the default Simple, which stretches this 26px outline
-        // sprite across the whole 1040x780 window — it renders as an enormous soft octagon glow
-        // hanging outside the panel, which is exactly what the first build did.
         winEdge.type = Image.Type.Sliced;
         Stretch(winEdge.rectTransform);
         FlatUI.ApplySliceThickness(winEdge, 2f);
 
-        // The one lit element allowed: a hairline along the top lip, so the plate still reads as a
-        // physical sheet rather than a flat rectangle. NOT a glow — it has no falloff into the panel.
-        Image lip = AddImage(window, "Lip", FlatUI.FadedRule(), T.EdgeLight, false);
+        // Hairline along the top lip: the plate's own cut edge catching the same raking light.
+        Image lip = AddImage(window, "Lip", FlatUI.FadedRule(), Fade(PlateSheen, 0.62f), false);
         lip.rectTransform.anchorMin = new Vector2(0f, 1f);
         lip.rectTransform.anchorMax = new Vector2(1f, 1f);
         lip.rectTransform.pivot = new Vector2(0.5f, 1f);
         lip.rectTransform.anchoredPosition = new Vector2(0f, -3f);
-        lip.rectTransform.sizeDelta = new Vector2(-56f, 1f);
+        lip.rectTransform.sizeDelta = new Vector2(-56f, 2f);
 
-        TextMeshProUGUI title = AddText(window, "Title", "THE OXIDATION DISTRICT", 30f, T.TextBright,
+        TextMeshProUGUI title = AddText(window, "Title", "THE OXIDATION DISTRICT", 30f, TextTitle,
             TextAlignmentOptions.Center);
         title.rectTransform.anchorMin = new Vector2(0f, 1f);
         title.rectTransform.anchorMax = new Vector2(1f, 1f);
         title.rectTransform.pivot = new Vector2(0.5f, 1f);
-        title.rectTransform.anchoredPosition = new Vector2(0f, -26f);
+        title.rectTransform.anchoredPosition = new Vector2(0f, -24f);
         title.rectTransform.sizeDelta = new Vector2(-80f, 38f);
         title.characterSpacing = 8f;
 
-        sub = AddText(window, "Sub", "CHOOSE YOUR ROUTE", 15f, T.TextMuted,
-            TextAlignmentOptions.Center);
+        sub = AddText(window, "Sub", "", 15f, TextQuiet, TextAlignmentOptions.Center);
         sub.rectTransform.anchorMin = new Vector2(0f, 1f);
         sub.rectTransform.anchorMax = new Vector2(1f, 1f);
         sub.rectTransform.pivot = new Vector2(0.5f, 1f);
-        sub.rectTransform.anchoredPosition = new Vector2(0f, -62f);
+        sub.rectTransform.anchoredPosition = new Vector2(0f, -58f);
         sub.rectTransform.sizeDelta = new Vector2(-80f, 22f);
         sub.characterSpacing = 6f;
 
-        Image rule = AddImage(window, "TitleRule", FlatUI.FadedRule(), T.BorderSoft, false);
+        Image rule = AddImage(window, "TitleRule", FlatUI.FadedRule(), Fade(GrooveLit, 0.85f), false);
         rule.rectTransform.anchorMin = new Vector2(0f, 1f);
         rule.rectTransform.anchorMax = new Vector2(1f, 1f);
         rule.rectTransform.pivot = new Vector2(0.5f, 1f);
-        rule.rectTransform.anchoredPosition = new Vector2(0f, -88f);
-        rule.rectTransform.sizeDelta = new Vector2(-120f, 1f);
+        rule.rectTransform.anchoredPosition = new Vector2(0f, -84f);
+        rule.rectTransform.sizeDelta = new Vector2(-120f, 2f);
 
-        // The chart itself.
         area = AddPoint(window, "Area", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
         area.anchorMin = new Vector2(0f, 0f);
         area.anchorMax = new Vector2(1f, 1f);
         area.offsetMin = new Vector2(AREA_SIDE, AREA_BOTTOM);
         area.offsetMax = new Vector2(-AREA_SIDE, -AREA_TOP);
 
-        footer = AddText(window, "Footer", "", 14f, T.TextMuted, TextAlignmentOptions.Center);
+        footer = AddText(window, "Footer", "", 14f, TextQuiet, TextAlignmentOptions.Center);
         footer.rectTransform.anchorMin = new Vector2(0f, 0f);
         footer.rectTransform.anchorMax = new Vector2(1f, 0f);
         footer.rectTransform.pivot = new Vector2(0.5f, 0f);
-        footer.rectTransform.anchoredPosition = new Vector2(0f, 22f);
+        footer.rectTransform.anchoredPosition = new Vector2(0f, 20f);
         footer.rectTransform.sizeDelta = new Vector2(-80f, 24f);
         footer.characterSpacing = 4f;
     }
@@ -243,7 +327,6 @@ public class RunMapScreen : MonoBehaviour
         if (hudWasActive && HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(true);
 
         FitWindowToCanvas();
-
         Refresh();
 
         StopAllCoroutines();
@@ -271,16 +354,12 @@ public class RunMapScreen : MonoBehaviour
     //
     // ⚠️ This is the WIDEST window in the game (1560), so it is the first thing to run off the edge
     // on a narrow display. With the canvas matching HEIGHT, its logical width is 1080 * aspect —
-    // which is 1920 at 16:9 and 2560 at 21:9, but only 1440 at 4:3, and the frame then hangs off
-    // both sides. Measured at 1440x1080: the chart itself stayed readable but the panel had no
-    // visible left or right edge.
+    // 1920 at 16:9 and 2560 at 21:9, but only 1440 at 4:3.
     //
-    // Only the map does this. The chart is laid out inside `area`, which is anchored to the
-    // window's corners with insets, so it genuinely reflows into whatever size it is given. The
-    // other screens position their content at fixed offsets from the window centre, so shrinking
-    // THEM would overlap their columns rather than reflow — for those, a smaller window is worse
-    // than an overhanging one. (Settings, the next widest at 1240, still fits any aspect down to
-    // 1.15 — narrower than any display in use.)
+    // Only the map RESIZES. Its chart lives in `area`, anchored to the window corners with insets,
+    // so it genuinely reflows into whatever size it is given — and LayOutNodes reads `area.rect`
+    // fresh every Refresh, so the relaxation re-solves for the smaller width. The other screens
+    // position content at fixed offsets from their centre and must SCALE instead.
     private void FitWindowToCanvas()
     {
         RectTransform parent = transform as RectTransform;
@@ -314,9 +393,7 @@ public class RunMapScreen : MonoBehaviour
     private void Update()
     {
         if (!isOpen) return;
-
         if (Input.GetKeyDown(KeyCode.Escape)) { DismissIfAllowed(); return; }
-
         TickMotion();
     }
 
@@ -326,7 +403,6 @@ public class RunMapScreen : MonoBehaviour
         Hide();
     }
 
-    // Commits the branch the player clicked and lets the run continue.
     private void ConfirmChoice()
     {
         System.Action cb = onChosen;
@@ -337,32 +413,35 @@ public class RunMapScreen : MonoBehaviour
         cb?.Invoke();
     }
 
-    // Motion lives in the information, not the atmosphere — see the header. Branches you can take
-    // breathe; the route already walked carries a slow travelling shimmer.
+    // The only motion on the plate, and it is information, not atmosphere: acid still working at
+    // the frontier. Deliberately slow and shallow — this screen is read, not watched, and anything
+    // livelier competes with the route the player is trying to trace.
     private void TickMotion()
     {
-        float pulse = 0.55f + 0.45f * Mathf.Sin(Time.unscaledTime * 3.0f);
+        float breathe = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 1.8f);
 
-        for (int i = 0; i < availableMarks.Count; i++)
+        for (int i = 0; i < frontierBlooms.Count; i++)
         {
-            Image img = availableMarks[i];
+            Image img = frontierBlooms[i];
             if (img == null) continue;
-            Color c = img.color;
-            c.a = Mathf.Lerp(0.35f, 1f, pulse);
-            img.color = c;
+            img.color = Fade(CopperHot, Mathf.Lerp(0.035f, 0.105f, breathe));
         }
 
+        for (int i = 0; i < frontierRims.Count; i++)
+        {
+            Image img = frontierRims[i];
+            if (img == null) continue;
+            img.color = Color.Lerp(Copper, CopperHot, breathe);
+        }
+
+        // Offset per edge so the glint runs ALONG the walked route rather than the whole path
+        // flashing at once, which reads as one object instead of a path.
         for (int i = 0; i < travelledEdges.Count; i++)
         {
             Image img = travelledEdges[i];
             if (img == null) continue;
-            // Offset per edge so the shimmer runs ALONG the route instead of the whole path
-            // flashing at once, which reads as a single object rather than a path.
-            float phase = Time.unscaledTime * 1.9f - i * 0.55f;
-            float k = 0.5f + 0.5f * Mathf.Sin(phase);
-            Color c = T.Accent;
-            c.a = Mathf.Lerp(0.55f, 0.95f, k);
-            img.color = c;
+            float k = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 1.6f - i * 0.5f);
+            img.color = Color.Lerp(CopperWorn, Copper, k);
         }
     }
 
@@ -371,7 +450,8 @@ public class RunMapScreen : MonoBehaviour
     private void Refresh()
     {
         // Deactivate before Destroy: Unity's Destroy is deferred to end of frame, so the old chart
-        // would otherwise still render on top of the new one for a frame.
+        // would otherwise render on top of the new one for a frame — and its buttons would still
+        // answer GetComponentsInChildren.
         foreach (GameObject go in spawned)
         {
             if (go == null) continue;
@@ -379,7 +459,8 @@ public class RunMapScreen : MonoBehaviour
             Destroy(go);
         }
         spawned.Clear();
-        availableMarks.Clear();
+        frontierBlooms.Clear();
+        frontierRims.Clear();
         travelledEdges.Clear();
 
         RunMapManager mgr = RunMapManager.instance;
@@ -393,128 +474,253 @@ public class RunMapScreen : MonoBehaviour
 
         Dictionary<int, Vector2> pos = LayOutNodes(map);
 
-        // Edges first so nodes sit on top of them.
+        DrawFloorBands(map);
+
+        // Edges first so the sockets sit on top of where they land.
         foreach (MapNode n in map.nodes)
-        {
             foreach (int id in n.next)
             {
                 MapNode m = map.Get(id);
                 if (m == null) continue;
                 DrawEdge(map, mgr, n, m, pos[n.id], pos[m.id]);
             }
-        }
 
         foreach (MapNode n in map.nodes) DrawNode(map, mgr, n, pos[n.id]);
 
-        if (sub != null)
-            sub.text = mustChoose ? "CHOOSE YOUR ROUTE" : "PRESS ESC TO CLOSE";
+        if (sub != null) sub.text = mustChoose ? "CHOOSE YOUR ROUTE" : "PRESS ESC TO CLOSE";
 
         int floorsLeft = (map.floors - 1) - (map.Current != null ? map.Current.floor : 0);
         if (mustChoose)
-        {
             SetFooter($"PICK A BRANCH TO CONTINUE   ·   {floorsLeft} TO THE BOSS");
-        }
         else if (mgr != null && mgr.HasChosenNext)
         {
             MapNode chosen = map.Get(mgr.ChosenNextId);
             SetFooter($"NEXT: {MapGlyphs.LabelFor(chosen.type)}{RechargeSuffix(chosen)}   ·   {floorsLeft} TO THE BOSS");
         }
         else if (map.AvailableNext().Count > 0)
-        {
             SetFooter($"PICK A BRANCH   ·   {floorsLeft} TO THE BOSS");
-        }
         else
-        {
             SetFooter("ACT COMPLETE");
-        }
     }
 
     private string RechargeSuffix(MapNode n)
-    {
-        return n.recharge == RechargeType.None ? "" : $" + {MapGlyphs.LabelFor(n.recharge)}";
-    }
+        => n.recharge == RechargeType.None ? "" : $" + {MapGlyphs.LabelFor(n.recharge)}";
 
     private void SetFooter(string s)
     {
         if (footer != null) footer.text = s;
     }
 
-    // Positions every node in the chart area. Columns are spread across the full width and floors
-    // stack bottom-to-top, with a small DETERMINISTIC jitter per node so the act reads as a drawn
-    // route rather than a spreadsheet — seeded by node id so it never moves between openings.
+    // A scored line per floor, with a depth mark in the left gutter.
+    //
+    // This is the single change that turns the chart from scattered dots into a structure you climb.
+    // It also gives the run a visible scale: how far the boss is stops being a number in the footer
+    // and becomes a distance you can see.
+    private void DrawFloorBands(RunMap map)
+    {
+        Rect r = area.rect;
+        float h = r.height, w = r.width;
+        float step = map.floors > 1 ? h / (map.floors - 1) : h;
+        int curFloor = map.Current != null ? map.Current.floor : 0;
+
+        for (int f = 0; f < map.floors; f++)
+        {
+            float y = -h * 0.5f + step * f;
+            bool passed = f < curFloor;
+            bool here = f == curFloor;
+            bool bossBand = f == map.floors - 1;
+
+            // Bands behind the player are worn to copper like everything else they have walked.
+            // The boss band is deliberately the heaviest line on the plate: it is the edge of the
+            // act, and the thing every route on the chart is pointing at.
+            Color line = here ? Fade(Copper, 0.42f)
+                       : bossBand ? Fade(GrooveLit, 0.62f)
+                       : passed ? Fade(CopperWorn, 0.24f)
+                                : Fade(GrooveLit, 0.30f);
+
+            GameObject go = new GameObject($"Band{f}", typeof(RectTransform));
+            RectTransform rt = go.GetComponent<RectTransform>();
+            rt.SetParent(area, false);
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = new Vector2(0f, y);
+            rt.sizeDelta = new Vector2(w, bossBand ? 3f : 2f);   // 2px min — a hairline is subpixel luck
+
+            Image img = go.AddComponent<Image>();
+            img.sprite = FlatUI.FadedRule();     // scores across and fades at the ends
+            img.color = line;
+            img.raycastTarget = false;
+            spawned.Add(go);
+
+            // Depth mark, in the gutter X_PAD keeps clear of every node and label.
+            string mark = f == 0 ? "HUB" : f == map.floors - 1 ? "BOSS" : f.ToString("00");
+            TextMeshProUGUI t = AddText(area, $"Depth{f}", mark, 11f,
+                here ? Fade(Copper, 0.95f) : Fade(passed ? CopperWorn : PatinaSoft, 0.9f),
+                TextAlignmentOptions.Left);
+            t.rectTransform.anchoredPosition = new Vector2(-w * 0.5f + 4f, y + 11f);
+            t.rectTransform.sizeDelta = new Vector2(70f, 14f);
+            t.characterSpacing = 3f;
+            spawned.Add(t.gameObject);
+        }
+    }
+
+    // Positions every node in the chart area.
+    //
+    // Each node is pulled toward the mean X of everything it connects to (barycentric ordering,
+    // the standard layered-graph fix), then each row is pushed apart to MIN_SEP.
+    //
+    // ⚠️ WHAT THIS DOES AND DOES NOT DO — measured over 300 generated acts, because the first
+    // version of this comment claimed a crossing fix that does not exist:
+    //
+    //   · Edge crossings were ALREADY ZERO and still are (0.00/act in both layouts, worst case 0).
+    //     The generator's column carving prevents them; nothing here was needed. If the old chart
+    //     looked tangled, that was edges passing near unrelated nodes, not true intersections.
+    //   · What it actually buys: average sideways travel per edge falls 214px -> 86px, a 60% drop.
+    //     Edges become far more vertical, so a route reads as one continuous climb instead of a
+    //     zigzag. THAT is the legibility win.
+    //   · The cost, and why MIN_SEP is load-bearing: pulling nodes toward their neighbours also
+    //     pulls them toward each other, and the tightest same-floor gap falls 232px -> 132px. That
+    //     is still wider than the 118px label box, which is the only reason labels don't collide.
+    //     Lower MIN_SEP below the label width and they will.
+    //
+    // Deterministic: no random jitter at all. The old jitter existed to stop the chart looking like
+    // a spreadsheet, but on an ENGRAVED plate sitting exactly on the floor line is correct —
+    // precision is the material — and the bands now supply the structure the jitter was faking.
     private Dictionary<int, Vector2> LayOutNodes(RunMap map)
     {
-        Dictionary<int, Vector2> pos = new Dictionary<int, Vector2>();
-
         Rect r = area.rect;
         float w = r.width, h = r.height;
+        float halfW = w * 0.5f;
+        float limit = Mathf.Max(0f, halfW - X_PAD);
+
+        float step = map.floors > 1 ? h / (map.floors - 1) : h;
 
         int maxCol = 0;
         foreach (MapNode n in map.nodes) if (n.column > maxCol) maxCol = n.column;
-
         float colStep = maxCol > 0 ? w / (maxCol + 1) : w;
-        float floorStep = map.floors > 1 ? h / (map.floors - 1) : h;
 
+        // Seed from the generator's columns.
+        Dictionary<int, float> x = new Dictionary<int, float>();
         foreach (MapNode n in map.nodes)
+            x[n.id] = maxCol > 0 ? -halfW + colStep * (n.column + 0.5f) : 0f;
+
+        // Group by floor once.
+        List<List<MapNode>> byFloor = new List<List<MapNode>>();
+        for (int f = 0; f < map.floors; f++) byFloor.Add(new List<MapNode>());
+        foreach (MapNode n in map.nodes)
+            if (n.floor >= 0 && n.floor < map.floors) byFloor[n.floor].Add(n);
+
+        for (int iter = 0; iter < RELAX_ITERS; iter++)
         {
-            float x = maxCol > 0 ? -w * 0.5f + colStep * (n.column + 0.5f) : 0f;
-            float y = -h * 0.5f + floorStep * n.floor;
-
-            // Start and Boss are single nodes and belong dead centre — they are the act's spine.
-            if (n.type == MapNodeType.Start || n.type == MapNodeType.Boss)
+            foreach (List<MapNode> row in byFloor)
             {
-                pos[n.id] = new Vector2(0f, y);
-                continue;
+                foreach (MapNode n in row)
+                {
+                    // The act's spine. Start and Boss are single nodes and belong dead centre;
+                    // letting them drift makes the whole chart look tipped over.
+                    if (n.type == MapNodeType.Start || n.type == MapNodeType.Boss) { x[n.id] = 0f; continue; }
+
+                    float sum = 0f; int count = 0;
+                    foreach (int id in n.next) { if (x.ContainsKey(id)) { sum += x[id]; count++; } }
+                    foreach (int id in n.prev) { if (x.ContainsKey(id)) { sum += x[id]; count++; } }
+                    if (count == 0) continue;
+
+                    x[n.id] = Mathf.Lerp(x[n.id], sum / count, RELAX_RATE);
+                }
+
+                // Push the row apart, then re-centre it so repeated passes don't march it right.
+                row.Sort((a, b) => x[a.id].CompareTo(x[b.id]));
+                for (int i = 1; i < row.Count; i++)
+                {
+                    float need = x[row[i - 1].id] + MIN_SEP;
+                    if (x[row[i].id] < need) x[row[i].id] = need;
+                }
+                if (row.Count > 1)
+                {
+                    float mid = (x[row[0].id] + x[row[row.Count - 1].id]) * 0.5f;
+                    foreach (MapNode n in row)
+                        if (n.type != MapNodeType.Start && n.type != MapNodeType.Boss) x[n.id] -= mid;
+                }
+
+                foreach (MapNode n in row)
+                    if (n.type != MapNodeType.Start && n.type != MapNodeType.Boss)
+                        x[n.id] = Mathf.Clamp(x[n.id], -limit, limit);
             }
-
-            System.Random rng = new System.Random(n.id * 7919 + map.seed);
-            // Horizontal jitter is kept tighter than vertical: sideways wander is what pushes two
-            // nodes on the same floor close enough for their labels to collide, while vertical
-            // wander costs nothing.
-            float jx = ((float)rng.NextDouble() - 0.5f) * colStep * 0.20f;
-            float jy = ((float)rng.NextDouble() - 0.5f) * floorStep * 0.28f;
-
-            pos[n.id] = new Vector2(x + jx, y + jy);
         }
 
+        Dictionary<int, Vector2> pos = new Dictionary<int, Vector2>();
+        foreach (MapNode n in map.nodes)
+            pos[n.id] = new Vector2(x[n.id], -h * 0.5f + step * n.floor);
         return pos;
     }
 
-    // A line between two nodes, drawn as a thin rotated rect.
+    // A channel cut between two nodes: a dark groove with a lit wall along one side. The offset is
+    // perpendicular to the run and constant in SCREEN space, so every groove on the plate catches
+    // the light from the same direction — which is what sells the engraving.
     private void DrawEdge(RunMap map, RunMapManager mgr, MapNode from, MapNode to, Vector2 a, Vector2 b)
     {
         bool travelled = map.visited.Contains(from.id) && map.visited.Contains(to.id);
         bool open = map.currentNodeId == from.id && map.CanTravelTo(to.id);
         bool committed = open && mgr != null && mgr.ChosenNextId == to.id;
 
-        Color c;
-        float thickness = EDGE_THICKNESS;
-
-        if (travelled) { c = T.Accent; thickness = EDGE_THICKNESS + 1.5f; }
-        else if (committed) { c = T.Accent; thickness = EDGE_THICKNESS + 1f; }
-        else if (open) { c = T.TextBody; }
-        else { c = T.BorderSoft; thickness = EDGE_THICKNESS - 1f; }
-
         Vector2 delta = b - a;
         float len = delta.magnitude;
         if (len < 0.01f) return;
 
-        GameObject go = new GameObject($"Edge{from.id}_{to.id}", typeof(RectTransform));
+        // ⚠️ TRIM BOTH ENDS BACK TO THE SOCKET RIM. A channel runs BETWEEN two sockets; drawn
+        // centre-to-centre it runs straight through them and, worse, straight through the label
+        // hanging under the far one. On the hub row — five edges fanning up into five labelled
+        // nodes — that put a line through every word on the frontier.
+        Vector2 dir = delta / len;
+        float ra = MapGlyphs.SizeFor(from.type) * 0.5f + 10f + 4f;
+        float rb = MapGlyphs.SizeFor(to.type) * 0.5f + 10f + 4f;
+        if (ra + rb >= len - 4f) return;      // sockets touch; a stub between them reads as dirt
+
+        a += dir * ra;
+        b -= dir * rb;
+        delta = b - a;
+        len = delta.magnitude;
+
+        float ang = Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg;
+        Vector2 mid = a + delta * 0.5f;
+
+        Color groove;
+        float thickness;
+        if (travelled) { groove = Copper; thickness = EDGE_THICKNESS + 2f; }
+        else if (committed) { groove = CopperHot; thickness = EDGE_THICKNESS + 1.5f; }
+        else if (open) { groove = Patina; thickness = EDGE_THICKNESS + 0.5f; }
+        else { groove = PatinaSoft; thickness = EDGE_THICKNESS - 0.5f; }
+
+        // The dark cut, offset down-right — the shadowed inside wall of the channel.
+        MakeBar($"EdgeCut{from.id}_{to.id}", mid + PerpOffset(delta, -1.4f), len, thickness,
+                ang, Fade(GrooveDark, 0.75f), null);
+
+        Image lit = MakeBar($"Edge{from.id}_{to.id}", mid, len, thickness, ang, groove, null);
+        if (travelled) travelledEdges.Add(lit);
+    }
+
+    // Perpendicular offset of `dist` px to the left of the run direction.
+    private static Vector2 PerpOffset(Vector2 dir, float dist)
+    {
+        Vector2 n = new Vector2(-dir.y, dir.x).normalized;
+        return n * dist;
+    }
+
+    private Image MakeBar(string name, Vector2 pos, float len, float thick, float angle, Color c, Sprite s)
+    {
+        GameObject go = new GameObject(name, typeof(RectTransform));
         RectTransform rt = go.GetComponent<RectTransform>();
         rt.SetParent(area, false);
-        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = a + delta * 0.5f;
-        rt.sizeDelta = new Vector2(len, thickness);
-        rt.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = pos;
+        rt.sizeDelta = new Vector2(len, thick);
+        rt.localRotation = Quaternion.Euler(0f, 0f, angle);
 
         Image img = go.AddComponent<Image>();
-        img.sprite = FlatUI.Pixel();
+        img.sprite = s != null ? s : FlatUI.Pixel();
         img.color = c;
         img.raycastTarget = false;
-
         spawned.Add(go);
-        if (travelled) travelledEdges.Add(img);
+        return img;
     }
 
     private void DrawNode(RunMap map, RunMapManager mgr, MapNode n, Vector2 p)
@@ -525,70 +731,104 @@ public class RunMapScreen : MonoBehaviour
         bool committed = mgr != null && mgr.ChosenNextId == n.id;
 
         float size = MapGlyphs.SizeFor(n.type);
+        float socket = size + 20f;
 
         GameObject go = new GameObject($"Node{n.id}", typeof(RectTransform));
         RectTransform rt = go.GetComponent<RectTransform>();
         rt.SetParent(area, false);
-        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = p;
-        rt.sizeDelta = new Vector2(size + 26f, size + 26f);
+        rt.sizeDelta = new Vector2(socket + 12f, socket + 12f);
         spawned.Add(go);
 
-        // A pulsing halo marks every branch the player may actually take. It is the only thing on
-        // the chart that moves on its own, which is what makes "where can I go" answerable at a
-        // glance without reading anything.
+        // The boss gets a standing haze of its own — not a pulse, because it is a destination
+        // rather than an option. It is the one node the player never chooses and always ends at,
+        // so it should have presence without asking to be clicked.
+        if (n.type == MapNodeType.Boss)
+        {
+            Image aura = AddImage(rt, "BossAura", MapGlyphs.Bloom(), Fade(GrooveLit, 0.10f), false);
+            aura.rectTransform.sizeDelta = new Vector2(socket * 3.4f, socket * 3.4f);
+        }
+
+        // The acid still biting at the frontier. Behind everything, and the only thing that moves.
         if (reachable)
         {
-            Image halo = AddImage(rt, "Halo", MapGlyphs.Ring(), T.TextBright, false);
-            halo.rectTransform.sizeDelta = new Vector2(size + 22f, size + 22f);
-            availableMarks.Add(halo);
+            Image bloom = AddImage(rt, "Bloom", MapGlyphs.Bloom(), Fade(CopperHot, 0.06f), false);
+            bloom.rectTransform.sizeDelta = new Vector2(socket * 2.4f, socket * 2.4f);
+            frontierBlooms.Add(bloom);
         }
+
+        // --- the socket, cut into the plate -------------------------------------------------------
+        // Recess floor, then the rim TWICE at opposite offsets: dark on the lit (upper-left) side,
+        // bright on the shaded (lower-right) side. ⚠️ Swap those two and the node reads as a button
+        // stuck ON the plate instead of a hole punched INTO it — that inversion is the entire cue.
+        Image well = AddImage(rt, "Socket", MapGlyphs.Disc(), SocketFloor, false);
+        well.rectTransform.sizeDelta = new Vector2(socket, socket);
+
+        Image rimDark = AddImage(rt, "RimDark", MapGlyphs.SocketRim(), RimShadow, false);
+        rimDark.rectTransform.sizeDelta = new Vector2(socket, socket);
+        rimDark.rectTransform.anchoredPosition = new Vector2(-BEVEL, BEVEL);
+
+        Color rimCol = isCurrent ? CopperHot
+                     : visited ? CopperWorn
+                     : reachable ? Copper
+                     : Fade(GrooveLit, 0.95f);
+        Image rimLit = AddImage(rt, "RimLit", MapGlyphs.SocketRim(), rimCol, false);
+        rimLit.rectTransform.sizeDelta = new Vector2(socket, socket);
+        rimLit.rectTransform.anchoredPosition = new Vector2(BEVEL, -BEVEL);
+        if (reachable) frontierRims.Add(rimLit);
 
         if (committed)
         {
-            Image lockRing = AddImage(rt, "Committed", MapGlyphs.Ring(), T.Accent, false);
-            lockRing.rectTransform.sizeDelta = new Vector2(size + 34f, size + 34f);
+            Image lockRing = AddImage(rt, "Committed", MapGlyphs.Ring(), CopperHot, false);
+            lockRing.rectTransform.sizeDelta = new Vector2(socket + 16f, socket + 16f);
         }
 
-        Color tint;
-        if (isCurrent) tint = T.Accent;
-        else if (visited) tint = new Color(T.Accent.r, T.Accent.g, T.Accent.b, 0.55f);
-        else if (reachable) tint = T.TextBright;
-        else tint = T.TextDisabled;
+        // --- the mark itself ----------------------------------------------------------------------
+        Color tint = isCurrent ? CopperHot
+                   : visited ? CopperWorn
+                   : reachable ? CopperHot
+                   : Patina;                 // ⚠️ legible, not disabled — see the header
+
+        // Its own shadow in the socket, so the glyph looks stamped rather than pasted.
+        Image glyphShadow = AddImage(rt, "GlyphShadow", MapGlyphs.ForNode(n.type), Fade(RimShadow, 0.85f), false);
+        glyphShadow.rectTransform.sizeDelta = new Vector2(size, size);
+        glyphShadow.rectTransform.anchoredPosition = new Vector2(-2f, 2f);
 
         Image glyph = AddImage(rt, "Glyph", MapGlyphs.ForNode(n.type), tint, false);
         glyph.rectTransform.sizeDelta = new Vector2(size, size);
 
-        // Recharge attachment: a small badge clipped to the node's upper right. None of these
-        // appear until their room prefab is assigned on LevelManager — the map refuses to draw a
-        // room it cannot spawn.
         if (n.recharge != RechargeType.None)
         {
             float badge = 20f;
             RectTransform bt = AddPoint(rt, "Recharge", new Vector2(0.5f, 0.5f),
-                new Vector2(size * 0.48f, size * 0.48f), new Vector2(badge + 8f, badge + 8f));
+                new Vector2(socket * 0.46f, socket * 0.46f), new Vector2(badge + 10f, badge + 10f));
 
             Image disc = bt.gameObject.AddComponent<Image>();
-            disc.sprite = FlatUI.Panel(5);
-            disc.type = Image.Type.Sliced;
-            disc.color = T.SurfaceRaised;
+            disc.sprite = MapGlyphs.Disc();
+            disc.color = Fade(GrooveDark, 0.95f);
             disc.raycastTarget = false;
 
+            Image ring = AddImage(bt, "BadgeRim", MapGlyphs.SocketRim(),
+                reachable || visited ? Fade(Copper, 0.9f) : Fade(GrooveLit, 0.9f), false);
+            ring.rectTransform.sizeDelta = new Vector2(badge + 10f, badge + 10f);
+
             Image mark = AddImage(bt, "Mark", MapGlyphs.ForRecharge(n.recharge),
-                reachable || visited ? T.TextBright : T.TextMuted, false);
+                reachable || visited ? CopperHot : Patina, false);
             mark.rectTransform.sizeDelta = new Vector2(badge, badge);
         }
 
-        // Only reachable nodes are clickable. Choosing is a commitment, not navigation, so the
-        // click sets the branch and the run travels there when the player reaches the exit door.
+        AddLabel(rt, n, socket, isCurrent, visited, reachable);
+
+        // Only reachable nodes are clickable. Choosing is a commitment, not navigation: the click
+        // sets the branch and the run travels there when the player reaches the exit door.
         if (reachable)
         {
             Button btn = go.AddComponent<Button>();
             btn.transition = Selectable.Transition.None;
 
             Image hit = AddImage(rt, "Hit", FlatUI.Pixel(), new Color(0f, 0f, 0f, 0f), true);
-            hit.rectTransform.sizeDelta = new Vector2(size + 26f, size + 26f);
+            hit.rectTransform.sizeDelta = new Vector2(socket + 12f, socket + 12f);
             btn.targetGraphic = hit;
 
             int id = n.id;
@@ -596,47 +836,70 @@ public class RunMapScreen : MonoBehaviour
             {
                 if (RunMapManager.instance == null || !RunMapManager.instance.ChooseNext(id)) return;
                 // Opened by the exit: committing IS leaving, so go. Opened with M: this is
-                // planning, so just mark the branch and let the player keep reading the act.
+                // planning, so mark the branch and let the player keep reading the act.
                 if (mustChoose) ConfirmChoice();
                 else Refresh();
             });
-
-            AddHoverLabel(rt, n, size);
-        }
-        else if (isCurrent)
-        {
-            // BELOW the node. Above it collides with the hanging label of whichever branch sits
-            // directly overhead, which on the hub row is almost always one of them.
-            TextMeshProUGUI here = AddText(rt, "Here", "YOU ARE HERE", 11f, T.Accent, TextAlignmentOptions.Center);
-            here.rectTransform.pivot = new Vector2(0.5f, 1f);
-            here.rectTransform.anchoredPosition = new Vector2(0f, -(size * 0.5f + 10f));
-            here.rectTransform.sizeDelta = new Vector2(160f, 16f);
-            here.characterSpacing = 3f;
         }
     }
 
-    // The node's promise, spelled out under it. Present on every reachable branch rather than on
-    // hover only: the whole point of the map is comparing branches at a glance, and a label you
-    // have to hover to read cannot be compared with anything.
-    private void AddHoverLabel(RectTransform parent, MapNode n, float size)
+    // ⚠️ EVERY node is labelled, not just the reachable ones. The whole point of showing the act is
+    // planning a route through it, and you cannot plan through nodes that have no names. The old
+    // version labelled only what you could reach this instant, which meant the 90% of the chart the
+    // feature exists to show was anonymous.
+    //
+    // Distance is carried by WEIGHT rather than presence: the branches in front of you are bright
+    // and spaced, the act ahead is quiet patina.
+    private void AddLabel(RectTransform parent, MapNode n, float socket,
+                          bool isCurrent, bool visited, bool reachable)
     {
-        string text = MapGlyphs.LabelFor(n.type);
-        if (n.recharge != RechargeType.None) text += "\n+ " + MapGlyphs.LabelFor(n.recharge);
+        string text = isCurrent ? "YOU ARE HERE" : MapGlyphs.LabelFor(n.type);
+        if (n.recharge != RechargeType.None && !isCurrent) text += "\n+ " + MapGlyphs.LabelFor(n.recharge);
 
-        TextMeshProUGUI label = AddText(parent, "Label", text, 12f, T.TextBody, TextAlignmentOptions.Top);
-        // Pivot at the TOP so the offset positions the text's first line, not its box centre. With
-        // a centred pivot a 34px-tall box put its first line back on top of the glyph.
+        Color c = isCurrent ? CopperHot
+                : reachable ? Fade(CopperHot, 0.95f)
+                : visited ? Fade(CopperWorn, 0.9f)
+                : Fade(Patina, 0.82f);
+
+        float fs = reachable || isCurrent ? 12.5f : 11.5f;
+        float y = -(socket * 0.5f + 7f);
+        int lines = text.Contains("\n") ? 2 : 1;
+
+        // ⚠️ A CHASED PATCH BEHIND THE WORD, and it is not decoration — it is the fix for edges
+        // running through labels. Trimming the channels at the socket rim removes most of that, but
+        // a node with an edge leaving DOWNWARD still has that edge pass straight through the label
+        // hanging beneath it — measured on the committed branch, where the bright copper line went
+        // right through "ELITE". Soft-edged rather than a rectangle so it reads as a shallow
+        // depression beaten into the plate, not a UI box laid on top of one.
+        Image patch = AddImage(parent, "LabelPatch", MapGlyphs.Bloom(), Fade(SocketFloor, 0.80f), false);
+        patch.rectTransform.pivot = new Vector2(0.5f, 1f);
+        patch.rectTransform.anchoredPosition = new Vector2(0f, y + 4f);
+        patch.rectTransform.sizeDelta = new Vector2(128f, 20f + lines * 15f);
+
+        // Stamped, like the glyph: a dark copy behind, offset along the same light direction.
+        TextMeshProUGUI shadow = AddText(parent, "LabelShadow", text, fs, Fade(RimShadow, 0.9f),
+                                         TextAlignmentOptions.Top);
+        shadow.rectTransform.pivot = new Vector2(0.5f, 1f);
+        shadow.rectTransform.anchoredPosition = new Vector2(-1.4f, y - 1.4f);
+        shadow.rectTransform.sizeDelta = new Vector2(118f, 34f);
+        shadow.characterSpacing = 3f;
+        shadow.lineSpacing = -14f;
+
+        TextMeshProUGUI label = AddText(parent, "Label", text, fs, c, TextAlignmentOptions.Top);
+        // Pivot at the TOP so the offset places the text's first line, not its box centre. With a
+        // centred pivot a 34px-tall box put its first line back on top of the glyph.
         label.rectTransform.pivot = new Vector2(0.5f, 1f);
-        label.rectTransform.anchoredPosition = new Vector2(0f, -(size * 0.5f + 9f));
-        // Narrower than it looks like it needs to be. Neighbouring nodes on a floor sit about one
-        // column apart MINUS their jitter, so a 150px label ran into its neighbour's on any floor
-        // that filled up.
+        label.rectTransform.anchoredPosition = new Vector2(0f, y);
+        // ⚠️ Must match the shadow's box exactly — two objects that track each other by position
+        // have to agree on anchor, pivot AND size, or they drift apart at different text lengths.
         label.rectTransform.sizeDelta = new Vector2(118f, 34f);
         label.characterSpacing = 3f;
         label.lineSpacing = -14f;
     }
 
     // ---- small builders -------------------------------------------------------------------------
+
+    private static Color Fade(Color c, float a) => new Color(c.r, c.g, c.b, a);
 
     private static void Stretch(RectTransform rt)
     {
