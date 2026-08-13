@@ -119,6 +119,59 @@ public static class TileVariantGenerator
         return w > 1.01f || h > 1.01f;
     }
 
+    // ⚠️ THIRD MEMBER OF THE SAME FAMILY AS THE NULL-SPRITE AND OVERSIZED GUARDS: never give Grid
+    // collision to a tile that does not actually fill its cell.
+    //
+    // Grid collision is ALWAYS the whole 1x1 cell. Some tiles in this pack are thin lips drawn along
+    // the BOTTOM of their cell — "Ground Extra_146" and "Ground Extra_148" have opaque art in only
+    // the bottom fifth — so a Grid copy puts a solid surface 25 pixels above anything drawn. The
+    // player stands most of a cell up, visibly hovering over the ledge they are supposedly on. The
+    // designer spotted it in play; both tiles are in the importer's mask table, so it reached rooms.
+    //
+    // Measured from the actual pixels rather than the sprite rect: the rect is a full cell for these,
+    // it is the ART inside it that stops short. Sprite collision traces the art, so they are correct
+    // when left alone — the variant is the only thing that breaks them.
+    public static bool ArtLeavesGapAtTop(Tile tile, out float gapPx)
+    {
+        gapPx = 0f;
+        if (tile == null || tile.sprite == null) return false;
+        Sprite s = tile.sprite;
+
+        int topRow = TopOpaqueRow(s);
+        if (topRow < 0) return false;                       // fully transparent: the null-sprite guard's problem
+
+        float ppu = s.pixelsPerUnit;
+        float artTop = 0.5f + ((topRow + 1 - s.rect.y) - s.pivot.y) / ppu;   // in cell units
+        gapPx = (1f - artTop) * ppu;
+        return gapPx > 2f;
+    }
+
+    // Topmost texture row inside the sprite's rect that has opaque pixels, or -1.
+    // Blits through a RenderTexture so it works on textures that are not marked readable.
+    private static int TopOpaqueRow(Sprite s)
+    {
+        var src = s.texture;
+        var rt = RenderTexture.GetTemporary(src.width, src.height, 0,
+                                            RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+        Graphics.Blit(src, rt);
+        RenderTexture prev = RenderTexture.active;
+        RenderTexture.active = rt;
+        var tex = new Texture2D(src.width, src.height, TextureFormat.RGBA32, false);
+        tex.ReadPixels(new Rect(0, 0, src.width, src.height), 0, 0);
+        tex.Apply();
+        RenderTexture.active = prev;
+        RenderTexture.ReleaseTemporary(rt);
+
+        int x0 = (int)s.rect.x, y0 = (int)s.rect.y, w = (int)s.rect.width, h = (int)s.rect.height;
+        int found = -1;
+        for (int y = y0 + h - 1; y >= y0 && found < 0; y--)
+            for (int x = x0; x < x0 + w; x++)
+                if (tex.GetPixel(x, y).a > 0.5f) { found = y; break; }
+
+        Object.DestroyImmediate(tex);
+        return found;
+    }
+
     private static Sprite FlattenSprite(Sprite src, string outName)
     {
         string outPath = FlatTextureFolder + "/" + outName + ".png";
@@ -232,7 +285,7 @@ public static class TileVariantGenerator
         // always felt right: what is drawn is what is solid. So oversized tiles are SKIPPED here
         // and keep their native Sprite collision, while cell-sized tiles still get the nub fix.
         // Visual and collision then agree for both kinds.
-        int solids = 0, skippedOversize = 0;
+        int solids = 0, skippedOversize = 0, skippedGap = 0;
         foreach (string shortName in LevelTextImporter.AllPaintedTileNames())
         {
             string file = "TX Tileset - Dungeon " + shortName + ".asset";
@@ -258,18 +311,31 @@ public static class TileVariantGenerator
                 continue;
             }
 
+            string stalePath = VariantFolder + "/TX Tileset - Dungeon " + shortName + " Solid.asset";
+
             if (IsOversized(src))
             {
                 // Any stale Solid copy from before this rule must go, or Resolve keeps preferring it.
-                string stale = VariantFolder + "/TX Tileset - Dungeon " + shortName + " Solid.asset";
-                if (AssetDatabase.LoadAssetAtPath<Tile>(stale) != null) AssetDatabase.DeleteAsset(stale);
+                if (AssetDatabase.LoadAssetAtPath<Tile>(stalePath) != null) AssetDatabase.DeleteAsset(stalePath);
                 skippedOversize++;
                 continue;
             }
+
+            if (ArtLeavesGapAtTop(src, out float gapPx))
+            {
+                if (AssetDatabase.LoadAssetAtPath<Tile>(stalePath) != null) AssetDatabase.DeleteAsset(stalePath);
+                skippedGap++;
+                Debug.LogWarning($"[TileVariantGenerator] '{src.name}' draws nothing in the top {gapPx:F0}px " +
+                                 "of its cell — skipping its Grid-collision copy. Grid is always the whole " +
+                                 "cell, so the player would stand that far above the art.");
+                continue;
+            }
+
             if (MakeVariant(path, "Solid", Color.white, ref made, null, Tile.ColliderType.Grid)) solids++;
         }
         Debug.Log("[TileVariantGenerator] Grid-collision copies: " + solids
-                  + "   (skipped " + skippedOversize + " oversized tiles — they keep Sprite collision)");
+                  + "   (skipped " + skippedOversize + " oversized, " + skippedGap
+                  + " with empty space at the top of the cell — both keep Sprite collision)");
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
