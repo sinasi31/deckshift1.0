@@ -128,16 +128,6 @@ public class DeckManager : MonoBehaviour
         bool success = player.ExecuteAction(data.actionType, actionValue, out bool keepInHand);
         CardBeingPlayed = null;
 
-        // Shift is deducted only when the action actually executed — Blocked plays
-        // (conflict refusal) and Failed plays (e.g. Comet Dive while grounded) cost
-        // nothing. The affordability check above still gates execution up front.
-        // Portal stays exempt: TryPlacePortal spends its own cost on second placement.
-        if (success && data.actionType != CardActionType.Portal)
-        {
-            if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
-                player.SpendShift(cost);
-        }
-
         // Oath tracking. Noted on `success` alone rather than inside the !keepInHand branch below,
         // because a card that stays in hand (Portal's first placement) has still been PLAYED as far
         // as "clear a room without playing a card" is concerned. Blocked and failed plays don't
@@ -147,6 +137,20 @@ public class DeckManager : MonoBehaviour
 
         if (success && !keepInHand)
         {
+            // Shift is deducted only when the action actually executed AND the card is actually
+            // leaving the hand — Blocked plays (conflict refusal) and Failed plays (e.g. Comet Dive
+            // while grounded) cost nothing. The affordability check above still gates up front.
+            //
+            // ⚠️ THIS LIVES INSIDE THE !keepInHand BLOCK ON PURPOSE. Every card except Portal
+            // returns keepInHand = false, so for all of them this is identical to charging on
+            // `success` alone. Portal is the one card that reports success while STAYING in hand
+            // (its first placement), and putting the spend here is what lets it be charged once, on
+            // the second placement, by the same code path as everything else. It used to charge
+            // itself inside TryPlacePortal, which is why "On the House" and First One's Free did
+            // nothing on it. Do not hoist this back out.
+            if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
+                player.SpendShift(cost);
+
             OnCardPlayed?.Invoke(index);
             player.FlashCardPlay();
 
@@ -405,6 +409,12 @@ public class DeckManager : MonoBehaviour
         // Oath tracking, placed after every early-return above so a REFUSED recall (not enough
         // Shift) doesn't break the No Take-Backs oath — the player didn't get one.
         if (QuestSystem.instance != null) QuestSystem.instance.NoteRecall();
+
+        // Recall discards the hand, so a Portal that placed its first half and never its second
+        // would leave that half orphaned in the room with firstPortalInstance still pointing at it.
+        // The next Portal drawn in the same room would then place the SECOND portal on its first
+        // click and charge for it.
+        player.CancelPendingPortal();
 
         // 5. Asıl işlemi başlat
         ReloadHand();

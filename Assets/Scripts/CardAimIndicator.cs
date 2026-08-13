@@ -119,6 +119,8 @@ public class CardAimIndicator : MonoBehaviour
     // --- Portal visuals ---
     private GameObject portalRoot;
     private SpriteRenderer portalGhost;
+    private LineRenderer portalBound;          // the bubble the next portal must land inside
+    private bool portalBoundsBuilt;
 
     // --- Platform visuals ---
     private GameObject platformRoot;
@@ -545,6 +547,8 @@ public class CardAimIndicator : MonoBehaviour
         if (portalRoot != null) return;
         if (player.portalPrefab == null) return;
 
+        portalBoundsBuilt = false;
+
         // Steal the portal's look straight from the prefab so the ghost always matches.
         Portal prefabPortal = player.portalPrefab.GetComponent<Portal>();
         SpriteRenderer srcSr = prefabPortal != null && prefabPortal.spriteRenderer != null
@@ -558,8 +562,23 @@ public class CardAimIndicator : MonoBehaviour
         portalGhost.sortingLayerID = srcSr.sortingLayerID;
         portalGhost.sortingOrder = srcSr.sortingOrder + 5;
         portalGhost.transform.localScale = srcSr.transform.lossyScale;
+
+        // The bubble the next portal must land inside. Same LineRenderer treatment as the Phase
+        // boundary — a constant world-space width stays crisp at both the small place radius and
+        // the much larger link radius, where a scaled sprite ring would go soft.
+        portalBound = MakeLineChild(portalRoot.transform, "Bound", 0.06f, sortingOrder - 1);
+        portalBound.loop = true;
+        portalBound.positionCount = BITE_SEGMENTS;
+        portalBoundsBuilt = true;
     }
 
+    // Shows BOTH halves of the placement rule the player is currently subject to: the bubble the
+    // portal must land inside, and whether the exact spot under the cursor would be accepted.
+    //
+    // ⚠️ Validity is asked of PlayerController.IsPortalPlacementValid — the same method
+    // TryPlacePortal itself calls — rather than re-deriving the distance test here. This preview and
+    // the click can therefore never disagree, which matters more for Portal than for any other card:
+    // a refused placement costs nothing but looks identical to a bug if the ghost said it was fine.
     private void UpdatePortal(float dim)
     {
         if (portalRoot == null || portalGhost == null) return;
@@ -569,19 +588,30 @@ public class CardAimIndicator : MonoBehaviour
         Vector2 mouse = cam.ScreenToWorldPoint(Input.mousePosition);
         portalGhost.transform.position = new Vector3(mouse.x, mouse.y, 0f);
 
-        // First placement is free-form (spawns gray); the second must land inside the
-        // first portal's range circle or TryPlacePortal refuses it.
+        // Before the first placement the bubble is around the PLAYER (portalPlaceRange); once the
+        // first portal is down it becomes the hop radius around THAT portal (portalMaxRange).
         Portal first = player.FirstPortalInstance;
-        Color c;
-        if (first == null)
-            c = portalFirstColor;
-        else
-            c = Vector2.Distance(first.transform.position, mouse) <= player.portalMaxRange
-                ? portalValidColor
-                : portalInvalidColor;
+        Vector2 center = first == null ? player.BiteCenter : (Vector2)first.transform.position;
+        float radius = first == null ? player.portalPlaceRange : player.portalMaxRange;
 
+        bool valid = player.IsPortalPlacementValid(mouse);
+
+        Color c = valid ? (first == null ? portalFirstColor : portalValidColor) : portalInvalidColor;
         c.a *= (0.75f + 0.25f * Mathf.Sin(Time.unscaledTime * 5f)) * dim;
         portalGhost.color = c;
+
+        if (portalBoundsBuilt && portalBound != null)
+        {
+            float breath = 1f + 0.015f * Mathf.Sin(Time.unscaledTime * 2.4f);
+            float r = radius * breath;
+            for (int i = 0; i < BITE_SEGMENTS; i++)
+            {
+                float a = (float)i / BITE_SEGMENTS * Mathf.PI * 2f;
+                portalBound.SetPosition(i, new Vector3(center.x + Mathf.Cos(a) * r, center.y + Mathf.Sin(a) * r, 0f));
+            }
+            Color bc = valid ? portalValidColor : portalInvalidColor;
+            portalBound.startColor = portalBound.endColor = new Color(bc.r, bc.g, bc.b, bc.a * 0.7f * dim);
+        }
     }
 
     // ------------------------------------------------------------------ PLATFORM CREATE

@@ -136,7 +136,23 @@ public class PlayerController : MonoBehaviour
 
     [Header("Portal Settings")]
     public GameObject portalPrefab;
-    public float portalMaxRange = 10f;
+
+    // Portal used to be the biggest skip in the game and the only card whose reach depended on the
+    // player's MONITOR: the first portal had no range limit at all, so it could go anywhere the
+    // mouse reached — the camera's half-width, which is 9.3 units at 4:3 but 16.3 at 21:9. With the
+    // link range on top, total reach was 24-31 units against a spawn-to-exit separation the level
+    // laws set at ~20. Anchoring the first portal to the PLAYER fixes both at once: the apparatus is
+    // now placed around you rather than painted across the room, and the numbers are the same on
+    // every display.
+    [Tooltip("How far from the PLAYER the first portal may be placed, in world units (1 unit = 1 tile). " +
+             "This is the 'set it down near you' radius — it is what makes Portal's reach independent " +
+             "of screen aspect ratio. Matches the Phase bubble so both cards read as the same idea.")]
+    public float portalPlaceRange = 6f;
+
+    [Tooltip("How far the SECOND portal may be placed from the first — i.e. the size of the hop. " +
+             "This is the number that decides how much level Portal can skip; tune this one first.")]
+    public float portalMaxRange = 15f;
+
     private Portal firstPortalInstance;
     // Read-only view for CardAimIndicator's portal ghost (first vs second placement preview).
     internal Portal FirstPortalInstance => firstPortalInstance;
@@ -387,6 +403,9 @@ public class PlayerController : MonoBehaviour
         // Dying mid-Phase kills PhaseRoutine before its cleanup runs, so the death
         // path must restore the matrix itself (audit_report.md Critical #2).
         playerHealth.OnDied += RestorePhaseLayerCollisions;
+
+        // A pending first portal must not outlive the run that placed it.
+        playerHealth.OnDied += CancelPendingPortal;
 
         if (visualModel != null)
         {
@@ -985,6 +1004,11 @@ public class PlayerController : MonoBehaviour
         tookDamageThisRoom = false;
         ResetFallTracking();
 
+        // The portal object itself carries TemporaryObject and is destroyed with the room, but the
+        // reference would survive as a Unity fake-null. Clearing it explicitly also takes the range
+        // ring down and keeps the "pending portal" state a per-room thing by construction.
+        CancelPendingPortal();
+
         // Starts the oath recorder for this room (no-cards / no-recall / low-shift / no-stagger).
         // Hooked here rather than in LevelManager so it can't be missed by any path that puts the
         // player into a room.
@@ -1196,13 +1220,65 @@ public class PlayerController : MonoBehaviour
         if (QuestSystem.instance != null) QuestSystem.instance.NoteShiftSpent(amount);
     }
 
-    internal bool TryPlacePortal(out bool keepCard, int shiftCost)
+    // Is `spot` somewhere the player could actually stand? A portal is a place you ARRIVE at, so the
+    // honest test is whether the player's own capsule fits there — nothing else would stop you
+    // teleporting into the middle of a wall, and unlike Phase (which has EjectFromGeometry) Portal
+    // has no recovery, so that was a dead run.
+    //
+    // Uses terrainLayer, NOT groundLayer: groundLayer deliberately contains Enemy so the player can
+    // land on heads, and an enemy wandering past should not veto a portal placement.
+    internal bool IsPortalSpotClear(Vector2 spot)
+    {
+        if (capsuleCollider == null) return true;
+        Vector2 center = spot + capsuleCollider.offset;
+        return !Physics2D.OverlapBox(center, capsuleCollider.size * 0.9f, 0f, terrainLayer);
+    }
+
+    // The single source of truth for "may a portal go here right now?". CardAimIndicator calls this
+    // exact method for its preview, so the ghost can never disagree with what the click will do.
+    internal bool IsPortalPlacementValid(Vector2 spot)
+    {
+        if (!IsPortalSpotClear(spot)) return false;
+
+        return firstPortalInstance == null
+            ? Vector2.Distance(BiteCenter, spot) <= portalPlaceRange       // first: near the PLAYER
+            : Vector2.Distance(firstPortalInstance.transform.position, spot) <= portalMaxRange;
+    }
+
+    // Throws away a first portal that never got its pair. Without this the pending portal and its
+    // range ring sat in the room forever and firstPortalInstance stayed set, so the NEXT Portal play
+    // in that room placed the second half and charged for it — the card silently did something other
+    // than what it looked like it was doing. Called on deselect, Recall, room change and death.
+    internal void CancelPendingPortal()
+    {
+        if (firstPortalInstance == null) return;
+        Destroy(firstPortalInstance.gameObject);
+        firstPortalInstance = null;
+    }
+
+    // ⚠️ THIS NO LONGER SPENDS SHIFT. It used to charge its own cost, which meant it only knew about
+    // the Kinetic discount and silently ignored Blompo's "On the House" and the First One's Free
+    // relic — the latter being consumed on the second placement while the player was charged anyway.
+    // DeckManager.PlayCard now pays for Portal exactly like every other card (see the spend inside
+    // its `success && !keepInHand` block), so every discount applies for free and the cost lives in
+    // ONE place. That also retires the old trap where Portal's price was stored twice, in `shiftCost`
+    // (what the card face and the affordability gate used) and `actionValue` (what was really
+    // charged) — two fields that had to agree and were never checked against each other.
+    internal bool TryPlacePortal(out bool keepCard)
     {
         keepCard = false;
         if (portalPrefab == null) return false;
         if (mainCamera == null) return false;
 
         Vector2 mousePos = mainCamera.ScreenToWorldPoint(Input.mousePosition);
+
+        // Out of range or inside rock: refuse without cost and keep the card. The aim indicator has
+        // already been showing this spot as invalid, so a refusal here is never a surprise.
+        if (!IsPortalPlacementValid(mousePos))
+        {
+            keepCard = true;
+            return false;
+        }
 
         if (firstPortalInstance == null)
         {
@@ -1211,43 +1287,16 @@ public class PlayerController : MonoBehaviour
             firstPortalInstance.spriteRenderer.color = Color.gray;
             firstPortalInstance.ShowRangeCircle(portalMaxRange);
 
-            keepCard = true;
+            keepCard = true;      // first placement is free; the card is spent on the second
             return true;
         }
-        else
-        {
-            float distance = Vector2.Distance(firstPortalInstance.transform.position, mousePos);
-            if (distance > portalMaxRange)
-            {
-                keepCard = true;
-                return false;
-            }
 
-            int finalCost = shiftCost;
+        GameObject p2 = Instantiate(portalPrefab, mousePos, Quaternion.identity);
+        firstPortalInstance.Link(p2.GetComponent<Portal>());
+        firstPortalInstance = null;
 
-            if (SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.KineticDiscount))
-            {
-                finalCost = Mathf.Max(0, finalCost - 1);
-            }
-
-            if (currentShift < finalCost)
-            {
-                keepCard = true;
-                return false;
-            }
-
-            if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
-                SpendShift(finalCost);
-
-            GameObject p2 = Instantiate(portalPrefab, mousePos, Quaternion.identity);
-            Portal secondPortal = p2.GetComponent<Portal>();
-
-            firstPortalInstance.Link(secondPortal);
-            firstPortalInstance = null;
-
-            keepCard = false;
-            return true;
-        }
+        keepCard = false;
+        return true;
     }
 
     // Returns true if the bite landed on a target. Returns false when nothing damageable is in
