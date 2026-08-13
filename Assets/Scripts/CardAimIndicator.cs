@@ -70,7 +70,12 @@ public class CardAimIndicator : MonoBehaviour
     [SerializeField] private float wailRippleMaxRadius = 6f;
     [SerializeField] private float wailRipplePeriod = 1.1f;
 
-    private enum Kind { None, Fireball, Dash, Bite, Portal, Platform, Freefall, Wail }
+    [Header("Phase")]
+    // Matches PhaseBoundary's violet so the preview and the live bubble read as the same thing.
+    [SerializeField] private Color phaseColor = new Color(0.72f, 0.55f, 1f, 0.75f);
+    [SerializeField] private float phaseRingWidth = 0.05f;
+
+    private enum Kind { None, Fireball, Dash, Bite, Portal, Platform, Freefall, Wail, Phase }
     private Kind activeKind = Kind.None;
 
     // All layers, triggers included — same as the game code's OverlapCircleAll(..., ~0).
@@ -126,6 +131,11 @@ public class CardAimIndicator : MonoBehaviour
     private float freefallScanTimer;
     private bool freefallHit;
 
+    // --- Phase visuals ---
+    private GameObject phaseRoot;
+    private LineRenderer phaseRing;
+    private SpriteRenderer phaseFill;
+
     // --- Glass Wail visuals ---
     private GameObject wailRoot;
     private SpriteRenderer[] wailRipples;
@@ -170,6 +180,7 @@ public class CardAimIndicator : MonoBehaviour
             case CardActionType.PlatformCreate: SetKind(Kind.Platform); UpdatePlatform(dim); break;
             case CardActionType.FreefallBlade:  SetKind(Kind.Freefall); UpdateFreefall(dim); break;
             case CardActionType.GlassWail:      SetKind(Kind.Wail);     UpdateWail(dim);     break;
+            case CardActionType.Phase:          SetKind(Kind.Phase);    UpdatePhase(dim);    break;
             default:                            SetKind(Kind.None);                          break;
         }
     }
@@ -201,6 +212,7 @@ public class CardAimIndicator : MonoBehaviour
         if (platformRoot != null) platformRoot.SetActive(kind == Kind.Platform);
         if (freefallRoot != null) freefallRoot.SetActive(kind == Kind.Freefall);
         if (wailRoot != null) wailRoot.SetActive(kind == Kind.Wail);
+        if (phaseRoot != null) phaseRoot.SetActive(kind == Kind.Phase);
 
         switch (kind)
         {
@@ -211,6 +223,7 @@ public class CardAimIndicator : MonoBehaviour
             case Kind.Platform: EnsurePlatformVisuals(); if (platformRoot != null) platformRoot.SetActive(true); break;
             case Kind.Freefall: EnsureFreefallVisuals(); freefallScanTimer = 0f; freefallRoot.SetActive(true); break;
             case Kind.Wail:     EnsureWailVisuals();     wailScanTimer = 0f; wailRoot.SetActive(true); break;
+            case Kind.Phase:    EnsurePhaseVisuals();    phaseRoot.SetActive(true); break;
         }
     }
 
@@ -736,6 +749,46 @@ public class CardAimIndicator : MonoBehaviour
             wailGlints[i].transform.position = p;
             wailGlints[i].color = new Color(wailColor.r, wailColor.g, wailColor.b, pulse * dim);
         }
+    }
+
+    // ------------------------------------------------------------------ PHASE
+
+    private void EnsurePhaseVisuals()
+    {
+        if (phaseRoot != null) return;
+
+        phaseRoot = MakeContainer("Aim_Phase");
+
+        phaseRing = MakeLineChild(phaseRoot.transform, "Ring", phaseRingWidth, sortingOrder);
+        phaseRing.loop = true;
+        phaseRing.positionCount = BITE_SEGMENTS;
+
+        phaseFill = MakeSpriteChild(phaseRoot.transform, "Fill", GetDotSprite(), sortingOrder - 1);
+    }
+
+    // Where the phase bubble WILL be anchored: centred on the body, following the player until
+    // they cast. Mirrors PlayerController.PhaseRoutine (anchor = BiteCenter) and the radius it
+    // clamps to — if phaseMaxRadius or the anchor point changes there, change it here too or the
+    // preview starts lying about where the player can reach.
+    private void UpdatePhase(float dim)
+    {
+        Vector2 center = player.BiteCenter;
+        float radius = player.phaseMaxRadius;
+
+        float breath = 1f + 0.015f * Mathf.Sin(Time.unscaledTime * 2.4f);
+        float r = radius * breath;
+
+        for (int i = 0; i < BITE_SEGMENTS; i++)
+        {
+            float a = (float)i / BITE_SEGMENTS * Mathf.PI * 2f;
+            phaseRing.SetPosition(i, new Vector3(center.x + Mathf.Cos(a) * r, center.y + Mathf.Sin(a) * r, 0f));
+        }
+
+        phaseRing.startColor = phaseRing.endColor = new Color(phaseColor.r, phaseColor.g, phaseColor.b, phaseColor.a * dim);
+
+        phaseFill.transform.position = new Vector3(center.x, center.y, 0f);
+        phaseFill.transform.localScale = Vector3.one * (r * 2f);
+        phaseFill.color = new Color(phaseColor.r, phaseColor.g, phaseColor.b, 0.04f * dim);
     }
 
     // ------------------------------------------------------------------ BUILD HELPERS

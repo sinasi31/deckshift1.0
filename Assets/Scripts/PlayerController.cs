@@ -335,6 +335,20 @@ public class PlayerController : MonoBehaviour
     public GameObject gravityAuraEffect;        // looping anti-gravity aura prefab (GravityAuraVFX), played for the reversal duration
     private GameObject gravityAuraInstance;
 
+    [Header("Phase")]
+    // Phase is bounded to a bubble anchored where it was cast. Without one it is the strongest
+    // traversal tool in the game by a wide margin: 8-directional flight at full moveSpeed for the
+    // card's 2s duration reaches ~16 world units through solid rock in any direction, which is more
+    // than the 20-tile spawn-to-exit separation the level design laws are built on. The bubble keeps
+    // Phase as "get through that wall into that pocket" and stops it being "skip the room".
+    [Tooltip("How far the player may travel from the cast point while phasing, in world units " +
+             "(1 unit = 1 tile). Anchored at the BODY CENTER the moment the card is played; it does " +
+             "NOT follow the player. Pushing the edge slides along it rather than stopping dead. " +
+             "⚠️ The Phase card's description names this number — update the card asset if you change it.")]
+    public float phaseMaxRadius = 6f;
+    private Vector2 phaseAnchor;
+    internal bool IsPhasing => isPhasing;
+
     [Header("Phase Visual")]
     [SerializeField] internal SkinnedMeshRenderer[] phaseVisuals;
     private Coroutine phaseVisualCoroutine;
@@ -709,7 +723,8 @@ public class PlayerController : MonoBehaviour
 
         if (isPhasing)
         {
-            rb.linearVelocity = new Vector2(moveInput * moveSpeed * slowFactor, verticalInput * moveSpeed * slowFactor);
+            rb.linearVelocity = ClampPhaseVelocity(
+                new Vector2(moveInput * moveSpeed * slowFactor, verticalInput * moveSpeed * slowFactor));
         }
         else if (isSwimming && currentState != PlayerState.Dashing && currentState != PlayerState.KnockedBack && currentState != PlayerState.CometDiving)
         {
@@ -1383,9 +1398,49 @@ public class PlayerController : MonoBehaviour
         return true;
     }
 
+    // Keeps a phasing player inside the bubble anchored at the cast point (see phaseMaxRadius).
+    //
+    // Two halves, and both are needed. The VELOCITY projection strips the outward component so
+    // pressing the edge SLIDES along it: a dead stop reads as the controls breaking, and the player
+    // still has to be able to travel around the inside of the bubble to find somewhere solid to
+    // land before the timer runs out. The POSITION backstop exists because a tangential slide cuts
+    // a chord across the circle, creeping a fraction of a unit outward every step — small per step,
+    // but it compounds across the whole cast, and anything else that moves the player (knockback,
+    // a hazard) would otherwise leave them permanently outside with no way back in.
+    private Vector2 ClampPhaseVelocity(Vector2 desired)
+    {
+        if (phaseMaxRadius <= 0f) return desired;
+
+        Vector2 bodyOffset = capsuleCollider != null ? capsuleCollider.offset : Vector2.zero;
+        Vector2 body = rb.position + bodyOffset;
+        Vector2 outward = body - phaseAnchor;
+        float dist = outward.magnitude;
+
+        if (dist < 0.0001f) return desired;             // sitting on the anchor; no outward axis yet
+
+        Vector2 n = outward / dist;
+
+        if (dist > phaseMaxRadius)
+            rb.position = phaseAnchor + n * phaseMaxRadius - bodyOffset;
+
+        float radial = Vector2.Dot(desired, n);
+        if (radial <= 0f) return desired;               // heading back inward is always allowed
+
+        // Don't interfere at all unless this step would actually leave the bubble.
+        if (((body + desired * Time.fixedDeltaTime) - phaseAnchor).sqrMagnitude
+            <= phaseMaxRadius * phaseMaxRadius) return desired;
+
+        return desired - n * radial;                    // tangent only: slide along the boundary
+    }
+
     internal IEnumerator PhaseRoutine(float duration)
     {
         isPhasing = true;
+
+        // Anchor the bubble on the BODY CENTER, not the transform (which sits at the feet), so the
+        // drawn boundary is centred on the player and matches what ClampPhaseVelocity enforces.
+        phaseAnchor = BiteCenter;
+        PhaseBoundary boundary = PhaseBoundary.Spawn(phaseAnchor, phaseMaxRadius, this);
 
         float originalGravity = rb.gravityScale;
         rb.gravityScale = 0f;
@@ -1415,6 +1470,10 @@ public class PlayerController : MonoBehaviour
 
         if (phaseVisualCoroutine != null) { StopCoroutine(phaseVisualCoroutine); phaseVisualCoroutine = null; }
         RestorePhaseVisuals();
+
+        // Normal exit. The boundary also self-collapses if it sees isPhasing go false without this
+        // running (dying mid-Phase kills the coroutine before it reaches here).
+        if (boundary != null) boundary.Collapse();
 
         Physics2D.IgnoreLayerCollision(playerLayer, groundLayerIndex, false);
         Physics2D.IgnoreLayerCollision(playerLayer, enemyLayerIndex, false);
