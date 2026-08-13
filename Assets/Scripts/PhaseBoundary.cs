@@ -117,6 +117,15 @@ public class PhaseBoundary : MonoBehaviour
         fill.transform.localScale = Vector3.one * (radius * 2f);
     }
 
+    // Moves the bubble to follow a legitimate teleport taken mid-Phase (a portal, Second Thoughts,
+    // a fall respawn). Without this the player lands outside their own bubble and the clamp drags
+    // them straight back, silently undoing the trip. See PlayerController.OnTeleported.
+    public void Reanchor(Vector2 newAnchor)
+    {
+        anchor = newAnchor;
+        transform.position = new Vector3(newAnchor.x, newAnchor.y, 0f);
+    }
+
     // Normal end-of-phase exit. Safe to call more than once.
     public void Collapse()
     {

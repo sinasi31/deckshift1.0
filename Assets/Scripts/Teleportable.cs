@@ -3,21 +3,31 @@ using System.Collections;
 
 public class Teleportable : MonoBehaviour
 {
-    // Iþýnlandýktan sonra tekrar ýþýnlanabilmek için bekleme süresi
+    // Iï¿½ï¿½nlandï¿½ktan sonra tekrar ï¿½ï¿½ï¿½nlanabilmek iï¿½in bekleme sï¿½resi
     private float teleportCooldown = 0.5f;
     private bool canTeleport = true;
 
     /// <summary>
-    /// Bu fonksiyon Portal tarafýndan çaðrýlýr.
+    /// Bu fonksiyon Portal tarafï¿½ndan ï¿½aï¿½rï¿½lï¿½r.
     /// </summary>
     public void TeleportTo(Vector3 targetPosition)
     {
         if (!canTeleport) return;
 
-        // 1. Pozisyonu deðiþtir
+        // 1. Pozisyonu deï¿½iï¿½tir
+        // Both the body and the transform: Physics2D.autoSyncTransforms is OFF, so a transform-only
+        // write leaves Rigidbody2D.position reporting the old spot until the next physics step â€”
+        // and code that reads rb.position (e.g. the Phase bubble clamp) would act on the stale one.
+        var body = GetComponent<Rigidbody2D>();
+        if (body != null) body.position = targetPosition;
         transform.position = targetPosition;
 
-        // 2. Cooldown baþlat (Hemen geri ýþýnlanmasýn)
+        // Let the player know they moved without walking. A live Phase bubble is anchored in world
+        // space and would otherwise drag them straight back out of the portal they just took.
+        var pc = GetComponent<PlayerController>();
+        if (pc != null) pc.OnTeleported();
+
+        // 2. Cooldown baï¿½lat (Hemen geri ï¿½ï¿½ï¿½nlanmasï¿½n)
         StartCoroutine(CooldownRoutine());
     }
 

@@ -226,7 +226,9 @@ public class PlayerHealth : MonoBehaviour
             playerController.EndCometDive();
         rb.linearVelocity = Vector2.zero;
         transform.position = playerController.currentRoomEntryPoint;
-        playerController.ResetFallTracking();   // the teleport isn't a fall — don't Meteor on landing
+        // Clears fall tracking (the teleport isn't a fall — don't Meteor on landing) and re-anchors
+        // a live Phase bubble, which would otherwise yank the player back out of the respawn.
+        playerController.OnTeleported();
         OnFallRespawn?.Invoke();
     }
 

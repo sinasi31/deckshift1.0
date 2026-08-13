@@ -75,7 +75,12 @@ public class CardAimIndicator : MonoBehaviour
     [SerializeField] private Color phaseColor = new Color(0.72f, 0.55f, 1f, 0.75f);
     [SerializeField] private float phaseRingWidth = 0.05f;
 
-    private enum Kind { None, Fireball, Dash, Bite, Portal, Platform, Freefall, Wail, Phase }
+    [Header("Return Anchor")]
+    // Amber, matching ReturnAnchorVFX — and deliberately clear of the violet Phase bubble and the
+    // cyan portal ring, so the three world markers never read as each other.
+    [SerializeField] private Color anchorColor = new Color(1f, 0.72f, 0.28f, 0.85f);
+
+    private enum Kind { None, Fireball, Dash, Bite, Portal, Platform, Freefall, Wail, Phase, Anchor }
     private Kind activeKind = Kind.None;
 
     // All layers, triggers included — same as the game code's OverlapCircleAll(..., ~0).
@@ -138,6 +143,11 @@ public class CardAimIndicator : MonoBehaviour
     private LineRenderer phaseRing;
     private SpriteRenderer phaseFill;
 
+    // --- Return Anchor visuals ---
+    private GameObject anchorRoot;
+    private LineRenderer anchorTether;         // player -> anchor, so you can find it from anywhere
+    private SpriteRenderer anchorMark;         // where the anchor is (or would be dropped)
+
     // --- Glass Wail visuals ---
     private GameObject wailRoot;
     private SpriteRenderer[] wailRipples;
@@ -183,6 +193,7 @@ public class CardAimIndicator : MonoBehaviour
             case CardActionType.FreefallBlade:  SetKind(Kind.Freefall); UpdateFreefall(dim); break;
             case CardActionType.GlassWail:      SetKind(Kind.Wail);     UpdateWail(dim);     break;
             case CardActionType.Phase:          SetKind(Kind.Phase);    UpdatePhase(dim);    break;
+            case CardActionType.ReturnAnchor:   SetKind(Kind.Anchor);   UpdateAnchor(dim);   break;
             default:                            SetKind(Kind.None);                          break;
         }
     }
@@ -215,6 +226,7 @@ public class CardAimIndicator : MonoBehaviour
         if (freefallRoot != null) freefallRoot.SetActive(kind == Kind.Freefall);
         if (wailRoot != null) wailRoot.SetActive(kind == Kind.Wail);
         if (phaseRoot != null) phaseRoot.SetActive(kind == Kind.Phase);
+        if (anchorRoot != null) anchorRoot.SetActive(kind == Kind.Anchor);
 
         switch (kind)
         {
@@ -226,6 +238,7 @@ public class CardAimIndicator : MonoBehaviour
             case Kind.Freefall: EnsureFreefallVisuals(); freefallScanTimer = 0f; freefallRoot.SetActive(true); break;
             case Kind.Wail:     EnsureWailVisuals();     wailScanTimer = 0f; wailRoot.SetActive(true); break;
             case Kind.Phase:    EnsurePhaseVisuals();    phaseRoot.SetActive(true); break;
+            case Kind.Anchor:   EnsureAnchorVisuals();   anchorRoot.SetActive(true); break;
         }
     }
 
@@ -819,6 +832,53 @@ public class CardAimIndicator : MonoBehaviour
         phaseFill.transform.position = new Vector3(center.x, center.y, 0f);
         phaseFill.transform.localScale = Vector3.one * (r * 2f);
         phaseFill.color = new Color(phaseColor.r, phaseColor.g, phaseColor.b, 0.04f * dim);
+    }
+
+    // ------------------------------------------------------------------ RETURN ANCHOR
+
+    private void EnsureAnchorVisuals()
+    {
+        if (anchorRoot != null) return;
+
+        anchorRoot = MakeContainer("Aim_Anchor");
+
+        anchorTether = MakeLineChild(anchorRoot.transform, "Tether", 0.05f, sortingOrder - 1);
+        anchorTether.positionCount = 2;
+
+        anchorMark = MakeSpriteChild(anchorRoot.transform, "Mark", GetRingSprite(), sortingOrder);
+    }
+
+    // Two states, and the SECOND is the one that matters: once an anchor exists the card's whole
+    // decision is "do I want to be back THERE right now?", which is unanswerable if you can't see
+    // where "there" is. The tether runs from the player to the anchor so it can be found from
+    // anywhere in the room — the card has no range limit, so the anchor is often off-screen.
+    private void UpdateAnchor(float dim)
+    {
+        if (anchorRoot == null) return;
+
+        bool placed = player.HasReturnAnchor;
+        Vector2 target = placed ? player.ReturnAnchorPos : (Vector2)transform.position;
+
+        float pulse = 0.7f + 0.3f * Mathf.Sin(Time.unscaledTime * 4f);
+        Color c = anchorColor;
+        c.a *= pulse * dim;
+
+        // Flattened, like the real marker: this is a place on the floor, not an object in the air.
+        anchorMark.transform.position = new Vector3(target.x, target.y + 0.12f, 0f);
+        anchorMark.transform.localScale = new Vector3(1.7f / 0.41f, 1.7f * 0.42f / 0.41f, 1f);
+        anchorMark.color = c;
+
+        // No tether before placement — the marker lands at the player's own feet, so a line to
+        // themselves would be noise.
+        anchorTether.enabled = placed;
+        if (placed)
+        {
+            anchorTether.SetPosition(0, new Vector3(transform.position.x, transform.position.y + 0.5f, 0f));
+            anchorTether.SetPosition(1, new Vector3(target.x, target.y + 0.12f, 0f));
+            Color tc = anchorColor;
+            tc.a *= 0.35f * pulse * dim;
+            anchorTether.startColor = anchorTether.endColor = tc;
+        }
     }
 
     // ------------------------------------------------------------------ BUILD HELPERS

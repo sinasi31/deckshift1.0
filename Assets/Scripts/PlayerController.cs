@@ -157,6 +157,17 @@ public class PlayerController : MonoBehaviour
     // Read-only view for CardAimIndicator's portal ghost (first vs second placement preview).
     internal Portal FirstPortalInstance => firstPortalInstance;
 
+    [Header("Return Anchor (Second Thoughts)")]
+    // Deliberately has NO range limit, which is the whole difference from Portal. The return end is
+    // always somewhere the player has already stood, so it can never carry them forward through a
+    // room — it can only undo a trip they already paid for. That makes unlimited range safe by
+    // construction, and it's what the card is for: commit to a detour, come back cheap.
+    private Vector2 returnAnchorPos;
+    private bool hasReturnAnchor;
+    private ReturnAnchorVFX returnAnchorVfx;
+    internal bool HasReturnAnchor => hasReturnAnchor;
+    internal Vector2 ReturnAnchorPos => returnAnchorPos;
+
     [Header("Wall Settings")]
     public Transform wallCheck;
     public float wallCheckDistance = 0.5f;
@@ -363,6 +374,7 @@ public class PlayerController : MonoBehaviour
              "⚠️ The Phase card's description names this number — update the card asset if you change it.")]
     public float phaseMaxRadius = 6f;
     private Vector2 phaseAnchor;
+    private PhaseBoundary phaseBoundary;    // live only while phasing; OnTeleported re-anchors it
     internal bool IsPhasing => isPhasing;
 
     [Header("Phase Visual")]
@@ -404,8 +416,9 @@ public class PlayerController : MonoBehaviour
         // path must restore the matrix itself (audit_report.md Critical #2).
         playerHealth.OnDied += RestorePhaseLayerCollisions;
 
-        // A pending first portal must not outlive the run that placed it.
+        // A pending first portal / return anchor must not outlive the run that placed it.
         playerHealth.OnDied += CancelPendingPortal;
+        playerHealth.OnDied += ClearReturnAnchor;
 
         if (visualModel != null)
         {
@@ -1009,6 +1022,9 @@ public class PlayerController : MonoBehaviour
         // ring down and keeps the "pending portal" state a per-room thing by construction.
         CancelPendingPortal();
 
+        // Same for the return anchor: a marker pointing into the previous room is worse than none.
+        ClearReturnAnchor();
+
         // Starts the oath recorder for this room (no-cards / no-recall / low-shift / no-stagger).
         // Hooked here rather than in LevelManager so it can't be missed by any path that puts the
         // player into a room.
@@ -1220,25 +1236,88 @@ public class PlayerController : MonoBehaviour
         if (QuestSystem.instance != null) QuestSystem.instance.NoteShiftSpent(amount);
     }
 
-    // Is `spot` somewhere the player could actually stand? A portal is a place you ARRIVE at, so the
-    // honest test is whether the player's own capsule fits there — nothing else would stop you
-    // teleporting into the middle of a wall, and unlike Phase (which has EjectFromGeometry) Portal
-    // has no recovery, so that was a dead run.
+    // Would the player's capsule fit standing with its FEET at `feetPos`? Shared by every card that
+    // puts the player somewhere: a portal and a return anchor are both places you ARRIVE at, so the
+    // honest test is the player's own body, not a point sample. Nothing else would stop you
+    // teleporting into the middle of a wall, and unlike Phase (which has EjectFromGeometry) neither
+    // card has any recovery, so that was a dead run.
     //
     // Uses terrainLayer, NOT groundLayer: groundLayer deliberately contains Enemy so the player can
-    // land on heads, and an enemy wandering past should not veto a portal placement.
-    internal bool IsPortalSpotClear(Vector2 spot)
+    // land on heads, and an enemy wandering past should not veto a placement.
+    internal bool PlayerFitsAt(Vector2 feetPos)
     {
         if (capsuleCollider == null) return true;
-        Vector2 center = spot + capsuleCollider.offset;
+        Vector2 center = feetPos + capsuleCollider.offset;
         return !Physics2D.OverlapBox(center, capsuleCollider.size * 0.9f, 0f, terrainLayer);
+    }
+
+    // Every teleport in the game should funnel through here. Currently: Portal traversal (via
+    // Teleportable), Second Thoughts' return, and the out-of-bounds fall respawn.
+    //
+    // ⚠️ THE PHASE RE-ANCHOR IS LOAD-BEARING. The Phase bubble is anchored in WORLD space, so a
+    // teleport taken mid-Phase would drop the player outside it and ClampPhaseVelocity would haul
+    // them straight back — silently undoing the trip they just paid for. Portalling while phasing
+    // did exactly that until this existed. Moving the bubble with them is the honest reading: the
+    // limit is "how far you may travel under your own power", not "where you happen to be".
+    internal void OnTeleported()
+    {
+        ResetFallTracking();   // a teleport is not a fall — don't Meteor Greaves on the next landing
+
+        if (!isPhasing) return;
+        phaseAnchor = BiteCenter;
+        if (phaseBoundary != null) phaseBoundary.Reanchor(phaseAnchor);
+    }
+
+    // Second Thoughts. First play drops the anchor and keeps the card; the second snaps back to it
+    // from anywhere in the room and spends the card. Mirrors Portal's two-stage shape on purpose —
+    // one card teaching the pattern makes the other easier to read.
+    internal bool TryReturnAnchor(out bool keepCard)
+    {
+        keepCard = false;
+
+        if (!hasReturnAnchor)
+        {
+            returnAnchorPos = rb.position;             // the FEET: exactly where the player will be put back
+            hasReturnAnchor = true;
+            returnAnchorVfx = ReturnAnchorVFX.Spawn(returnAnchorPos);
+            keepCard = true;                           // dropping the marker is free; the trip costs
+            return true;
+        }
+
+        // The spot the player stood on can stop being standable — a gate closing over it is the
+        // realistic case. Refuse rather than teleport them into it: a refused play costs nothing and
+        // keeps the card, so the anchor stays available once whatever it is has moved.
+        if (!PlayerFitsAt(returnAnchorPos))
+        {
+            keepCard = true;
+            return false;
+        }
+
+        // ⚠️ BOTH, NOT JUST THE TRANSFORM. Physics2D.autoSyncTransforms is OFF in this project, so a
+        // transform write leaves rb.position reporting the OLD spot until the next physics step.
+        // ClampPhaseVelocity reads rb.position, so returning mid-Phase would spend that step
+        // believing the player was far outside their bubble and drag them to its edge.
+        rb.position = returnAnchorPos;
+        transform.position = returnAnchorPos;
+        rb.linearVelocity = Vector2.zero;              // otherwise you arrive still falling at speed
+        OnTeleported();
+        ClearReturnAnchor();
+        return true;
+    }
+
+    // Drops the marker without taking the trip. Called when the card leaves the hand unspent
+    // (Recall), and on room change / death, for the same reasons as CancelPendingPortal.
+    internal void ClearReturnAnchor()
+    {
+        hasReturnAnchor = false;
+        if (returnAnchorVfx != null) { returnAnchorVfx.Dismiss(); returnAnchorVfx = null; }
     }
 
     // The single source of truth for "may a portal go here right now?". CardAimIndicator calls this
     // exact method for its preview, so the ghost can never disagree with what the click will do.
     internal bool IsPortalPlacementValid(Vector2 spot)
     {
-        if (!IsPortalSpotClear(spot)) return false;
+        if (!PlayerFitsAt(spot)) return false;
 
         return firstPortalInstance == null
             ? Vector2.Distance(BiteCenter, spot) <= portalPlaceRange       // first: near the PLAYER
@@ -1489,7 +1568,7 @@ public class PlayerController : MonoBehaviour
         // Anchor the bubble on the BODY CENTER, not the transform (which sits at the feet), so the
         // drawn boundary is centred on the player and matches what ClampPhaseVelocity enforces.
         phaseAnchor = BiteCenter;
-        PhaseBoundary boundary = PhaseBoundary.Spawn(phaseAnchor, phaseMaxRadius, this);
+        phaseBoundary = PhaseBoundary.Spawn(phaseAnchor, phaseMaxRadius, this);
 
         float originalGravity = rb.gravityScale;
         rb.gravityScale = 0f;
@@ -1522,7 +1601,7 @@ public class PlayerController : MonoBehaviour
 
         // Normal exit. The boundary also self-collapses if it sees isPhasing go false without this
         // running (dying mid-Phase kills the coroutine before it reaches here).
-        if (boundary != null) boundary.Collapse();
+        if (phaseBoundary != null) { phaseBoundary.Collapse(); phaseBoundary = null; }
 
         Physics2D.IgnoreLayerCollision(playerLayer, groundLayerIndex, false);
         Physics2D.IgnoreLayerCollision(playerLayer, enemyLayerIndex, false);

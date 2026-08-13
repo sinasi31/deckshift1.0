@@ -415,6 +415,7 @@ public class DeckManager : MonoBehaviour
         // The next Portal drawn in the same room would then place the SECOND portal on its first
         // click and charge for it.
         player.CancelPendingPortal();
+        player.ClearReturnAnchor();   // same reasoning for Second Thoughts' marker
 
         // 5. Asıl işlemi başlat
         ReloadHand();
