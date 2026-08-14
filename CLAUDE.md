@@ -10,7 +10,11 @@ This file is loaded automatically into Claude Code at the start of every session
 
 **Core concept:** "Movement is a Resource." Jumping consumes **Shift**, which does not regenerate on its own — and **Shift CARRIES OVER between rooms** (designer-confirmed 2026-07-13: it is a run-long resource, and this persistence is "the whole identity of the game" — spending Shift now means having less for the rest of the run). Do NOT describe or implement Shift as a per-room resource. Most other actions (attacks, special movement, utility) are delivered via cards. Cards have **charges**; when charges deplete the card moves to the exhaust pile and must be recovered via scrap.
 
-**Current state:** Act 1 (Oxidation District) prototype. **10 combat levels in the run pool** (+ hub + boss room; ~15 more contract-valid rooms exist unused — see Room Pool), **16 CardData assets in `Assets/Cards/`, 19 relics, and 8 quest assets** (relics/quests re-verified 2026-08-11; note 2 of the 16 cards are not normal reward cards — `Stagger` is the fail-state card and `AnaKartVeritabanı` is the card *database* asset, so the real playable pool is ~14). Two acts (Vapor Stratum, Final Forge) planned but not started. Target: 45-50 minute run length, 60+ cards total at content-complete.
+**Current state:** Act 1 (Oxidation District) prototype. **10 combat levels in the run pool** (+ hub + boss room; ~15 more contract-valid rooms exist unused — see Room Pool), **16 CardData assets in `Assets/Cards/`, 19 relics, and 8 quest assets** (relics/quests re-verified 2026-08-11; note 2 of the 16 cards are not normal reward cards — `Stagger` is the fail-state card and `AnaKartVeritabanı` is the card *database* asset, so the real playable pool is ~14). Two acts (Vapor Stratum, Final Forge) planned but not started. Target: 45-50 minute run length, 60+ cards total at content-complete. **24 Blompo blessings** as of 2026-08-14 — the card *pool* is still the bottleneck, but the enhancement multiplier on it is now built.
+
+⚠️ **`DeckManager.startingDeck` is currently 3 cards (Phase, Freefall Blade, Second Thoughts) and that is the designer using it as a TESTING TOOL, not the intended starting deck.** Do not balance against it, and do not "fix" it. It does have one live side effect worth knowing: the `Only Child` blessing keys off a deck under 10 cards, so it currently fires for the whole run.
+
+📐 **UI work has its own loadable skill: `.claude/skills/deckshift-ui/SKILL.md`.** House style and the inversion rule, linear-colour-space calibration, uGUI traps, pause/HUD wiring, and a pre-delivery checklist. Invoke it (`/deckshift-ui`) before building or restyling any screen — the UI sections of this file are the summary, that is the working reference.
 
 ⚠️ **Content is the project's real bottleneck, and it gates the two biggest planned systems.** The run map is explicitly blocked on level count (it's mediocre at ~7 rooms, sings at ~30), and card *enhancements* ("Blompo") are a multiplier on the card pool — both want more content underneath them before they pay off. When choosing between "build another system" and "author more cards/levels", the honest answer is usually the latter.
 
@@ -140,6 +144,17 @@ The player has check Transforms parented to the player root (NOT to visualModel)
 
 `groundLayer` mask is **`2056` = layer 3 (`Ground`) + layer 11 (`Enemy`)** — verified against Player.prefab 2026-07-18. (An earlier version of this file claimed `2057` including layer 0 `Default`; that was WRONG — Default is NOT in the mask.) Consequences worth knowing: level geometry is on layer 3, and because layer 11 `Enemy` IS in the mask, the player can **stand on / ground-check against every Enemy-layer enemy**. See "Layer Convention Mismatch" under Enemy System for the verified per-enemy layer split — it is inconsistent and decides which enemies are walkable. This is a known issue but currently load-bearing.
 
+### Jump Forgiveness — coyote time + jump buffering (added 2026-08-14)
+
+Neither existed before this. `coyoteTime` 0.10s and `jumpBufferTime` 0.12s, both serialized on the Player.
+
+⚠️ **THEY MATTER MORE HERE THAN IN AN ORDINARY PLATFORMER.** Elsewhere a jump that fails on a timing gap costs a retry. Here it costs **Shift** — a run-long resource — twice: once if the input fired at all, and again for the re-attempt. It is the only fix to the Shift economy that *removes waste* rather than adding income.
+
+- **Coyote time** is refreshed while grounded and bleeds away once you step off. **Consumed on use** (`coyoteTimer = 0` on a successful jump) — without that, the leftover window hands out a second free jump immediately after the first.
+- **Jump buffering** remembers the press and retries it each frame. `PerformJump`, `PerformWallJump` and `HandleJumpInput` all **return bool**, and the buffer clears ONLY on a jump that really happened — so a press that can't be paid for at 0 Shift expires instead of firing later.
+
+⚠️ **Testing this across MCP tool calls is misleading.** The editor stalls for seconds between calls, and Unity caps the resulting first-frame `Time.deltaTime` at `Time.maximumDeltaTime` (0.333) — enough to drain a 0.12s buffer before it is ever checked. A buffer test that "fails" this way is a test artifact. Verify with a deliberately long buffer and check it fires **exactly once** (Shift 40 → 39, not 40 → 0).
+
 ### Gravity Reversal System
 
 Triggered by the "Floor is Lava" card (`CardActionType.ReverseGravity`). Lasts 5 seconds with a 0.5s warning flash + audio cue before expiration.
@@ -193,6 +208,45 @@ The gravity reversal factor compensates for the 180° Z rotation inverting the v
 ### Deck Structure
 
 `DeckManager` maintains four piles: `drawPile`, `hand`, `discardPile`, `exhaustPile`. **Recall** (R key) is the player's manual refresh action — costs Shift, redraws the hand, cost increases each use within a level.
+
+### Card Enhancements — Blompo's blessings (24 of them, rebuilt 2026-08-14)
+
+**`CardEnhancements.cs` is the whole system: the enum, the metadata, the eligibility rules AND every runtime hook.** Adding a blessing is one file, not eight.
+
+It went 7 → 24 because the designer's verdict on the original seven was *"too simple and not very fun"*, and that was right: six of the seven were "cheaper, or more of the same" and only one changed how a card BEHAVES. Three were **cut** and should not come back as-is:
+
+- **On the House** (costs no Shift) — measured, **nine of fifteen cards already cost 0 Shift and the dearest costs 2**, so the whole cost-reduction axis is nearly a no-op. `Ritual` replaces it by going the other way: pay MORE, hit harder. That's a decision; a discount isn't.
+- **Extra Spicy** (+50% damage) — asked nothing of the player.
+- **Double Dip** (plays twice) — could only ever be offered on the five cards holding no ConflictFlags, so most of the deck never saw it. **`Echo` is the same idea done properly:** its 2-second delay lets the first cast's flags expire, so it works on the whole deck. The delay is the mechanism, not flavour.
+
+**The hooks, and where they're consumed:**
+
+| hook | called from | blessings |
+|---|---|---|
+| `EffectiveCost` | `DeckManager.PlayCard`, `CardAimIndicator`, `BlompoScreen` | Ritual, Donor Card |
+| `ModifyActionValue` | `PlayCard` (cast time) | Ritual, Glass, Loaded Dice |
+| `ModifyDamage` | `RelicManager.ModifyPlayerDamage` | Grudge, Momentum, Finisher, Opener, Heavy Hitter |
+| `ShouldSpendCharge` | `PlayCard` | Sleight of Hand, Slow Burn, Teacher's Pet |
+| `NotePlayed` / `NoteKill` | `PlayCard` / `EnemyHealth.Die` | Compound Interest, Donor Card, Toll Booth, Grudge |
+| `RescueFromExhaust` / `OnExhausted` | `PlayCard` routing | Last Call, Inheritance |
+| `BeginRoom` | `PlayerController.OnNewRoomEnter` | Time Will Come, Only Child, Teacher's Pet |
+| `StaysInHand` / `RetainsThroughRecall` | `PlayCard`, `ReloadRoutine` | Clingy, Teacher's Pet |
+
+⚠️ **`EffectiveCost` is the ONE place a card's cost is computed.** DeckManager, CardAimIndicator and BlompoScreen all call it. They used to each carry a copy of the rule with a comment begging whoever edited one to remember the others.
+
+⚠️ **Damage-time blessings live at `RelicManager.ModifyPlayerDamage` for two reasons**: it's the single chokepoint every point of player damage passes through (so a damage source added later can't forget them), and it's **the only place the TARGET is known** — which is what lets Finisher and Opener read the enemy's real health instead of guessing at cast time.
+
+⚠️ **`DeckManager.AttributedCard` is NOT the same as `CardBeingPlayed`, and the difference is projectiles.** `CardBeingPlayed` is live only during `ExecuteAction`. Most card damage resolves synchronously inside that, but **a Fireball lands seconds later**, so `Fireball.sourceCard` is stamped at spawn and re-installed around its hit. **Without that, every damage blessing silently does nothing on the main attack card.** Any future delayed damage source (a lingering pool, a summon) must do the same. It must also be nulled again, or the next spike or pogo bounce inherits a Grudge bonus it never earned.
+
+Kills are credited in `EnemyHealth.Die`, which runs *inside* `TakeDamage` while the attribution is still live — so Grudge and Toll Booth are exact, not a time window.
+
+⚠️ **TWIN IS DELIBERATELY BROKEN, BY REQUEST.** A Twinned card counts as still-unblessed, so it can take another blessing **and be Twinned again** — the only route in the system to an exponential deck. The designer wants the ceiling found in beta rather than guessed. If it's miserable rather than fun, the fix is one line in `CanApplyTo`.
+
+**Offer weights were flattened 10/6/3/1 → 10/7/5/2** ("make Blompo more OP overall"). Measured over 4000 visits: **8.6% offer a Legendary, 59.6% an Epic-or-better.**
+
+⚠️ **`Understudy` needs a THIRD pick step** in `BlompoScreen` (blessing → card → partner). It's the only blessing that does; `NeedsPartner` is the flag.
+
+⚠️ **Per-card blessing state lives on `RuntimeCard`**, not CardData — `grudgeBonus`, `roomsSincePlayed`, `lastCallUsed`, `playedThisRoom`, `lastCostPaid`, `understudyPartner`. Same reason the enhancement itself does: it's per-copy and per-run.
 
 ### Stagger Mechanic (REDESIGNED 2026-08-09 — it is no longer a three-strikes death sentence)
 
@@ -698,7 +752,25 @@ Lessons already paid for, don't re-learn them:
 
 ⚠️ **Bulletin proves the strongest available inversion is VALUE, not hue.** Every other screen is a dark plate with light text on it; the quest board is a dark board with **pale paper pinned to it**, so its text ramp is INK (`TextBright` is nearly black) and the bright/dark areas have swapped places. That single structural choice makes it unmistakable at a glance while claiming almost no colour. Its wear is also the only wear in the game that says something about the **world** (other people took contracts here) rather than about the object. **Reach for this before reaching for another hue.**
 
-⚠️ **The hue budget is nearly spent.** Claimed: orange (Iron), violet (Arcane), no-hue (Loadout), verdigris green + copper (map), warm wood/amber (shop), frost blue (Halt), arc-cyan (Apparatus), deep wax red (Bulletin). Roughly magenta and yellow remain. When those run out, **stop reaching for a new colour and invert a different axis instead** — light direction, motion vocabulary, surface treatment and now value structure separate these screens at least as much as hue does, and Loadout proves a theme can carry no hue at all.
+### Cartograph — the run map, rebuilt on paper (2026-08-14)
+
+⚠️ **THE MAP TOOK THREE ATTEMPTS AND THE TWO FAILURES ARE THE LESSON.** It was a flat slate panel, then an acid-etched copper plate. Both were given a MATERIAL, both were carefully lit, and the designer rejected both as still reading like a diagram. **A material is not enough.** A map feels like a map because it is a **DOCUMENT** — printed, folded, carried, then scribbled on. Four things carry that, and stripping any one slides it back to a node graph:
+
+1. **PAPER, NOT A PANEL.** The sheet IS the window — no frame, and its edge is a torn deckle rather than a chamfer. Every other screen is a plate you look AT; this is an object you're holding.
+2. **FOLDS.** Two vertical creases and one horizontal. The cheapest possible signal the thing was in a pocket a second ago.
+3. **DASHED TRAILS.** A solid line between two points is a graph edge; a dashed line is a ROUTE. Biggest change to the read after the paper itself.
+4. **PROGRESS IS ANNOTATION.** The chart is printed in brown ink; where you've been and what you may take next is marked over it in **red pen**. Printed trails are mechanically tiled and neat; the player's are individual strokes with per-stroke wobble — **two different hands, deliberately**. Every state is signalled by that fiction with no colour key.
+
+`Parchment.cs` holds the procedural paper, grain, ink strokes, hand-drawn rings and compass rose. It claims **tan/paper + oxblood** and gives back verdigris.
+
+⚠️ **LIGHT GROUND INVERTS THE CALIBRATION RULES.** Everything in §2 of the `deckshift-ui` skill assumes a dark plate. On paper:
+- The fold **highlight** had to drop 0.20 → **0.055**. A bright line has almost no headroom above bright paper, so any visible value instantly reads as a drawn rule — the sheet came out with three glowing lines across it.
+- The compass was **invisible** as a large 0.115 watermark. A dark mark on a light ground **washes out** rather than reading as subtle. It needed to be *smaller and three times stronger*.
+- The player's pen needed a **shorter stroke period and more overlap** than felt right: a trail between adjacent floors is only ~60px after trimming, so at the printed spacing the player's own route came out fainter than the chart it overlays.
+
+⚠️ **NODE LAYOUT IS A FIXED COLUMN LATTICE. DO NOT REINTRODUCE BARYCENTRIC RELAXATION.** It was tried and reverted the same day. Pulling nodes toward their neighbours' mean X does straighten the trails — measured, sideways travel per edge falls 214px → 86px — but it computes a **different spread for every row**, so a floor with three nodes shares no column with a floor that has five. The designer read the result instantly as *"the nodes are off, they are not where they are meant to be"*. A grid you can scan beats trails that lean less. Edge crossings are **zero either way** (measured over 300 acts), so nothing is lost.
+
+⚠️ **The hue budget is nearly spent.** Claimed: orange (Iron), violet (Arcane), no-hue (Loadout), **tan paper + oxblood (map — Cartograph)**, warm wood/amber (shop), frost blue (Halt), arc-cyan (Apparatus), deep wax red (Bulletin). Roughly magenta and yellow remain. **Cartograph and Bulletin are the two light-ground themes** and stay separable because Bulletin is small pale slips on a DARK board — its dominant field is dark, where the map's whole field is paper. When those run out, **stop reaching for a new colour and invert a different axis instead** — light direction, motion vocabulary, surface treatment and now value structure separate these screens at least as much as hue does, and Loadout proves a theme can carry no hue at all.
 
 **The Marketplace (`ShopScreenUI`) keeps its own material** — warm wood, striped canvas awning, lamplight — and was already bespoke rather than old chrome. What it needed wasn't a reskin but a PERSON; see "The keeper talks back" below.
 
@@ -996,6 +1068,40 @@ down inside the hole — under the acid, invisible.
 
 **Entity placement:** most enemies have kinematic physics and do NOT fall, so the importer auto-grounds standing markers (`X m r l M C ^ W T` + the spawn): after instantiating, it measures the instance's combined renderer bounds (ignoring particles/trails, collider fallback) and shifts it so bounds-bottom sits exactly on the cell floor. Floaty pickups (`+ g`) and flyers (`b`) stay at cell center. Decoration (props) stays a manual pass by design. Planned next stages: movement-metrics doc (jump/dash distances in tiles) then batch room drafting.
 
+### ⚠️ SHIFT SUPPLY IS A MEASURABLE ROOM PROPERTY: ~7 Shift per 1000 tiles (2026-08-14)
+
+The designer reported the generated rooms as far harsher than the hand-made ones and punishing on a missed jump. Measured, it was not a feel problem — it was a **4.5× supply gap that compounds with room size**:
+
+| | shift | area (tiles) | per 1000 |
+|---|---|---|---|
+| hand-made average | 6.9 | 1090 | **6.3** |
+| GenLevel7 | 3 | 2584 | 1.2 |
+| GenLevel8 | 3 | 2880 | 1.0 |
+| GenLevel9 | 7 | 2772 | 2.5 |
+| GenLevel10 | 2 | 2520 | **0.8** |
+
+The generated rooms are **~2.5× larger AND paid half as much**, so per unit of traversal GenLevel10 was **nine times stingier** than efeslevel1. All four are now stocked to **6.9–7.1 per 1000 tiles** (targeting the most generous hand-made rooms, not the average, because the bigger layouts demand more traversal). Total Shift across a 10-room run went **63 → 123**.
+
+**Room size is staying big — the designer likes the large layouts, so the lever is supply, not size.** When authoring a new room, check crystals against area; the hand-made band is 5.1–7.7 per 1000.
+
+⚠️ **The gold/crystal split still holds:** gold piles must be GROUNDED, Shift crystals floating is correct and wanted.
+
+### ⚠️ THREE PLATFORM VARIANTS DO NOT FILL THEIR FOOTPRINT — removed 2026-08-14
+
+Measured by stamping each multi-cell variant on a bare tilemap and probing every cell with `Physics2D.OverlapPoint`:
+
+```
+Ground Dirt_10   2x2   1 of 4 cells solid
+Ground_6         3x3   8 of 9
+Ground Dirt_6    3x3   8 of 9
+```
+
+They are oversized, so `TileVariantGenerator` correctly refuses them full-cell Grid collision and they keep `colliderType = Sprite` — which traces the **alpha outline**. These three are drawn as irregular rounded rocks rather than filled blocks, so the corners simply are not there. **A platform stamped with one looks solid and is not.** All three are gone from `PlatformShapes`; the other 17 variants measured complete.
+
+⚠️ **Being the right pixel size is NOT evidence.** `Ground Dirt_10` measures **2.06 × 2.03**, which looks perfect. Any new variant added to `PlatformShapes` must be probed, not eyeballed.
+
+⚠️ **`Ground Dirt_13 Solid` was the same class of bug and is also gone** — a 0.44 × 0.38 pebble carrying FULL-CELL Grid collision, so the player stood **0.62 units above a pebble**. Every instance sat at the outer edge of a floor run, i.e. exactly the surface you walk onto. This is very likely the designer's "2-3 tiles where the colliders are off and the player seems to float".
+
 ### Level Validator (2026-08-07) — run this BEFORE importing a level
 
 `Assets/Scripts/Editor/LevelValidator.cs`, menu **Deckshift → Validate Level Text(s)**.
@@ -1011,7 +1117,11 @@ down inside the hole — under the acid, invisible.
 - **Airtime ≈ 1.5s** (0.90s up at −12.26, 0.60s down at −26.98 thanks to `fallMultiplier`).
 - **Flat jump reach ≈ 12 tiles** — simply `moveSpeed × airtime`. Still about **2× the "flat gaps ≤ 5-6 tiles"** the design laws assume, which is worth knowing when rooms play flat.
 
-⚠️ **`PerformJump`'s horizontal impulse is DEAD CODE — do not model it, and know it's a landmine.** `PerformJump` does `AddForce(moveInput * jumpForce, jumpForce)`, which looks like a running jump should launch at 8 + 11 = 19 u/s. It doesn't: **`isGrounded` is assigned only in `Update()` and nothing clears it on jumping**, so the very next `FixedUpdate` still sees `isGrounded == true`, runs the grounded branch (`rb.linearVelocity = (moveInput * moveSpeed, y)`) and overwrites the horizontal impulse back to 8 about 20ms later. Vertical is untouched, which is why the apex is unaffected. **If anyone ever "fixes" that stale `isGrounded` read, every jump instantly gains a large horizontal boost and every gap in every level becomes trivially clearable.**
+✅ **`PerformJump`'s horizontal impulse is GONE (2026-08-14), and the reason it had to go is worth keeping.** It used to do `AddForce(moveInput * jumpForce, jumpForce)`, which looked like a running jump should launch at 8 + 11 = 19 u/s. It didn't: `isGrounded` is assigned only in `Update()` and nothing clears it on jumping, so the very next `FixedUpdate` saw `isGrounded == true`, ran the grounded branch (`rb.linearVelocity = (moveInput * moveSpeed, y)`) and overwrote it back to 8 about 20ms later. Dead code — **on a grounded jump.**
+
+⚠️ **COYOTE TIME REACHED THAT LANDMINE FROM THE OTHER SIDE.** A coyote jump fires while `isGrounded` is **false**, so FixedUpdate takes the AIR branch instead, which only lerps toward moveSpeed at ~7% per step — the impulse would have survived most of a second. Coyote jumps would have flown noticeably further than the ordinary jumps they're meant to be indistinguishable from, and **every gap in the game would have been clearable by deliberately stepping off the edge first.** The old warning here was about "fixing" the stale `isGrounded` read; that was only one of the two routes in.
+
+Deleted outright rather than special-cased, which is safe because **`maxAirJumps` is 0** so the ground branch is `PerformJump`'s only caller. Verified: a coyote jump while running leaves horizontal velocity at **8.00, not 19**.
 
 (An earlier version of this section claimed a 15-tile reach and a 3× discrepancy, from modelling that impulse as if it survived. It does not.)
 
@@ -1042,6 +1152,15 @@ Verified, not assumed. The tilemaps render with **`Sprite-Lit-Default` (URP 2D l
 `LevelManager.roomPrefabs` holds the pool of room prefabs. **Element 0 must be the hub;** elements 1..n are the run's combat levels. The boss room is NOT in this list — it has its own `bossRoomPrefab` slot.
 
 **Verified pool contents (2026-08-08):** `[0] hub, [1] efeslevel1, [2] efeslevel2, [3] efeslevel3, [4] EfeVrl4, [5] EfeVrl5, [6] EfeVrl6, [7] EfeVrl7, [8] GenLevel7, [9] GenLevel8, [10] GenLevel9` + `bossRoomPrefab = BossRoom`. So the run is **10 combat levels**. All satisfy the room contract (CameraBounds / GirisNoktasi / ExitDoor), and only `hub` has a `HubMarker`.
+
+**GenLevel7/8/9 were brought up to the current rules IN PLACE (2026-08-14)** — never by re-import, for the reason immediately below. Four things had drifted, all found by auditing against GenLevel10 (the only generated room built under current rules):
+
+1. **The backdrop was six tiles of a sixty-four piece wall.** `TX Tileable - Dungeon Wall` is one seamless 8×8 picture; the old importer held six pieces and scattered them randomly. **That is why generated rooms never looked like the hand-made ones.** Now 64/64, assembled via `BackWallIndex`. ⚠️ Only cells that ALREADY held a tile were rewritten — the designer erased backdrop tiles by hand in these rooms and filling every empty cell would silently undo that.
+2. **`Ground Dirt_13 Solid`** floating-collider cells (14 of them). See the tile section above.
+3. **Overlapping spikes** — 1.55 wide placed 1.00 apart. Re-spaced to GenLevel10's 1.67 pitch about each run's original centre. No spikes removed; the floor runs had room for their existing count all along.
+4. **Every mid-air platform was `Ground_11` repeated per cell** (GenLevel8 had 86 cells of it and nothing else) — these rooms predate `StampPlatformShapes`. Re-stamped as decomposed whole shapes, plus 11 new **vertical** pieces (pillars, boxes, blocks) added additively so they cannot make an exit unreachable.
+
+⚠️ **RE-STAMPING NARROWED THE PLATFORMS, and this is a real gameplay change.** `Ground_11` is 3 units of art on a 1-cell stamp with Sprite collision, so painting it per cell overlapped it three deep AND spilled past both ends. Measured on a 7-wide run: collision ran x=5.0–15.0 for cells 6..12 — a cell too far left, two too far right. It is now exactly 6.0–13.0, the run as drawn. The old width was a bug, but it is a bug those rooms were playtested with.
 
 ⚠️ **THE `.txt` IS NO LONGER THE SOURCE OF TRUTH FOR `GenLevel7/8/9` (2026-08-09).** The designer has hand-edited the built prefabs — moved loot, placed a Blompo, erased tiles. **Re-importing any of them from its text file DESTROYS that work**, and also renumbers every fileID so `LevelManager.roomPrefabs` loses its reference. Edit these rooms in the Unity editor, or if a text re-import is genuinely needed, diff the prefab first and re-apply the hand edits afterwards. `GenLevel8` has carried hand-tuning since 2026-08-08; 7 and 9 now do too.
 
@@ -1568,7 +1687,7 @@ The `CardTemplate` prefab has fundamental scale corruption: root scale is non-un
   - **Dependency status:** the old "BLOCKED on level count" framing is softer than it looked. Shop/Blompo/quest board are **NPCs placed in rooms**, not dedicated room prefabs, so those node types are near-free. ~15 contract-valid rooms already exist unused (see Room Pool) and need correction passes, not authoring from scratch. Still, tiers are baked into layout, so each room serves ONE tier — roughly 4 Skirmish / 4 Fight / 3 Elite are needed for one repeat-free act.
 
 - **Quest banking — designed 2026-08-03, not built.** Quest rewards should stop paying out instantly and instead **accumulate**, to be collected at a quest board **at the start of the next act** (post-boss). Quests are taken at run start, so they act as *route-shaping objectives* — "kill 3 elites" pushes you onto dangerous paths, "collect 500 gold" into exploration detours. The existing run loop already does this shape (`LevelManager` goes hub → levels → boss → back to hub, and the hub already has the board), so the structural work is small. **The board does NOT need its own map node yet** — only four quest assets exist (one pays zero), which is too thin to carry a node; put it inside the Market or Well for now. When the map exists, show it *while* the player picks quests, so quest selection isn't a blind bet.
-- **Card enhancements via "Blompo" (SkillManager repurpose) — designed 2026-07-18, NOT started.** Pivot the existing global skill passives into **per-card enhancements** (e.g. +charges, infinite charges, free-to-play, generates Shift, Retain-on-Recall, scaling-on-discard, Bond). Open decisions flagged in that discussion: (1) the **stacking guardrail** — `does-not-cost-shift` + `gain-shift-when-played` + `infinite-charges` on one card is an unbounded Shift engine and must be rule-blocked; (2) **Bond** (auto-play a linked card) collides with the ConflictFlags system exactly like Echo Chamber's double-cast; (3) enhancements should be **filtered by card type** (a damage buff is meaningless on Portal); (4) decide whether an enhancement is permanent and what happens when the card exhausts.
+- ~~Card enhancements via "Blompo"~~ — **BUILT. 24 blessings as of 2026-08-14** (see Card System → Card Enhancements). This entry described it as "NOT started" for weeks after it shipped with seven; do not plan from that.
 - Boss encounters per act (3 bosses per act, randomly selected from pool). **Act 1's Moss Knight is a playable encounter** (moveset, gated fight start, awaken cinematic, SFX, boss health bar, and a death celebration that drops real collectible gold + shift crystals). It's the run finale (`LevelManager.bossRoomPrefab`). Full doc: `BossDesign_MossKnight.md`. Still open there: the acid arena (flank pools + platforms) and an optional post-kill RewardManager card/relic screen. The other Act-1 bosses and the pool/random-select aren't built.
 - Chunk-based level system (currently hand-crafted levels).
 - **Starting relic system** + **Fireball relic** for the wizard identity (auto-fires fireball every 10s). Deferred when the broader relic redesign was prioritized — may be revisited as a small early demo polish.

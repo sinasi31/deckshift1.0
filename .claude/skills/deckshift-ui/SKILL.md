@@ -45,17 +45,26 @@ Screens share the *ideology* — flat procedural plates, restraint, directional
 light, a subtle particle drift, one meaningful accent — and **never the same
 skin**. The material should say what the place DOES.
 
-| | **Iron** (ScrapForge) | **Arcane** (Blompo) | **Loadout** (relics) | **Halt** (pause) | **Apparatus** (settings) | **Bulletin** (quests) |
-|---|---|---|---|---|---|---|
-| What it is | a workbench | a blessing granted | what you're carrying | the moment you stopped | the machine's own panel | contracts you promise |
-| Palette | warm charcoal | cold indigo | near-**colourless** | cold blue-black | smoked glass + arc-cyan | dark wood + **pale paper** |
-| Light | fire from **below** | descends from **above** | none | from **edges inward** | **emitted by the content** | rakes in from the **left** |
-| Particles | embers **rising** | motes **settling** | none | **suspended**, shivering | none — one scan sweep | none — the content sways |
-| Corner marks | rivets | four-point stars | none | none | calibration crosshairs | brass tacks |
-| Surface | scuffed | pristine | plain sockets | **crazed** | unblemished glass | **perforated** |
+| | **Iron** (ScrapForge) | **Arcane** (Blompo) | **Loadout** (relics) | **Halt** (pause) | **Apparatus** (settings) | **Bulletin** (quests) | **Cartograph** (run map) |
+|---|---|---|---|---|---|---|---|
+| What it is | a workbench | a blessing granted | what you're carrying | the moment you stopped | the machine's own panel | contracts you promise | a folded map you just opened |
+| Palette | warm charcoal | cold indigo | near-**colourless** | cold blue-black | smoked glass + arc-cyan | dark wood + **pale paper** | **tan paper** + oxblood |
+| Light | fire from **below** | descends from **above** | none | from **edges inward** | **emitted by the content** | rakes in from the **left** | even, with aged corners |
+| Particles | embers **rising** | motes **settling** | none | **suspended**, shivering | none — one scan sweep | none — the content sways | none — paper doesn't move |
+| Corner marks | rivets | four-point stars | none | none | calibration crosshairs | brass tacks | **compass rose** |
+| Surface | scuffed | pristine | plain sockets | **crazed** | unblemished glass | **perforated** | **stained, foxed, folded** |
 
 The Marketplace (`ShopScreenUI`) keeps its own: warm wood, striped awning,
 lamplight.
+
+⚠️ **A MATERIAL ALONE IS NOT ENOUGH — the map proved it twice.** It was given flat
+slate, then acid-etched copper, both carefully lit, and both were rejected as
+still reading like a diagram. What fixed it was making it a **DOCUMENT**: paper
+instead of a panel (the sheet IS the window, torn edge, no frame), fold creases,
+**dashed** trails instead of solid lines, and the player's own progress drawn
+over the print in red pen by a visibly different hand. When a screen depicts a
+THING that exists in the world, ask what that thing has been *through*, not just
+what it is made of.
 
 ### The inversions are the point
 
@@ -160,6 +169,26 @@ Consequences, all load-bearing:
 - **A dark dot cannot mark anything on a dark surface.** The quest board's pin
   holes read because of a pale crescent on the side away from the lamp, drawn
   OVER a wider dark smudge. Rim-only reads as dust; dark-only is invisible.
+
+### ⚠️ A LIGHT GROUND INVERTS EVERY RULE ABOVE
+
+Everything above assumes a dark plate. `Cartograph` is paper, and on paper the
+same instincts are wrong in the opposite direction. Measured while building it:
+
+- **A subtle bright mark has almost no headroom.** The fold highlight had to drop
+  from 0.20 to **0.055** — at 0.20 the sheet came out with three glowing lines
+  ruled across it, reading as laser guides rather than creases. On a dark plate a
+  low bright alpha blooms; on a light one it just becomes a drawn line.
+- **A subtle DARK mark washes out instead of reading as subtle.** The compass was
+  completely invisible as a large 0.115 watermark. It needed to be **smaller and
+  roughly three times stronger** to register at all. This is the exact inverse of
+  "atmosphere wants half the alpha you reach for".
+- **The masking trick flips too, and gets better.** On a dark screen, hiding a
+  line behind a label needs a visible plate. On paper the mask can be the GROUND
+  ITSELF — a paper-coloured blob is invisible except for what it hides.
+
+The rule underneath all three: **contrast against the ground is what matters, not
+the alpha.** Never carry a value across from a dark theme to a light one.
 
 ### Rarity must separate on three channels at once
 
@@ -381,6 +410,21 @@ warning flash was "fixed" twice this way and stayed invisible for months.
 - **Screenshot recipe:** enter Play mode → `ScreenCapture.CaptureScreenshot(abs
   path)` → `Read` the PNG in a **later** tool call (it's async) → stop Play mode.
   `CaptureScreenshotAsTexture()` returns null from `execute_code`.
+- ⚠️ **`Texture2D.ReadPixels` does NOT read the game framebuffer from
+  `execute_code` either** — it returned a uniform flat grey for a screen that was
+  demonstrably on display. The async file capture is the ONLY trustworthy route.
+  To sample exact pixel values, capture to a PNG and load that back as a texture.
+- ⚠️ **NEVER WRITE A MEASURED CLAIM INTO A COMMENT YOU HAVE NOT MEASURED.** A
+  header in `RunMapScreen` asserted that a layout change cut edge crossings from
+  ~9 per act to under 1. Measured afterwards over 300 generated acts: crossings
+  were **zero before and zero after** — the change did something else entirely
+  (sideways travel per edge, 214px → 86px). A confident false number in a comment
+  is worse than no comment, because the next person plans around it.
+- ⚠️ **Verify a fix against the FAILURE, not the mechanism.** A soft radial was
+  added behind labels to hide lines crossing them, and it looked like a fix — but
+  a radial is an ELLIPSE, so it was nearly transparent at exactly the left and
+  right ends where the lines actually cross. Test the thing the user complained
+  about, not the thing you built.
 - ⚠️ **Trust only the real framebuffer.** A manual `camera.Render()` into a
   RenderTexture can sort differently from the URP pipeline and has produced a
   false "this is fixed" image.
