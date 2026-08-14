@@ -52,16 +52,6 @@ public class RunMapScreen : MonoBehaviour
     private const float AREA_BOTTOM = 94f;
     private const float AREA_SIDE = 58f;
 
-    // Node X is clamped this far inside the area so a label (118 wide) never runs off the plate,
-    // and so the floor-band depth marks in the left gutter are never sat on.
-    private const float X_PAD = 74f;
-    // Minimum horizontal gap between two nodes on the same floor. Must exceed the label width or
-    // neighbouring labels collide — which is what the old jitter kept doing.
-    private const float MIN_SEP = 132f;
-
-    private const int RELAX_ITERS = 24;
-    private const float RELAX_RATE = 0.35f;
-
     private const float EDGE_THICKNESS = 3f;
 
     // ---- the etch palette ------------------------------------------------------------------------
@@ -105,7 +95,10 @@ public class RunMapScreen : MonoBehaviour
     private static readonly Color CopperWorn = new Color(0.565f, 0.395f, 0.250f, 1f);
 
     private static readonly Color TextTitle = new Color(0.885f, 0.930f, 0.905f, 1f);
-    private static readonly Color TextQuiet = new Color(0.470f, 0.560f, 0.525f, 1f);
+    // ⚠️ Raised from 0.470/0.560/0.525, which was unreadable in play. A "quiet" caption still has
+    // to be READ — the subtitle is where the screen tells you whether Escape will close it, and on
+    // a required route choice it will not, so it is the one line that must never be decorative.
+    private static readonly Color TextQuiet = new Color(0.660f, 0.760f, 0.720f, 1f);
 
     private RectTransform window, area;
     private CanvasGroup group;
@@ -275,7 +268,7 @@ public class RunMapScreen : MonoBehaviour
         title.rectTransform.sizeDelta = new Vector2(-80f, 38f);
         title.characterSpacing = 8f;
 
-        sub = AddText(window, "Sub", "", 15f, TextQuiet, TextAlignmentOptions.Center);
+        sub = AddText(window, "Sub", "", 16.5f, TextQuiet, TextAlignmentOptions.Center);
         sub.rectTransform.anchorMin = new Vector2(0f, 1f);
         sub.rectTransform.anchorMax = new Vector2(1f, 1f);
         sub.rectTransform.pivot = new Vector2(0.5f, 1f);
@@ -565,32 +558,33 @@ public class RunMapScreen : MonoBehaviour
 
     // Positions every node in the chart area.
     //
-    // Each node is pulled toward the mean X of everything it connects to (barycentric ordering,
-    // the standard layered-graph fix), then each row is pushed apart to MIN_SEP.
+    // Every node sits on a FIXED COLUMN LATTICE: column decides x, floor decides y, and nothing
+    // else moves it. Combined with the floor bands that gives the chart a real grid, which is what
+    // lets the eye compare one floor against another.
     //
-    // ⚠️ WHAT THIS DOES AND DOES NOT DO — measured over 300 generated acts, because the first
-    // version of this comment claimed a crossing fix that does not exist:
+    // ⚠️ DO NOT REINTRODUCE BARYCENTRIC RELAXATION HERE. It was tried and reverted the same day.
+    // Pulling each node toward the mean X of its neighbours and re-centring the row does produce
+    // straighter edges — measured, average sideways travel per edge falls 214px -> 86px — but it
+    // computes a DIFFERENT spread for every row, so a floor with three nodes ends up sharing no
+    // column with a floor that has five. The lattice disappears, and the designer read the result
+    // immediately as "the nodes are off, they are not where they are meant to be". A grid you can
+    // scan beats edges that lean less; slanted edges on an honest lattice are what every map of
+    // this shape does.
     //
-    //   · Edge crossings were ALREADY ZERO and still are (0.00/act in both layouts, worst case 0).
-    //     The generator's column carving prevents them; nothing here was needed. If the old chart
-    //     looked tangled, that was edges passing near unrelated nodes, not true intersections.
-    //   · What it actually buys: average sideways travel per edge falls 214px -> 86px, a 60% drop.
-    //     Edges become far more vertical, so a route reads as one continuous climb instead of a
-    //     zigzag. THAT is the legibility win.
-    //   · The cost, and why MIN_SEP is load-bearing: pulling nodes toward their neighbours also
-    //     pulls them toward each other, and the tightest same-floor gap falls 232px -> 132px. That
-    //     is still wider than the 118px label box, which is the only reason labels don't collide.
-    //     Lower MIN_SEP below the label width and they will.
+    // Two related notes, both measured over 300 generated acts:
+    //   · Edge crossings are ZERO either way. The generator's column carving already prevents
+    //     them, so nothing in the layout needs to defend against crossings.
+    //   · Lattice spacing is w/(maxCol+1) — about 289px at full width, comfortably past both
+    //     MIN_SEP and the label box, so nothing on a floor can collide.
     //
-    // Deterministic: no random jitter at all. The old jitter existed to stop the chart looking like
-    // a spreadsheet, but on an ENGRAVED plate sitting exactly on the floor line is correct —
-    // precision is the material — and the bands now supply the structure the jitter was faking.
+    // Deterministic: no random jitter. The old jitter existed to stop the chart looking like a
+    // spreadsheet, but it also knocked nodes off their floor line; on an ENGRAVED plate precision
+    // is the material, and the bands now supply the structure the jitter was faking.
     private Dictionary<int, Vector2> LayOutNodes(RunMap map)
     {
         Rect r = area.rect;
         float w = r.width, h = r.height;
         float halfW = w * 0.5f;
-        float limit = Mathf.Max(0f, halfW - X_PAD);
 
         float step = map.floors > 1 ? h / (map.floors - 1) : h;
 
@@ -598,58 +592,17 @@ public class RunMapScreen : MonoBehaviour
         foreach (MapNode n in map.nodes) if (n.column > maxCol) maxCol = n.column;
         float colStep = maxCol > 0 ? w / (maxCol + 1) : w;
 
-        // Seed from the generator's columns.
-        Dictionary<int, float> x = new Dictionary<int, float>();
-        foreach (MapNode n in map.nodes)
-            x[n.id] = maxCol > 0 ? -halfW + colStep * (n.column + 0.5f) : 0f;
-
-        // Group by floor once.
-        List<List<MapNode>> byFloor = new List<List<MapNode>>();
-        for (int f = 0; f < map.floors; f++) byFloor.Add(new List<MapNode>());
-        foreach (MapNode n in map.nodes)
-            if (n.floor >= 0 && n.floor < map.floors) byFloor[n.floor].Add(n);
-
-        for (int iter = 0; iter < RELAX_ITERS; iter++)
-        {
-            foreach (List<MapNode> row in byFloor)
-            {
-                foreach (MapNode n in row)
-                {
-                    // The act's spine. Start and Boss are single nodes and belong dead centre;
-                    // letting them drift makes the whole chart look tipped over.
-                    if (n.type == MapNodeType.Start || n.type == MapNodeType.Boss) { x[n.id] = 0f; continue; }
-
-                    float sum = 0f; int count = 0;
-                    foreach (int id in n.next) { if (x.ContainsKey(id)) { sum += x[id]; count++; } }
-                    foreach (int id in n.prev) { if (x.ContainsKey(id)) { sum += x[id]; count++; } }
-                    if (count == 0) continue;
-
-                    x[n.id] = Mathf.Lerp(x[n.id], sum / count, RELAX_RATE);
-                }
-
-                // Push the row apart, then re-centre it so repeated passes don't march it right.
-                row.Sort((a, b) => x[a.id].CompareTo(x[b.id]));
-                for (int i = 1; i < row.Count; i++)
-                {
-                    float need = x[row[i - 1].id] + MIN_SEP;
-                    if (x[row[i].id] < need) x[row[i].id] = need;
-                }
-                if (row.Count > 1)
-                {
-                    float mid = (x[row[0].id] + x[row[row.Count - 1].id]) * 0.5f;
-                    foreach (MapNode n in row)
-                        if (n.type != MapNodeType.Start && n.type != MapNodeType.Boss) x[n.id] -= mid;
-                }
-
-                foreach (MapNode n in row)
-                    if (n.type != MapNodeType.Start && n.type != MapNodeType.Boss)
-                        x[n.id] = Mathf.Clamp(x[n.id], -limit, limit);
-            }
-        }
-
         Dictionary<int, Vector2> pos = new Dictionary<int, Vector2>();
         foreach (MapNode n in map.nodes)
-            pos[n.id] = new Vector2(x[n.id], -h * 0.5f + step * n.floor);
+        {
+            // The act's spine. Start and Boss are single nodes and belong dead centre; letting
+            // them take a lattice slot makes the whole chart look tipped over.
+            float x = (n.type == MapNodeType.Start || n.type == MapNodeType.Boss || maxCol == 0)
+                    ? 0f
+                    : -halfW + colStep * (n.column + 0.5f);
+
+            pos[n.id] = new Vector2(x, -h * 0.5f + step * n.floor);
+        }
         return pos;
     }
 
@@ -863,18 +816,38 @@ public class RunMapScreen : MonoBehaviour
 
         float fs = reachable || isCurrent ? 12.5f : 11.5f;
         float y = -(socket * 0.5f + 7f);
-        int lines = text.Contains("\n") ? 2 : 1;
 
-        // ⚠️ A CHASED PATCH BEHIND THE WORD, and it is not decoration — it is the fix for edges
-        // running through labels. Trimming the channels at the socket rim removes most of that, but
-        // a node with an edge leaving DOWNWARD still has that edge pass straight through the label
-        // hanging beneath it — measured on the committed branch, where the bright copper line went
-        // right through "ELITE". Soft-edged rather than a rectangle so it reads as a shallow
-        // depression beaten into the plate, not a UI box laid on top of one.
-        Image patch = AddImage(parent, "LabelPatch", MapGlyphs.Bloom(), Fade(SocketFloor, 0.80f), false);
-        patch.rectTransform.pivot = new Vector2(0.5f, 1f);
-        patch.rectTransform.anchoredPosition = new Vector2(0f, y + 4f);
-        patch.rectTransform.sizeDelta = new Vector2(128f, 20f + lines * 15f);
+        string[] parts = text.Split('\n');
+        int lines = parts.Length;
+        int widest = 0;
+        foreach (string p in parts) if (p.Length > widest) widest = p.Length;
+
+        // ⚠️ A CHASED NAMEPLATE, AND IT MUST BE A PLATE — not a soft blob. This is the fix for
+        // edges running through labels: trimming the channels at the socket rim removes most of it,
+        // but a node whose edge leaves DOWNWARD still sends that edge straight through the word
+        // hanging beneath it. The first attempt used a soft radial, which is an ELLIPSE — so it was
+        // nearly transparent at exactly the left and right ends where the lines actually cross, and
+        // the designer still saw lines through the text. A bounded plate is the only thing that
+        // reliably masks.
+        //
+        // Sized to its own text rather than a fixed box, or a five-letter word sits marooned in the
+        // middle of a slab. ~0.78em per character matches the measured render at 12.5pt.
+        float plateW = Mathf.Clamp(widest * fs * 0.78f + 20f, 58f, 176f);
+        float plateH = 9f + lines * 15f;
+
+        Image plate = AddImage(parent, "LabelPlate", FlatUI.Panel(4), Fade(SocketFloor, 0.93f), false);
+        plate.type = Image.Type.Sliced;      // 9-sliced chamfer: Simple would smear it
+        plate.rectTransform.pivot = new Vector2(0.5f, 1f);
+        plate.rectTransform.anchoredPosition = new Vector2(0f, y + 4f);
+        plate.rectTransform.sizeDelta = new Vector2(plateW, plateH);
+
+        // Lit along the BOTTOM edge only. A recess under a light raking in from the upper left has
+        // its far wall lit, so this is the same cue the sockets use — which is what keeps the
+        // nameplate reading as beaten into the plate rather than stuck onto it.
+        Image plateLip = AddImage(parent, "LabelPlateLip", FlatUI.FadedRule(), Fade(GrooveLit, 0.5f), false);
+        plateLip.rectTransform.pivot = new Vector2(0.5f, 1f);
+        plateLip.rectTransform.anchoredPosition = new Vector2(0f, y + 4f - plateH);
+        plateLip.rectTransform.sizeDelta = new Vector2(plateW - 10f, 2f);
 
         // Stamped, like the glyph: a dark copy behind, offset along the same light direction.
         TextMeshProUGUI shadow = AddText(parent, "LabelShadow", text, fs, Fade(RimShadow, 0.9f),
