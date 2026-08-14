@@ -267,6 +267,23 @@ public class PlayerController : MonoBehaviour
     public PlayerState currentState;
     internal bool isGrounded;
 
+    [Header("Jump Forgiveness")]
+    // Two standard platformer affordances. Neither is a mechanic the player learns — when they work
+    // you don't notice them, you just stop having moments where you swear you pressed jump and the
+    // character dropped anyway.
+    //
+    // ⚠️ THEY MATTER MORE HERE THAN IN AN ORDINARY PLATFORMER, because in this game a jump that
+    // fails on a timing gap does not just cost you a retry — it costs SHIFT, twice: once for the
+    // failed input if it fired at all, and again for the re-attempt. That is a run-long resource
+    // being spent on input latency rather than on decisions.
+    [Tooltip("Seconds after walking off a ledge during which a jump still counts as grounded.")]
+    public float coyoteTime = 0.10f;
+    [Tooltip("Seconds a jump press is remembered for, so pressing just before landing still fires.")]
+    public float jumpBufferTime = 0.12f;
+
+    private float coyoteTimer;
+    private float jumpBufferTimer;
+
     [Header("Combat Settings")]
     public GameObject fireballPrefab;
     public Transform firePoint;
@@ -505,10 +522,18 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            if (Input.GetButtonDown("Jump"))
-            {
-                HandleJumpInput();
-            }
+            // Coyote time: refreshed while grounded, bleeds away once you step off.
+            if (isGrounded) coyoteTimer = coyoteTime;
+            else coyoteTimer -= Time.deltaTime;
+
+            // Jump buffering: the press is remembered rather than consumed on the frame it arrives.
+            if (Input.GetButtonDown("Jump")) jumpBufferTimer = jumpBufferTime;
+            else jumpBufferTimer -= Time.deltaTime;
+
+            // Retried every frame while the buffer is live, and cleared only when a jump ACTUALLY
+            // happened — so a press made a moment too early survives until landing, and a press
+            // that could not be paid for (0 Shift) simply expires instead of firing later.
+            if (jumpBufferTimer > 0f && HandleJumpInput()) jumpBufferTimer = 0f;
 
             if (currentState == PlayerState.Idle || currentState == PlayerState.Running || currentState == PlayerState.Jumping)
                 moveInput = Input.GetAxisRaw("Horizontal");
@@ -714,38 +739,52 @@ public class PlayerController : MonoBehaviour
         animator.SetFloat("VelocityY", rb.linearVelocity.y);
     }
 
-    private void HandleJumpInput()
+    // Returns true only if a jump actually happened, which is what lets the buffer above know
+    // whether to clear itself or keep waiting.
+    private bool HandleJumpInput()
     {
         if (currentState == PlayerState.WallSliding)
         {
-            PerformWallJump();
+            return PerformWallJump();
         }
-        else if (isGrounded)
+
+        // ⚠️ `coyoteTimer > 0` is the ONLY change to the grounded test, and it must stay that way.
+        // Do NOT "fix" isGrounded to clear itself on jumping while you are in here: PerformJump's
+        // horizontal impulse is dead code precisely because the next FixedUpdate still sees
+        // isGrounded == true and overwrites it with the walking speed. Make isGrounded honest and
+        // every jump silently gains a large horizontal boost, and every gap in every level in the
+        // game becomes trivially clearable.
+        if (isGrounded || coyoteTimer > 0f)
         {
-            PerformJump(defaultJumpForce);
+            if (!PerformJump(defaultJumpForce)) return false;
+            // Spend the coyote window. Without this, the leftover timer would hand out a second
+            // free jump immediately after the first — a double jump nobody asked for.
+            coyoteTimer = 0f;
+            return true;
         }
-        else
+
+        bool hasWings = SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.SpectralWings);
+
+        if (hasWings && !freeAirJumpUsed)
         {
-            bool hasWings = SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.SpectralWings);
+            freeAirJumpUsed = true;
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
+            rb.AddForce(new Vector2(0f, defaultJumpForce), ForceMode2D.Impulse);
+            ChangeState(PlayerState.Jumping);
 
-            if (hasWings && !freeAirJumpUsed)
-            {
-                freeAirJumpUsed = true;
-                rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
-                rb.AddForce(new Vector2(0f, defaultJumpForce), ForceMode2D.Impulse);
-                ChangeState(PlayerState.Jumping);
-
-                SfxManager.PlayOn(audioSource, jumpSound);
-                Debug.Log("SPECTRAL WINGS: Bedava Zıplama!");
-                return;
-            }
-
-            if (currentAirJumps < maxAirJumps && currentShift > 0)
-            {
-                currentAirJumps++;
-                PerformJump(defaultJumpForce);
-            }
+            SfxManager.PlayOn(audioSource, jumpSound);
+            Debug.Log("SPECTRAL WINGS: Bedava Zıplama!");
+            return true;
         }
+
+        if (currentAirJumps < maxAirJumps && currentShift > 0)
+        {
+            if (!PerformJump(defaultJumpForce)) return false;
+            currentAirJumps++;
+            return true;
+        }
+
+        return false;
     }
 
     private void FixedUpdate()
@@ -927,7 +966,9 @@ public class PlayerController : MonoBehaviour
         return LastExecuteResult == CardExecuteResult.Success;
     }
 
-    private void PerformJump(float jumpForce)
+    // Returns true if the jump actually fired. The bool matters: at 0 Shift this refuses, and the
+    // jump buffer must not treat a refusal as a jump or the press is silently swallowed.
+    private bool PerformJump(float jumpForce)
     {
         if (currentShift > 0)
         {
@@ -947,9 +988,27 @@ public class PlayerController : MonoBehaviour
                 SpendShift(1);
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
             float jumpDir = isGravityReversed ? -1f : 1f;
-            rb.AddForce(new Vector2(moveInput * jumpForce * 1f, jumpDir * jumpForce), ForceMode2D.Impulse);
+
+            // ⚠️ PURELY VERTICAL, AND THE HORIZONTAL TERM WAS REMOVED ON PURPOSE (2026-08-14).
+            //
+            // This used to add `moveInput * jumpForce` sideways as well. On a GROUNDED jump that was
+            // dead code — isGrounded is still true on the next FixedUpdate, which hard-sets
+            // horizontal velocity to moveInput * moveSpeed and erases it about 20ms later.
+            //
+            // Coyote time reaches this from the other side and would have revived it. A coyote jump
+            // happens while isGrounded is FALSE, so FixedUpdate takes the AIR branch instead, which
+            // only lerps toward moveSpeed at ~7% per step — the impulse would have survived for the
+            // best part of a second. A coyote jump would have flown noticeably further than the
+            // ordinary jump it is meant to be indistinguishable from, and every gap in the game
+            // would have been clearable by deliberately stepping off the edge first.
+            //
+            // Safe to delete outright because maxAirJumps is 0, so the ground branch is the only
+            // caller: verified no behaviour change for a normal jump.
+            rb.AddForce(new Vector2(0f, jumpDir * jumpForce), ForceMode2D.Impulse);
             ChangeState(PlayerState.Jumping);
+            return true;
         }
+        return false;
     }
 
     internal IEnumerator DashIFrames(float duration) => playerHealth.GrantInvincibility(duration);
@@ -1090,9 +1149,9 @@ public class PlayerController : MonoBehaviour
     // JUMP has to be paid for. Deckshift's whole thesis is that vertical movement is a resource, and
     // a free wall jump is an unlimited climb: exactly the hole Pogo Boots' Shift refund opened, and
     // a wall is far easier to find than an enemy to bounce on.
-    private void PerformWallJump()
+    private bool PerformWallJump()
     {
-        if (currentShift <= 0) return;
+        if (currentShift <= 0) return false;
 
         if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
             SpendShift(1);
@@ -1109,6 +1168,7 @@ public class PlayerController : MonoBehaviour
             SfxManager.PlayOn(audioSource, jumpSound);
             audioSource.pitch = 1f;
         }
+        return true;
     }
 
     // ⚠️ TERRAIN ONLY, and deliberately NOT `groundLayer`.
