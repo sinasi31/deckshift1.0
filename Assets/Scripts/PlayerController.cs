@@ -1029,6 +1029,11 @@ public class PlayerController : MonoBehaviour
         // Hooked here rather than in LevelManager so it can't be missed by any path that puts the
         // player into a room.
         if (QuestSystem.instance != null) QuestSystem.instance.BeginRoom();
+
+        // Blompo blessings that pay out per room (Time Will Come, Only Child, Compound Interest's
+        // counter, Teacher's Pet's opening-hand pull, Slow Burn's per-room tally). Hooked at the
+        // same point and for the same reason as the oaths above.
+        if (DeckManager.instance != null) DeckManager.instance.BeginRoomForEnhancements();
     }
 
     // Clears Meteor Greaves fall tracking so a teleport (fall-respawn, room spawn) isn't
@@ -1194,7 +1199,13 @@ public class PlayerController : MonoBehaviour
 
         Fireball fireballScript = fireballInstance.GetComponent<Fireball>();
         if (fireballScript != null)
+        {
             fireballScript.damage = damageFromCard;
+            // Stamp the card that fired it. The shot outlives the play, so this is the only way its
+            // blessings (Finisher, Grudge, Toll Booth…) can still apply when it finally lands.
+            if (DeckManager.instance != null)
+                fireballScript.sourceCard = DeckManager.instance.AttributedCard;
+        }
     }
 
     internal IEnumerator FireballCastRoutine(float damageFromCard)

@@ -175,6 +175,12 @@ public class EnemyHealth : MonoBehaviour, IDamageable
     {
         if (healthBar != null) Destroy(healthBar.gameObject);
 
+        // Blompo: credit the kill to the card that landed the killing blow (Grudge grows, Toll
+        // Booth refunds). Die() is called from inside TakeDamage, so the attribution set around
+        // that damage is still live — which is what makes this exact rather than a time window.
+        if (DeckManager.instance != null)
+            CardEnhancements.NoteKill(DeckManager.instance.AttributedCard);
+
         if (RelicManager.instance != null)
             RelicManager.instance.OnEnemyKilled();
 
