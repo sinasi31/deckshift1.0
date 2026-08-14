@@ -284,6 +284,14 @@ public class PlayerController : MonoBehaviour
     private float coyoteTimer;
     private float jumpBufferTimer;
 
+    [Header("Character")]
+    // The played character, and with it the innate. Left null the player simply has no innate —
+    // the game plays exactly as it did before this system existed, which is what makes it safe to
+    // ship without a character-select screen yet.
+    public CharacterData character;
+    private float innateCooldownTimer;
+    [SerializeField] private AudioClip innateCastSound;
+
     [Header("Combat Settings")]
     public GameObject fireballPrefab;
     public Transform firePoint;
@@ -577,12 +585,21 @@ public class PlayerController : MonoBehaviour
 
     private void HandleCardInput()
     {
+        if (innateCooldownTimer > 0f) innateCooldownTimer -= Time.deltaTime;
+
         if (DeckManager.instance == null) return;
 
-        if (Input.GetKeyDown(KeyCode.Alpha1)) DeckManager.instance.SelectCard(0);
-        if (Input.GetKeyDown(KeyCode.Alpha2)) DeckManager.instance.SelectCard(1);
-        if (Input.GetKeyDown(KeyCode.Alpha3)) DeckManager.instance.SelectCard(2);
-        if (Input.GetKeyDown(KeyCode.Alpha4)) DeckManager.instance.SelectCard(3);
+        // Number keys TOGGLE. Pressing the selected card's own key again deselects it.
+        //
+        // ⚠️ THIS IS WHERE DESELECT LIVES NOW — right mouse used to do it, and right mouse is the
+        // innate key. The overlap could not be split by context ("cancel if a card is selected,
+        // otherwise fire"), because that makes the innate unavailable exactly when the player is
+        // mid-decision in a fight; an attack key that sometimes isn't an attack key is worse than
+        // a cancel that moved.
+        if (Input.GetKeyDown(KeyCode.Alpha1)) ToggleCardSelection(0);
+        if (Input.GetKeyDown(KeyCode.Alpha2)) ToggleCardSelection(1);
+        if (Input.GetKeyDown(KeyCode.Alpha3)) ToggleCardSelection(2);
+        if (Input.GetKeyDown(KeyCode.Alpha4)) ToggleCardSelection(3);
 
         if (Input.GetMouseButtonDown(0))
         {
@@ -591,8 +608,66 @@ public class PlayerController : MonoBehaviour
 
         if (Input.GetMouseButtonDown(1))
         {
-            DeckManager.instance.DeselectCard();
+            TryUseInnate();
         }
+    }
+
+    private void ToggleCardSelection(int index)
+    {
+        if (DeckManager.instance.GetSelectedIndex() == index) DeckManager.instance.DeselectCard();
+        else DeckManager.instance.SelectCard(index);
+    }
+
+    // The character's free attack. Costs no Shift and no card charge — that is the entire reason it
+    // exists. Before innates, a room entered with an empty deck was a room that could not be
+    // fought in at all, so every fight was a net loss and skipping combat was the correct play.
+    public bool TryUseInnate()
+    {
+        if (character == null || character.innate == InnateType.None) return false;
+        if (innateCooldownTimer > 0f) return false;
+        if (currentState == PlayerState.InCannon) return false;
+        if (playerHealth != null && playerHealth.IsDead) return false;
+
+        switch (character.innate)
+        {
+            case InnateType.ArcaneBolt:
+                FireArcaneBolt();
+                break;
+            default:
+                return false;
+        }
+
+        innateCooldownTimer = character.innateCooldown;
+        return true;
+    }
+
+    public float InnateDamage()
+    {
+        return character != null ? character.innateDamage : 0f;
+    }
+
+    private void FireArcaneBolt()
+    {
+        if (firePoint == null) return;
+
+        SfxManager.PlayOn(audioSource, innateCastSound);
+        ArcaneBolt.Spawn(firePoint.position, isFacingRight, InnateDamage());
+
+        StartCoroutine(InnateCastPose());
+    }
+
+    // Borrows the Fireball card's cast animation for body language, but fires on the SAME frame as
+    // the press rather than at the clip's 0.36s cast event. The innate is a light, repeatable poke;
+    // a half-second commitment on it would read as input lag, where on a 15-damage card it reads as
+    // weight. Released well inside the cooldown so two casts can never overlap the pose.
+    private IEnumerator InnateCastPose()
+    {
+        if (animator == null) yield break;
+
+        animator.SetInteger("AttackAction", 14);
+        animator.SetBool("IsAttacking", true);
+        yield return new WaitForSeconds(0.3f);
+        animator.SetBool("IsAttacking", false);
     }
 
     public void AddGold(int amount)

@@ -39,6 +39,16 @@ public enum CardActionType
     ReturnAnchor     = 19,
 }
 
+// A character's innate ability — the one thing they can always do, for free, with no card and no
+// Shift. Every character has exactly one, and it is bound to the SAME key for all of them (right
+// mouse), so switching character never means relearning the controls.
+public enum InnateType
+{
+    None        = 0,
+    // Wizard. A bolt that gets stronger the emptier your hand is.
+    ArcaneBolt  = 1,
+}
+
 public enum SkillType
 {
     None,
