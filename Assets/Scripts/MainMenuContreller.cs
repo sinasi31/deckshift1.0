@@ -11,7 +11,16 @@ public class MainMenuController : MonoBehaviour
     public GameObject tutorialPanel;
 
     // PLAY butonu i�in
+    //
+    // Play always asks who you are playing. The screen carries the pick over to the run itself
+    // through CharacterSelection; if it cannot open for any reason it starts the run anyway rather
+    // than leaving the button dead.
     public void PlayGame()
+    {
+        CharacterSelectScreen.Open(StartRun);
+    }
+
+    private void StartRun()
     {
         // Build Settings'deki s�radaki sahneyi y�kle
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);

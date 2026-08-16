@@ -19,6 +19,9 @@ public class DeckManager : MonoBehaviour
     public PlayerController player;
 
     [Header("Deste Ayarlarý")]
+    // FALLBACK ONLY once a character is assigned on the Player — the character's own startingDeck
+    // wins. Kept because it is also the designer's testing tool: clear the character field and this
+    // list is the deck again, exactly as before characters existed.
     public List<CardData> startingDeck;
 
     [Header("Special Cards")]
@@ -29,7 +32,27 @@ public class DeckManager : MonoBehaviour
     private List<RuntimeCard> discardPile = new List<RuntimeCard>();
     private List<RuntimeCard> exhaustPile = new List<RuntimeCard>();
 
+    // BASE capacity. Read HandCapacity, never this — a character's trait can raise it.
     public int handCapacity = 4;
+
+    // ⚠️ THE ONE PLACE HAND SIZE IS DECIDED. Every full-hand check goes through here, so a trait
+    // that grants a slot cannot be honoured by the draw and then forgotten by, say, the Teacher's
+    // Pet pull or the Stagger check. Same reasoning as CardEnhancements.EffectiveCost.
+    public int HandCapacity
+    {
+        get
+        {
+            int bonus = (player != null && player.character != null)
+                ? player.character.handCapacityBonus : 0;
+            return Mathf.Max(1, handCapacity + bonus);
+        }
+    }
+
+    // Character trait hook. Like HandCapacity, it is read rather than mirrored into a field, so it
+    // can never fall out of step with the character actually being played.
+    public bool RecallCostIsLocked =>
+        player != null && player.character != null && player.character.recallCostNeverRises;
+
     private int selectedIndex = -1;
     private bool isReloading = false;
 
@@ -70,14 +93,23 @@ public class DeckManager : MonoBehaviour
 
     private void Start()
     {
-
-        foreach (CardData data in startingDeck)
+        foreach (CardData data in ResolveStartingDeck())
         {
-            drawPile.Add(new RuntimeCard(data));
+            if (data != null) drawPile.Add(new RuntimeCard(data));
         }
         ShuffleDeck();
         ReloadHand(); // Baþlangýçta animasyon olsun
         ResetRecallCost();
+    }
+
+    // The character's deck is the run's deck; `startingDeck` is the fallback. An EMPTY character
+    // deck falls back rather than starting the run with no cards at all — a half-authored character
+    // asset should look wrong in the Inspector, not softlock the run.
+    private List<CardData> ResolveStartingDeck()
+    {
+        CharacterData c = player != null ? player.character : null;
+        if (c != null && c.startingDeck != null && c.startingDeck.Count > 0) return c.startingDeck;
+        return startingDeck;
     }
 
     public void SelectCard(int index)
@@ -309,7 +341,7 @@ public class DeckManager : MonoBehaviour
             RuntimeCard c = drawPile[i];
             if (!CardEnhancements.WantsOpeningHand(c)) continue;
             if (hand.Contains(c)) continue;
-            if (hand.Count >= handCapacity)
+            if (hand.Count >= HandCapacity)
             {
                 RuntimeCard bumped = null;
                 for (int h = hand.Count - 1; h >= 0; h--)
@@ -327,7 +359,7 @@ public class DeckManager : MonoBehaviour
     // "Understudy": pull the bound partner out of wherever it is and into hand.
     private void DrawSpecificCard(RuntimeCard target)
     {
-        if (target == null || hand.Contains(target) || hand.Count >= handCapacity) return;
+        if (target == null || hand.Contains(target) || hand.Count >= HandCapacity) return;
 
         if (drawPile.Remove(target) || discardPile.Remove(target))
         {
@@ -509,7 +541,10 @@ public class DeckManager : MonoBehaviour
             if (!inHub)
             {
                 player.SpendShift(currentRecallCost);
-                currentRecallCost++;
+                // The Ninja's "Fast Hands": the price never climbs, so cycling the hand is a real
+                // strategy instead of something the escalation quietly teaches you not to do. The
+                // recall still COSTS — it just stops getting worse.
+                if (!RecallCostIsLocked) currentRecallCost++;
                 OnRecallCostChanged?.Invoke(currentRecallCost);
             }
         }
@@ -559,7 +594,7 @@ public class DeckManager : MonoBehaviour
         hand.Clear();
         hand.AddRange(retained);
 
-        for (int i = hand.Count; i < handCapacity; i++)
+        for (int i = hand.Count; i < HandCapacity; i++)
         {
             if (drawPile.Count == 0 && discardPile.Count > 0)
             {
@@ -584,7 +619,7 @@ public class DeckManager : MonoBehaviour
 
     public void DrawCard()
     {
-        if (hand.Count >= handCapacity) return;
+        if (hand.Count >= HandCapacity) return;
 
         if (drawPile.Count == 0)
         {

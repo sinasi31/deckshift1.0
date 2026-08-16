@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e52aebcd04c3d3844a86f95913467ff0, type: 3}
+  m_Name: Wizard
+  m_EditorClassIdentifier: 
+  characterName: Wizard
+  description: The plain one. Robes, a staff, and deep pockets. Starts with a way
+    to hurt things and a way to reach things.
+  portrait: {fileID: 0}
+  startingDeck:
+  - {fileID: 11400000, guid: 788a6406bf04dcb498f55317f601f2b7, type: 2}
+  - {fileID: 11400000, guid: 788a6406bf04dcb498f55317f601f2b7, type: 2}
+  - {fileID: 11400000, guid: 2b6b5dacabc9303428fb6c97dad09625, type: 2}
+  - {fileID: 11400000, guid: 26ab3f4e031f6eb4198d3c3e6942ff07, type: 2}
+  traitName: Big Sleeves
+  traitDescription: You hold one more card in hand.
+  handCapacityBonus: 1
+  recallCostNeverRises: 0
+  appearancePreset: {fileID: 1546294774153461753, guid: a681efe484dfa1844add09aa56bfe57d, type: 3}
+  weaponPrefab: {fileID: 6805170423116255223, guid: 5524504c0f9476b439e6da105d3898e4, type: 3}

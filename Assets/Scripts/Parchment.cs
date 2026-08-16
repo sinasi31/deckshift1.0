@@ -41,6 +41,14 @@ public static class Parchment
 
     // ---- the sheet -------------------------------------------------------------------------------
 
+    // Builds every sprite up front so no screen pays for them mid-play. Called from
+    // RunMapManager.Awake, i.e. during a scene load. Cheap to call again — everything is cached.
+    public static void Prewarm()
+    {
+        Sheet(); Grain(); Vignette(); Stroke();
+        InkRing(false); InkRing(true); Blot(); Compass();
+    }
+
     // Greyscale luminance + a torn alpha edge. Tint it with Paper: multiplying a warm tan through a
     // luminance map is what makes the stains read as the same paper rather than as painted-on spots.
     public static Sprite Sheet()
@@ -57,8 +65,19 @@ public static class Parchment
         for (int i = 0; i < stains.Length; i++)
             stains[i] = new Vector3(Hash(i, 11, 5) , Hash(i, 23, 9), 0.10f + Hash(i, 37, 3) * 0.22f);
 
+        // The widest a stain can ever be, so a pixel far from every stain can skip the whole loop
+        // (and the noise call inside it) instead of measuring seven distances to find that out.
+        float maxStainR = 0f;
+        foreach (Vector3 st in stains) maxStainR = Mathf.Max(maxStainR, st.z * (0.72f + 0.55f));
+
+        // ⚠️ ROWS ARE COMPUTED IN PARALLEL, AND THAT IS ONLY LEGAL BECAUSE NOTHING IN HERE TOUCHES
+        // UNITY. It is all Mathf/struct arithmetic writing to disjoint indices of one array; the
+        // Texture2D calls below stay on the main thread where they belong. This was a 1.4-SECOND
+        // freeze the first time the player opened the map — the sheet is 409,600 pixels and each
+        // one costs a fistful of noise octaves.
         Color[] px = new Color[S * S];
-        for (int y = 0; y < S; y++)
+        System.Threading.Tasks.Parallel.For(0, S, y =>
+        {
             for (int x = 0; x < S; x++)
             {
                 float u = x / (float)S, v = y / (float)S;
@@ -69,12 +88,27 @@ public static class Parchment
                 lum -= (Fbm(u * 5.5f, v * 5.5f, 1, 4) - 0.5f) * 0.20f;
                 lum -= (ValueNoise(u * 46f, v * 46f, 17) - 0.5f) * 0.055f;
 
-                foreach (Vector3 st in stains)
+                // ⚠️ HOISTED OUT OF THE STAIN LOOP. It reads only u and v — no stain — so the old
+                // code evaluated the SAME two-octave field seven times per pixel and threw six of
+                // them away. That single line was over half the cost of the whole texture.
+                float radiusNoise = 0f;
+                bool nearAnyStain = false;
+                for (int i = 0; i < stains.Length && !nearAnyStain; i++)
                 {
-                    float d = Vector2.Distance(new Vector2(u, v), new Vector2(st.x, st.y));
-                    // Noisy radius, or every stain is a perfect disc.
-                    float r = st.z * (0.72f + Fbm(u * 7f, v * 7f, 5, 2) * 0.55f);
-                    if (d < r) lum -= (1f - d / r) * (1f - d / r) * 0.085f;
+                    float ddx = u - stains[i].x, ddy = v - stains[i].y;
+                    if (ddx * ddx + ddy * ddy < maxStainR * maxStainR) nearAnyStain = true;
+                }
+                if (nearAnyStain)
+                {
+                    radiusNoise = 0.72f + Fbm(u * 7f, v * 7f, 5, 2) * 0.55f;
+                    foreach (Vector3 st in stains)
+                    {
+                        float ddx = u - st.x, ddy = v - st.y;
+                        float d = Mathf.Sqrt(ddx * ddx + ddy * ddy);
+                        // Noisy radius, or every stain is a perfect disc.
+                        float r = st.z * radiusNoise;
+                        if (d < r) lum -= (1f - d / r) * (1f - d / r) * 0.085f;
+                    }
                 }
 
                 // Foxing: tiny age spots, only where a high-frequency field spikes.
@@ -86,12 +120,19 @@ public static class Parchment
                 lum -= Mathf.Clamp01(1f - edge / 0.13f) * 0.16f;
 
                 // Torn deckle. The alpha boundary itself wanders, so the sheet is not a rectangle.
-                float tear = 0.010f + Fbm(u * 13f, v * 13f, 41, 3) * 0.020f;
-                float a = Mathf.Clamp01((edge - tear) / 0.006f);
+                // The tear can never reach further in than 0.030 + the 0.006 falloff, so past that
+                // the alpha is flatly 1 and the three-octave field behind it is wasted work.
+                float a = 1f;
+                if (edge < 0.045f)
+                {
+                    float tear = 0.010f + Fbm(u * 13f, v * 13f, 41, 3) * 0.020f;
+                    a = Mathf.Clamp01((edge - tear) / 0.006f);
+                }
 
                 lum = Mathf.Clamp01(lum);
                 px[y * S + x] = new Color(lum, lum, lum, a);
             }
+        });
 
         tex.SetPixels(px);
         tex.Apply();

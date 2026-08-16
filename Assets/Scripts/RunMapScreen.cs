@@ -591,6 +591,14 @@ public class RunMapScreen : MonoBehaviour
         bool open = map.currentNodeId == from.id && map.CanTravelTo(to.id);
         bool committed = open && mgr != null && mgr.ChosenNextId == to.id;
 
+        // ⚠️ ONCE A BRANCH IS CHOSEN, THE OTHERS STOP BEING DRAWN IN PEN. Every open branch used to
+        // stay in red no matter what you picked, so committing changed one line's thickness by two
+        // pixels and left four rival red routes fanning out of the same node. Collapsing the pen to
+        // the single route you actually drew is what makes the choice readable from across the
+        // screen — and it is what a person marking up a map would have done.
+        bool rejected = open && !committed && mgr != null && mgr.ChosenNextId >= 0;
+        if (rejected) open = false;
+
         Vector2 delta = b - a;
         float len = delta.magnitude;
         if (len < 0.01f) return;
@@ -612,7 +620,7 @@ public class RunMapScreen : MonoBehaviour
         if (travelled || committed || open)
         {
             Color pen = travelled || committed ? Parchment.Red : Parchment.RedSoft;
-            float thick = travelled ? TRAIL_W + 3.5f : committed ? TRAIL_W + 2f : TRAIL_W + 0.5f;
+            float thick = travelled ? TRAIL_W + 3.5f : committed ? TRAIL_W + 4f : TRAIL_W + 0.5f;
             PenLine(a, delta, len, pen, thick, PEN_FILL, seed, open && !committed);
         }
         else
@@ -685,6 +693,7 @@ public class RunMapScreen : MonoBehaviour
         bool visited = map.visited.Contains(n.id);
         bool reachable = map.CanTravelTo(n.id);
         bool committed = mgr != null && mgr.ChosenNextId == n.id;
+        bool anyChosen = mgr != null && mgr.ChosenNextId >= 0;
 
         float size = MapGlyphs.SizeFor(n.type);
         float mark = size + 22f;
@@ -710,13 +719,26 @@ public class RunMapScreen : MonoBehaviour
         Image ring = AddImage(rt, "Ring", Parchment.InkRing(false), Fade(Parchment.Ink, 0.80f), false);
         ring.rectTransform.sizeDelta = new Vector2(mark, mark);
 
-        // Only VISITED marks fade — they are behind you. The current one must stay full strength:
-        // it is circled in red precisely because it is the thing you are looking for.
-        Color glyphCol = visited && !isCurrent ? Fade(Parchment.Ink, 0.45f) : Parchment.Ink;
+        // Visited marks fade — they are behind you. FUTURE marks (further off than the branches you
+        // can take now) are pulled back too, so the live row is the strongest printed thing on the
+        // sheet and the eye lands on the decision without being told where to look. Held at 0.72
+        // rather than pushed further: every node is labelled because the screen exists for ROUTE
+        // PLANNING, and a plan you have to squint at is not one.
+        bool future = !visited && !isCurrent && !reachable;
+        Color glyphCol = visited && !isCurrent ? Fade(Parchment.Ink, 0.45f)
+                       : future ? Fade(Parchment.Ink, 0.72f)
+                                : Parchment.Ink;
+        ring.color = Fade(Parchment.Ink, future ? 0.58f : 0.80f);
+
         Image glyph = AddImage(rt, "Glyph", MapGlyphs.ForNode(n.type), glyphCol, false);
         glyph.rectTransform.sizeDelta = new Vector2(size, size);
 
         // --- the annotation, in red pen -----------------------------------------------------------
+        //
+        // ⚠️ THE RING SPRITE IS NOT ROTATIONALLY SYMMETRIC — its radius wanders and the nib lifts at
+        // one point — so drawing the same sprite twice at different angles genuinely reads as two
+        // separate hand-drawn circles. At the same angle it reads as one thick printed ring.
+        Image penRing = null;
         if (isCurrent)
         {
             // Ringed twice, the way you'd circle where you are on a real map.
@@ -724,17 +746,45 @@ public class RunMapScreen : MonoBehaviour
             r1.rectTransform.sizeDelta = new Vector2(mark + 12f, mark + 12f);
             Image r2 = AddImage(rt, "PenRing2", Parchment.InkRing(false), Fade(Parchment.Red, 0.75f), false);
             r2.rectTransform.sizeDelta = new Vector2(mark + 24f, mark + 24f);
+            r2.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 17f);
         }
         else if (committed)
         {
+            // The chosen branch is scribbled over HARD: a red wash soaked into the paper under the
+            // mark, two heavy rings at different angles, a faint outer sweep, and the label
+            // underlined. It has to survive being one mark among twenty-odd on a busy sheet — the
+            // old single ring differed from an unchosen branch by two pixels of radius and a
+            // slightly deeper red, which is not a difference.
+            Image soak = AddImage(rt, "PenSoak", Parchment.Blot(), Fade(Parchment.Red, 0.14f), false);
+            soak.rectTransform.sizeDelta = new Vector2(mark + 20f, mark + 20f);
+            soak.rectTransform.SetSiblingIndex(1);   // above the paper mask, under the printed mark
+
             Image r1 = AddImage(rt, "PenRing", Parchment.InkRing(true), Parchment.Red, false);
-            r1.rectTransform.sizeDelta = new Vector2(mark + 14f, mark + 14f);
+            r1.rectTransform.sizeDelta = new Vector2(mark + 13f, mark + 13f);
+            r1.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -6f);
+
+            Image r2 = AddImage(rt, "PenRing2", Parchment.InkRing(true), Parchment.Red, false);
+            r2.rectTransform.sizeDelta = new Vector2(mark + 26f, mark + 26f);
+            r2.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 121f);
+
+            Image r3 = AddImage(rt, "PenRing3", Parchment.InkRing(false), Fade(Parchment.Red, 0.45f), false);
+            r3.rectTransform.sizeDelta = new Vector2(mark + 37f, mark + 37f);
+            r3.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 244f);
+
+            penRing = r1;
         }
         else if (reachable)
         {
-            Image r1 = AddImage(rt, "PenRing", Parchment.InkRing(true), Parchment.RedSoft, false);
+            // ⚠️ ONCE A BRANCH IS CHOSEN THE RIVALS STEP BACK, and this is what finally made the
+            // choice readable. Four siblings wearing the same red ring as the chosen one is why it
+            // "wasn't clear which I picked" — the mark was fine, the CONTEXT was competing with it.
+            // They stay faintly ringed rather than going bare, and hover brings one straight back to
+            // full, so it is still obvious you may change your mind.
+            bool sidelined = anyChosen;
+            Image r1 = AddImage(rt, "PenRing", Parchment.InkRing(true),
+                                sidelined ? Fade(Parchment.RedSoft, 0.34f) : Parchment.RedSoft, false);
             r1.rectTransform.sizeDelta = new Vector2(mark + 12f, mark + 12f);
-            penMarks.Add(r1);
+            penRing = r1;
         }
         else if (visited)
         {
@@ -760,7 +810,8 @@ public class RunMapScreen : MonoBehaviour
             bm.rectTransform.sizeDelta = new Vector2(badge, badge);
         }
 
-        AddLabel(rt, n, mark, isCurrent, visited, reachable);
+        TextMeshProUGUI labelText = AddLabel(rt, n, mark, isCurrent, visited, reachable,
+                                             committed, anyChosen && reachable && !committed);
 
         // Only reachable nodes are clickable. Choosing is a commitment, not navigation: the click
         // sets the branch and the run travels there when the player reaches the exit door.
@@ -769,9 +820,25 @@ public class RunMapScreen : MonoBehaviour
             Button btn = go.AddComponent<Button>();
             btn.transition = Selectable.Transition.None;
 
+            // ⚠️ The hit target must cover the GROWN mark, not the resting one. Sized to the
+            // resting +10 it would fall out from under the cursor at the edge of a hovered node,
+            // firing exit/enter repeatedly and leaving the mark flickering.
             Image hit = AddImage(rt, "Hit", FlatUI.Pixel(), new Color(0f, 0f, 0f, 0f), true);
-            hit.rectTransform.sizeDelta = new Vector2(mark + 10f, mark + 10f);
+            hit.rectTransform.sizeDelta = new Vector2(mark + 34f, mark + 34f);
             btn.targetGraphic = hit;
+
+            MapNodeMark hover = go.AddComponent<MapNodeMark>();
+            hover.body = rt;
+            hover.ring = penRing;
+            hover.label = labelText;
+            // Nothing breathes once a choice exists. Before you pick, the pulse is the screen
+            // asking a question; after you pick it has been answered, and five marks still
+            // twitching at you is exactly the competition that made the choice hard to see.
+            hover.pulses = !committed && !anyChosen;
+            hover.restCol = penRing != null ? penRing.color : Parchment.RedSoft;
+            hover.hotCol = Parchment.Red;
+            hover.labelRest = labelText != null ? labelText.color : Parchment.Red;
+            hover.labelHot = Parchment.Red;
 
             int id = n.id;
             btn.onClick.AddListener(() =>
@@ -791,8 +858,9 @@ public class RunMapScreen : MonoBehaviour
     // The backing is PAPER-COLOURED, not a dark plate. On a light ground the mask can be the ground
     // itself, so it is invisible except for the dashes it hides — which is the whole trick the
     // etched version could not pull off, where the equivalent had to be a visible dark nameplate.
-    private void AddLabel(RectTransform parent, MapNode n, float mark,
-                          bool isCurrent, bool visited, bool reachable)
+    private TextMeshProUGUI AddLabel(RectTransform parent, MapNode n, float mark,
+                                     bool isCurrent, bool visited, bool reachable,
+                                     bool committed, bool sidelined)
     {
         string text = isCurrent ? "YOU ARE HERE" : MapGlyphs.LabelFor(n.type);
         if (n.recharge != RechargeType.None && !isCurrent) text += "\n" + MapGlyphs.LabelFor(n.recharge);
@@ -810,7 +878,8 @@ public class RunMapScreen : MonoBehaviour
         back.rectTransform.sizeDelta = new Vector2(Mathf.Clamp(widest * fs * 0.82f + 26f, 66f, 190f),
                                                   14f + parts.Length * 16f);
 
-        Color c = isCurrent || reachable ? Parchment.Red
+        Color c = isCurrent || committed ? Parchment.Red
+                : reachable ? (sidelined ? Fade(Parchment.Red, 0.48f) : Parchment.Red)
                 : visited ? Fade(Parchment.Red, 0.72f)
                           : Parchment.InkSoft;
 
@@ -822,6 +891,20 @@ public class RunMapScreen : MonoBehaviour
         label.rectTransform.sizeDelta = new Vector2(150f, 36f);
         label.characterSpacing = 2f;
         label.lineSpacing = -12f;
+
+        // The chosen branch gets its name underlined in the same pen as its rings. Cheap, and it
+        // means the mark is identifiable from the label alone when the rings are behind the cursor.
+        if (committed)
+        {
+            float w = Mathf.Clamp(widest * fs * 0.74f, 44f, 150f);
+            Image rule = AddImage(parent, "LabelRule", Parchment.Stroke(), Parchment.Red, false);
+            rule.type = Image.Type.Tiled;
+            rule.rectTransform.sizeDelta = new Vector2(w, 4f);
+            rule.rectTransform.anchoredPosition = new Vector2(0f, y - 15f - (parts.Length - 1) * 16f);
+            rule.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -1.1f);
+        }
+
+        return label;
     }
 
     // ---- small builders -------------------------------------------------------------------------

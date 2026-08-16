@@ -298,10 +298,11 @@ MonoBehaviour:
   currentState: 0
   coyoteTime: 0.1
   jumpBufferTime: 0.12
-  character: {fileID: 11400000, guid: 5ee2573da5fd92d4ab8e915538da4c07, type: 2}
-  innateCastSound: {fileID: 0}
+  character: {fileID: 11400000, guid: 21b96c1d04ec32147ae371aee3de4593, type: 2}
   fireballPrefab: {fileID: 6847861146471343392, guid: c410de68076b28846bb5e156129b8267, type: 3}
   firePoint: {fileID: 7525573285496672760}
+  shurikenThrowSound: {fileID: 0}
+  shurikenSprite: {fileID: 1030694015, guid: b217a154a8231e54bbb50405bdfafbaf, type: 3}
   wailRange: 10
   fireballCastDelay: 0.12
   biteRange: 1.5
@@ -677,6 +678,9 @@ MonoBehaviour:
   phaseColor: {r: 0.72, g: 0.55, b: 1, a: 0.75}
   phaseRingWidth: 0.05
   anchorColor: {r: 1, g: 0.72, b: 0.28, a: 0.85}
+  shurikenColor: {r: 0.82, g: 0.88, b: 0.96, a: 0.8}
+  shurikenEnemyColor: {r: 1, g: 0.28, b: 0.2, a: 0.95}
+  shurikenDots: 9
 --- !u!1001 &259556885127125483
 PrefabInstance:
   m_ObjectHideFlags: 0
