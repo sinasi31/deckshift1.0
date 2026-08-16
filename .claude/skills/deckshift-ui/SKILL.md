@@ -45,14 +45,14 @@ Screens share the *ideology* — flat procedural plates, restraint, directional
 light, a subtle particle drift, one meaningful accent — and **never the same
 skin**. The material should say what the place DOES.
 
-| | **Iron** (ScrapForge) | **Arcane** (Blompo) | **Loadout** (relics) | **Halt** (pause) | **Apparatus** (settings) | **Bulletin** (quests) | **Cartograph** (run map) | **Vigil** (character select) |
+| | **Iron** (ScrapForge) | **Arcane** (Blompo) | **Loadout** (relics) | **Halt** (pause) | **Apparatus** (settings) | **Bulletin** (quests) | **Cartograph** (run map) | **Marquee** (character select) |
 |---|---|---|---|---|---|---|---|---|
-| What it is | a workbench | a blessing granted | what you're carrying | the moment you stopped | the machine's own panel | contracts you promise | a folded map you just opened | who you are about to be |
-| Palette | warm charcoal | cold indigo | near-**colourless** | cold blue-black | smoked glass + arc-cyan | dark wood + **pale paper** | **tan paper** + oxblood | near-black + one **warm lamp** |
-| Light | fire from **below** | descends from **above** | none | from **edges inward** | **emitted by the content** | rakes in from the **left** | even, with aged corners | **travels the row** (the inversion) |
-| Particles | embers **rising** | motes **settling** | none | **suspended**, shivering | none — one scan sweep | none — the content sways | none — paper doesn't move | none — the chosen rig **breathes** |
-| Corner marks | rivets | four-point stars | none | none | calibration crosshairs | brass tacks | **compass rose** | none — alcove arches |
-| Surface | scuffed | pristine | plain sockets | **crazed** | unblemished glass | **perforated** | **stained, foxed, folded** | cold **stone** |
+| What it is | a workbench | a blessing granted | what you're carrying | the moment you stopped | the machine's own panel | contracts you promise | a folded map you just opened | the billing before you go on |
+| Palette | warm charcoal | cold indigo | near-**colourless** | cold blue-black | smoked glass + arc-cyan | dark wood + **pale paper** | **tan paper** + oxblood | near-black + **the CHARACTER's colour** |
+| Light | fire from **below** | descends from **above** | none | from **edges inward** | **emitted by the content** | rakes in from the **left** | even, with aged corners | one key light on the hero |
+| Particles | embers **rising** | motes **settling** | none | **suspended**, shivering | none — one scan sweep | none — the content sways | none — paper doesn't move | **speed streaks** tearing past |
+| Corner marks | rivets | four-point stars | none | none | calibration crosshairs | brass tacks | **compass rose** | none — raked livery bars |
+| Surface | scuffed | pristine | plain sockets | **crazed** | unblemished glass | **perforated** | **stained, foxed, folded** | none — no plate at all |
 
 The Marketplace (`ShopScreenUI`) keeps its own: warm wood, striped awning,
 lamplight.
@@ -80,20 +80,29 @@ paper pinned to it** — its `TextBright` is nearly black, and bright and dark h
 swapped places. That one structural choice makes it unmistakable while claiming
 almost no colour. **Reach for this before reaching for another hue.**
 
-⚠️ **VIGIL (character select) is the other proof, and the cheapest inversion yet:
-LIGHT DIRECTION.** A dark hall of alcoves where the roster stands dormant and one
-travelling lamp wakes only the chosen one. Every other screen is an evenly lit
-surface marking its selection with COLOUR; this one is dark and marks it by
-*lighting* it — so it claims **no hue at all**, and gets motion as a free second
-signal (unselected rigs are `animator.speed = 0`).
+⚠️ **MARQUEE (character select) is the other proof, and the cheapest inversion
+yet: THE THEME OWNS NO ACCENT.** Every other screen has one fixed accent that
+identifies a PLACE. Marquee is about an IDENTITY, so it takes the *character's*
+colour and the whole frame cross-fades when the selection moves — colour there is
+the **selection signal**, not the theme signature. It costs nothing from the
+budget below, and it makes the choice feel consequential before a word is read.
+
+⚠️ **AND A SCREEN REJECTED TWICE HAS A MEANING PROBLEM, NOT A DRESSING PROBLEM.**
+Marquee replaced **Vigil**, a cold hall of stone alcoves where the roster stood
+dormant and a travelling lamp woke only the chosen one. Vigil's second pass gave
+it real dungeon art, a torch per alcove and a diegetic flame — better dressing,
+same rejection. The fault was that its whole vocabulary was **DORMANCY** on the
+one screen in the game that is pure hype: the last beat before the run starts.
+**Ask what a screen is SAYING before you improve how it looks.**
 
 ⚠️ **The hue budget is nearly spent.** Claimed: orange (Iron), violet (Arcane),
 no-hue (Loadout), **tan paper + oxblood (map — Cartograph)**, warm wood/amber
 (shop), frost blue (Halt), arc-cyan (Apparatus), deep wax red (Bulletin), and
-no-hue again (**Vigil**). Roughly magenta and yellow remain. After that, **stop
-reaching for a colour and invert a different axis** — light direction, motion
-vocabulary, surface treatment and value structure separate these screens at least
-as much as hue does. Loadout and Vigil both prove a theme can carry no hue at all.
+**no fixed hue (Marquee** — but its ROSTER palette spends jade, magenta, gold and
+ice). Roughly yellow remains for a *place*. After that, **stop reaching for a
+colour and invert a different axis** — light direction, motion vocabulary,
+surface treatment and value structure separate these screens at least as much as
+hue does. Loadout and Marquee both prove a theme can carry no fixed hue at all.
 
 ⚠️ **The map is CARTOGRAPH — paper, not metal.** An earlier verdigris-and-copper
 etched-plate version was built and REJECTED: a material is not enough, because a
@@ -394,6 +403,19 @@ the art doesn't use: only Epic/Legendary blessings pulse.
   `Update` has to run to catch the key that *opens* it, and a deactivated
   GameObject gets no `Update`. When a sub-panel borrows the display, drop the
   CanvasGroup's alpha rather than deactivating anything.
+- ⚠️ **Anything a screen creates OUTSIDE its own hierarchy will NOT be hidden with
+  it.** The character select's live rigs are world objects 3000 units out, so
+  hiding the screen left one camera per character rendering a 420×614 target
+  every frame for the rest of the session. Switch them off explicitly in `Hide`.
+- ⚠️ **A static `instance` and a scene object can DISAGREE, so adopt-then-verify.**
+  Anything that clears statics without destroying scene objects — an editor domain
+  reload is the everyday one — leaves the field null while the old screen sits in
+  the Canvas still running. Building on top of that stacks screens (measured:
+  **three screens, six character plots**). But re-finding it is only half the fix:
+  a domain reload also **resets every non-serialized field**, so the adopted
+  component comes back with its collections EMPTY while its built children survive.
+  That renders the old hierarchy while driving none of it. **Check the screen is
+  actually built before trusting it, and rebuild if not.**
 - **Restore only what you hid.** Turning every child back on is not the inverse
   of hiding them — some children are supposed to be off. Record the visible set
   when hiding and restore exactly that. (One card flip resurrected three

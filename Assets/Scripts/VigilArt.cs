@@ -1,7 +1,19 @@
 using UnityEngine;
 
 /// <summary>
-/// The real game art the character select (theme **Vigil**) is built from.
+/// Real game art the character select is built from.
+///
+/// ⚠️ **THE NAME IS HISTORICAL AND ONLY `wallTexture` IS STILL CONSUMED.** This was authored for
+/// theme **Vigil** — a hall of stone alcoves with a torch over each one — which the designer
+/// rejected and which `CharacterSelectScreen` has since replaced with **Marquee**. Marquee is a
+/// poster, not a room, so it wants a dark textured ground and nothing else: the alcove, plinth,
+/// torch, flame, banner, beam, floor and grime slots below are **unused today**.
+///
+/// They are kept rather than deleted for two reasons. The class name and the asset path
+/// (`Assets/Resources/VigilArt.asset`) are loaded by name at runtime, so renaming them is a live
+/// risk to a lookup for zero visible benefit; and the references are already resolved, so a future
+/// pass that wants a prop back gets it for free. **Do not read this file as a description of what
+/// the screen currently looks like.**
 ///
 /// ⚠️ **This exists for the same reason `UITypeSettings` does: none of this art lives in a
 /// `Resources/` folder.** It all ships inside `Assets/Cainos/Pixel Art Platformer - Dungeon/`, and

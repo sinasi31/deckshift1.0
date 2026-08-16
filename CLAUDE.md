@@ -125,76 +125,124 @@ throws** — when this threw inside `PlayerController.Awake` it switched off the
 movement, no jump, no card hotkeys, while Recall and clicking cards still worked (those are
 DeckManager and UI). **A cosmetic pass must never be able to brick the character.**
 
-### Character select — theme **Vigil** (see UI System → Themes)
+### Character select — theme **Marquee** (rebuilt 2026-08-17; see UI System → Themes)
 
-Opens on PLAY from the main menu; the designer chose "always ask" over "remember last pick". A dark
-hall of alcoves with the roster standing dormant; one warm lamp travels the row, and the chosen
-character wakes and breathes while the rest stay frozen in cold blue shadow.
+Opens on PLAY from the main menu; the designer chose "always ask" over "remember last pick". **The
+billing before you go on:** one character owns the frame at full size, the rest of the roster stands
+back in the dark, the name is printed across the top at poster size, and the whole screen tears past
+in that character's colour.
 
-- **The inversion is LIGHT.** Every other screen is an evenly lit surface marking its selection with
-  colour; this one is dark and marks the selection by *lighting* it. Costs no hue, which matters —
-  the palette budget is nearly spent.
-- **Motion is the second signal, free:** unselected rigs are `animator.speed = 0`.
+⚠️ **THIS REPLACED *VIGIL*, WHICH THE DESIGNER REJECTED TWICE. DO NOT REBUILD IT.** Vigil was a cold
+hall of stone alcoves: the roster stood dormant as statues and one warm lamp travelled the row to
+whoever you were on. It was carefully made — real dungeon art, a torch per alcove, a diegetic flame
+— and it was wrong, for a reason that generalises: **its entire vocabulary was DORMANCY.** Stillness,
+cold, low light, a row of equals waiting their turn. That is a fine mood and it is the opposite of
+what this screen is FOR. The character select is the last beat before the run starts — the one screen
+in the game that is pure hype rather than decision support. A screen about to launch you should not
+feel like a mausoleum. **When a screen is rejected twice, question what it is SAYING before dressing
+it better; the second Vigil pass improved the art and changed nothing about the problem.**
+
+Three inversions of what Vigil did, and all three are the design:
+
+1. **ONE HERO, NOT A ROW OF EQUALS.** Vigil gave every character the same small alcove, which with a
+   roster of two is two little figures in a lot of empty dark. The chosen one now steps forward at
+   full size; the others recede, shrink and go cold. Readable from silhouettes alone.
+2. **VELOCITY, NOT STILLNESS.** Nothing rests: streaks tear across the backdrop, figures spring
+   between slots and overshoot, the name slams in. The game's stated thesis is "movement is a
+   resource" — the select screen may as well say so.
+3. **FEWER WORDS** (designer-requested). Vigil printed a title ("WHO'S UP?"), the name on every
+   alcove AND again below, a trait name, a trait line and a six-word key line. What is left is the
+   **name, the trait, the trait's one sentence, BEGIN and ESC** — the name appeared twice and the
+   title said nothing the screen did not already say.
+
+⚠️ **THE THEME CLAIMS NO HUE — IT TAKES THE CHARACTER'S.** Every other screen has ONE fixed accent
+identifying a PLACE. This screen is about an IDENTITY, so the accent belongs to the character and the
+whole frame cross-fades when the selection moves: **colour here is the selection signal, not the
+theme signature.** It therefore costs nothing from the nearly-spent hue budget, which is the standing
+instruction when hues run out (invert a different axis instead of picking a new colour).
+
+⚠️ **Accents are PALETTE-BY-INDEX, not a field on `CharacterData`.** A new character must never be
+able to arrive with an unset colour and render black — dropping an asset into `Resources/Characters`
+is still the whole job of adding one. Ordered for maximum separation between *neighbours* (jade →
+magenta → gold → ice), because with a roster of two the player only ever compares slot 0 against 1.
+
+**Still true from the old screen, do not re-learn:**
 - **Live rigs render to one RenderTexture each** (`CharacterStagePortrait`, stage at world
-  (3000, −3000) on its own `CharacterStage` layer). Two reasons: the menu Canvas is Screen Space
-  Overlay, so a world character would sit *behind* the backdrop; and one texture each makes dimming a
-  plain `RawImage.color` tint instead of reaching into Cainos shaders.
-- ⚠️ **A `RawImage` with no texture draws a solid WHITE quad** — tinted, that was a large blue slab
-  where a character should have been.
+  (3000, −3000) on its own `CharacterStage` layer). The menu Canvas is Screen Space Overlay, so a
+  world character would sit *behind* the backdrop; and one texture each makes dimming a plain
+  `RawImage.color` tint instead of reaching into Cainos shaders.
+- ⚠️ **A `RawImage` with no texture draws a solid WHITE quad** — tinted, that was a large coloured
+  slab where a character should have been. A half-authored character must leave an empty slot.
 - ⚠️ **A key that activated the button which OPENED this screen is still down on its first `Update`.**
   It confirmed instantly from the Enter that pressed PLAY; guarded with `openedFrame`. Same family as
   `PauseScreen`'s Escape memory, from the other direction.
+- ⚠️ **`RefreshInfo` is called every frame and self-guards on `lastShown`** — the panel is DERIVED
+  from `index`, never pushed at it. It had already rotted once when the click handler set `index`
+  without refreshing. Requiring every mutation site to remember is the losing pattern.
+- It uses `GameScreen.FindRootCanvas()`, never `FindFirstObjectByType<Canvas>()` (which in a gameplay
+  scene returns a world-space **enemy health bar** — 18 canvases in SampleScene), and all text routes
+  through `UIType` (skipping it is how the screen once shipped in Liberation Sans).
 
-### The real-asset pass — DONE 2026-08-17 (`VigilArt`)
+**New traps paid for in the rebuild:**
 
-The hall is now built from the game's own dungeon art instead of procedural shapes: the tiled stone
-wall, hanging banners, a stone plinth per alcove, a cave-mouth recess, a floor strip, a ceiling
-timber, and **a real torch over every alcove whose flame burns only on the chosen one**. That last
-one is the point of the pass — Vigil's inversion is that light marks the selection, and until now
-that light had no SOURCE; it was a glow sprite floating in the dark.
+⚠️ **AN ADOPTED SCREEN MAY BE A HUSK.** `Open` now re-finds an existing screen when the static
+`instance` is null (a domain reload clears statics while scene objects survive — otherwise you stack
+a second screen, a second roster and a live camera per character; measured **three screens and six
+portrait plots**). But a domain reload also **resets every non-serialized field**, so the component
+comes back with `figures` and `roster` EMPTY while `content` and the built children survive. The
+symptom is a beautifully half-updated frame: the previous character still standing there under the
+previous name, while the accent — the one value computed from `index` alone — cross-fades to the new
+pick. `Open` therefore checks `IsBuilt` and rebuilds rather than adopting a husk.
 
-⚠️ **`Assets/Resources/VigilArt.asset` carries the sprite references** because none of this art is in
-a `Resources/` folder. Same pattern and same reason as `UIType.asset`; rebuilt by **Deckshift →
-Rebuild Vigil Art**. **Every field is optional and each use is guarded** — a missing asset falls back
-to the old procedural shapes rather than leaving the player unable to pick a character.
+⚠️ **THE CHARACTER PLOTS ARE SCENE-ROOT OBJECTS, SO HIDING THE SCREEN DOES NOT STOP THEM.** They have
+to be — world space, 3000 units out, while the screen is a RectTransform. Without
+`CharacterStagePortrait.SetStageActive`, one camera per character keeps rendering a 420×614 target
+every frame for the rest of the session, through the entire run. `Build` also sweeps any orphaned
+plot before creating its own.
 
-⚠️ **`TX FX Torch Flame` is an UNSLICED 128×128 ANIMATION SHEET.** Unity reports it as ONE sprite, so
-drawing it whole renders a grid of ~36 tiny flames — which is exactly what the first pass put above
-each torch, and it looked like specks of dust. Measured by blitting to a RenderTexture and reading
-the alpha (the source is not readable): six clean empty columns, and six uneven horizontal bands
-whose coverage rises to the middle and tapers — a flame growing and shrinking. **Row 2 (y 42–64) is
-the one band with content in all six columns**, so the screen cycles that row as a six-frame loop.
-Cycling one known-good row beats slicing all 36 and hoping the grid is exact; a misaligned frame
-reads as the flame sliding sideways.
+⚠️ **The bars were calibrated DOWN by two-thirds.** At alpha 0.055/0.035 the two raked accent bars
+stopped being livery and became enormous slabs owning the composition — they read as the subject
+rather than as light behind it, and flattened the character they crossed. 0.020/0.012. Linear colour
+space again: measure by screenshot, never by arithmetic.
 
-⚠️ **PIXEL ART ENLARGED PAST ~2× STOPS READING AS THE THING IT DEPICTS.** The 38×27 grime sprite was
-blown to 420×420 (15×) and became angular shapes that looked like broken masonry floating in mid-air.
-Held near native now. Same reason the torch is 18×78 from an 8×35 source, not 26×96.
+⚠️ **The unlit floor is 0.42, not 0.30.** Below ~0.4 a flanking character stops reading as "someone
+standing in the dark" and starts reading as a rendering artefact — and showing you the roster is this
+screen's job, so the ones you did *not* pick still have to be recognisable.
 
-⚠️ **`Image.Type.Tiled` on an ATLASED sprite repeats the wrong part.** `Pillar 01 A` tiled up a shaft
-repeated the pillar's *capital*, so both alcoves grew brackets at chest height. Stretching it instead
-gave a 3× vertical smear. **Pillars were dropped** — the arch, banners, plinth and torch already carry
-the architecture, and forcing a prop to be something it is not drawn as costs more than it pays. A
-real column needs a purpose-drawn shaft sprite.
+⚠️ **The contact mark under each figure is LIGHT, not a shadow.** A black ellipse on a near-black
+backdrop is invisible by definition. Inverting it grounds the figure AND carries the accent.
+
+⚠️ **Arrow hints are DRAWN AS SPRITES, never typed as "← →".** CCBattleScarred is a display face with
+no guarantee of carrying arrow glyphs, and a missing glyph renders as a blank or a box.
+
+⚠️ **Springs, not lerps — and they were measured, not eyeballed.** Simulated at 144/60/30 fps: peak
+overshoot 52–69px, settles ~0.65s, converges exactly, and the scale spring never goes negative
+(min 0.51, max 1.08). `dt` is clamped to 1/30 because an explicit integrator plus one long frame (a
+domain reload, an editor stall) throws a figure off the screen.
+
+**Nothing is fit-scaled**, deliberately: every CanvasScaler matches on HEIGHT, so the canvas is always
+1080 tall and only width flexes (1440 at 4:3 → 2560 at 21:9). The widest element is ~1150px, so the
+fixed layout is safe everywhere and the Point-filtered portraits stay at exactly 1:1. Verified by
+screenshot at 4:3, 16:9 and 21:9.
+
+⚠️ **`Assets/Resources/VigilArt.asset` survives but ONLY `wallTexture` is still consumed.** The name
+is historical — the alcove/plinth/torch/flame/banner/beam/floor/grime slots are Vigil's and are now
+unused. They are kept because the class name and the asset path are loaded by name at runtime
+(renaming is a live risk to a lookup for no visible benefit) and the references are already resolved.
+**Do not read that file as a description of what the screen looks like.**
 
 ⚠️ **The wall is ONE seamless 8×8 picture, so the WHOLE 256×256 texture is tiled as a single sprite** —
 tiling any one of its 64 sub-sprites repeats a fragment of a larger image and reads as a
-checkerboard. This is the same mistake that made generated rooms never look hand-made. Tint is
-measured on screen (`WallTint` 0.34): at 0.20 the texture was invisible, and near full value it
-becomes a bright grey field that kills the one thing this theme has.
+checkerboard. This is the same mistake that made generated rooms never look hand-made. Tint measured
+on screen: at 0.15 the masonry was invisible and the backdrop was a flat void, throwing away the one
+piece of real game art on the screen; near full value it is a bright grey field. **0.25.**
 
-**Fixed in the same pass:** the alcove CLICK handler set `index` without calling `RefreshInfo`, so
-clicking a character moved the light onto them while the name, trait and starting deck kept
-describing the previous one. `RefreshInfo` self-guards on `lastShown`, so it is now called every
-frame from `Update` — **the panel is DERIVED from `index` rather than pushed at it**, which is the
-only version that cannot rot when a new mutation site is added.
-
-⚠️ **Two bugs on this screen were found and fixed 2026-08-16 — do not reintroduce them.** It parented
-to `FindFirstObjectByType<Canvas>()`, which in a gameplay scene returns a **world-space enemy health
-bar** (18 canvases in SampleScene); it built itself there at 0.01 scale, measured 76.7×24, and
-rendered invisibly while `Open()` still reported success and armed its confirm callback. It now uses
-`GameScreen.FindRootCanvas()`. Its `AddText` also never called the font helper, so the whole screen
-rendered in Liberation Sans — it now routes through `UIType`.
+**Two lessons from the Vigil art pass that still hold, and cost real time:**
+- ⚠️ **PIXEL ART ENLARGED PAST ~2× STOPS READING AS THE THING IT DEPICTS.** A 38×27 grime sprite blown
+  to 420×420 (15×) became angular shapes that looked like broken masonry floating in mid-air.
+- ⚠️ **`Image.Type.Tiled` on an ATLASED sprite repeats the wrong part.** `Pillar 01 A` tiled up a
+  shaft repeated the pillar's *capital*, so both alcoves grew brackets at chest height; stretched, it
+  gave a 3× vertical smear. A real column needs a purpose-drawn shaft sprite.
 
 ## Player System
 
@@ -925,14 +973,17 @@ Lessons already paid for, don't re-learn them:
 
 ⚠️ **NODE LAYOUT IS A FIXED COLUMN LATTICE. DO NOT REINTRODUCE BARYCENTRIC RELAXATION.** It was tried and reverted the same day. Pulling nodes toward their neighbours' mean X does straighten the trails — measured, sideways travel per edge falls 214px → 86px — but it computes a **different spread for every row**, so a floor with three nodes shares no column with a floor that has five. The designer read the result instantly as *"the nodes are off, they are not where they are meant to be"*. A grid you can scan beats trails that lean less. Edge crossings are **zero either way** (measured over 300 acts), so nothing is lost.
 
-**Vigil — the character select (2026-08-14).** A dark hall of alcoves; the roster stands dormant and
-one warm lamp travels the row, waking only the chosen one. ⚠️ **Its inversion is LIGHT, and it is the
-cheapest inversion found so far: every other screen is an evenly lit surface that marks its selection
-with COLOUR; this one is dark and marks the selection by lighting it.** It therefore claims **no hue
-at all** — which mattered, because the budget below is nearly gone. Motion is the free second signal
-(unselected rigs are `animator.speed = 0`). See Characters for its implementation traps.
+**Marquee — the character select (rebuilt 2026-08-17).** The billing before you go on: one character
+owns the frame, the rest of the roster stands back in the dark, the name is printed across the top at
+poster size, and everything tears past in that character's colour. ⚠️ **Its inversion is that the
+theme claims NO ACCENT OF ITS OWN — it takes the character's, and the whole frame cross-fades when
+the selection moves.** Every other screen has one fixed accent identifying a PLACE; this screen is
+about an IDENTITY, so colour here is the *selection signal* rather than the theme signature. Its
+motion vocabulary is the second inversion: everything else in the game is restrained and settled, and
+this one never rests. **It replaced *Vigil*, which the designer rejected twice — see Characters for
+what Vigil got wrong and for the rebuild's traps. Do not rebuild Vigil.**
 
-⚠️ **The hue budget is nearly spent.** Claimed: orange (Iron), violet (Arcane), no-hue (Loadout), **tan paper + oxblood (map — Cartograph)**, warm wood/amber (shop), frost blue (Halt), arc-cyan (Apparatus), deep wax red (Bulletin), no-hue again (**Vigil**, which buys its identity with light direction instead). Roughly magenta and yellow remain. **Cartograph and Bulletin are the two light-ground themes** and stay separable because Bulletin is small pale slips on a DARK board — its dominant field is dark, where the map's whole field is paper. When those run out, **stop reaching for a new colour and invert a different axis instead** — light direction, motion vocabulary, surface treatment and now value structure separate these screens at least as much as hue does, and Loadout proves a theme can carry no hue at all.
+⚠️ **The hue budget is nearly spent.** Claimed: orange (Iron), violet (Arcane), no-hue (Loadout), **tan paper + oxblood (map — Cartograph)**, warm wood/amber (shop), frost blue (Halt), arc-cyan (Apparatus), deep wax red (Bulletin), and **no fixed hue at all (Marquee**, which borrows the character's — jade / magenta / gold / ice are spent on the ROSTER, not on the screen). Roughly magenta and yellow remain for a *place*, but note Marquee is already using magenta for a character. **Cartograph and Bulletin are the two light-ground themes** and stay separable because Bulletin is small pale slips on a DARK board — its dominant field is dark, where the map's whole field is paper. When those run out, **stop reaching for a new colour and invert a different axis instead** — light direction, motion vocabulary, surface treatment and now value structure separate these screens at least as much as hue does, and Loadout and Marquee both prove a theme can carry no fixed hue at all.
 
 **The Marketplace (`ShopScreenUI`) keeps its own material** — warm wood, striped canvas awning, lamplight — and was already bespoke rather than old chrome. What it needed wasn't a reskin but a PERSON; see "The keeper talks back" below.
 

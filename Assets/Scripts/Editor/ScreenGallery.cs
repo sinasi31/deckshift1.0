@@ -513,12 +513,13 @@ public static class ScreenGallery
             Close = () => { if (DeckViewUI.instance != null) DeckViewUI.instance.CloseView(); },
         });
 
-        // ⚠️ Destroyed rather than hidden, and given extra settle. Its `Hide()` only switches off the
-        // UI content — the live character rigs and their portrait cameras stay in the scene, and once
-        // a resolution change invalidates their RenderTextures those cameras start drawing the stage
-        // straight into the game. That contaminated every capture after it on the first run.
+        // ⚠️ Destroyed rather than hidden, and given extra settle. `Hide()` now deactivates the
+        // character plots too, so the old failure — portrait cameras surviving a resolution change
+        // with dead RenderTextures and drawing the stage straight into every later capture — can no
+        // longer happen. Destroying is kept anyway: it is the only path that RELEASES those
+        // RenderTextures, and this tool changes resolution three times per screen.
         list.Add(Simple("Character Select", typeof(CharacterSelectScreen),
-            "Vigil — a main-menu screen, so it may not stage correctly in a gameplay scene", () =>
+            "Marquee — a main-menu screen, so it may not stage correctly in a gameplay scene", () =>
         {
             CharacterSelectScreen.Open(null);
             return true;
