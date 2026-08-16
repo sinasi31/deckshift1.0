@@ -237,6 +237,14 @@ not a tinted hairline: at 52px over moving gameplay a hairline is not reliably
 readable. **Only Epic/Legendary animate** — that's what makes a Legendary catch
 your eye in a row of five.
 
+⚠️ **A STATUS COLOUR MUST BE MEASURED AGAINST THE SURFACE IT APPEARS ON, not
+chosen for its meaning.** Two digits on the canonical card frame were invisible
+for exactly this reason, and both would have shipped: the Shift cost was
+`(0.307, 0.304, 0.934)` on a crystal sampling `(0.377, 0.398, 0.920)` — the same
+blue — and the *last charge* warning was painted `Color.red` on a medallion that
+**is a red ball**. Red means danger, and it is the one colour that cannot say so
+there. Sample the artwork, then pick.
+
 ⚠️ **Card rarity is the ART's job, not the UI's.** Card art bakes rarity in as
 colour (dark grey Common, light grey Uncommon, yellow Rare, purple Epic; no
 Legendary cards). **Never invent a second rarity colour system on a card** — two

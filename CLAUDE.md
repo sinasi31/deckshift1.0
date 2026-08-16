@@ -1304,16 +1304,39 @@ The Scrap Forge and Blompo used to build their own card chips: a FlatUI plate wi
 
 ⚠️ **THE SET CURRENTLY HAS TWO ART STYLES AND THEY FIGHT.** The older cards socket their medallions in dark gold circles; **Dead Weight, Freefall Blade, Glass Parry and Shuriken** are newer art with a red ball and a **blue crystal**, and no painted name. Consequences already hit: a blue Shift digit on a blue crystal was *invisible* at ~10px (fixed with a 4-way dark **keyline**, not a one-sided drop shadow — that leaves most of the glyph edge unlit), and those three had `nameIsPaintedIntoArt` wrongly set true in the bulk pass, so they rendered a blank name plate **in the hand as well**.
 
-⚠️ ~~Both styles put cost right / charges left, so the positions do hold.~~ **THAT WAS WRONG AND IS NOW FIXED (2026-08-17).** Measured off the sprites (blit to a RenderTexture, find the coloured blob in the top band — the source textures are not import-readable), the two generations put their medallions **0.045 of a card width apart**:
+### ⚠️ THE FREEFALL BLADE FRAME IS THE CANONICAL CARD FRAME (designer, 2026-08-17)
+
+**All new card art uses it**, and the layout is fixed for every card: the **red ball** (charges, left), the **blue crystal** (Shift cost, right), an **empty name plate** (drawn in code — see below), and on cards that deal damage a **heart container**. `CardFace.Gem` is therefore the layout to tune and trust; **`CardFace.Classic` is legacy** and exists only until the 14 old cards are re-cut. When they are, delete `Classic` and the chooser with it.
+
+⚠️ **The heart container is NOT BUILT — it is the designer's stated plan, not a request.** Do not invent a different mechanism for "does this card deal damage" in the meantime. When it lands, the machinery already exists: `CardUI.RefreshCardFace` draws a number into a heart for **Stagger** today (the `HEART_*` fraction constants), which is the same problem in the same place.
+
+⚠️ ~~Both styles put cost right / charges left, so the positions do hold.~~ **THAT WAS WRONG AND IS NOW FIXED (2026-08-17).** The two generations put their medallions **0.045 of a card width apart**, and on the gem cards the charge number sat off the LEFT EDGE of the red ball entirely:
 
 | | charges | cost | sprite |
 |---|---|---|---|
-| classic gold sockets | (0.176, 0.909) | (0.848, 0.905) | `fireball_0`, 1024×1536, aspect **0.667** |
-| gem red ball | (0.218, 0.880) | (0.835, 0.874) | `freefallblade_0`, 118×200, aspect **0.590** |
+| **gem (canonical)** | **(0.2188, 0.8796)** | **(0.8330, 0.8623)** | `freefallblade_0`, 118×200, aspect **0.590** |
+| classic (legacy) | (0.173, 0.921) | (0.848, 0.905) | `fireball_0`, 1024×1536, aspect **0.667** |
 
-On the gem cards the charge number sat off the LEFT EDGE of the red ball entirely. `CardFace.LayoutFor(sprite)` now picks the layout, and **`CardFace` is the single source for every screen INCLUDING the hand** — `CardUI.Setup` calls `CardFace.PlaceMedallion` on its two prefab labels rather than trusting their authored positions, so the hand and the forge cannot drift apart.
+⚠️ **The canonical positions were measured by BOUNDING BOX, not centroid.** Both shapes are symmetrical — the ball is a true **42×42 circle**, the crystal a **26×40 diamond** — so the bbox centre IS the centre, whereas a centroid is dragged off by highlights and facets that fail a strict colour test. They disagreed by 0.014 on the ball's x and 0.009 on the gem's y. (Method: blit the sprite to a RenderTexture and read it back — the source textures are not import-readable. Scan the FULL sprite height: a window clipped to the top band cut off the ball's bottom and skewed the first measurement.)
 
-⚠️ **The generation is told apart by SPRITE ASPECT, and that is a STOPGAP.** Aspect is at least a property of the art FILE rather than of gameplay data, but it is still a proxy — a third layout cut at 0.667 would silently take the classic positions. **When the set is re-cut to one style, delete the second entry and the chooser with it.**
+⚠️ **`CardFace` is the single source for every screen INCLUDING the hand.** `CardUI.Setup` calls `CardFace.PlaceMedallion` on its two prefab labels rather than trusting their authored positions, so the hand and the forge cannot drift apart.
+
+⚠️ **The generation is told apart by SPRITE ASPECT, and that is a STOPGAP.** Aspect is at least a property of the art FILE rather than of gameplay data, but it is still a proxy — a new card cut at 0.667 would silently take the legacy positions.
+
+### ⚠️ Two digits were invisible against the medallions they sat on (2026-08-17)
+
+Both are the same mistake and both were on the **canonical** frame, so both would have shipped:
+
+- **Shift cost: blue on a blue crystal.** Sampled off the sprite, the crystal averages **(0.377, 0.398, 0.920)** and the digit was **(0.307, 0.304, 0.934)** — the same colour. The designer reported it as blending into the background, and it did, exactly. Now pale ice **(0.90, 0.95, 1.00)**: keeps the Shift-blue identity the whole game uses for this resource, at luminance ~0.93 against the crystal's ~0.43.
+- **Last-charge warning: red on a red ball.** `currentUses == 1` painted the number `Color.red`, and the canonical charge medallion *is* a red ball — the warning was invisible exactly when it mattered most. Now amber **(1.00, 0.82, 0.25)**, which still reads inside the legacy frame's dark gold ring.
+
+**The general rule: a status colour must be measured against the SURFACE it appears on, not chosen for its meaning.** Red means danger, and it is the one colour that cannot say so on a red ball.
+
+⚠️ **The cost also grew 30 → 34.** Colour was the reported fault, but the cost was also the *smaller* of the two numbers while sitting on the *larger* medallion — a single digit filled ~40% of the crystal's width. Recolouring fixed legibility without fixing presence, and the cost is the number a player checks most often ("can I afford this?").
+
+⚠️ **The four-copy keyline is GONE — there is now ONE shared outlined material.** Every number used to be drawn five times (the digit plus four offset black copies) because the digits sit on saturated artwork. It worked, but **the hand never had it** — its labels are prefab objects, not built by `CardFace` — so the same card read differently in your hand than in the forge. `CardFace.ApplyNumberOutline` puts a real SDF outline on both. It must be `fontSharedMaterial` and it must be ONE cached material: writing `outlineWidth` on a `TMP_Text` auto-instances a material **per label**, which breaks batching and leaks one material per card drawn. Same look everywhere, one draw call, 8 fewer TMP objects per card.
+
+⚠️ **Max number width is PER MEDALLION** (`USES_MAX_W` 0.165 / `COST_MAX_W` 0.130), because the sockets are not the same size: the ball is 0.357 of the card wide, the crystal only 0.219 — and the crystal is a diamond, so a number near its full width runs into the tapering facets. One shared budget either wasted the ball or overran the gem.
 
 ⚠️ **`preserveAspect` MEANS THE ART IS NOT THE HOST — measure against the DRAWN art.** The gem sprite is 0.590 where the card box is 0.667, so it letterboxes to **88.5%** of the host width with bars either side, and every number stamped at a fraction of the HOST lands outside the artwork it belongs to. This is half of the misplacement above, and it is the same letterbox `CardUI` already maps Stagger's heart and name plate through. `CardFace.DrawnArtSize` is the shared helper.
 

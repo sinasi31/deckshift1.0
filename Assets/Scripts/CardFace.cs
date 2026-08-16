@@ -19,41 +19,42 @@ public static class CardFace
     public const float ASPECT = 1.5f;
 
     // ══════════════════════════════════════════════════════════════════════════════════════════
-    // Where the medallions sit — AS FRACTIONS OF THE SPRITE, and there are TWO ART GENERATIONS.
+    // Where the medallions sit — AS FRACTIONS OF THE SPRITE.
     // ══════════════════════════════════════════════════════════════════════════════════════════
+    //
+    // ⚠️ **THE FREEFALL BLADE FRAME IS THE CANONICAL CARD FRAME (designer, 2026-08-17).** All new
+    // card art uses it: the red ball for charges, the blue crystal for Shift cost, an empty name
+    // plate, and — on cards that deal damage — a heart container. **`Gem` is therefore the layout
+    // to tune and trust; `Classic` is legacy** and exists only until the 14 old cards are re-cut.
     //
     // ⚠️ **THE TWO STYLES DO NOT PUT THEIR MEDALLIONS IN THE SAME PLACE.** This file used to carry
     // one position for both, on the assumption that "both styles put cost right / charges left, so
-    // the positions hold". Measured off the sprites (blit to a RenderTexture, find the coloured blob
-    // in the top band — the source textures are not import-readable), they do not:
-    //
-    //     classic gold sockets (fireball_0, 1024x1536)  charges (0.176, 0.909)
-    //     gem     red ball     (freefallblade_0, 118x200) charges (0.218, 0.880)  cost (0.835, 0.874)
-    //
-    // 0.045 of a card width apart. On the gem cards the charge number sat off the left edge of the
-    // red ball entirely, and got worse with every digit — which is what the designer reported as
-    // "the charges look weird and bad over 10".
+    // the positions hold". They are 0.045 of a card width apart, and on the gem cards the charge
+    // number sat off the LEFT EDGE of the red ball entirely.
     //
     // ⚠️ **The generation is told apart by SPRITE ASPECT, and that is a STOPGAP.** Classic art is
-    // 1024x1536 (0.667); the gem art is 118x200 (0.590). Aspect is at least a property of the art
-    // FILE rather than of gameplay data — but it is still a proxy, and a third layout cut at 0.667
-    // would silently take the classic positions. **When the card set is re-cut to one style, delete
-    // the second entry and the chooser with it.**
+    // 1024x1536 (0.667); the canonical frame is 118x200 (0.590). Aspect is at least a property of
+    // the art FILE rather than of gameplay data — but it is still a proxy, and a new card cut at
+    // 0.667 would silently take the legacy positions. **When the set is fully re-cut, delete
+    // `Classic` and the chooser with it and keep `Gem` as the only layout.**
     public struct Medallions { public Vector2 Uses, Cost; }
 
-    // ⚠️ Classic keeps the ORIGINAL hand-authored values, not the measured ones (which differ by
-    // 0.003/0.012 — within the noise of a blob centroid that includes the gold ring itself). These
-    // have shipped and read correctly, so this change is a visual no-op on the 14 classic cards.
+    // ⚠️ Measured off the canonical sprite by BOUNDING BOX, not centroid. Both shapes are
+    // symmetrical — the ball is a true 42x42 circle, the crystal a 26x40 diamond — so the bbox
+    // centre IS the centre, whereas the centroid is pulled off by highlights and facets that fail a
+    // strict colour test (they disagreed by 0.014 on the ball's x and 0.009 on the gem's).
+    private static readonly Medallions Gem = new Medallions
+    {
+        Uses = new Vector2(0.2188f, 0.8796f),   // red ball,      42x42 of a 118x200 sprite
+        Cost = new Vector2(0.8330f, 0.8623f),   // blue crystal,  26x40
+    };
+
+    // ⚠️ Legacy keeps the ORIGINAL hand-authored values, so this stays a visual no-op on the 14 old
+    // cards until their art is replaced.
     private static readonly Medallions Classic = new Medallions
     {
         Cost = new Vector2(0.5f + 69.5f / 200f, 0.5f + 121.4f / 300f),
         Uses = new Vector2(0.5f - 65.4f / 200f, 0.5f + 126.4f / 300f),
-    };
-
-    private static readonly Medallions Gem = new Medallions
-    {
-        Cost = new Vector2(0.835f, 0.874f),
-        Uses = new Vector2(0.218f, 0.880f),
     };
 
     /// <summary>Which generation of card art this sprite belongs to. See the stopgap note above.</summary>
@@ -63,8 +64,33 @@ public static class CardFace
         return (art.rect.width / art.rect.height) < 0.63f ? Gem : Classic;
     }
 
-    private const float COST_SIZE = 30f / 200f;   // font size as a fraction of the DRAWN card width
+    // ⚠️ The cost was authored at 30 and is now 34. Colour was the reported fault — a blue digit on
+    // a blue crystal — but it was also the SMALLER of the two numbers while sitting on the larger,
+    // taller medallion: a single digit filled only ~40% of the crystal's width. Recolouring alone
+    // fixed legibility without fixing presence, and the cost is the number a player checks most
+    // often (can I afford this?).
+    private const float COST_SIZE = 34f / 200f;   // font size as a fraction of the DRAWN card width
     private const float USES_SIZE = 38f / 200f;
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+    // The digits' colours — chosen against the canonical frame, MEASURED not guessed.
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+    //
+    // ⚠️ **THE SHIFT COST USED TO BE BLUE ON A BLUE CRYSTAL.** Sampled off the sprite, the crystal
+    // averages (0.377, 0.398, 0.920) and the digit was (0.307, 0.304, 0.934) — the same colour. The
+    // designer reported it as blending into the background, and it did, exactly.
+    //
+    // Pale ice rather than pure white: it keeps the Shift-blue identity the whole game uses for this
+    // resource while carrying a luminance of ~0.93 against the crystal's ~0.43.
+    public static readonly Color CostColor = new Color(0.90f, 0.95f, 1.00f, 1f);
+
+    /// <summary>Charges, normal. White on the red ball.</summary>
+    public static readonly Color ChargeColor = Color.white;
+
+    // ⚠️ **THE LAST-CHARGE WARNING WAS RED ON A RED BALL** — the same fault as the cost, on the same
+    // frame, and it would have shipped invisible. Amber reads as a warning without competing with
+    // the ball, and still reads inside the legacy frame's dark gold ring.
+    public static readonly Color ChargeLowColor = new Color(1.00f, 0.82f, 0.25f, 1f);
 
     // ── Fitting a number to its socket ─────────────────────────────────────────────────────────
     //
@@ -78,16 +104,58 @@ public static class CardFace
     // documented in this project as unreliable to measure, and these labels are rebuilt constantly.
     private const float GLYPH_W = 0.582f;    // widest digit, as a multiple of font size
     private const float INF_W = 0.709f;      // the infinity glyph
-    private const float NUMBER_MAX_W = 0.135f;   // of the drawn card width — inside both sockets
+
+    // ⚠️ **PER MEDALLION, because the two sockets are not the same size.** Measured on the canonical
+    // frame: the ball is 0.357 of the card wide, the crystal only 0.219 — and the crystal is a
+    // DIAMOND, so a number near its full width would run into the tapering facets. One shared budget
+    // either wasted the ball or overran the gem.
+    private const float USES_MAX_W = 0.165f;   // of the drawn card width — inside the ball
+    private const float COST_MAX_W = 0.130f;   // inside the crystal's waist
 
     /// <summary>The font size at which <paramref name="text"/> still fits inside its medallion.</summary>
-    public static float FitNumberSize(string text, float authoredSize, float drawnCardWidth)
+    public static float FitNumberSize(string text, float authoredSize, float drawnCardWidth, bool cost)
     {
         if (string.IsNullOrEmpty(text) || drawnCardWidth <= 0f) return authoredSize;
         float ratio = text == "∞" ? INF_W : GLYPH_W * text.Length;
         float want = ratio * authoredSize;
-        float max = NUMBER_MAX_W * drawnCardWidth;
+        float max = (cost ? COST_MAX_W : USES_MAX_W) * drawnCardWidth;
         return want <= max ? authoredSize : authoredSize * (max / want);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+    // ⚠️ ONE SHARED OUTLINED MATERIAL for every medallion digit, in the hand AND on every screen.
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+    //
+    // The digits sit directly on saturated artwork — a white number on a red ball, a pale one on a
+    // blue crystal — and without a dark edge they smear into it at hand size. `CardFace` used to
+    // fake this with FOUR offset copies of every number (a "keyline"), which the hand never had at
+    // all, so the same card read differently in your hand than in the forge.
+    //
+    // ⚠️ **It must be `fontSharedMaterial`, and it must be ONE material.** Writing `outlineWidth` on
+    // a TMP_Text auto-instances a material PER LABEL, which breaks batching and leaks one material
+    // per card drawn. A single cached variant of the display font's material keeps every digit in
+    // one draw call and replaces 8 extra TMP objects per card with zero.
+    private static Material outlineMat;
+
+    private static Material OutlineMaterial()
+    {
+        if (outlineMat != null) return outlineMat;
+        TMP_FontAsset f = UIType.Display();
+        if (f == null || f.material == null) return null;
+
+        outlineMat = new Material(f.material) { name = "CardNumber (outlined)" };
+        outlineMat.EnableKeyword(ShaderUtilities.Keyword_Outline);
+        outlineMat.SetColor(ShaderUtilities.ID_OutlineColor, new Color(0.05f, 0.04f, 0.06f, 1f));
+        outlineMat.SetFloat(ShaderUtilities.ID_OutlineWidth, 0.18f);
+        return outlineMat;
+    }
+
+    /// <summary>Give a medallion digit the shared dark edge. Safe to call every refresh.</summary>
+    public static void ApplyNumberOutline(TMP_Text t)
+    {
+        if (t == null) return;
+        Material m = OutlineMaterial();
+        if (m != null) t.fontSharedMaterial = m;
     }
 
     /// <summary>
@@ -139,7 +207,9 @@ public static class CardFace
         rt.anchoredPosition = MedallionOffset(host, artImage.sprite, cost);
 
         label.enableWordWrapping = false;   // "10" has no break opportunity, but do not tempt it
-        label.fontSize = FitNumberSize(label.text, (cost ? COST_SIZE : USES_SIZE) * drawn.x, drawn.x);
+        label.fontSize = FitNumberSize(label.text, (cost ? COST_SIZE : USES_SIZE) * drawn.x, drawn.x, cost);
+        ApplyNumberOutline(label);
+        if (cost) label.color = CostColor;   // the charge colour carries the low-charge warning
     }
 
     private static readonly Color COST_COLOR = new Color(0.307f, 0.304f, 0.934f, 1f);
@@ -194,41 +264,26 @@ public static class CardFace
 
         string cost = card.cardData.shiftCost.ToString();
         AddNumber(host, "Cost", MedallionOffset(hostSize, card.cardData.cardArt, true),
-                  FitNumberSize(cost, COST_SIZE * w, w), cost, COST_COLOR);
+                  FitNumberSize(cost, COST_SIZE * w, w, true), cost, CostColor);
 
         string charges = card.isInfinite ? "∞" : card.currentUses.ToString();
-        Color chargeCol = (!card.isInfinite && card.currentUses <= 1) ? Color.red : Color.white;
+        Color chargeCol = (!card.isInfinite && card.currentUses <= 1) ? ChargeLowColor : ChargeColor;
         AddNumber(host, "Charges", MedallionOffset(hostSize, card.cardData.cardArt, false),
-                  FitNumberSize(charges, USES_SIZE * w, w), charges, chargeCol);
+                  FitNumberSize(charges, USES_SIZE * w, w, false), charges, chargeCol);
     }
 
-    // ⚠️ EVERY NUMBER GETS A DARK SHADOW, because the set currently has TWO art styles and a digit
-    // that reads on one vanishes on the other. The older cards socket their medallions in dark gold
-    // circles, where the Shift blue is crisp; the newer ones (Dead Weight, Freefall Blade, Glass
-    // Parry) use a red ball and a BLUE CRYSTAL — and a blue digit on the blue crystal is invisible.
-    // Keeping the hand's colours and adding a shadow fixes it without inventing a third palette.
-    private static readonly Vector2[] OUTLINE =
-    {
-        new Vector2(-1f, 0f), new Vector2(1f, 0f),
-        new Vector2(0f, -1f), new Vector2(0f, 1f),
-    };
-
+    // ⚠️ THE FOUR-COPY KEYLINE IS GONE. Every number used to be drawn five times — the digit plus
+    // four offset black copies ringing it — because the digits sit on saturated artwork and smear
+    // into it without a dark edge. It worked, but the HAND never had it (its labels are prefab
+    // objects, not built here), so the same card read differently in your hand than in the forge.
+    // `ApplyNumberOutline` puts a real SDF outline on both through one shared material: same look
+    // everywhere, one draw call, and 8 fewer TMP objects per card.
     private static TextMeshProUGUI AddNumber(RectTransform parent, string name, Vector2 offset, float size,
                                              string text, Color color)
     {
-        // A KEYLINE, not a drop shadow. A single offset copy was not enough: the Shift digit is
-        // blue, the new art's cost medallion is a blue CRYSTAL, and at ~10px on screen the digit
-        // simply disappeared into it — a one-sided shadow leaves most of the glyph edge unlit.
-        // Four copies ring it and it reads on any medallion, old socket or new gem.
-        //
-        // ⚠️ The ring SCALES with the font. It used to be a flat 1.6px, which is a heavy outline on
-        // a 17px number in the character select and invisible on an 84px one in the Scrap Forge.
-        float ring = Mathf.Max(1.2f, size * 0.045f);
-        for (int i = 0; i < OUTLINE.Length; i++)
-            AddNumberLayer(parent, name + "Edge" + i, offset + OUTLINE[i] * ring, size, text,
-                           new Color(0f, 0f, 0f, 0.85f));
-
-        return AddNumberLayer(parent, name, offset, size, text, color);
+        TextMeshProUGUI t = AddNumberLayer(parent, name, offset, size, text, color);
+        ApplyNumberOutline(t);
+        return t;
     }
 
     private static TextMeshProUGUI AddNumberLayer(RectTransform parent, string name, Vector2 offset,

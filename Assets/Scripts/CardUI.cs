@@ -85,11 +85,14 @@ public class CardUI : MonoBehaviour, IPointerClickHandler
         // Uses
         if (usesText != null)
         {
-            if (card.isInfinite) usesText.text = "∞";
+            if (card.isInfinite) { usesText.text = "∞"; usesText.color = CardFace.ChargeColor; }
             else
             {
                 usesText.text = card.currentUses.ToString();
-                usesText.color = (card.currentUses == 1) ? Color.red : Color.white;
+                // ⚠️ NOT red. The canonical frame's charge medallion IS a red ball, so the
+                // last-charge warning was red on red — invisible exactly when it matters most.
+                // Colours come from CardFace so the hand and every screen agree.
+                usesText.color = (card.currentUses == 1) ? CardFace.ChargeLowColor : CardFace.ChargeColor;
             }
         }
 
