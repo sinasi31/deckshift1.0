@@ -45,14 +45,14 @@ Screens share the *ideology* — flat procedural plates, restraint, directional
 light, a subtle particle drift, one meaningful accent — and **never the same
 skin**. The material should say what the place DOES.
 
-| | **Iron** (ScrapForge) | **Arcane** (Blompo) | **Loadout** (relics) | **Halt** (pause) | **Apparatus** (settings) | **Bulletin** (quests) | **Cartograph** (run map) |
-|---|---|---|---|---|---|---|---|
-| What it is | a workbench | a blessing granted | what you're carrying | the moment you stopped | the machine's own panel | contracts you promise | a folded map you just opened |
-| Palette | warm charcoal | cold indigo | near-**colourless** | cold blue-black | smoked glass + arc-cyan | dark wood + **pale paper** | **tan paper** + oxblood |
-| Light | fire from **below** | descends from **above** | none | from **edges inward** | **emitted by the content** | rakes in from the **left** | even, with aged corners |
-| Particles | embers **rising** | motes **settling** | none | **suspended**, shivering | none — one scan sweep | none — the content sways | none — paper doesn't move |
-| Corner marks | rivets | four-point stars | none | none | calibration crosshairs | brass tacks | **compass rose** |
-| Surface | scuffed | pristine | plain sockets | **crazed** | unblemished glass | **perforated** | **stained, foxed, folded** |
+| | **Iron** (ScrapForge) | **Arcane** (Blompo) | **Loadout** (relics) | **Halt** (pause) | **Apparatus** (settings) | **Bulletin** (quests) | **Cartograph** (run map) | **Vigil** (character select) |
+|---|---|---|---|---|---|---|---|---|
+| What it is | a workbench | a blessing granted | what you're carrying | the moment you stopped | the machine's own panel | contracts you promise | a folded map you just opened | who you are about to be |
+| Palette | warm charcoal | cold indigo | near-**colourless** | cold blue-black | smoked glass + arc-cyan | dark wood + **pale paper** | **tan paper** + oxblood | near-black + one **warm lamp** |
+| Light | fire from **below** | descends from **above** | none | from **edges inward** | **emitted by the content** | rakes in from the **left** | even, with aged corners | **travels the row** (the inversion) |
+| Particles | embers **rising** | motes **settling** | none | **suspended**, shivering | none — one scan sweep | none — the content sways | none — paper doesn't move | none — the chosen rig **breathes** |
+| Corner marks | rivets | four-point stars | none | none | calibration crosshairs | brass tacks | **compass rose** | none — alcove arches |
+| Surface | scuffed | pristine | plain sockets | **crazed** | unblemished glass | **perforated** | **stained, foxed, folded** | cold **stone** |
 
 The Marketplace (`ShopScreenUI`) keeps its own: warm wood, striped awning,
 lamplight.
@@ -80,13 +80,26 @@ paper pinned to it** — its `TextBright` is nearly black, and bright and dark h
 swapped places. That one structural choice makes it unmistakable while claiming
 almost no colour. **Reach for this before reaching for another hue.**
 
+⚠️ **VIGIL (character select) is the other proof, and the cheapest inversion yet:
+LIGHT DIRECTION.** A dark hall of alcoves where the roster stands dormant and one
+travelling lamp wakes only the chosen one. Every other screen is an evenly lit
+surface marking its selection with COLOUR; this one is dark and marks it by
+*lighting* it — so it claims **no hue at all**, and gets motion as a free second
+signal (unselected rigs are `animator.speed = 0`).
+
 ⚠️ **The hue budget is nearly spent.** Claimed: orange (Iron), violet (Arcane),
-no-hue (Loadout), verdigris + copper (map), warm wood/amber (shop), frost blue
-(Halt), arc-cyan (Apparatus), deep wax red (Bulletin). Roughly magenta and yellow
-remain. After that, **stop reaching for a colour and invert a different axis** —
-light direction, motion vocabulary, surface treatment and value structure
-separate these screens at least as much as hue does. Loadout proves a theme can
-carry no hue at all.
+no-hue (Loadout), **tan paper + oxblood (map — Cartograph)**, warm wood/amber
+(shop), frost blue (Halt), arc-cyan (Apparatus), deep wax red (Bulletin), and
+no-hue again (**Vigil**). Roughly magenta and yellow remain. After that, **stop
+reaching for a colour and invert a different axis** — light direction, motion
+vocabulary, surface treatment and value structure separate these screens at least
+as much as hue does. Loadout and Vigil both prove a theme can carry no hue at all.
+
+⚠️ **The map is CARTOGRAPH — paper, not metal.** An earlier verdigris-and-copper
+etched-plate version was built and REJECTED: a material is not enough, because a
+map reads as a map by being a DOCUMENT (torn deckle edge, fold creases, dashed
+routes, progress annotated in red pen over printed brown ink). If a doc still
+describes the map as verdigris, it is stale.
 
 ### Motion has a vocabulary too, and it must not contradict itself
 

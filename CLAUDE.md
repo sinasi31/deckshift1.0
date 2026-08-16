@@ -10,7 +10,7 @@ This file is loaded automatically into Claude Code at the start of every session
 
 **Core concept:** "Movement is a Resource." Jumping consumes **Shift**, which does not regenerate on its own — and **Shift CARRIES OVER between rooms** (designer-confirmed 2026-07-13: it is a run-long resource, and this persistence is "the whole identity of the game" — spending Shift now means having less for the rest of the run). Do NOT describe or implement Shift as a per-room resource. Most other actions (attacks, special movement, utility) are delivered via cards. Cards have **charges**; when charges deplete the card moves to the exhaust pile and must be recovered via scrap.
 
-**Current state:** Act 1 (Oxidation District) prototype. **10 combat levels in the run pool** (+ hub + boss room; ~15 more contract-valid rooms exist unused — see Room Pool), **16 CardData assets in `Assets/Cards/`, 19 relics, and 8 quest assets** (relics/quests re-verified 2026-08-11; note 2 of the 16 cards are not normal reward cards — `Stagger` is the fail-state card and `AnaKartVeritabanı` is the card *database* asset, so the real playable pool is ~14). Two acts (Vapor Stratum, Final Forge) planned but not started. Target: 45-50 minute run length, 60+ cards total at content-complete. **24 Blompo blessings** as of 2026-08-14 — the card *pool* is still the bottleneck, but the enhancement multiplier on it is now built.
+**Current state:** Act 1 (Oxidation District) prototype. **11 combat levels in the run pool** (+ hub + boss room; ~15 more contract-valid rooms exist unused — see Room Pool), **18 CardData assets in `Assets/Cards/`, 19 relics, and 8 quest assets** (cards re-counted 2026-08-16; note 2 of the 18 are not normal reward cards — `Stagger` is the fail-state card and `AnaKartVeritabanı` is the card *database* asset, so the real playable pool is **16**). **2 playable characters** in `Assets/Resources/Characters/` (see Characters). Two acts (Vapor Stratum, Final Forge) planned but not started. Target: 45-50 minute run length, 60+ cards total at content-complete. **24 Blompo blessings** as of 2026-08-14 — the card *pool* is still the bottleneck, but the enhancement multiplier on it is now built.
 
 ⚠️ **`DeckManager.startingDeck` is currently 3 cards (Phase, Freefall Blade, Second Thoughts) and that is the designer using it as a TESTING TOOL, not the intended starting deck.** Do not balance against it, and do not "fix" it. It does have one live side effect worth knowing: the `Only Child` blessing keys off a deck under 10 cards, so it currently fires for the whole run.
 
@@ -68,6 +68,96 @@ These are absolute. Do not suggest alternatives without explicit user approval.
 6. **Asset pack imports require extreme care.** The Cainos Customizable Pixel Character pack ships as a "complete project" that wants to overwrite `ProjectSettings/`. Always uncheck `ProjectSettings/` in the import dialog and uncheck any duplicate packs you already have. See "Common Pitfalls" for the full story.
 
 ---
+
+## Characters (built 2026-08-14)
+
+**A character is TWO things and no more: the deck you start the run with, and one passive trait.**
+`CharacterData` assets live in **`Assets/Resources/Characters/`** and are found by `Resources.LoadAll`,
+not a hand-kept list — adding a character is dropping in an asset, with nothing to rebuild.
+
+| | deck | trait |
+|---|---|---|
+| **Wizard** | Fireball ×2, Create Platform, Dash | *Big Sleeves* — +1 hand |
+| **Ninja** | Shuriken ×2, Dash, Leap | *Fast Hands* — Recall never escalates, **−1 hand** |
+
+⚠️ **A character's innate ACTIVE ability was built and then CUT. Do not re-propose it.** The first
+version gave the Wizard a free, unlimited, aimed attack on right mouse. It worked, and the designer
+rejected it after one playtest. The reasoning generalises, which is why it is recorded here:
+
+- A free attack doesn't out-damage your attack cards — it **prevents the situations those cards exist
+  for**. Comet Dive is for being surrounded, Glass Wail for being overwhelmed. Delete everything at
+  range for nothing and none of those moments happen.
+- Underneath that: **the game charges nothing for TIME.** No timer, no reinforcements, Shift does not
+  decay. So an infinite-but-slow attack always beats a finite-but-fast one, and every attack card in
+  the game is fundamentally selling speed.
+- It also made breakable walls free to open, and voided the design law that a boss room must provide
+  a way to damage the boss.
+
+Measured at the time: of the playable cards, 7 are attacks but only **Fireball** and **Dead Weight**
+were *directly* outclassed. **The felt problem was far broader than the measured one, and that gap is
+the whole lesson** — don't re-litigate this with a damage table.
+
+**Traits are read, never mirrored into a field**, so a character swap can't leave a stale copy:
+- **`DeckManager.HandCapacity`** — the ONE place hand size is decided. Never read `handCapacity`
+  directly. (Base is **3** in the scene, not the script default of 4.) `handCapacityBonus` may be
+  **negative** — traits are allowed real downsides, and the designer wants that.
+- **`DeckManager.RecallCostIsLocked`** — read at the escalation site.
+- **`PlayerController.Awake`** — `CharacterSelection.Chosen` (static + PlayerPrefs) overrides the
+  prefab's `character`.
+
+### `CharacterAppearance` — it re-dresses the rig, it does not swap the model
+
+⚠️ **It copies the preset's MATERIALS onto the existing rig.** The player's visual model carries a lot
+of fragile hand setup (Cainos controller scripts stripped, `AnimationEventReceiver` removed,
+`PlayerAnimEventSink` on the Animator child, 0.8 scale) and every one of those steps fails silently
+when missed. Every preset is the same rig in different clothes.
+
+⚠️ **Weapons go through the pack's `PixelCharacter.AddWeapon(prefab, true)`.** `PixelCharacter.Weapon`
+is read-only, and the pack syncs the weapon to the rig bone and pushes sorting layer + alpha onto the
+new renderers. Hand-parenting looks right standing still and then sorts or fades wrong.
+
+⚠️ **Reading an unassigned object reference on a Cainos preset THROWS** `UnassignedReferenceException`
+instead of returning null, so every slot read goes through a `Safe()` guard. `HairRampTexture` is
+deliberately not copied.
+
+⚠️ **`Apply` catches everything, and it must.** Unity **DISABLES a MonoBehaviour whose `Awake`
+throws** — when this threw inside `PlayerController.Awake` it switched off the entire player: no
+movement, no jump, no card hotkeys, while Recall and clicking cards still worked (those are
+DeckManager and UI). **A cosmetic pass must never be able to brick the character.**
+
+### Character select — theme **Vigil** (see UI System → Themes)
+
+Opens on PLAY from the main menu; the designer chose "always ask" over "remember last pick". A dark
+hall of alcoves with the roster standing dormant; one warm lamp travels the row, and the chosen
+character wakes and breathes while the rest stay frozen in cold blue shadow.
+
+- **The inversion is LIGHT.** Every other screen is an evenly lit surface marking its selection with
+  colour; this one is dark and marks the selection by *lighting* it. Costs no hue, which matters —
+  the palette budget is nearly spent.
+- **Motion is the second signal, free:** unselected rigs are `animator.speed = 0`.
+- **Live rigs render to one RenderTexture each** (`CharacterStagePortrait`, stage at world
+  (3000, −3000) on its own `CharacterStage` layer). Two reasons: the menu Canvas is Screen Space
+  Overlay, so a world character would sit *behind* the backdrop; and one texture each makes dimming a
+  plain `RawImage.color` tint instead of reaching into Cainos shaders.
+- ⚠️ **A `RawImage` with no texture draws a solid WHITE quad** — tinted, that was a large blue slab
+  where a character should have been.
+- ⚠️ **A key that activated the button which OPENED this screen is still down on its first `Update`.**
+  It confirmed instantly from the Enter that pressed PLAY; guarded with `openedFrame`. Same family as
+  `PauseScreen`'s Escape memory, from the other direction.
+
+**Open: the real-asset pass on this screen is STARTED, NOT DONE.** The designer asked for it to be
+built from actual game art rather than procedural shapes. Found so far: `TX Tileable - Dungeon Wall`
+(64 sprites, seamless 8×8 — see the level importer's `BackWallIndex`), `TX Dungeon Wall Deco` (17),
+`TX Dungeon Wall Dirt` (15), `TX FX Torch Flame`, `TX FX Candle Flame`. **The agreed idea is a real
+torch above every alcove with only the selected one lit**, which makes the light diegetic instead of
+a UI effect. Still needed: prop sprites for a torch bracket, banners, floor and arch.
+
+⚠️ **Two bugs on this screen were found and fixed 2026-08-16 — do not reintroduce them.** It parented
+to `FindFirstObjectByType<Canvas>()`, which in a gameplay scene returns a **world-space enemy health
+bar** (18 canvases in SampleScene); it built itself there at 0.01 scale, measured 76.7×24, and
+rendered invisibly while `Open()` still reported success and armed its confirm callback. It now uses
+`GameScreen.FindRootCanvas()`. Its `AddText` also never called the font helper, so the whole screen
+rendered in Liberation Sans — it now routes through `UIType`.
 
 ## Player System
 
@@ -247,6 +337,34 @@ Kills are credited in `EnemyHealth.Die`, which runs *inside* `TakeDamage` while 
 ⚠️ **`Understudy` needs a THIRD pick step** in `BlompoScreen` (blessing → card → partner). It's the only blessing that does; `NeedsPartner` is the flag.
 
 ⚠️ **Per-card blessing state lives on `RuntimeCard`**, not CardData — `grudgeBonus`, `roomsSincePlayed`, `lastCallUsed`, `playedThisRoom`, `lastCostPaid`, `understudyPartner`. Same reason the enhancement itself does: it's per-copy and per-run.
+
+### Shuriken (built 2026-08-14) — and the Animator traps it exposed
+
+`CardActionType.Shuriken = 20`. **8 damage, 10 charges, 0 Shift, and AIMED** — it flies at the cursor
+in any direction, which is the thing Fireball structurally cannot do. It is in the shared card pool,
+so any character can find it (verified surfacing in 107 of 2000 reward draws); the procedural star is
+the fallback for a character not holding one.
+
+Aiming needed no new input mode: cards are cast with a left click, so **the cursor at click time IS
+the aim**, and `CardAimIndicator` draws the same line beforehand.
+
+⚠️ **`AttackAction = 13` is THROW; `AttackAction = 14` is CAST.** 13 is a wind-up / hold / release
+driven by `IsAttacking`; 14 is the wizard's spell pose, a 1.0s clip that self-exits at 80%. Using 14
+for the throw is why it first looked wrong and ran long. (`AttackAction` is an **Int** — see the
+Animator Parameter Map.)
+
+⚠️ **`AttackSpeedMul` IS A GLOBAL ANIMATOR PARAMETER.** The throw sets it to **2.2** and must restore
+it to **1** afterwards, or **any character carrying a Shuriken gets a double-speed Fireball cast**.
+
+⚠️ **The star leaves on the arm's snap, not the keypress** (`THROW_RELEASE = 0.13s`). Spawned
+immediately it outran the animation. The aim is captured at the press; only the release waits.
+
+The projectile uses the pack's own shuriken sprite, sized from `sprite.bounds` rather than a fixed
+scale, and the held star is hidden for 0.28s during the throw so the thing that flies is the thing
+that was in his hand.
+
+**Still open: the card ART is a placeholder** borrowed from Freefall Blade. `nameIsPaintedIntoArt` is
+correctly `false`, so the title draws in code and reads right — only the illustration is wrong.
 
 ### Stagger Mechanic (REDESIGNED 2026-08-09 — it is no longer a three-strikes death sentence)
 
@@ -770,7 +888,14 @@ Lessons already paid for, don't re-learn them:
 
 ⚠️ **NODE LAYOUT IS A FIXED COLUMN LATTICE. DO NOT REINTRODUCE BARYCENTRIC RELAXATION.** It was tried and reverted the same day. Pulling nodes toward their neighbours' mean X does straighten the trails — measured, sideways travel per edge falls 214px → 86px — but it computes a **different spread for every row**, so a floor with three nodes shares no column with a floor that has five. The designer read the result instantly as *"the nodes are off, they are not where they are meant to be"*. A grid you can scan beats trails that lean less. Edge crossings are **zero either way** (measured over 300 acts), so nothing is lost.
 
-⚠️ **The hue budget is nearly spent.** Claimed: orange (Iron), violet (Arcane), no-hue (Loadout), **tan paper + oxblood (map — Cartograph)**, warm wood/amber (shop), frost blue (Halt), arc-cyan (Apparatus), deep wax red (Bulletin). Roughly magenta and yellow remain. **Cartograph and Bulletin are the two light-ground themes** and stay separable because Bulletin is small pale slips on a DARK board — its dominant field is dark, where the map's whole field is paper. When those run out, **stop reaching for a new colour and invert a different axis instead** — light direction, motion vocabulary, surface treatment and now value structure separate these screens at least as much as hue does, and Loadout proves a theme can carry no hue at all.
+**Vigil — the character select (2026-08-14).** A dark hall of alcoves; the roster stands dormant and
+one warm lamp travels the row, waking only the chosen one. ⚠️ **Its inversion is LIGHT, and it is the
+cheapest inversion found so far: every other screen is an evenly lit surface that marks its selection
+with COLOUR; this one is dark and marks the selection by lighting it.** It therefore claims **no hue
+at all** — which mattered, because the budget below is nearly gone. Motion is the free second signal
+(unselected rigs are `animator.speed = 0`). See Characters for its implementation traps.
+
+⚠️ **The hue budget is nearly spent.** Claimed: orange (Iron), violet (Arcane), no-hue (Loadout), **tan paper + oxblood (map — Cartograph)**, warm wood/amber (shop), frost blue (Halt), arc-cyan (Apparatus), deep wax red (Bulletin), no-hue again (**Vigil**, which buys its identity with light direction instead). Roughly magenta and yellow remain. **Cartograph and Bulletin are the two light-ground themes** and stay separable because Bulletin is small pale slips on a DARK board — its dominant field is dark, where the map's whole field is paper. When those run out, **stop reaching for a new colour and invert a different axis instead** — light direction, motion vocabulary, surface treatment and now value structure separate these screens at least as much as hue does, and Loadout proves a theme can carry no hue at all.
 
 **The Marketplace (`ShopScreenUI`) keeps its own material** — warm wood, striped canvas awning, lamplight — and was already bespoke rather than old chrome. What it needed wasn't a reskin but a PERSON; see "The keeper talks back" below.
 
@@ -1846,7 +1971,7 @@ The `CardTemplate` prefab has fundamental scale corruption: root scale is non-un
 
 ### Content (TODO)
 
-- Scale to 60+ cards (currently **16 assets in `Assets/Cards/`, ~14 genuinely playable** — `Stagger` is the fail-state card, `AnaKartVeritabanı` is the database asset). **This is the single biggest content gap and it gates both the map system and card enhancements.**
+- Scale to 60+ cards (currently **18 assets in `Assets/Cards/`, 16 genuinely playable** — `Stagger` is the fail-state card, `AnaKartVeritabanı` is the database asset). **This is the single biggest content gap and it gates both the map system and card enhancements.** The two archetypes the GDD names are the thinnest lines in the deck: **Glass has 2 cards** (Glass Wail, Glass Parry) and **Vampiric has 1** (Vampiric Bite), against 6 movement / 4 attack / 3 utility.
 - Glass archetype: cards exist in theory, not implemented.
 - Expand Vampiric archetype.
 - Three-act structure: Act 1 prototype exists; Acts 2-3 not started.
