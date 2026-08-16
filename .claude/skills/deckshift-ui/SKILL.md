@@ -331,6 +331,32 @@ the art doesn't use: only Epic/Legendary blessings pulse.
 
 ## 5. Wiring — a screen that doesn't integrate is broken
 
+> ### ⚠️ Start here: extend `GameScreen`, and set text through `UIType`
+>
+> **`GameScreen` (`Assets/Scripts/GameScreen.cs`) already implements most of this section.**
+> A new screen calls `AcquireDisplay()` from its Show and `ReleaseDisplay()` from its Hide, and
+> gets the pause, game-state, HUD-hide and drawer-lock handover correct by construction — plus
+> `FindRootCanvas()`, both aspect-fit modes, the one-frame Escape memory (`UIHeldPauseLastFrame`)
+> and an unscaled-time `FadeGroup`. It does **not** own activation, because `PauseScreen`'s root
+> must stay active to catch its own Escape; screens keep their own Show/Hide.
+>
+> **`UIType` decides the face.** `UIType.Apply(text, role)` for the display face — titles,
+> headings, buttons, stat labels, numbers. `UIType.ApplyProse(text, role)` for **real sentences
+> only**; the display face has essentially no lowercase and renders prose as a wall of capitals.
+> Sizes are roles (Hero/Title/Heading/Label/Body/Caption), never magic numbers, and prose is
+> auto-compensated ×1.18 for Pixie's smaller cap height — **never hand-tune a size to compensate.**
+>
+> ⚠️ **Judge any type decision on a screen with SENTENCES in it.** The pause screen looks like the
+> obvious test as the densest screen and is nearly useless for it — 30 labels and numbers, almost
+> no prose. The quest board decided the current split.
+>
+> ⚠️ **A thin face on a LIGHT ground needs darker ink than the number suggests** — §2's calibration
+> rule applies to type too. The quest slip's body ink had to go 0.189 → 0.141 against paper at 0.75
+> when it moved to the prose face, because thinner strokes cover less area at the same value.
+>
+> Existing screens migrate when already being touched — **do not retrofit them all at once.**
+> `QuestBoardScreen` is the worked example for both.
+
 - **Pause through the counter, never `Time.timeScale` directly.**
   `GameManager.instance.RequestPause()` / `ReleasePause()`. Documented exceptions:
   `HitStop`, Adrenaline slow-mo, and hard resets before a scene transition.

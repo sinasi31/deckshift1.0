@@ -858,6 +858,47 @@ Screen details worth keeping: the value is re-read from `GameSettings` on every 
 
 Three procedural sounds in `ProcSfx`: `PauseHalt`, `PauseRelease`, `PauseTick`. They are a **fourth sound family**, defined by their ENVELOPE rather than their spectrum (magic = harmonic bell partials, metal = inharmonic bar modes, stone = noise + sub). The halt is the only sound in the game that gets **choked** — a damper clamps the ring away over 180ms instead of letting it decay. A sound that fades out says "ending"; a sound cut short says "held". Release is its inverse and is allowed to run out naturally.
 
+### `GameScreen.cs` (2026-08-16) — the shared screen contract
+
+**Every new full-screen panel should extend `GameScreen`.** It owns taking over the display and
+handing it back: pause, game state, HUD hide, hand-drawer lock, the one-frame Escape memory, both
+aspect-fit modes, and finding the right Canvas.
+
+⚠️ **It is deliberately NOT a lifecycle that owns activation.** Screens genuinely differ there —
+`PauseScreen`'s root must stay ACTIVE so its `Update` can catch the Escape that *opens* it, while
+every other screen deactivates its own GameObject. Screens keep their own Show/Hide and call
+`AcquireDisplay()` / `ReleaseDisplay()` from inside it. A base class that insisted on `SetActive`
+would have to be fought by the one screen that matters most.
+
+**Why it exists:** those twelve lines were copy-pasted *identically* into ten screens — same fields,
+same order, same guards. Three details are load-bearing and none are obvious, so every new screen was
+one forgotten line from a bug that only appears when screens open on top of each other:
+
+- **`hudWasActive` is RECORDED, not assumed.** A screen opened over another (a chest's relic swap,
+  Blompo from the forge) must restore the HUD to what it *was*, not switch it on.
+- **The drawer lock is GATED on `hudWasActive`**, or an inner screen unlocks a drawer the outer
+  screen still needs locked.
+- **`prevState` is SAVED, not hardcoded to `Playing`.**
+
+`AcquireDisplay`/`ReleaseDisplay` are **idempotent** (a double Show can't stack two pauses), and
+`OnDestroy` releases — a screen destroyed while open would otherwise leave the game paused forever
+with no HUD.
+
+⚠️ **The two aspect-fit modes are NOT interchangeable.** `FitWindowToCanvas` RESIZES and is only safe
+when content is anchored to the window's corners with insets (the run map's chart). `FitScaleFor`
+returns a uniform scale and is required when content sits at fixed offsets from the window centre
+(Blompo, Settings, the shop) — *resizing* those overlaps their own columns.
+
+`UIHeldPauseLastFrame` + `TickUIPauseMemory()` generalise the guard that used to live only in
+`PauseScreen`: any screen opening on a keypress must check it, because script execution order is
+undefined and the screen closing this frame may release its pause before yours runs.
+
+⚠️ **Do NOT retrofit every screen at once.** New screens use it immediately; existing ones migrate
+when already being touched. **`QuestBoardScreen` is the migrated worked example.** Verified after
+migrating: open/close balanced, no pause leak over three cycles, double-open and double-close safe,
+and — the load-bearing case — opening the board *on top of* the relic panel and closing it leaves the
+HUD hidden and the outer screen's pause intact.
+
 ### Typography — `UIType.cs` (2026-08-16), two stated faces and a size scale
 
 **`UIType` is the single source of truth for what the UI is set in.** Before it, the font was decided

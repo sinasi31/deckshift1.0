@@ -25,7 +25,7 @@ using TMPro;
 // House pattern: entirely procedural, self-instantiating, no prefab and no art files — same shape
 // as ScrapForgeScreen and BlompoScreen. It replaced a painted board sprite that the designer
 // disliked; QuestSystem no longer owns any UI references at all.
-public class QuestBoardScreen : MonoBehaviour
+public class QuestBoardScreen : GameScreen
 {
     private static QuestBoardScreen instance;
 
@@ -72,11 +72,8 @@ public class QuestBoardScreen : MonoBehaviour
     private TextMeshProUGUI hintLabel;
 
     private readonly List<Slip> slips = new List<Slip>();
-    private bool isOpen;
     private float fitScale = 1f;
-    private GameState prevState;
-    private GameObject cachedHud;
-    private bool hudWasActive;
+    // isOpen, and the pause / game-state / HUD / drawer bookkeeping, now live in GameScreen.
 
     // One pinned contract.
     private class Slip
@@ -134,18 +131,9 @@ public class QuestBoardScreen : MonoBehaviour
         instance.Build();
     }
 
-    private static Canvas FindRootCanvas()
-    {
-        Canvas[] all = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
-        Canvas fallback = null;
-        foreach (Canvas c in all)
-        {
-            if (c == null) continue;
-            if (fallback == null) fallback = c;
-            if (c.isRootCanvas && c.renderMode == RenderMode.ScreenSpaceOverlay) return c;
-        }
-        return fallback;
-    }
+    // FindRootCanvas now lives in GameScreen — every screen carried its own copy, and the one screen
+    // that did NOT (the character select, which used FindFirstObjectByType<Canvas>) built itself
+    // inside a world-space enemy health bar and rendered invisibly.
 
     // ---- construction -----------------------------------------------------------------------------
 
@@ -680,16 +668,11 @@ public class QuestBoardScreen : MonoBehaviour
         gameObject.SetActive(true);
         transform.SetAsLastSibling();
 
-        prevState = GameManager.instance != null ? GameManager.instance.currentState : GameState.Playing;
-        if (GameManager.instance != null)
-        {
-            GameManager.instance.RequestPause();
-            GameManager.instance.SetGameState(GameState.Paused);
-        }
-        if (cachedHud == null) cachedHud = GameObject.Find("GameplayHUD");
-        hudWasActive = cachedHud != null && cachedHud.activeSelf;
-        if (cachedHud != null) cachedHud.SetActive(false);
-        if (hudWasActive && HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(true);
+        // The pause / game-state / HUD / hand-drawer handover lives in GameScreen — it was twelve
+        // identical lines in every screen, and three of its details are load-bearing and non-obvious
+        // (the HUD state is recorded rather than assumed, the drawer lock is gated on it, and the
+        // previous game state is restored rather than hardcoded to Playing).
+        AcquireDisplay();
 
         Refresh();
         FitScale();
@@ -705,13 +688,7 @@ public class QuestBoardScreen : MonoBehaviour
         if (!isOpen) return;
         isOpen = false;
 
-        if (GameManager.instance != null)
-        {
-            GameManager.instance.ReleasePause();
-            GameManager.instance.SetGameState(prevState);
-        }
-        if (cachedHud != null) cachedHud.SetActive(hudWasActive);
-        if (hudWasActive && HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(false);
+        ReleaseDisplay();
 
         StopAllCoroutines();
         gameObject.SetActive(false);
