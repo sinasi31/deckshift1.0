@@ -125,6 +125,38 @@ throws** — when this threw inside `PlayerController.Awake` it switched off the
 movement, no jump, no card hotkeys, while Recall and clicking cards still worked (those are
 DeckManager and UI). **A cosmetic pass must never be able to brick the character.**
 
+### ⚠️ Starting a run: the load is 1.04s and must be OVERLAPPED, not queued (2026-08-17)
+
+**Measured, not estimated: `SceneManager.LoadScene` into SampleScene takes 1.04 seconds**, and the
+synchronous call spends every one of them frozen on the last rendered frame — no animation, no
+feedback, indistinguishable from a hang. On top of that the character select used to play its exit
+animation and *then* hand over, so a player clicking BEGIN waited **1.46s**: 0.42s of animation
+followed by a full second of dead image. The designer reported it as "it takes too long for the next
+screen to load".
+
+Two changes, and the order matters more than either one:
+- **`MainMenuController.StartRun` uses `LoadSceneAsync`.** The load costs the same second; it just
+  stops freezing the frame while it happens.
+- **`CharacterSelectScreen.ConfirmRoutine` fires its callback FIRST, not last.** The exit burst now
+  plays *through* the load instead of before it. **This is where the saving comes from** — the load
+  did not get faster, it stopped being dead time.
+
+Now **1.085s, all of it animated.** The residual is the scene load itself; making that shorter means
+restructuring SampleScene, which is out of bounds.
+
+⚠️ **The screen washes to near-white and HOLDS.** The swap lands whenever the load happens to
+finish, which is not a moment anything can predict — cutting out of a detailed frame reads as a
+glitch, cutting out of a white one is invisible.
+
+⚠️ **The hold loop must still be able to END.** The scene swap normally destroys the screen mid-hold,
+so the loop usually never exits — but `ScreenGallery` opens the screen with a **null callback**, and
+a failed or absent load must not strand the player on a white rectangle. There is a give-up timeout.
+
+⚠️ **`SceneManager.GetActiveScene().buildIndex + 1` resolves to SampleScene ONLY because `Hub` is
+DISABLED in Build Settings** and disabled scenes are not counted. Verified: [0] MainMenu,
+[1] SampleScene, [2] GameOverScene, [3] GameScene. **Enabling Hub would silently send PLAY to the
+wrong scene** — it looks like a build-settings tick, and it re-routes the game.
+
 ### Character select — theme **Marquee** (rebuilt 2026-08-17; see UI System → Themes)
 
 Opens on PLAY from the main menu; the designer chose "always ask" over "remember last pick". **The
@@ -936,6 +968,26 @@ Lessons already paid for, don't re-learn them:
 - **Show the numbers a decision depends on.** Blompo's card-pick step listed only a bare charge count — no Shift cost, no maximum — so you chose which card to permanently alter without seeing what it cost or how much life it had. Chips now carry labelled SHIFT / CHARGES stats, and `StampChip` refreshes *both* on the bind frame because several blessings visibly change them.
 - **Empty states must collapse.** `LayoutSections` lays the screen out top-down and resizes the window to its content, so an empty section shrinks to one explanatory line. The fixed-height version had two large voids and looked broken — and that state is *common*, since early in a run nothing is damaged or exhausted.
 
+### ⚠️ OPEN DESIGNER NOTE: the menu screens don't feel like the WORLD yet (2026-08-17)
+
+**Standing feedback, not a bug, and not yet actioned.** On accepting Marquee the designer said it is
+"a better screen, doesn't really fit the theme of the game and the world", and named **the pause
+menu and the settings menu** as feeling the same way — "they are fine for now, I would like to
+change them in the future for sure".
+
+Why this is worth recording rather than fixing on the spot: **the three named screens are the three
+that depict no place in the game.** Iron is a workbench you stand at, Bulletin is a board in the hub,
+Cartograph is a document you carry, the Marketplace is a stall with a person in it — all of them
+borrow their material from something the player has actually seen. Halt, Apparatus and Marquee are
+abstractions (a moment, a control panel, a billing), so each had to invent its material from nothing,
+and inventing is exactly where "competent but generic" creeps back in — the failure the FlatUI pass
+was created to kill.
+
+**Do not start a redesign of these unprompted**, and do not treat their themes as settled either.
+When it is picked up, the lead to follow is the one the run map already proved: **a material is not
+enough; ask what the thing has been THROUGH.** The map stopped reading as a diagram only when it
+became a document that had been folded, carried and scribbled on.
+
 ### Themes — same ideology, never the same skin (2026-08-03)
 
 **Screens must NOT all look alike.** Designer's rule: share the ideology (flat procedural plates, restraint, directional light, a subtle particle drift, one meaningful accent), but each place gets its own material, and **the material should say what the place DOES**.
@@ -1250,7 +1302,26 @@ The Scrap Forge and Blompo used to build their own card chips: a FlatUI plate wi
 
 ⚠️ **THE MEDALLION NUMBERS ARE NOT PAINTED INTO THE ART.** The art carries the empty gold circles; the digits are TMP fields in `CardUI_Template`. Any screen that draws `cardData.cardArt` on its own gets a card with two **blank sockets**. `CardFace` stamps them at fractions measured off the prefab (`Cost_Text` at (69.5, 121.4), `Uses_Text` at (-65.4, 126.4) in a 200×300 rect), so there is one place to fix if the art is re-cut.
 
-⚠️ **THE SET CURRENTLY HAS TWO ART STYLES AND THEY FIGHT.** The older cards socket their medallions in dark gold circles; **Dead Weight, Freefall Blade and Glass Parry** are newer art with a red ball and a **blue crystal**, and no painted name. Consequences already hit: a blue Shift digit on a blue crystal was *invisible* at ~10px (fixed with a 4-way dark **keyline**, not a one-sided drop shadow — that leaves most of the glyph edge unlit), and those three had `nameIsPaintedIntoArt` wrongly set true in the bulk pass, so they rendered a blank name plate **in the hand as well**. Both styles put cost right / charges left, so the positions do hold.
+⚠️ **THE SET CURRENTLY HAS TWO ART STYLES AND THEY FIGHT.** The older cards socket their medallions in dark gold circles; **Dead Weight, Freefall Blade, Glass Parry and Shuriken** are newer art with a red ball and a **blue crystal**, and no painted name. Consequences already hit: a blue Shift digit on a blue crystal was *invisible* at ~10px (fixed with a 4-way dark **keyline**, not a one-sided drop shadow — that leaves most of the glyph edge unlit), and those three had `nameIsPaintedIntoArt` wrongly set true in the bulk pass, so they rendered a blank name plate **in the hand as well**.
+
+⚠️ ~~Both styles put cost right / charges left, so the positions do hold.~~ **THAT WAS WRONG AND IS NOW FIXED (2026-08-17).** Measured off the sprites (blit to a RenderTexture, find the coloured blob in the top band — the source textures are not import-readable), the two generations put their medallions **0.045 of a card width apart**:
+
+| | charges | cost | sprite |
+|---|---|---|---|
+| classic gold sockets | (0.176, 0.909) | (0.848, 0.905) | `fireball_0`, 1024×1536, aspect **0.667** |
+| gem red ball | (0.218, 0.880) | (0.835, 0.874) | `freefallblade_0`, 118×200, aspect **0.590** |
+
+On the gem cards the charge number sat off the LEFT EDGE of the red ball entirely. `CardFace.LayoutFor(sprite)` now picks the layout, and **`CardFace` is the single source for every screen INCLUDING the hand** — `CardUI.Setup` calls `CardFace.PlaceMedallion` on its two prefab labels rather than trusting their authored positions, so the hand and the forge cannot drift apart.
+
+⚠️ **The generation is told apart by SPRITE ASPECT, and that is a STOPGAP.** Aspect is at least a property of the art FILE rather than of gameplay data, but it is still a proxy — a third layout cut at 0.667 would silently take the classic positions. **When the set is re-cut to one style, delete the second entry and the chooser with it.**
+
+⚠️ **`preserveAspect` MEANS THE ART IS NOT THE HOST — measure against the DRAWN art.** The gem sprite is 0.590 where the card box is 0.667, so it letterboxes to **88.5%** of the host width with bars either side, and every number stamped at a fraction of the HOST lands outside the artwork it belongs to. This is half of the misplacement above, and it is the same letterbox `CardUI` already maps Stagger's heart and name plate through. `CardFace.DrawnArtSize` is the shared helper.
+
+⚠️ **A TWO-DIGIT CHARGE COUNT IS 1.93× THE WIDTH OF ONE DIGIT, AND THE SOCKETS ARE DRAWN FOR ONE.** Measured in the display face at 100pt: widest digit `0` = 58.2px, `10` = 110.8, `99` = 112.2, `100` = 176.0, `∞` = 70.9. **Shuriken is the only card in the set with `maxUses` 10**, so it was the one that showed it — the designer reported the charges as "weird and bad over 10", and on both styles the number simply spilled off its medallion. `CardFace.FitNumberSize` shrinks any number to `NUMBER_MAX_W` (0.135 of the drawn card width, which is inside both sockets — verified on both styles at 1/9/10/99).
+
+⚠️ **Deterministic scaling, NOT `enableAutoSizing`.** TMP auto-size settles over several frames and is documented in this file as unreliable to measure; these labels are rebuilt on every hand refresh. The scale comes from a measured glyph-width constant instead, so it is correct on the frame it is set.
+
+⚠️ **Verified as a NO-OP on the 14 classic cards**: a single-digit classic card still resolves to font size 38.0 at exactly (-65.40, 126.40) — byte-identical to the authored prefab values.
 
 ⚠️ **`CardUI_Template` is NOT scale-corrupted** — measured 2026-08-09: root scale (1,1,1), 200×300, `ShiftCostContainer` scale (1,1,1) and inactive. The "non-uniform (0.119, 0.568, 0.92)" warning below refers to an older prefab and does not apply to the card the game actually uses.
 

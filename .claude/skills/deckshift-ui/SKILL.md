@@ -330,6 +330,21 @@ the art doesn't use: only Epic/Legendary blessings pulse.
 - ⚠️ **UI children are NOT clipped, so FX geometry is bounded by the WINDOW, not
   the stage.** A 520px ring scattered runes outside the panel onto the backdrop.
   Check available room in both axes; squash in Y if the stage is off-centre.
+- ⚠️ **`preserveAspect` MEANS THE ART IS NOT THE HOST.** Anything stamped at a
+  fraction of the host rect lands off the artwork the moment the sprite's aspect
+  differs from the box. The card set has two generations — 1024×1536 (0.667) and
+  118×200 (0.590) — so the newer art letterboxes to **88.5%** of the host width
+  and every medallion number drifted outward off its socket. Measure against the
+  DRAWN size (`CardFace.DrawnArtSize`), never the host.
+- ⚠️ **A TWO-DIGIT NUMBER IS ~1.93× THE WIDTH OF ONE DIGIT.** Measured in the
+  display face at 100pt: widest digit `0` = 58.2px, `10` = 110.8, `99` = 112.2,
+  `100` = 176.0, `∞` = 70.9. Any socket, badge or medallion drawn for one digit
+  will be overflowed by two — and it will not be noticed until one value in the
+  whole game reaches 10. **Fit the string, don't trust the authored size.**
+- ⚠️ **Fit it DETERMINISTICALLY, not with `enableAutoSizing`.** Auto-size settles
+  over several frames (§4 above), so a label rebuilt every refresh can render at
+  the wrong size on the frame that matters. Scale from a measured glyph-width
+  constant instead and it is correct immediately.
 - **Textures need `FilterMode.Bilinear`** — Point aliases chamfer edges badly.
 - **Get the SDF right.** Rounded box is `inside + outside − radius`; the chamfer
   is that box distance `max`'d with a normalised diagonal half-plane. Naive

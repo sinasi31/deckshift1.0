@@ -75,7 +75,7 @@ public class CharacterSelectScreen : MonoBehaviour
     private RectTransform content, stage, streakLayer, deckRow, beginBar, ring;
     private CanvasGroup group;
     private Image wall, barA, barB, heroGlow, groundRule, ringImg, beginPlate, beginEdge, beginChevron;
-    private Image arrowL, arrowR;
+    private Image arrowL, arrowR, flashImg;
     private TextMeshProUGUI nameText, traitName, traitBody, beginText, escText;
     private AudioSource audioSrc;
     private int figureBaseSibling;      // where the figure block starts in Content's child order
@@ -86,6 +86,7 @@ public class CharacterSelectScreen : MonoBehaviour
     private float ringT = 2f;                // >1 = spent
     private float flare;                     // confirm burst
     private float launch;                    // confirm: streaks accelerate away
+    private float wash;                      // confirm: the screen whites out and holds for the cut
     private float deckT = 1f;                // deck cards popping in
 
     // ── palette ────────────────────────────────────────────────────────────────────────────────
@@ -230,6 +231,8 @@ public class CharacterSelectScreen : MonoBehaviour
         lastShown = -1;
         flare = 0f;
         launch = 0f;
+        wash = 0f;
+        if (flashImg != null) flashImg.color = new Color(1f, 1f, 1f, 0f);
         ringT = 2f;
         accent = AccentFor(index);
 
@@ -307,6 +310,11 @@ public class CharacterSelectScreen : MonoBehaviour
         BuildInfo();
         BuildBegin();
         BuildCorner();
+
+        // The launch wash. Last child of Content so it covers everything, transparent until confirm.
+        flashImg = AddImage(content, "Flash", FlatUI.Pixel(), new Color(1f, 1f, 1f, 0f), false);
+        Stretch(flashImg.rectTransform);
+        flashImg.transform.SetAsLastSibling();
     }
 
     private void BuildBackdrop()
@@ -946,25 +954,47 @@ public class CharacterSelectScreen : MonoBehaviour
         StartCoroutine(ConfirmRoutine());
     }
 
-    // The accent floods, the streaks tear away, and the run begins. Deliberately short — this is the
-    // last thing standing between the player and playing.
+    // The accent floods, the streaks tear away, and the run begins.
+    //
+    // ⚠️ **THE CALLBACK FIRES FIRST, NOT LAST — that is the "it takes too long" fix.** Loading
+    // SampleScene is a measured **1.04 seconds**. This routine used to play a 0.42s exit and *then*
+    // hand over, so the player waited 1.46s: 0.42 of animation followed by a full second of frozen
+    // image, because `SceneManager.LoadScene` is synchronous and nothing renders during it. Starting
+    // the load on the first frame of the burst overlaps the two — the exit now plays THROUGH the
+    // load (which is async, see `MainMenuController.StartRun`) and the wait drops to the load alone,
+    // with something moving the whole time.
+    //
+    // ⚠️ And the screen washes out to near-white and HOLDS there. The scene swap lands at an
+    // unpredictable moment — whenever the load happens to finish — and cutting out of a detailed
+    // frame reads as a glitch, where cutting out of a white one is invisible.
     private IEnumerator ConfirmRoutine()
     {
         isOpen = false;
 
+        System.Action cb = onConfirmed;
+        onConfirmed = null;
+        if (cb != null) cb();
+
+        // ⚠️ The scene swap normally destroys this object mid-hold, so this loop usually never
+        // ends — but it MUST be able to. `ScreenGallery` opens the screen with a null callback, and
+        // a failed or absent load must not strand the player on a white rectangle forever.
+        const float GIVE_UP = 6f;
         float t = 0f;
-        while (t < 1f)
+        while (t < GIVE_UP)
         {
-            t += Time.unscaledDeltaTime * 2.4f;
-            group.alpha = 1f - Mathf.Clamp01(t) * 0.25f;
+            t += Time.unscaledDeltaTime;
+            // Burst first, wash second: the character you just picked is the payoff, so let it blow
+            // out for a beat before the screen takes the frame.
+            wash = Mathf.Clamp01((t - 0.30f) / 0.32f) * 0.93f;
+            if (flashImg != null) flashImg.color = new Color(1f, 1f, 1f, wash);
+            if (cb == null && t > 0.75f) break;      // nothing is coming; return to the menu
             yield return null;
         }
 
-        System.Action cb = onConfirmed;
-        onConfirmed = null;
+        wash = 0f;
+        if (flashImg != null) flashImg.color = new Color(1f, 1f, 1f, 0f);
         Hide();
         group.alpha = 1f;
-        if (cb != null) cb();
     }
 
     private void Play(AudioClip clip, float volume = 1f)

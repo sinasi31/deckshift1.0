@@ -22,8 +22,21 @@ public class MainMenuController : MonoBehaviour
 
     private void StartRun()
     {
-        // Build Settings'deki s�radaki sahneyi y�kle
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
+        // ⚠️ ASYNC, NOT `LoadScene`. Measured: loading SampleScene takes **1.04 seconds**, and the
+        // synchronous call spends every one of them frozen on the last rendered frame — no
+        // animation, no feedback, indistinguishable from a hang. Async costs the same second but
+        // the character select keeps playing its exit over it, and the character select now fires
+        // this callback at the START of that exit rather than after it, so the load and the
+        // animation overlap instead of queueing. That is the whole of the "it takes too long"
+        // fix — the load did not get faster, it stopped being dead time.
+        //
+        // `allowSceneActivation` is left at its default (true): the scene swaps in the moment it is
+        // ready, and the select screen holds a bright wash by then so the cut is invisible.
+        //
+        // ⚠️ buildIndex + 1 resolves to SampleScene because `Hub` is DISABLED in Build Settings and
+        // disabled scenes are not counted — verified, [0] MainMenu, [1] SampleScene, [2] GameOver,
+        // [3] GameScene. Enabling Hub would silently send PLAY to the wrong scene.
+        SceneManager.LoadSceneAsync(SceneManager.GetActiveScene().buildIndex + 1);
     }
 
     // SETTINGS butonu i�in
