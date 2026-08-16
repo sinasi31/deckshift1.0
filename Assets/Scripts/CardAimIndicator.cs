@@ -217,7 +217,8 @@ public class CardAimIndicator : MonoBehaviour
         int cost = card.cardData.shiftCost;
         if (SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.KineticDiscount))
             cost = Mathf.Max(0, cost - 1);
-        if (card.enhancement == CardEnhancement.OnTheHouse) cost = 0;
+        // Same function PlayCard charges through, so the dimming cannot drift from the real price.
+        cost = Mathf.Max(0, CardEnhancements.EffectiveCost(card, cost));
         if (deck.isNextCardFree) cost = 0;
         return player.GetCurrentShift() >= cost;
     }

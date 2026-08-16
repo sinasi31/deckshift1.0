@@ -273,6 +273,7 @@ MonoBehaviour:
   adrenalineSpeedMult: 2
   ghostDelay: 0.05
   portalPrefab: {fileID: 908333651306973326, guid: 794d2df75acd43b45bb5028c806b3b7e, type: 3}
+  portalPlaceRange: 6
   portalMaxRange: 15
   wallCheck: {fileID: 182352444585531103}
   wallCheckDistance: 0.32
@@ -295,6 +296,10 @@ MonoBehaviour:
   speedBoostMultiplier: 4
   adrenalineAuraEffect: {fileID: 7401582936470158293, guid: c1f4a7d92b8e406c95a3d1e6f7b0c284, type: 3}
   currentState: 0
+  coyoteTime: 0.1
+  jumpBufferTime: 0.12
+  character: {fileID: 11400000, guid: 5ee2573da5fd92d4ab8e915538da4c07, type: 2}
+  innateCastSound: {fileID: 0}
   fireballPrefab: {fileID: 6847861146471343392, guid: c410de68076b28846bb5e156129b8267, type: 3}
   firePoint: {fileID: 7525573285496672760}
   wailRange: 10
@@ -329,6 +334,7 @@ MonoBehaviour:
   staggerEffect: {fileID: 0}
   visualFlipYOffset: 1.6875
   gravityAuraEffect: {fileID: 5910283746501928374, guid: d2a7e9c4b1f3406a8c5d2e1b3f4a6c70, type: 3}
+  phaseMaxRadius: 6
   phaseVisuals:
   - {fileID: 9072995722623145862}
   - {fileID: 9072995722623145958}
@@ -668,6 +674,9 @@ MonoBehaviour:
   wailColor: {r: 0.75, g: 0.95, b: 1, a: 0.6}
   wailRippleMaxRadius: 6
   wailRipplePeriod: 1.1
+  phaseColor: {r: 0.72, g: 0.55, b: 1, a: 0.75}
+  phaseRingWidth: 0.05
+  anchorColor: {r: 1, g: 0.72, b: 0.28, a: 0.85}
 --- !u!1001 &259556885127125483
 PrefabInstance:
   m_ObjectHideFlags: 0

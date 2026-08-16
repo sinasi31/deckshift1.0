@@ -2,52 +2,68 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.EventSystems;
 using TMPro;
 
 // The run map — press M. A chart of the whole act, so the player plans a ROUTE rather than picking
 // one door at a time.
 //
-// THEME: Verdigris (FlatUI.Verdigris), and it is deliberately the odd one out. Every other screen
-// dresses a PLACE and renders it with light on material — the Forge lit from below, Blompo lit from
-// above, the Marketplace by lamplight. A map is not a place: you are not standing in it, you are
-// reading it. So this screen inverts the lighting model entirely — flat, matte, unlit, with no glow
-// source and NO PARTICLE FIELD, because a chart has no air. What moves instead is the INFORMATION:
-// branches you can take pulse, and the route you have walked shimmers along its length.
+// THEME: Cartograph. The screen is a folded sheet of parchment the player has just opened out.
 //
-// The material is oxidised copper, Act 1's own chemistry, and it pays off the accent: the travelled
-// route is drawn in warm BARE copper, as if the patina had been worn back to metal by walking it.
-// Every other theme's accent is light being added; this one's is surface being worn away.
+// ⚠️ THIS IS THE THIRD ATTEMPT, AND THE TWO FAILURES ARE THE USEFUL PART. It was first a flat slate
+// panel, then an acid-etched copper plate. Both were given a MATERIAL, both were carefully lit, and
+// both still read as a diagram. The lesson: a material is not enough, because a map does not feel
+// like a map on account of what it is made of. It feels like a map because it is a DOCUMENT —
+// something printed, folded, carried, and then scribbled on. Four things carry that, and if any
+// future pass strips one it will slide back to being a node graph:
 //
-// House pattern: entirely procedural, self-instantiating under the root Canvas, no prefab and no
-// art files. Same shape as ScrapForgeScreen and BlompoScreen.
+//   1. PAPER, NOT A PANEL. The sheet IS the window — there is no frame around it and its edge is
+//      torn, not chamfered. Every other screen in the game is a plate you look AT; this one is an
+//      object you are holding.
+//   2. FOLDS. Two vertical creases and one horizontal, with a lit and a shadowed side each. This is
+//      the cheapest possible signal that the thing was in a pocket a second ago, and it is the
+//      single detail that most says "I just opened this".
+//   3. DASHED TRAILS. A solid line between two points is a graph edge. A dashed line is a ROUTE.
+//      Nothing else on the screen changes the read as much for as little.
+//   4. THE PLAYER'S PROGRESS IS ANNOTATION. The chart is printed in brown ink; where you have BEEN
+//      and where you may go next is marked over the top in RED PEN. That is why the printed trails
+//      are neat and mechanically tiled while the red ones are hand-drawn with per-stroke wobble —
+//      the difference is the fiction, not an inconsistency. It also means every state on the map is
+//      signalled without a colour key.
+//
+// It inverts the whole rest of the UI on VALUE — this is a light ground with dark ink, where every
+// other screen is a dark plate with light text. Bulletin (the quest board) is the only relative, and
+// the two are still separable at a glance: Bulletin is small pale slips pinned to a DARK board, so
+// its dominant field is dark, while here the entire field is paper.
+//
+// House pattern: entirely procedural, self-instantiating under the root Canvas, no prefab, no art.
 public class RunMapScreen : MonoBehaviour
 {
     private static RunMapScreen instance;
 
-    // Sized to fill most of a 1920x1080 screen. The chart is the run's map of itself and the player
-    // now sees it on every room change, so it gets the room to be read rather than squinted at.
     private const float WIN_W = 1560f;
     private const float WIN_H = 980f;
-    private const float CHAMFER = 10f;
 
-    // Map drawing area, inset inside the window. The insets are generous on purpose: nodes are
-    // positioned by their CENTRE, so the boss glyph (76px) and the labels hanging under each
-    // reachable node both need room or they collide with the title rule and the footer.
     private const float AREA_TOP = 132f;
-    private const float AREA_BOTTOM = 106f;
-    private const float AREA_SIDE = 62f;
+    // ⚠️ Deep enough for the HUB's label. Every node's label hangs BELOW it, and the hub sits on the
+    // chart's bottom edge — so its label reaches this far down into the margin and, at 96, landed
+    // right on top of the footer line.
+    private const float AREA_BOTTOM = 118f;
+    private const float AREA_SIDE = 92f;
 
-    private const float EDGE_THICKNESS = 3f;
+    // Printed trails. Period is dash + gap; fill is how much of that the dash occupies.
+    private const float TRAIL_W = 5f;
+    // ⚠️ The pen needs a SHORTER period and MORE overlap than feels necessary. A trail between two
+    // adjacent floors is only ~60px after trimming, so at a 19px period it was three strokes with
+    // wobble between them — which read as a faint dotted line, weaker than the printed trails it is
+    // supposed to be drawn on top of. Your own route must be the boldest thing on the sheet.
+    private const float PEN_PERIOD = 12f;
+    private const float PEN_FILL = 1.40f;   // > 1 so the strokes overlap into a continuous line
 
     private RectTransform window, area;
     private CanvasGroup group;
     private TMP_FontAsset font;
     private TextMeshProUGUI footer, sub;
 
-    // Set when the screen was opened BECAUSE a branch is required (leaving a room with more than
-    // one way on). In that mode Escape and the backdrop do not dismiss it, and picking a node
-    // commits and continues the run immediately instead of just noting the plan.
     private bool mustChoose;
     private System.Action onChosen;
 
@@ -56,12 +72,8 @@ public class RunMapScreen : MonoBehaviour
     private bool hudWasActive;
     private GameState prevState;
 
-    // Rebuilt every Refresh. Kept so the pulse/shimmer tick doesn't have to search the hierarchy.
-    private readonly List<Image> availableMarks = new List<Image>();
-    private readonly List<Image> travelledEdges = new List<Image>();
+    private readonly List<Image> penMarks = new List<Image>();
     private readonly List<GameObject> spawned = new List<GameObject>();
-
-    private static readonly FlatUI.Theme T = FlatUI.Verdigris;
 
     // ---- entry points ---------------------------------------------------------------------------
 
@@ -77,8 +89,8 @@ public class RunMapScreen : MonoBehaviour
         else instance.Show();
     }
 
-    // Opens the map because the run needs a branch before it can continue. `onChosen` runs once
-    // the player commits — that is what actually spawns the next room.
+    // Opens the map because the run needs a branch before it can continue. `onChosen` runs once the
+    // player commits — that is what actually spawns the next room.
     //
     // If the screen cannot be created, onChosen is invoked immediately rather than dropped. A
     // missing Canvas must not strand the run in a room with no way forward.
@@ -150,75 +162,153 @@ public class RunMapScreen : MonoBehaviour
         Stretch(root);
         group = gameObject.AddComponent<CanvasGroup>();
 
-        Image backdrop = AddImage(transform, "Backdrop", null, T.Backdrop, true);
+        // Near-black behind, so the lit sheet reads as being held up in a dark room. This is also
+        // what keeps the value inversion legible: paper only looks like paper against something.
+        Image backdrop = AddImage(transform, "Backdrop", null, new Color(0.02f, 0.017f, 0.013f, 0.955f), true);
         Stretch(backdrop.rectTransform);
         Button backBtn = backdrop.gameObject.AddComponent<Button>();
         backBtn.transition = Selectable.Transition.None;
         backBtn.onClick.AddListener(DismissIfAllowed);
 
+        // A drop shadow under the sheet. Paper has thickness and sits ON something.
+        Image shadow = AddPoint(transform, "SheetShadow", new Vector2(0.5f, 0.5f),
+            new Vector2(6f, -10f), new Vector2(WIN_W + 44f, WIN_H + 44f)).gameObject.AddComponent<Image>();
+        shadow.sprite = Parchment.Vignette();
+        shadow.color = new Color(0f, 0f, 0f, 0.55f);
+        shadow.raycastTarget = false;
+
+        // THE SHEET. No panel sprite, no outline, no chamfer — the torn deckle in the paper texture
+        // is the edge of the screen.
         window = AddPoint(transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(WIN_W, WIN_H));
-        Image winBg = window.gameObject.AddComponent<Image>();
-        winBg.sprite = FlatUI.Panel((int)CHAMFER);
-        winBg.type = Image.Type.Sliced;
-        winBg.color = T.Surface;
-        winBg.raycastTarget = true;
+        Image paper = window.gameObject.AddComponent<Image>();
+        paper.sprite = Parchment.Sheet();
+        paper.color = Parchment.Paper;
+        paper.raycastTarget = true;
 
-        Image winEdge = AddImage(window, "Edge", FlatUI.Outline((int)CHAMFER, 2), T.Border, false);
-        // MUST be Sliced. AddImage leaves the default Simple, which stretches this 26px outline
-        // sprite across the whole 1040x780 window — it renders as an enormous soft octagon glow
-        // hanging outside the panel, which is exactly what the first build did.
-        winEdge.type = Image.Type.Sliced;
-        Stretch(winEdge.rectTransform);
-        FlatUI.ApplySliceThickness(winEdge, 2f);
+        // Fibre at native resolution. The sheet sprite is blown up ~2.4x and softens; this puts the
+        // tooth back. ⚠️ Must be Tiled — Simple would stretch a 64px noise tile across the whole
+        // sheet and produce visible blobs instead of grain.
+        Image grain = AddImage(window, "Grain", Parchment.Grain(), new Color(0.30f, 0.22f, 0.13f, 0.30f), false);
+        grain.type = Image.Type.Tiled;
+        Stretch(grain.rectTransform);
 
-        // The one lit element allowed: a hairline along the top lip, so the plate still reads as a
-        // physical sheet rather than a flat rectangle. NOT a glow — it has no falloff into the panel.
-        Image lip = AddImage(window, "Lip", FlatUI.FadedRule(), T.EdgeLight, false);
-        lip.rectTransform.anchorMin = new Vector2(0f, 1f);
-        lip.rectTransform.anchorMax = new Vector2(1f, 1f);
-        lip.rectTransform.pivot = new Vector2(0.5f, 1f);
-        lip.rectTransform.anchoredPosition = new Vector2(0f, -3f);
-        lip.rectTransform.sizeDelta = new Vector2(-56f, 1f);
+        Image vig = AddImage(window, "Vignette", Parchment.Vignette(), new Color(0.24f, 0.17f, 0.09f, 0.32f), false);
+        Stretch(vig.rectTransform);
 
-        TextMeshProUGUI title = AddText(window, "Title", "THE OXIDATION DISTRICT", 30f, T.TextBright,
-            TextAlignmentOptions.Center);
-        title.rectTransform.anchorMin = new Vector2(0f, 1f);
-        title.rectTransform.anchorMax = new Vector2(1f, 1f);
-        title.rectTransform.pivot = new Vector2(0.5f, 1f);
-        title.rectTransform.anchoredPosition = new Vector2(0f, -26f);
-        title.rectTransform.sizeDelta = new Vector2(-80f, 38f);
-        title.characterSpacing = 8f;
+        BuildFolds();
 
-        sub = AddText(window, "Sub", "CHOOSE YOUR ROUTE", 15f, T.TextMuted,
-            TextAlignmentOptions.Center);
-        sub.rectTransform.anchorMin = new Vector2(0f, 1f);
-        sub.rectTransform.anchorMax = new Vector2(1f, 1f);
-        sub.rectTransform.pivot = new Vector2(0.5f, 1f);
-        sub.rectTransform.anchoredPosition = new Vector2(0f, -62f);
-        sub.rectTransform.sizeDelta = new Vector2(-80f, 22f);
-        sub.characterSpacing = 6f;
+        // Compass rose, in the header margin where a chart conventionally puts one.
+        //
+        // ⚠️ It was first drawn large and faint (0.115) as a watermark UNDER the chart and was
+        // simply invisible — on a light ground a low-alpha dark mark washes out instead of reading
+        // as subtle, which is the exact inverse of how the dark screens behave. Smaller, in clear
+        // space, and roughly three times the alpha: now it is a printed detail rather than a stain.
+        Image rose = AddImage(window, "Compass", Parchment.Compass(), Fade(Parchment.InkSoft, 0.34f), false);
+        rose.rectTransform.anchorMin = rose.rectTransform.anchorMax = new Vector2(0f, 1f);
+        rose.rectTransform.anchoredPosition = new Vector2(148f, -96f);
+        rose.rectTransform.sizeDelta = new Vector2(132f, 132f);
 
-        Image rule = AddImage(window, "TitleRule", FlatUI.FadedRule(), T.BorderSoft, false);
-        rule.rectTransform.anchorMin = new Vector2(0f, 1f);
-        rule.rectTransform.anchorMax = new Vector2(1f, 1f);
-        rule.rectTransform.pivot = new Vector2(0.5f, 1f);
-        rule.rectTransform.anchoredPosition = new Vector2(0f, -88f);
-        rule.rectTransform.sizeDelta = new Vector2(-120f, 1f);
+        BuildCartouche();
 
-        // The chart itself.
         area = AddPoint(window, "Area", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
         area.anchorMin = new Vector2(0f, 0f);
         area.anchorMax = new Vector2(1f, 1f);
         area.offsetMin = new Vector2(AREA_SIDE, AREA_BOTTOM);
         area.offsetMax = new Vector2(-AREA_SIDE, -AREA_TOP);
 
-        footer = AddText(window, "Footer", "", 14f, T.TextMuted, TextAlignmentOptions.Center);
+        footer = AddText(window, "Footer", "", 15f, Parchment.InkSoft, TextAlignmentOptions.Center);
         footer.rectTransform.anchorMin = new Vector2(0f, 0f);
         footer.rectTransform.anchorMax = new Vector2(1f, 0f);
         footer.rectTransform.pivot = new Vector2(0.5f, 0f);
-        footer.rectTransform.anchoredPosition = new Vector2(0f, 22f);
-        footer.rectTransform.sizeDelta = new Vector2(-80f, 24f);
+        footer.rectTransform.anchoredPosition = new Vector2(0f, 20f);
+        footer.rectTransform.sizeDelta = new Vector2(-120f, 24f);
         footer.characterSpacing = 4f;
+    }
+
+    // Two vertical creases and one horizontal — the way a pocket map is actually folded.
+    //
+    // ⚠️ EACH CREASE IS A PAIR: a shadow line and a highlight line, side by side. One line alone
+    // reads as a drawn rule on the paper; it is the pairing that reads as the paper being bent,
+    // because that is what a fold does to light. Getting the order wrong (light on the far side)
+    // makes the sheet look embossed outward instead of folded.
+    private void BuildFolds()
+    {
+        // ⚠️ THE HIGHLIGHT MUST BE NEARLY NOTHING. First pass used near-white at 0.20 and the sheet
+        // came out with three glowing lines ruled across it — they read as laser guides, not folds.
+        // This is the LIGHT-GROUND inversion of the usual linear-space trap: on the dark screens a
+        // small bright alpha blooms, but here the ground is already bright, so a bright line has
+        // almost no headroom above it and any visible value instantly looks drawn-on. The SHADOW is
+        // what a viewer actually reads as a crease; the highlight only has to keep it from looking
+        // like a pencil rule. Judge both on screen, never on paper.
+        //
+        // FadedRule so each crease dies out before the torn edge — a fold does not reach the deckle.
+        foreach (float x in new[] { -WIN_W / 6f, WIN_W / 6f })
+        {
+            Image dark = AddImage(window, "FoldV", FlatUI.FadedRule(), Fade(Parchment.PaperShade, 0.30f), false);
+            dark.rectTransform.anchoredPosition = new Vector2(x, 0f);
+            dark.rectTransform.sizeDelta = new Vector2(WIN_H - 70f, 3f);
+            dark.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+
+            Image lit = AddImage(window, "FoldVLit", FlatUI.FadedRule(), new Color(1f, 0.98f, 0.92f, 0.055f), false);
+            lit.rectTransform.anchoredPosition = new Vector2(x + 3f, 0f);
+            lit.rectTransform.sizeDelta = new Vector2(WIN_H - 70f, 3f);
+            lit.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+        }
+
+        Image hDark = AddImage(window, "FoldH", FlatUI.FadedRule(), Fade(Parchment.PaperShade, 0.26f), false);
+        hDark.rectTransform.sizeDelta = new Vector2(WIN_W - 70f, 3f);
+        Image hLit = AddImage(window, "FoldHLit", FlatUI.FadedRule(), new Color(1f, 0.98f, 0.92f, 0.05f), false);
+        hLit.rectTransform.anchoredPosition = new Vector2(0f, -3f);
+        hLit.rectTransform.sizeDelta = new Vector2(WIN_W - 70f, 3f);
+    }
+
+    // The title block, drawn the way a chart labels itself: rules above and below, with the sheet's
+    // own name between them.
+    private void BuildCartouche()
+    {
+        TextMeshProUGUI title = AddText(window, "Title", "THE OXIDATION DISTRICT", 34f, Parchment.Ink,
+            TextAlignmentOptions.Center);
+        title.rectTransform.anchorMin = new Vector2(0f, 1f);
+        title.rectTransform.anchorMax = new Vector2(1f, 1f);
+        title.rectTransform.pivot = new Vector2(0.5f, 1f);
+        title.rectTransform.anchoredPosition = new Vector2(0f, -30f);
+        title.rectTransform.sizeDelta = new Vector2(-120f, 42f);
+        title.characterSpacing = 9f;
+
+        sub = AddText(window, "Sub", "", 16.5f, Parchment.InkSoft, TextAlignmentOptions.Center);
+        sub.rectTransform.anchorMin = new Vector2(0f, 1f);
+        sub.rectTransform.anchorMax = new Vector2(1f, 1f);
+        sub.rectTransform.pivot = new Vector2(0.5f, 1f);
+        sub.rectTransform.anchoredPosition = new Vector2(0f, -74f);
+        sub.rectTransform.sizeDelta = new Vector2(-120f, 22f);
+        sub.characterSpacing = 6f;
+
+        // Double rule under the title block, thick over thin — an engraver's convention, and the
+        // asymmetry is what stops it reading as a UI divider.
+        //
+        // ⚠️ TWO SEGMENTS WITH A GAP, not one line. The boss mark sits dead centre on the chart's
+        // top row and reaches up past this height, so a single centred rule ran straight through
+        // it — the node's paper disc masked the middle and the rule appeared to be interrupted by
+        // the boss. Leaving the centre empty is also just what a cartouche does.
+        foreach (float s in new[] { -1f, 1f })
+        {
+            Rule(s * 176f, -104f, 210f, 2.5f, 0.85f);
+            Rule(s * 176f, -110f, 210f, 1.5f, 0.55f);
+
+            // A small lozenge capping the outer end. Without it the line just stops.
+            Image dot = AddImage(window, "RuleCap", Parchment.Blot(), Fade(Parchment.Ink, 0.8f), false);
+            dot.rectTransform.anchorMin = dot.rectTransform.anchorMax = new Vector2(0.5f, 1f);
+            dot.rectTransform.anchoredPosition = new Vector2(s * 281f, -107f);
+            dot.rectTransform.sizeDelta = new Vector2(9f, 9f);
+        }
+    }
+
+    private void Rule(float x, float y, float w, float h, float a)
+    {
+        Image r = AddImage(window, "Rule", FlatUI.FadedRule(), Fade(Parchment.Ink, a), false);
+        r.rectTransform.anchorMin = r.rectTransform.anchorMax = new Vector2(0.5f, 1f);
+        r.rectTransform.anchoredPosition = new Vector2(x, y);
+        r.rectTransform.sizeDelta = new Vector2(w, h);
     }
 
     // ---- open / close ---------------------------------------------------------------------------
@@ -243,7 +333,6 @@ public class RunMapScreen : MonoBehaviour
         if (hudWasActive && HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(true);
 
         FitWindowToCanvas();
-
         Refresh();
 
         StopAllCoroutines();
@@ -267,20 +356,16 @@ public class RunMapScreen : MonoBehaviour
         gameObject.SetActive(false);
     }
 
-    // Shrinks the window if the canvas is narrower or shorter than its design size.
+    // Shrinks the sheet if the canvas is narrower or shorter than its design size.
     //
     // ⚠️ This is the WIDEST window in the game (1560), so it is the first thing to run off the edge
     // on a narrow display. With the canvas matching HEIGHT, its logical width is 1080 * aspect —
-    // which is 1920 at 16:9 and 2560 at 21:9, but only 1440 at 4:3, and the frame then hangs off
-    // both sides. Measured at 1440x1080: the chart itself stayed readable but the panel had no
-    // visible left or right edge.
+    // 1920 at 16:9 and 2560 at 21:9, but only 1440 at 4:3.
     //
-    // Only the map does this. The chart is laid out inside `area`, which is anchored to the
-    // window's corners with insets, so it genuinely reflows into whatever size it is given. The
-    // other screens position their content at fixed offsets from the window centre, so shrinking
-    // THEM would overlap their columns rather than reflow — for those, a smaller window is worse
-    // than an overhanging one. (Settings, the next widest at 1240, still fits any aspect down to
-    // 1.15 — narrower than any display in use.)
+    // Only the map RESIZES. Its chart lives in `area`, anchored to the sheet's corners with insets,
+    // so it genuinely reflows — LayOutNodes reads `area.rect` fresh every Refresh and re-solves the
+    // lattice for the smaller width. The other screens position content at fixed offsets from their
+    // centre and must SCALE instead.
     private void FitWindowToCanvas()
     {
         RectTransform parent = transform as RectTransform;
@@ -295,16 +380,19 @@ public class RunMapScreen : MonoBehaviour
         window.sizeDelta = new Vector2(w, h);
     }
 
+    // Unfolding, not fading in. The sheet arrives slightly small and settles, which is the closest a
+    // 0.2s open can get to "this was in your pocket a moment ago".
     private IEnumerator OpenAnim()
     {
-        const float dur = 0.16f;
+        const float dur = 0.22f;
         float t = 0f;
         while (t < dur)
         {
             t += Time.unscaledDeltaTime;   // the screen pauses the game; scaled time is frozen
             float k = Mathf.Clamp01(t / dur);
-            group.alpha = k;
-            window.localScale = Vector3.one * Mathf.Lerp(0.985f, 1f, k);
+            float e = 1f - (1f - k) * (1f - k);
+            group.alpha = Mathf.Clamp01(k * 1.4f);
+            window.localScale = Vector3.one * Mathf.Lerp(0.965f, 1f, e);
             yield return null;
         }
         group.alpha = 1f;
@@ -314,9 +402,7 @@ public class RunMapScreen : MonoBehaviour
     private void Update()
     {
         if (!isOpen) return;
-
         if (Input.GetKeyDown(KeyCode.Escape)) { DismissIfAllowed(); return; }
-
         TickMotion();
     }
 
@@ -326,7 +412,6 @@ public class RunMapScreen : MonoBehaviour
         Hide();
     }
 
-    // Commits the branch the player clicked and lets the run continue.
     private void ConfirmChoice()
     {
         System.Action cb = onChosen;
@@ -337,33 +422,15 @@ public class RunMapScreen : MonoBehaviour
         cb?.Invoke();
     }
 
-    // Motion lives in the information, not the atmosphere — see the header. Branches you can take
-    // breathe; the route already walked carries a slow travelling shimmer.
+    // Paper does not move, so almost nothing here does. The single exception is the red pen around
+    // the branches you may actually take: it breathes, because that is the one question the screen
+    // exists to answer and it should be answerable without reading a word.
     private void TickMotion()
     {
-        float pulse = 0.55f + 0.45f * Mathf.Sin(Time.unscaledTime * 3.0f);
-
-        for (int i = 0; i < availableMarks.Count; i++)
-        {
-            Image img = availableMarks[i];
-            if (img == null) continue;
-            Color c = img.color;
-            c.a = Mathf.Lerp(0.35f, 1f, pulse);
-            img.color = c;
-        }
-
-        for (int i = 0; i < travelledEdges.Count; i++)
-        {
-            Image img = travelledEdges[i];
-            if (img == null) continue;
-            // Offset per edge so the shimmer runs ALONG the route instead of the whole path
-            // flashing at once, which reads as a single object rather than a path.
-            float phase = Time.unscaledTime * 1.9f - i * 0.55f;
-            float k = 0.5f + 0.5f * Mathf.Sin(phase);
-            Color c = T.Accent;
-            c.a = Mathf.Lerp(0.55f, 0.95f, k);
-            img.color = c;
-        }
+        float k = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 2.1f);
+        Color c = Color.Lerp(Parchment.RedSoft, Parchment.Red, k);
+        for (int i = 0; i < penMarks.Count; i++)
+            if (penMarks[i] != null) penMarks[i].color = c;
     }
 
     // ---- drawing --------------------------------------------------------------------------------
@@ -371,7 +438,8 @@ public class RunMapScreen : MonoBehaviour
     private void Refresh()
     {
         // Deactivate before Destroy: Unity's Destroy is deferred to end of frame, so the old chart
-        // would otherwise still render on top of the new one for a frame.
+        // would otherwise render over the new one for a frame — and its buttons would still answer
+        // GetComponentsInChildren.
         foreach (GameObject go in spawned)
         {
             if (go == null) continue;
@@ -379,8 +447,7 @@ public class RunMapScreen : MonoBehaviour
             Destroy(go);
         }
         spawned.Clear();
-        availableMarks.Clear();
-        travelledEdges.Clear();
+        penMarks.Clear();
 
         RunMapManager mgr = RunMapManager.instance;
         RunMap map = mgr != null ? mgr.Map : null;
@@ -393,128 +460,223 @@ public class RunMapScreen : MonoBehaviour
 
         Dictionary<int, Vector2> pos = LayOutNodes(map);
 
-        // Edges first so nodes sit on top of them.
+        DrawSurveyLines(map);
+
         foreach (MapNode n in map.nodes)
-        {
             foreach (int id in n.next)
             {
                 MapNode m = map.Get(id);
                 if (m == null) continue;
-                DrawEdge(map, mgr, n, m, pos[n.id], pos[m.id]);
+                DrawTrail(map, mgr, n, m, pos[n.id], pos[m.id]);
             }
-        }
 
         foreach (MapNode n in map.nodes) DrawNode(map, mgr, n, pos[n.id]);
 
-        if (sub != null)
-            sub.text = mustChoose ? "CHOOSE YOUR ROUTE" : "PRESS ESC TO CLOSE";
+        if (sub != null) sub.text = mustChoose ? "CHOOSE YOUR ROUTE" : "PRESS ESC TO CLOSE";
 
         int floorsLeft = (map.floors - 1) - (map.Current != null ? map.Current.floor : 0);
         if (mustChoose)
-        {
             SetFooter($"PICK A BRANCH TO CONTINUE   ·   {floorsLeft} TO THE BOSS");
-        }
         else if (mgr != null && mgr.HasChosenNext)
         {
             MapNode chosen = map.Get(mgr.ChosenNextId);
             SetFooter($"NEXT: {MapGlyphs.LabelFor(chosen.type)}{RechargeSuffix(chosen)}   ·   {floorsLeft} TO THE BOSS");
         }
         else if (map.AvailableNext().Count > 0)
-        {
             SetFooter($"PICK A BRANCH   ·   {floorsLeft} TO THE BOSS");
-        }
         else
-        {
             SetFooter("ACT COMPLETE");
-        }
     }
 
     private string RechargeSuffix(MapNode n)
-    {
-        return n.recharge == RechargeType.None ? "" : $" + {MapGlyphs.LabelFor(n.recharge)}";
-    }
+        => n.recharge == RechargeType.None ? "" : $" + {MapGlyphs.LabelFor(n.recharge)}";
 
     private void SetFooter(string s)
     {
         if (footer != null) footer.text = s;
     }
 
-    // Positions every node in the chart area. Columns are spread across the full width and floors
-    // stack bottom-to-top, with a small DETERMINISTIC jitter per node so the act reads as a drawn
-    // route rather than a spreadsheet — seeded by node id so it never moves between openings.
+    // Faint ruled lines across the sheet, one per floor, with a depth mark in the margin.
+    //
+    // They do the job the etched version's floor bands did — turning scattered marks into levels and
+    // making the distance to the boss visible rather than a number in the footer — but drawn as
+    // survey lines, which is a thing charts genuinely have. Tiled rather than built from individual
+    // strokes: a band spans the whole sheet, and at ~65 strokes each that would be 500 objects for
+    // the guide lines alone.
+    private void DrawSurveyLines(RunMap map)
+    {
+        Rect r = area.rect;
+        float h = r.height, w = r.width;
+        float step = map.floors > 1 ? h / (map.floors - 1) : h;
+        int curFloor = map.Current != null ? map.Current.floor : 0;
+
+        for (int f = 0; f < map.floors; f++)
+        {
+            float y = -h * 0.5f + step * f;
+            bool here = f == curFloor;
+            bool bossLine = f == map.floors - 1;
+
+            GameObject go = new GameObject($"Survey{f}", typeof(RectTransform));
+            RectTransform rt = go.GetComponent<RectTransform>();
+            rt.SetParent(area, false);
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = new Vector2(0f, y);
+            rt.sizeDelta = new Vector2(w + 60f, 7f);
+
+            Image img = go.AddComponent<Image>();
+            img.sprite = Parchment.Stroke();
+            img.type = Image.Type.Tiled;
+            img.color = here ? Fade(Parchment.Red, 0.30f)
+                      : bossLine ? Fade(Parchment.Ink, 0.34f)
+                                 : Fade(Parchment.InkPale, 0.30f);
+            img.raycastTarget = false;
+            spawned.Add(go);
+
+            string mark = f == 0 ? "HUB" : bossLine ? "BOSS" : f.ToString("00");
+            TextMeshProUGUI t = AddText(area, $"Depth{f}", mark, 12f,
+                here ? Parchment.Red : Fade(Parchment.InkSoft, 0.85f), TextAlignmentOptions.Left);
+            t.rectTransform.anchoredPosition = new Vector2(-w * 0.5f - 24f, y + 12f);
+            t.rectTransform.sizeDelta = new Vector2(70f, 15f);
+            t.characterSpacing = 3f;
+            spawned.Add(t.gameObject);
+        }
+    }
+
+    // Every node sits on a FIXED COLUMN LATTICE: column decides x, floor decides y, nothing else
+    // moves it. Combined with the survey lines that gives the chart a real grid, which is what lets
+    // the eye compare one floor against another.
+    //
+    // ⚠️ DO NOT REINTRODUCE BARYCENTRIC RELAXATION HERE. It was tried and reverted. Pulling each
+    // node toward the mean X of its neighbours and re-centring the row does straighten the trails —
+    // measured, average sideways travel per edge falls 214px -> 86px — but it computes a DIFFERENT
+    // spread for every row, so a floor with three nodes ends up sharing no column with a floor that
+    // has five. The lattice disappears, and the designer read the result immediately as "the nodes
+    // are off, they are not where they are meant to be". A grid you can scan beats trails that lean
+    // less. Measured over 300 acts, edge crossings are zero either way, so nothing is lost.
     private Dictionary<int, Vector2> LayOutNodes(RunMap map)
     {
-        Dictionary<int, Vector2> pos = new Dictionary<int, Vector2>();
-
         Rect r = area.rect;
         float w = r.width, h = r.height;
+        float halfW = w * 0.5f;
+        float step = map.floors > 1 ? h / (map.floors - 1) : h;
 
         int maxCol = 0;
         foreach (MapNode n in map.nodes) if (n.column > maxCol) maxCol = n.column;
-
         float colStep = maxCol > 0 ? w / (maxCol + 1) : w;
-        float floorStep = map.floors > 1 ? h / (map.floors - 1) : h;
 
+        Dictionary<int, Vector2> pos = new Dictionary<int, Vector2>();
         foreach (MapNode n in map.nodes)
         {
-            float x = maxCol > 0 ? -w * 0.5f + colStep * (n.column + 0.5f) : 0f;
-            float y = -h * 0.5f + floorStep * n.floor;
+            // The act's spine. Start and Boss are single nodes and belong dead centre; letting them
+            // take a lattice slot makes the whole chart look tipped over.
+            float x = (n.type == MapNodeType.Start || n.type == MapNodeType.Boss || maxCol == 0)
+                    ? 0f
+                    : -halfW + colStep * (n.column + 0.5f);
 
-            // Start and Boss are single nodes and belong dead centre — they are the act's spine.
-            if (n.type == MapNodeType.Start || n.type == MapNodeType.Boss)
-            {
-                pos[n.id] = new Vector2(0f, y);
-                continue;
-            }
-
-            System.Random rng = new System.Random(n.id * 7919 + map.seed);
-            // Horizontal jitter is kept tighter than vertical: sideways wander is what pushes two
-            // nodes on the same floor close enough for their labels to collide, while vertical
-            // wander costs nothing.
-            float jx = ((float)rng.NextDouble() - 0.5f) * colStep * 0.20f;
-            float jy = ((float)rng.NextDouble() - 0.5f) * floorStep * 0.28f;
-
-            pos[n.id] = new Vector2(x + jx, y + jy);
+            pos[n.id] = new Vector2(x, -h * 0.5f + step * n.floor);
         }
-
         return pos;
     }
 
-    // A line between two nodes, drawn as a thin rotated rect.
-    private void DrawEdge(RunMap map, RunMapManager mgr, MapNode from, MapNode to, Vector2 a, Vector2 b)
+    // A trail between two marks.
+    //
+    // ⚠️ TWO DIFFERENT HANDS DRAW THESE, AND THAT IS DELIBERATE. Printed trails (everything the
+    // player has not touched) are a mechanically tiled dash — neat, because a press printed them.
+    // The player's own route and their live options are laid over the top in RED PEN, built from
+    // individual strokes with per-stroke wobble and rotation, because a hand drew those. Making
+    // both the same would throw away the annotation fiction that carries every state on this map.
+    private void DrawTrail(RunMap map, RunMapManager mgr, MapNode from, MapNode to, Vector2 a, Vector2 b)
     {
         bool travelled = map.visited.Contains(from.id) && map.visited.Contains(to.id);
         bool open = map.currentNodeId == from.id && map.CanTravelTo(to.id);
         bool committed = open && mgr != null && mgr.ChosenNextId == to.id;
 
-        Color c;
-        float thickness = EDGE_THICKNESS;
-
-        if (travelled) { c = T.Accent; thickness = EDGE_THICKNESS + 1.5f; }
-        else if (committed) { c = T.Accent; thickness = EDGE_THICKNESS + 1f; }
-        else if (open) { c = T.TextBody; }
-        else { c = T.BorderSoft; thickness = EDGE_THICKNESS - 1f; }
-
         Vector2 delta = b - a;
         float len = delta.magnitude;
         if (len < 0.01f) return;
 
-        GameObject go = new GameObject($"Edge{from.id}_{to.id}", typeof(RectTransform));
-        RectTransform rt = go.GetComponent<RectTransform>();
-        rt.SetParent(area, false);
-        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = a + delta * 0.5f;
-        rt.sizeDelta = new Vector2(len, thickness);
-        rt.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
+        // Trim to the marks at both ends: a trail runs BETWEEN two symbols, and drawn centre to
+        // centre it runs through them and through the label hanging under the far one.
+        Vector2 dir = delta / len;
+        float ra = MapGlyphs.SizeFor(from.type) * 0.5f + 16f;
+        float rb = MapGlyphs.SizeFor(to.type) * 0.5f + 16f;
+        if (ra + rb >= len - 6f) return;
 
-        Image img = go.AddComponent<Image>();
-        img.sprite = FlatUI.Pixel();
-        img.color = c;
-        img.raycastTarget = false;
+        a += dir * ra;
+        b -= dir * rb;
+        delta = b - a;
+        len = delta.magnitude;
 
-        spawned.Add(go);
-        if (travelled) travelledEdges.Add(img);
+        int seed = from.id * 733 + to.id;
+
+        if (travelled || committed || open)
+        {
+            Color pen = travelled || committed ? Parchment.Red : Parchment.RedSoft;
+            float thick = travelled ? TRAIL_W + 3.5f : committed ? TRAIL_W + 2f : TRAIL_W + 0.5f;
+            PenLine(a, delta, len, pen, thick, PEN_FILL, seed, open && !committed);
+        }
+        else
+        {
+            // Printed: one tiled dash run, straight and even.
+            GameObject go = new GameObject($"Trail{from.id}_{to.id}", typeof(RectTransform));
+            RectTransform rt = go.GetComponent<RectTransform>();
+            rt.SetParent(area, false);
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = a + delta * 0.5f;
+            rt.sizeDelta = new Vector2(len, TRAIL_W + 2f);
+            rt.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
+
+            Image img = go.AddComponent<Image>();
+            img.sprite = Parchment.Stroke();
+            img.type = Image.Type.Tiled;
+            img.color = Fade(Parchment.InkSoft, 0.72f);
+            img.raycastTarget = false;
+            spawned.Add(go);
+        }
+    }
+
+    // Hand-drawn line: short strokes along the run, each nudged sideways and rotated a little.
+    // `pulse` registers the strokes for the breathing tick on live branches.
+    private void PenLine(Vector2 a, Vector2 delta, float len, Color c, float thick, float fill, int seed, bool pulse)
+    {
+        Vector2 dir = delta / len;
+        Vector2 perp = new Vector2(-dir.y, dir.x);
+        float baseAng = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+
+        int n = Mathf.Max(2, Mathf.RoundToInt(len / PEN_PERIOD));
+        float seg = len / n;
+
+        for (int i = 0; i < n; i++)
+        {
+            float t = (i + 0.5f) * seg;
+            float wob = (Rand(seed, i) - 0.5f) * 2.6f;
+            float rot = baseAng + (Rand(seed, i + 500) - 0.5f) * 7f;
+
+            GameObject go = new GameObject("Pen", typeof(RectTransform));
+            RectTransform rt = go.GetComponent<RectTransform>();
+            rt.SetParent(area, false);
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = a + dir * t + perp * wob;
+            rt.sizeDelta = new Vector2(seg * fill, thick);
+            rt.localRotation = Quaternion.Euler(0f, 0f, rot);
+
+            Image img = go.AddComponent<Image>();
+            img.sprite = Parchment.Stroke();
+            img.color = c;
+            img.raycastTarget = false;
+            spawned.Add(go);
+            if (pulse) penMarks.Add(img);
+        }
+    }
+
+    private static float Rand(int seed, int i)
+    {
+        unchecked
+        {
+            int h = seed * 374761393 + i * 668265263;
+            h = (h ^ (h >> 13)) * 1274126177;
+            return ((h ^ (h >> 16)) & 0x7fffffff) / (float)0x7fffffff;
+        }
     }
 
     private void DrawNode(RunMap map, RunMapManager mgr, MapNode n, Vector2 p)
@@ -525,118 +687,146 @@ public class RunMapScreen : MonoBehaviour
         bool committed = mgr != null && mgr.ChosenNextId == n.id;
 
         float size = MapGlyphs.SizeFor(n.type);
+        float mark = size + 22f;
 
         GameObject go = new GameObject($"Node{n.id}", typeof(RectTransform));
         RectTransform rt = go.GetComponent<RectTransform>();
         rt.SetParent(area, false);
-        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = p;
-        rt.sizeDelta = new Vector2(size + 26f, size + 26f);
+        rt.sizeDelta = new Vector2(mark + 10f, mark + 10f);
         spawned.Add(go);
 
-        // A pulsing halo marks every branch the player may actually take. It is the only thing on
-        // the chart that moves on its own, which is what makes "where can I go" answerable at a
-        // glance without reading anything.
-        if (reachable)
-        {
-            Image halo = AddImage(rt, "Halo", MapGlyphs.Ring(), T.TextBright, false);
-            halo.rectTransform.sizeDelta = new Vector2(size + 22f, size + 22f);
-            availableMarks.Add(halo);
-        }
+        // A paper-coloured disc first, so the survey line and any trail behind the mark do not run
+        // through the symbol. Invisible on paper — it only shows by what it hides.
+        Image clear = AddImage(rt, "Clear", Parchment.Blot(), Fade(Parchment.Paper, 0.92f), false);
+        clear.rectTransform.sizeDelta = new Vector2(mark + 4f, mark + 4f);
 
-        if (committed)
-        {
-            Image lockRing = AddImage(rt, "Committed", MapGlyphs.Ring(), T.Accent, false);
-            lockRing.rectTransform.sizeDelta = new Vector2(size + 34f, size + 34f);
-        }
+        // Printed: a light ink wash under the symbol, then the symbol. The wash is what makes a mark
+        // look absorbed into the paper rather than laid on top of it.
+        Image wash = AddImage(rt, "Wash", Parchment.Blot(), Fade(Parchment.InkPale, 0.20f), false);
+        wash.rectTransform.sizeDelta = new Vector2(mark - 4f, mark - 4f);
 
-        Color tint;
-        if (isCurrent) tint = T.Accent;
-        else if (visited) tint = new Color(T.Accent.r, T.Accent.g, T.Accent.b, 0.55f);
-        else if (reachable) tint = T.TextBright;
-        else tint = T.TextDisabled;
+        Image ring = AddImage(rt, "Ring", Parchment.InkRing(false), Fade(Parchment.Ink, 0.80f), false);
+        ring.rectTransform.sizeDelta = new Vector2(mark, mark);
 
-        Image glyph = AddImage(rt, "Glyph", MapGlyphs.ForNode(n.type), tint, false);
+        // Only VISITED marks fade — they are behind you. The current one must stay full strength:
+        // it is circled in red precisely because it is the thing you are looking for.
+        Color glyphCol = visited && !isCurrent ? Fade(Parchment.Ink, 0.45f) : Parchment.Ink;
+        Image glyph = AddImage(rt, "Glyph", MapGlyphs.ForNode(n.type), glyphCol, false);
         glyph.rectTransform.sizeDelta = new Vector2(size, size);
 
-        // Recharge attachment: a small badge clipped to the node's upper right. None of these
-        // appear until their room prefab is assigned on LevelManager — the map refuses to draw a
-        // room it cannot spawn.
-        if (n.recharge != RechargeType.None)
+        // --- the annotation, in red pen -----------------------------------------------------------
+        if (isCurrent)
         {
-            float badge = 20f;
-            RectTransform bt = AddPoint(rt, "Recharge", new Vector2(0.5f, 0.5f),
-                new Vector2(size * 0.48f, size * 0.48f), new Vector2(badge + 8f, badge + 8f));
-
-            Image disc = bt.gameObject.AddComponent<Image>();
-            disc.sprite = FlatUI.Panel(5);
-            disc.type = Image.Type.Sliced;
-            disc.color = T.SurfaceRaised;
-            disc.raycastTarget = false;
-
-            Image mark = AddImage(bt, "Mark", MapGlyphs.ForRecharge(n.recharge),
-                reachable || visited ? T.TextBright : T.TextMuted, false);
-            mark.rectTransform.sizeDelta = new Vector2(badge, badge);
+            // Ringed twice, the way you'd circle where you are on a real map.
+            Image r1 = AddImage(rt, "PenRing", Parchment.InkRing(true), Parchment.Red, false);
+            r1.rectTransform.sizeDelta = new Vector2(mark + 12f, mark + 12f);
+            Image r2 = AddImage(rt, "PenRing2", Parchment.InkRing(false), Fade(Parchment.Red, 0.75f), false);
+            r2.rectTransform.sizeDelta = new Vector2(mark + 24f, mark + 24f);
+        }
+        else if (committed)
+        {
+            Image r1 = AddImage(rt, "PenRing", Parchment.InkRing(true), Parchment.Red, false);
+            r1.rectTransform.sizeDelta = new Vector2(mark + 14f, mark + 14f);
+        }
+        else if (reachable)
+        {
+            Image r1 = AddImage(rt, "PenRing", Parchment.InkRing(true), Parchment.RedSoft, false);
+            r1.rectTransform.sizeDelta = new Vector2(mark + 12f, mark + 12f);
+            penMarks.Add(r1);
+        }
+        else if (visited)
+        {
+            Image r1 = AddImage(rt, "PenRing", Parchment.InkRing(false), Fade(Parchment.Red, 0.6f), false);
+            r1.rectTransform.sizeDelta = new Vector2(mark + 10f, mark + 10f);
         }
 
-        // Only reachable nodes are clickable. Choosing is a commitment, not navigation, so the
-        // click sets the branch and the run travels there when the player reaches the exit door.
+        if (n.recharge != RechargeType.None)
+        {
+            float badge = 21f;
+            RectTransform bt = AddPoint(rt, "Recharge", new Vector2(0.5f, 0.5f),
+                new Vector2(mark * 0.46f, mark * 0.46f), new Vector2(badge + 12f, badge + 12f));
+
+            Image disc = bt.gameObject.AddComponent<Image>();
+            disc.sprite = Parchment.Blot();
+            disc.color = Fade(Parchment.Paper, 0.95f);
+            disc.raycastTarget = false;
+
+            Image bring = AddImage(bt, "BadgeRing", Parchment.InkRing(false), Fade(Parchment.Ink, 0.75f), false);
+            bring.rectTransform.sizeDelta = new Vector2(badge + 12f, badge + 12f);
+
+            Image bm = AddImage(bt, "Mark", MapGlyphs.ForRecharge(n.recharge), Parchment.Ink, false);
+            bm.rectTransform.sizeDelta = new Vector2(badge, badge);
+        }
+
+        AddLabel(rt, n, mark, isCurrent, visited, reachable);
+
+        // Only reachable nodes are clickable. Choosing is a commitment, not navigation: the click
+        // sets the branch and the run travels there when the player reaches the exit door.
         if (reachable)
         {
             Button btn = go.AddComponent<Button>();
             btn.transition = Selectable.Transition.None;
 
             Image hit = AddImage(rt, "Hit", FlatUI.Pixel(), new Color(0f, 0f, 0f, 0f), true);
-            hit.rectTransform.sizeDelta = new Vector2(size + 26f, size + 26f);
+            hit.rectTransform.sizeDelta = new Vector2(mark + 10f, mark + 10f);
             btn.targetGraphic = hit;
 
             int id = n.id;
             btn.onClick.AddListener(() =>
             {
                 if (RunMapManager.instance == null || !RunMapManager.instance.ChooseNext(id)) return;
-                // Opened by the exit: committing IS leaving, so go. Opened with M: this is
-                // planning, so just mark the branch and let the player keep reading the act.
+                // Opened by the exit: committing IS leaving, so go. Opened with M: this is planning,
+                // so mark the branch and let the player keep reading the act.
                 if (mustChoose) ConfirmChoice();
                 else Refresh();
             });
-
-            AddHoverLabel(rt, n, size);
-        }
-        else if (isCurrent)
-        {
-            // BELOW the node. Above it collides with the hanging label of whichever branch sits
-            // directly overhead, which on the hub row is almost always one of them.
-            TextMeshProUGUI here = AddText(rt, "Here", "YOU ARE HERE", 11f, T.Accent, TextAlignmentOptions.Center);
-            here.rectTransform.pivot = new Vector2(0.5f, 1f);
-            here.rectTransform.anchoredPosition = new Vector2(0f, -(size * 0.5f + 10f));
-            here.rectTransform.sizeDelta = new Vector2(160f, 16f);
-            here.characterSpacing = 3f;
         }
     }
 
-    // The node's promise, spelled out under it. Present on every reachable branch rather than on
-    // hover only: the whole point of the map is comparing branches at a glance, and a label you
-    // have to hover to read cannot be compared with anything.
-    private void AddHoverLabel(RectTransform parent, MapNode n, float size)
+    // ⚠️ EVERY node is labelled, not just the reachable ones. The whole point of showing the act is
+    // planning a route through it, and you cannot plan through marks that have no names.
+    //
+    // The backing is PAPER-COLOURED, not a dark plate. On a light ground the mask can be the ground
+    // itself, so it is invisible except for the dashes it hides — which is the whole trick the
+    // etched version could not pull off, where the equivalent had to be a visible dark nameplate.
+    private void AddLabel(RectTransform parent, MapNode n, float mark,
+                          bool isCurrent, bool visited, bool reachable)
     {
-        string text = MapGlyphs.LabelFor(n.type);
-        if (n.recharge != RechargeType.None) text += "\n+ " + MapGlyphs.LabelFor(n.recharge);
+        string text = isCurrent ? "YOU ARE HERE" : MapGlyphs.LabelFor(n.type);
+        if (n.recharge != RechargeType.None && !isCurrent) text += "\n" + MapGlyphs.LabelFor(n.recharge);
 
-        TextMeshProUGUI label = AddText(parent, "Label", text, 12f, T.TextBody, TextAlignmentOptions.Top);
-        // Pivot at the TOP so the offset positions the text's first line, not its box centre. With
-        // a centred pivot a 34px-tall box put its first line back on top of the glyph.
+        string[] parts = text.Split('\n');
+        int widest = 0;
+        foreach (string p in parts) if (p.Length > widest) widest = p.Length;
+
+        float fs = reachable || isCurrent ? 13f : 12f;
+        float y = -(mark * 0.5f + 6f);
+
+        Image back = AddImage(parent, "LabelBack", Parchment.Blot(), Fade(Parchment.Paper, 0.88f), false);
+        back.rectTransform.pivot = new Vector2(0.5f, 1f);
+        back.rectTransform.anchoredPosition = new Vector2(0f, y + 7f);
+        back.rectTransform.sizeDelta = new Vector2(Mathf.Clamp(widest * fs * 0.82f + 26f, 66f, 190f),
+                                                  14f + parts.Length * 16f);
+
+        Color c = isCurrent || reachable ? Parchment.Red
+                : visited ? Fade(Parchment.Red, 0.72f)
+                          : Parchment.InkSoft;
+
+        TextMeshProUGUI label = AddText(parent, "Label", text, fs, c, TextAlignmentOptions.Top);
+        // Pivot at the TOP so the offset places the text's first line, not its box centre. With a
+        // centred pivot a 34px-tall box put its first line back on top of the symbol.
         label.rectTransform.pivot = new Vector2(0.5f, 1f);
-        label.rectTransform.anchoredPosition = new Vector2(0f, -(size * 0.5f + 9f));
-        // Narrower than it looks like it needs to be. Neighbouring nodes on a floor sit about one
-        // column apart MINUS their jitter, so a 150px label ran into its neighbour's on any floor
-        // that filled up.
-        label.rectTransform.sizeDelta = new Vector2(118f, 34f);
-        label.characterSpacing = 3f;
-        label.lineSpacing = -14f;
+        label.rectTransform.anchoredPosition = new Vector2(0f, y);
+        label.rectTransform.sizeDelta = new Vector2(150f, 36f);
+        label.characterSpacing = 2f;
+        label.lineSpacing = -12f;
     }
 
     // ---- small builders -------------------------------------------------------------------------
+
+    private static Color Fade(Color c, float a) => new Color(c.r, c.g, c.b, a);
 
     private static void Stretch(RectTransform rt)
     {

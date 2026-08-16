@@ -309,11 +309,31 @@ public static class LevelTextImporter
             Tiles = new[]{ "Ground_8" } },
         // the box — AnchorY=1 for the same reason as the 2-tall piece above
         new PlatformShape { W=2, H=2, AnchorX=0, AnchorY=1, OffX=0.5f, OffY=0.5f,
-            Tiles = new[]{ "Ground_1", "Ground Dirt_1", "Ground Dirt_10" } },
+            Tiles = new[]{ "Ground_1", "Ground Dirt_1" } },
         // big block
         new PlatformShape { W=3, H=3, AnchorX=1, AnchorY=1,
-            Tiles = new[]{ "Ground_0", "Ground_6", "Ground Dirt_0", "Ground Dirt_6" } },
+            Tiles = new[]{ "Ground_0", "Ground Dirt_0" } },
     };
+
+    // ⚠️ THREE VARIANTS WERE REMOVED FROM THE LISTS ABOVE BECAUSE THEIR COLLISION DOES NOT FILL
+    // THEIR DECLARED FOOTPRINT (measured 2026-08-14, by stamping each one on a bare tilemap and
+    // probing every cell with Physics2D.OverlapPoint):
+    //
+    //     Ground Dirt_10   2x2   only 1 of 4 cells solid
+    //     Ground_6         3x3         8 of 9
+    //     Ground Dirt_6    3x3         8 of 9
+    //
+    // These are oversized tiles, so they keep colliderType = Sprite (TileVariantGenerator refuses
+    // to give an oversized tile full-cell Grid collision — see the note there). Sprite collision
+    // traces the ALPHA OUTLINE, and these three are drawn as irregular rounded rocks rather than
+    // filled blocks, so the corners of the footprint are simply not there. A platform stamped with
+    // one of them looks solid and is not: the player falls through part of it.
+    //
+    // Found when a 2x2 box added to GenLevel8 came out with 3 of its 4 cells empty. The other 17
+    // variants all measured complete, so the shapes themselves are sound — only these three.
+    //
+    // ⚠️ ANY NEW VARIANT ADDED TO PlatformShapes MUST BE MEASURED THE SAME WAY. "It is the right
+    // pixel size" is NOT enough: Ground Dirt_10 measures 2.06 x 2.03, which looks perfect.
 
     // Platforms bigger than this are rock masses, not ledges — they keep the mask painting.
     private const int MaxPlatformCells = 12;

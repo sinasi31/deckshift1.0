@@ -16,6 +16,15 @@ public class Fireball : MonoBehaviour
 
     public float damage = 10f;
 
+    // The card that fired this, stamped at spawn.
+    //
+    // ⚠️ WITHOUT THIS, EVERY DAMAGE-TIME BLESSING SILENTLY DOES NOTHING ON FIREBALL — which is the
+    // main attack card. DeckManager.AttributedCard is live only for the duration of ExecuteAction,
+    // and a projectile lands whole seconds after that has returned and cleared it. So the shot
+    // carries its own source and re-installs it around the hit. Any future delayed damage source
+    // (a lingering pool, a summon) must do the same.
+    [HideInInspector] public RuntimeCard sourceCard;
+
     private Rigidbody2D rb;
     private bool hasHit = false;
 
@@ -44,11 +53,20 @@ public class Fireball : MonoBehaviour
         if (targetHealth != null)
         {
             hasHit = true;
+
+            // Re-install this shot's card so the blessings on it apply, and so a kill is credited
+            // to it. Cleared again immediately — a stale attribution would hand the next spike or
+            // pogo bounce in the game a Grudge bonus it never earned.
+            RuntimeCard prev = DeckManager.instance != null ? DeckManager.instance.AttributedCard : null;
+            if (DeckManager.instance != null) DeckManager.instance.AttributedCard = sourceCard;
+
             // Route through the relic modifier (Whetstone / Midas Recoil / Glass Heart).
             float dealt = RelicManager.instance != null
                 ? RelicManager.instance.ModifyPlayerDamage(damage, targetHealth as EnemyHealth)
                 : damage;
             targetHealth.TakeDamage(dealt);
+
+            if (DeckManager.instance != null) DeckManager.instance.AttributedCard = prev;
             if (CameraShake.instance != null)
                 CameraShake.instance.Shake(0.15f, 0.5f);
             CreateExplosionEffect();

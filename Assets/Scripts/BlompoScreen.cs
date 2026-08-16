@@ -236,6 +236,8 @@ public class BlompoScreen : MonoBehaviour
         isOpen = true;
         blessingSpent = false;
         chosenOffer = CardEnhancement.None;
+        pendingCard = null;
+        pickingPartner = false;
 
         gameObject.SetActive(true);
         transform.SetAsLastSibling();
@@ -374,8 +376,24 @@ public class BlompoScreen : MonoBehaviour
         cardRow.gameObject.SetActive(true);
         if (forgeStage != null) forgeStage.gameObject.SetActive(false);
 
-        List<RuntimeCard> valid = CardEnhancements.CardsFor(chosenOffer, CollectDeck());
-        promptText.text = $"<b>{CardEnhancements.Name(chosenOffer)}</b> — {CardEnhancements.Description(chosenOffer)}  Choose a card.";
+        // "Understudy" is the one blessing that needs TWO picks — the card that receives it, then
+        // the card it is bound to. Everything else falls through the first branch untouched.
+        List<RuntimeCard> valid;
+        if (pickingPartner)
+        {
+            valid = new List<RuntimeCard>();
+            foreach (RuntimeCard c in CollectDeck())
+                if (c != null && c != pendingCard) valid.Add(c);
+
+            string recipient = pendingCard != null && pendingCard.cardData != null
+                ? pendingCard.cardData.cardName : "It";
+            promptText.text = $"<b>{recipient}</b> will draw… choose the card to bind it to.";
+        }
+        else
+        {
+            valid = CardEnhancements.CardsFor(chosenOffer, CollectDeck());
+            promptText.text = $"<b>{CardEnhancements.Name(chosenOffer)}</b> — {CardEnhancements.Description(chosenOffer)}  Choose a card.";
+        }
 
         // ⚠️ THIS USED TO CAP AT EIGHT CARDS AND SILENTLY DROP THE REST. With a deck of fifteen you
         // simply could not bless anything after the eighth valid card, and nothing on screen said
@@ -431,18 +449,45 @@ public class BlompoScreen : MonoBehaviour
         }
     }
 
+    // Understudy's two-step state. Reset alongside chosenOffer whenever the screen resets.
+    private RuntimeCard pendingCard;
+    private bool pickingPartner;
+
     private void ChooseCard(RuntimeCard card)
     {
-        if (blessingSpent || chosenOffer == CardEnhancement.None) return;
+        if (blessingSpent || chosenOffer == CardEnhancement.None || card == null) return;
+
+        // Second pick: the partner. Any card in the deck qualifies except the one receiving the
+        // blessing — a card that draws itself would do nothing.
+        if (pickingPartner)
+        {
+            if (card == pendingCard) return;
+            RuntimeCard recipient = pendingCard;
+            pendingCard = null;
+            pickingPartner = false;
+
+            blessingSpent = true;
+            StartCoroutine(ForgeRoutine(recipient, card));
+            return;
+        }
+
         if (!CardEnhancements.CanApplyTo(chosenOffer, card)) return;
 
+        if (CardEnhancements.NeedsPartner(chosenOffer))
+        {
+            pendingCard = card;
+            pickingPartner = true;
+            ShowCardStep();
+            return;
+        }
+
         blessingSpent = true;   // lock immediately so a double-click can't forge twice
-        StartCoroutine(ForgeRoutine(card));
+        StartCoroutine(ForgeRoutine(card, null));
     }
 
     // Blompo binds the blessing to the card: it takes centre stage while a ring of runes gathers
     // and closes around it, and the enhancement lands at the moment the charm sets.
-    private IEnumerator ForgeRoutine(RuntimeCard card)
+    private IEnumerator ForgeRoutine(RuntimeCard card, RuntimeCard partner)
     {
         ClearRow(cardRow);
         cardRow.gameObject.SetActive(false);
@@ -470,13 +515,16 @@ public class BlompoScreen : MonoBehaviour
         // only the X button to escape. That was exactly the "gets stuck" bug.
         yield return StartCoroutine(BlompoForgeFX.Play(this, forgeStage, chip, gem, () =>
         {
-            CardEnhancements.Apply(card, chosenOffer);
+            CardEnhancements.Apply(card, chosenOffer, partner);
             if (DeckManager.instance != null) DeckManager.instance.RefreshHandUI();
             StampChip(chip, card);
         }));
 
         string cardName = card.cardData != null ? card.cardData.cardName : "It";
-        promptText.text = $"<b>{cardName}</b> is now <b>{CardEnhancements.Name(chosenOffer)}</b>. Blompo is pleased.";
+        if (partner != null && partner.cardData != null)
+            promptText.text = $"<b>{cardName}</b> is bound to <b>{partner.cardData.cardName}</b>. Blompo is pleased.";
+        else
+            promptText.text = $"<b>{cardName}</b> is now <b>{CardEnhancements.Name(chosenOffer)}</b>. Blompo is pleased.";
         yield return StartCoroutine(CloseAfter(1.4f));
     }
 
@@ -492,7 +540,9 @@ public class BlompoScreen : MonoBehaviour
         SetChipText(chip, "Uses", card.isInfinite ? "∞" : $"{card.currentUses}/{maxUses}");
 
         int cost = card.cardData != null ? card.cardData.shiftCost : 0;
-        SetChipText(chip, "Cost", card.enhancement == CardEnhancement.OnTheHouse ? "0" : cost.ToString());
+        // Through the shared cost function, so a blessing that makes a card DEARER (Ritual) shows
+        // its real price here too — not just the ones that make it cheaper.
+        SetChipText(chip, "Cost", CardEnhancements.EffectiveCost(card, cost).ToString());
 
         if (card.enhancement == CardEnhancement.None || chip.Find("Badge") != null) return;
 

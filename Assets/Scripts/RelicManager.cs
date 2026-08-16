@@ -114,6 +114,13 @@ public class RelicManager : MonoBehaviour
         // Glass Heart: double damage (paid for with half max HP).
         if (HasRelic("GlassHeart")) dmg *= 2f;
 
+        // Blompo's damage-time blessings. They live at this chokepoint rather than at the seven
+        // damage call sites for the same reason the relics do — a damage source added later cannot
+        // forget to honour them. It is also the only place the TARGET is known, which is what lets
+        // Finisher and Opener read the enemy's health instead of guessing at cast time.
+        if (DeckManager.instance != null)
+            dmg = CardEnhancements.ModifyDamage(DeckManager.instance.AttributedCard, dmg, target);
+
         return dmg;
     }
 
