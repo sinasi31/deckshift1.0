@@ -659,39 +659,24 @@ public static class FlatUI
         TextDisabled = new Color(0.337f, 0.325f, 0.412f, 1f),
     };
 
-    // The font procedural UI should use.
+    // The DISPLAY font procedural UI should use — titles, headings, buttons, labels, numbers.
     //
-    // Deliberately NOT `FindAnyObjectByType<TMP_Text>().font`, which several older screens use:
-    // that returns an ARBITRARY text object, so the font a procedural panel picks up changes
-    // between runs. It was caught by two screenshots of the same screen coming back in different
-    // typefaces, and again when Blompo rendered in generic sans while the Forge rendered in the
-    // pixel font. Count the fonts actually in use and take the most common — the project's real UI
-    // font, deterministically, whatever a stray debug label happens to use.
+    // ⚠️ This used to BE the font decision, made by census: it counted every `TMP_Text` in the scene
+    // and returned the most common one. That was already an improvement on the older
+    // `FindAnyObjectByType<TMP_Text>().font` (which returned an arbitrary object, so the same screen
+    // came back in different typefaces between runs) — but it is still not a decision. It costs a
+    // full scene scan per call, it can answer differently in MainMenu than in SampleScene, and any
+    // screen that forgot to call it silently fell out of the system.
+    //
+    // The faces are now STATED in `UIType`. This stays as the display-face accessor because 18
+    // screens already call it, and it returns exactly what the census was resolving to
+    // (CCBattleScarred) — so the switch is a visual no-op.
+    //
+    // **For running sentences use `UIType.Prose()`, not this.** See `UIType` for the split and the
+    // migration policy.
     public static TMPro.TMP_FontAsset UIFont()
     {
-        var counts = new System.Collections.Generic.Dictionary<TMPro.TMP_FontAsset, int>();
-        foreach (TMPro.TMP_Text t in Object.FindObjectsByType<TMPro.TMP_Text>(FindObjectsInactive.Include, FindObjectsSortMode.None))
-        {
-            if (t == null || t.font == null) continue;
-            counts.TryGetValue(t.font, out int n);
-            counts[t.font] = n + 1;
-        }
-
-        TMPro.TMP_FontAsset best = null;
-        int bestCount = 0;
-        foreach (var kv in counts)
-        {
-            // Ties break on instance ID so the result is stable across runs rather than
-            // dictionary-order dependent.
-            if (kv.Value > bestCount ||
-                (kv.Value == bestCount && best != null && kv.Key.GetInstanceID() < best.GetInstanceID()))
-            {
-                best = kv.Key;
-                bestCount = kv.Value;
-            }
-        }
-
-        return best != null ? best : TMPro.TMP_Settings.defaultFontAsset;
+        return UIType.Display();
     }
 
     // LOADOUT — the relic bar and its tooltip.

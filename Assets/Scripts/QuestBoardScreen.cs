@@ -474,9 +474,30 @@ public class QuestBoardScreen : MonoBehaviour
         // of that reserve into a single hole above the progress bar and the slip read as unfinished.
         TextMeshProUGUI desc = AddText(rt, "Desc", s.data.description, 21f, T.TextBody,
                                        TextAlignmentOptions.Center);
+
+        // ⚠️ THE ONE PIECE OF REAL PROSE ON A SLIP, so it takes the PROSE face (see `UIType`). The
+        // display face has no lowercase, which rendered every contract as
+        // `CLEAR 4 ROOMS IN A ROW WITHOUT PLAYING STAGGER.` — a board of shouting. Sentence case is
+        // what makes a slip read as something a person wrote and pinned up, which is the whole
+        // Bulletin conceit. The title, tag, payout and progress stay in the display face: they are
+        // labels, not sentences.
+        TMP_FontAsset prose = UIType.Prose();
+        if (prose != null)
+        {
+            desc.font = prose;
+
+            // ⚠️ A THIN FACE ON A LIGHT GROUND NEEDS DARKER INK THAN THE NUMBER SUGGESTS. `T.TextBody`
+            // was picked for the display face, which is heavy enough to hold its value; Pixie's
+            // strokes cover far less area, so the identical colour reads visibly weaker. Measured on
+            // the slip: paper luminance 0.75, title ink 0.109, this ink 0.189 — it sat nearly twice
+            // as light as the title while carrying the sentence you actually have to read. Pulled
+            // most of the way toward the title without reaching it, since the title still outranks it.
+            desc.color = new Color(0.165f, 0.137f, 0.110f, desc.color.a);
+        }
+
         desc.enableAutoSizing = true;
-        desc.fontSizeMin = 15f;
-        desc.fontSizeMax = 21f;
+        desc.fontSizeMin = UIType.SizeFor(TextRole.Caption, true);   // 19 — was 15 in the display face
+        desc.fontSizeMax = UIType.SizeFor(TextRole.Body, true);      // 22 — was 21
         desc.rectTransform.sizeDelta = new Vector2(292f, 86f);
         desc.rectTransform.anchoredPosition = new Vector2(0f, -12f);
 

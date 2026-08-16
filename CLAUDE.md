@@ -858,6 +858,53 @@ Screen details worth keeping: the value is re-read from `GameSettings` on every 
 
 Three procedural sounds in `ProcSfx`: `PauseHalt`, `PauseRelease`, `PauseTick`. They are a **fourth sound family**, defined by their ENVELOPE rather than their spectrum (magic = harmonic bell partials, metal = inharmonic bar modes, stone = noise + sub). The halt is the only sound in the game that gets **choked** — a damper clamps the ring away over 180ms instead of letting it decay. A sound that fades out says "ending"; a sound cut short says "held". Release is its inverse and is allowed to run out naturally.
 
+### Typography — `UIType.cs` (2026-08-16), two stated faces and a size scale
+
+**`UIType` is the single source of truth for what the UI is set in.** Before it, the font was decided
+by **census**: `FlatUI.UIFont()` counted every `TMP_Text` in the scene and returned the most common
+one. That is an emergent property, not a decision — a full `FindObjectsByType` per call, capable of
+answering differently in MainMenu than in SampleScene, and **any screen that forgot to call it fell
+silently out of the system** (the character select shipped in Liberation Sans exactly that way).
+
+**The split (designer-chosen 2026-08-16, from screenshots):**
+
+| | face | takes |
+|---|---|---|
+| **Display** | `CCBattleScarred` | titles, headings, menu items, buttons, stat labels, numbers — the game's voice |
+| **Prose** | `Pixie` | running sentences ONLY — contract text, card rules, barks, trait blurbs |
+
+⚠️ **CCBattleScarred has essentially no lowercase**, so used for prose it renders every sentence as
+capitals. That is fine for labels and terrible for paragraphs.
+
+⚠️ **JUDGE A TYPE DECISION ON A SCREEN WITH SENTENCES IN IT.** The obvious candidate — the pause
+screen, "the densest screen" — turned out to barely discriminate: it is 30 labels and numbers with
+almost no prose, and the all-display version looks *best* there. The quest board decided it, because
+a contract reads `CLEAR 4 ROOMS IN A ROW WITHOUT PLAYING STAGGER.` in the display face and
+`Clear 4 rooms in a row without playing Stagger.` in the prose face — and the Bulletin theme's whole
+conceit is that a person wrote these and pinned them up.
+
+⚠️ **Prose size is auto-compensated (`ProseScale` 1.18).** Pixie has a smaller cap height, so at equal
+nominal pt it renders visibly smaller. `UIType.SizeFor(role, prose: true)` applies it — **never
+hand-tune a size to compensate**, or the two faces drift apart again.
+
+⚠️ **A THIN FACE ON A LIGHT GROUND NEEDS DARKER INK THAN THE NUMBER SUGGESTS.** The quest slip's body
+colour was chosen for the heavy display face; Pixie's strokes cover far less area, so the same value
+read washed out. Measured on the slip: paper luminance 0.75, title ink 0.109, body ink **0.189** —
+nearly twice as light as the title while carrying the sentence you actually have to read. Pulled to
+0.141. Same family as the linear-colour-space rule: **measure the pixels, don't compute them.**
+
+⚠️ **`Assets/Resources/UIType.asset` carries the two font references** because neither font lives in a
+`Resources/` folder (Pixie ships inside the Cainos pack, CCBattleScarred sits in `LevelEfeVrl/
+Sprites/`), and moving either risks a pack reimport undoing it. Rebuilt by **Deckshift → Rebuild UI
+Type**, same pattern as `RelicCatalogue`. If the asset goes missing, `UIType` **falls back to the old
+census** rather than breaking — degrading to today's look, not to Liberation Sans.
+
+**Migration policy: do NOT retrofit every screen at once.** `FlatUI.UIFont()` now delegates to
+`UIType.Display()` and returns exactly what the census was already resolving to, so wiring it in was
+a visual no-op across all 18 screens that call it. New screens use `UIType` immediately; existing ones
+move their prose to `UIType.Prose()` when they are already being touched. **`QuestBoardScreen` is the
+one migrated so far** — use it as the worked example.
+
 ### Cards: rarity colour is the ART's job, not the UI's (designer 2026-08-06)
 
 **Card rarity is telegraphed in the card ARTWORK, in colour: dark grey Common, light grey Uncommon, yellow Rare, purple Epic. There are no Legendary cards.** The incoming art has this baked in, so **UI code must not invent a second rarity colour system on a card** — two colour codes on one object that disagree is worse than one.
