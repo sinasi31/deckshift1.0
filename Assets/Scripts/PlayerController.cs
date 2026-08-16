@@ -285,16 +285,18 @@ public class PlayerController : MonoBehaviour
     private float jumpBufferTimer;
 
     [Header("Character")]
-    // The played character, and with it the innate. Left null the player simply has no innate —
-    // the game plays exactly as it did before this system existed, which is what makes it safe to
-    // ship without a character-select screen yet.
+    // The played character: the run's starting deck and one passive trait. Left null, the game
+    // plays exactly as it did before characters existed (DeckManager falls back to its own
+    // startingDeck), which is what makes this safe to ship without a select screen yet.
     public CharacterData character;
-    private float innateCooldownTimer;
-    [SerializeField] private AudioClip innateCastSound;
 
     [Header("Combat Settings")]
     public GameObject fireballPrefab;
     public Transform firePoint;
+    [SerializeField] private AudioClip shurikenThrowSound;
+    // The pack's own shuriken art, so the thrown star is the same object that was in the hand.
+    // Left empty, Shuriken falls back to its procedural star.
+    [SerializeField] private Sprite shurikenSprite;
     public float wailRange = 10f;
     [SerializeField] internal float fireballCastDelay = 0.12f;
     public float biteRange = 1.5f;
@@ -421,6 +423,16 @@ public class PlayerController : MonoBehaviour
             originalVisualLocalPos = visualModel.transform.localPosition;
             originalVisualScaleX = visualModel.transform.localScale.x;
         }
+
+        // ⚠️ THE SELECT SCREEN'S PICK OVERRIDES THE PREFAB. The prefab's `character` field is the
+        // fallback for entering play mode straight into SampleScene, which is how this project is
+        // actually developed — but a run started from the main menu must play whoever was chosen
+        // there, and that choice arrives a scene load away through CharacterSelection.
+        if (CharacterSelection.Chosen != null) character = CharacterSelection.Chosen;
+
+        // Re-dress the rig for the played character. In Awake so the player is never seen wearing
+        // the wrong outfit for a frame; a no-op when no character or no preset is assigned.
+        CharacterAppearance.Apply(this, character);
     }
 
     void Start()
@@ -585,21 +597,12 @@ public class PlayerController : MonoBehaviour
 
     private void HandleCardInput()
     {
-        if (innateCooldownTimer > 0f) innateCooldownTimer -= Time.deltaTime;
-
         if (DeckManager.instance == null) return;
 
-        // Number keys TOGGLE. Pressing the selected card's own key again deselects it.
-        //
-        // ⚠️ THIS IS WHERE DESELECT LIVES NOW — right mouse used to do it, and right mouse is the
-        // innate key. The overlap could not be split by context ("cancel if a card is selected,
-        // otherwise fire"), because that makes the innate unavailable exactly when the player is
-        // mid-decision in a fight; an attack key that sometimes isn't an attack key is worse than
-        // a cancel that moved.
-        if (Input.GetKeyDown(KeyCode.Alpha1)) ToggleCardSelection(0);
-        if (Input.GetKeyDown(KeyCode.Alpha2)) ToggleCardSelection(1);
-        if (Input.GetKeyDown(KeyCode.Alpha3)) ToggleCardSelection(2);
-        if (Input.GetKeyDown(KeyCode.Alpha4)) ToggleCardSelection(3);
+        if (Input.GetKeyDown(KeyCode.Alpha1)) DeckManager.instance.SelectCard(0);
+        if (Input.GetKeyDown(KeyCode.Alpha2)) DeckManager.instance.SelectCard(1);
+        if (Input.GetKeyDown(KeyCode.Alpha3)) DeckManager.instance.SelectCard(2);
+        if (Input.GetKeyDown(KeyCode.Alpha4)) DeckManager.instance.SelectCard(3);
 
         if (Input.GetMouseButtonDown(0))
         {
@@ -608,66 +611,8 @@ public class PlayerController : MonoBehaviour
 
         if (Input.GetMouseButtonDown(1))
         {
-            TryUseInnate();
+            DeckManager.instance.DeselectCard();
         }
-    }
-
-    private void ToggleCardSelection(int index)
-    {
-        if (DeckManager.instance.GetSelectedIndex() == index) DeckManager.instance.DeselectCard();
-        else DeckManager.instance.SelectCard(index);
-    }
-
-    // The character's free attack. Costs no Shift and no card charge — that is the entire reason it
-    // exists. Before innates, a room entered with an empty deck was a room that could not be
-    // fought in at all, so every fight was a net loss and skipping combat was the correct play.
-    public bool TryUseInnate()
-    {
-        if (character == null || character.innate == InnateType.None) return false;
-        if (innateCooldownTimer > 0f) return false;
-        if (currentState == PlayerState.InCannon) return false;
-        if (playerHealth != null && playerHealth.IsDead) return false;
-
-        switch (character.innate)
-        {
-            case InnateType.ArcaneBolt:
-                FireArcaneBolt();
-                break;
-            default:
-                return false;
-        }
-
-        innateCooldownTimer = character.innateCooldown;
-        return true;
-    }
-
-    public float InnateDamage()
-    {
-        return character != null ? character.innateDamage : 0f;
-    }
-
-    private void FireArcaneBolt()
-    {
-        if (firePoint == null) return;
-
-        SfxManager.PlayOn(audioSource, innateCastSound);
-        ArcaneBolt.Spawn(firePoint.position, isFacingRight, InnateDamage());
-
-        StartCoroutine(InnateCastPose());
-    }
-
-    // Borrows the Fireball card's cast animation for body language, but fires on the SAME frame as
-    // the press rather than at the clip's 0.36s cast event. The innate is a light, repeatable poke;
-    // a half-second commitment on it would read as input lag, where on a 15-damage card it reads as
-    // weight. Released well inside the cooldown so two casts can never overlap the pose.
-    private IEnumerator InnateCastPose()
-    {
-        if (animator == null) yield break;
-
-        animator.SetInteger("AttackAction", 14);
-        animator.SetBool("IsAttacking", true);
-        yield return new WaitForSeconds(0.3f);
-        animator.SetBool("IsAttacking", false);
     }
 
     public void AddGold(int amount)
@@ -1341,6 +1286,149 @@ public class PlayerController : MonoBehaviour
             if (DeckManager.instance != null)
                 fireballScript.sourceCard = DeckManager.instance.AttributedCard;
         }
+    }
+
+    // The Ninja's aimed throw.
+    //
+    // ⚠️ AIM COMES FROM THE CURSOR, AND THE CURSOR IS ALREADY WHERE THE PLAYER WANTS IT. Cards are
+    // cast with a LEFT CLICK, so the mouse at the moment of the cast IS the aim — this needs no
+    // extra input mode, no charge-up and no confirm step. The aim indicator draws the same line
+    // beforehand, so what you see before the click is what you get.
+    public void ThrowShuriken(float damageFromCard)
+    {
+        if (mainCamera == null) return;
+
+        Vector2 origin = ShurikenOrigin;
+        Vector2 aim = (Vector2)mainCamera.ScreenToWorldPoint(Input.mousePosition) - origin;
+        if (aim.sqrMagnitude < 0.0001f) aim = new Vector2(isFacingRight ? 1f : -1f, 0f);
+        aim.Normalize();
+
+        // Turn to the throw. Throwing left while facing right reads as a bug, and facing is what
+        // every other system reads for direction anyway.
+        if (aim.x > 0.01f && !isFacingRight) Flip();
+        else if (aim.x < -0.01f && isFacingRight) Flip();
+
+        RuntimeCard src = DeckManager.instance != null ? DeckManager.instance.AttributedCard : null;
+
+        if (throwRoutine != null) StopCoroutine(throwRoutine);
+        throwRoutine = StartCoroutine(ThrowRoutine(aim, damageFromCard, src));
+    }
+
+    private Coroutine throwRoutine;
+
+    // ⚠️ THE STAR LEAVES ON THE ARM'S SNAP, NOT ON THE KEYPRESS. Spawning it immediately made the
+    // shuriken outrun the animation — it was already gone before he moved. The aim is captured at
+    // the press (so it is still exactly where the cursor was), and only the release waits.
+    private IEnumerator ThrowRoutine(Vector2 aim, float damage, RuntimeCard src)
+    {
+        BeginThrowPose();
+        yield return new WaitForSeconds(THROW_RELEASE);
+
+        // Re-read the hand: it has moved during the wind-up, and throwing from where it WAS looks
+        // like the star spawned beside him.
+        Vector2 origin = ShurikenOrigin;
+
+        SfxManager.PlayOn(audioSource, shurikenThrowSound);
+        HideHeldWeapon(0.28f);
+        Shuriken.Spawn(origin + aim * 0.3f, aim, damage, src, shurikenSprite);
+
+        EndThrowPose();
+        throwRoutine = null;
+    }
+
+    // ⚠️ THE STAR IN HIS HAND IS THE STAR THAT FLIES. The held weapon is hidden for the length of
+    // the throw and comes back after — so the projectile reads as the object he was holding rather
+    // than as a second one conjured out of nowhere. Cosmetic only; nothing else looks at it.
+    private Coroutine heldWeaponHide;
+
+    private void HideHeldWeapon(float seconds)
+    {
+        SpriteRenderer[] parts = HeldWeaponRenderers();
+        if (parts == null || parts.Length == 0) return;
+
+        if (heldWeaponHide != null) StopCoroutine(heldWeaponHide);
+        heldWeaponHide = StartCoroutine(HideHeldWeaponRoutine(parts, seconds));
+    }
+
+    private IEnumerator HideHeldWeaponRoutine(SpriteRenderer[] parts, float seconds)
+    {
+        foreach (SpriteRenderer sr in parts) if (sr != null) sr.enabled = false;
+        yield return new WaitForSeconds(seconds);
+        // Re-shown unconditionally: a throw interrupted by death or a room change must never leave
+        // the character permanently empty-handed.
+        foreach (SpriteRenderer sr in parts) if (sr != null) sr.enabled = true;
+        heldWeaponHide = null;
+    }
+
+    private SpriteRenderer[] HeldWeaponRenderers()
+    {
+        Transform slot = HeldWeaponSlot;
+        return slot != null ? slot.GetComponentsInChildren<SpriteRenderer>(true) : null;
+    }
+
+    private Transform HeldWeaponSlot
+    {
+        get
+        {
+            if (cachedWeaponSlot != null) return cachedWeaponSlot;
+            if (visualModel == null) return null;
+            foreach (Transform t in visualModel.GetComponentsInChildren<Transform>(true))
+                if (t.name == "Weapon Slot") { cachedWeaponSlot = t; break; }
+            return cachedWeaponSlot;
+        }
+    }
+    private Transform cachedWeaponSlot;
+
+    // Thrown from the HAND, so the star leaves from where the player can see it leave. Falls back
+    // to the body centre if the rig has no weapon slot.
+    //
+    // ⚠️ NOT `firePoint`. That sits out at the wand hand on the facing side — right for a forward
+    // cast, wrong for a 360° throw, where aiming straight up or down launches the star off to one
+    // side of the player. The aim indicator reads this SAME property, so the preview and the throw
+    // start from one origin and can never disagree.
+    internal Vector2 ShurikenOrigin
+    {
+        get
+        {
+            Transform slot = HeldWeaponSlot;
+            if (slot != null) return slot.position;
+
+            if (bodyCapsule == null) bodyCapsule = GetComponent<CapsuleCollider2D>();
+            return bodyCapsule != null
+                ? (Vector2)transform.position + bodyCapsule.offset
+                : (Vector2)transform.position;
+        }
+    }
+
+    // ⚠️ ATTACK ACTION 13 IS **THROW**, NOT 14. 14 is Cast — the wizard's two-handed spell pose,
+    // which is what this used before and is exactly why it looked wrong AND ran long: Cast is a 1.0s
+    // clip that self-exits at 80%, so every star cost nearly a second of standing still.
+    //
+    // Throw is a wind-up / hold / release set (Throw Start -> Throw Loop -> Throw End), driven by
+    // IsAttacking: true winds up and holds, false releases. So a quick throw is simply a very short
+    // hold. `AttackSpeedMul` scales both halves, and at 2.2 the whole action lands near 0.45s
+    // against Cast's ~1.3s.
+    private const int THROW_ACTION = 13;
+    private const float THROW_SPEED = 2.2f;
+    private const float THROW_RELEASE = 0.13f;   // hold before the arm snaps forward
+
+    private void BeginThrowPose()
+    {
+        if (animator == null) return;
+        animator.SetFloat("AttackSpeedMul", THROW_SPEED);
+        animator.SetInteger("AttackAction", THROW_ACTION);
+        animator.SetBool("IsAttacking", true);
+    }
+
+    private void EndThrowPose()
+    {
+        if (animator == null) return;
+        // Dropping IsAttacking is what fires Throw End — the release itself, not a tidy-up.
+        animator.SetBool("IsAttacking", false);
+        // ⚠️ Put the multiplier back. It is a GLOBAL animator parameter shared by every attack
+        // state, so leaving it at 2.2 would quietly double-speed the Fireball cast for any
+        // character who picked up a Shuriken.
+        animator.SetFloat("AttackSpeedMul", 1f);
     }
 
     internal IEnumerator FireballCastRoutine(float damageFromCard)

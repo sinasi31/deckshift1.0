@@ -37,16 +37,9 @@ public enum CardActionType
     // has ALREADY STOOD, so unlike Portal it can never advance them through a room — which is why
     // it needs no range limit at all.
     ReturnAnchor     = 19,
-}
-
-// A character's innate ability — the one thing they can always do, for free, with no card and no
-// Shift. Every character has exactly one, and it is bound to the SAME key for all of them (right
-// mouse), so switching character never means relearning the controls.
-public enum InnateType
-{
-    None        = 0,
-    // Wizard. A bolt that gets stronger the emptier your hand is.
-    ArcaneBolt  = 1,
+    // The Ninja's card. Unlike Fireball it is AIMED: the shot flies toward the cursor, in any
+    // direction, rather than straight ahead along the player's facing.
+    Shuriken         = 20,
 }
 
 public enum SkillType

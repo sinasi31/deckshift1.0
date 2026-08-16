@@ -62,6 +62,12 @@ public class RunMapManager : MonoBehaviour
     {
         if (instance != null && instance != this) { Destroy(gameObject); return; }
         instance = this;
+
+        // Bake the map's paper here rather than on the first press of M. Parchment caches every
+        // sprite in a static, so this costs nothing after the first scene load — but it is ~100ms
+        // of pixel work, and paying it during a scene load nobody is looking at is free where
+        // paying it the moment a screen is asked for is a visible stutter.
+        Parchment.Prewarm();
     }
 
     private void OnDestroy()

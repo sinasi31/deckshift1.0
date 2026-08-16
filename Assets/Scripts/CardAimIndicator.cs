@@ -80,7 +80,15 @@ public class CardAimIndicator : MonoBehaviour
     // cyan portal ring, so the three world markers never read as each other.
     [SerializeField] private Color anchorColor = new Color(1f, 0.72f, 0.28f, 0.85f);
 
-    private enum Kind { None, Fireball, Dash, Bite, Portal, Platform, Freefall, Wail, Phase, Anchor }
+    [Header("Shuriken")]
+    // Cold steel, deliberately clear of Fireball's orange: the two are both "a shot from here to
+    // there" and the only difference is that this one goes where you point, so they must not read
+    // as the same card.
+    [SerializeField] private Color shurikenColor = new Color(0.82f, 0.88f, 0.96f, 0.8f);
+    [SerializeField] private Color shurikenEnemyColor = new Color(1f, 0.28f, 0.2f, 0.95f);
+    [SerializeField] private int shurikenDots = 9;
+
+    private enum Kind { None, Fireball, Dash, Bite, Portal, Platform, Freefall, Wail, Phase, Anchor, Shuriken }
     private Kind activeKind = Kind.None;
 
     // All layers, triggers included — same as the game code's OverlapCircleAll(..., ~0).
@@ -143,6 +151,11 @@ public class CardAimIndicator : MonoBehaviour
     private LineRenderer phaseRing;
     private SpriteRenderer phaseFill;
 
+    // --- Shuriken visuals ---
+    private GameObject shurikenRoot;
+    private SpriteRenderer[] shurikenDotsSR;
+    private SpriteRenderer shurikenHitRing;
+
     // --- Return Anchor visuals ---
     private GameObject anchorRoot;
     private LineRenderer anchorTether;         // player -> anchor, so you can find it from anywhere
@@ -204,6 +217,7 @@ public class CardAimIndicator : MonoBehaviour
             case CardActionType.GlassWail:      SetKind(Kind.Wail);     UpdateWail(dim);     break;
             case CardActionType.Phase:          SetKind(Kind.Phase);    UpdatePhase(dim);    break;
             case CardActionType.ReturnAnchor:   SetKind(Kind.Anchor);   UpdateAnchor(dim);   break;
+            case CardActionType.Shuriken:       SetKind(Kind.Shuriken); UpdateShuriken(dim); break;
             default:                            SetKind(Kind.None);                          break;
         }
     }
@@ -238,6 +252,7 @@ public class CardAimIndicator : MonoBehaviour
         if (wailRoot != null) wailRoot.SetActive(kind == Kind.Wail);
         if (phaseRoot != null) phaseRoot.SetActive(kind == Kind.Phase);
         if (anchorRoot != null) anchorRoot.SetActive(kind == Kind.Anchor);
+        if (shurikenRoot != null) shurikenRoot.SetActive(kind == Kind.Shuriken);
 
         switch (kind)
         {
@@ -250,6 +265,7 @@ public class CardAimIndicator : MonoBehaviour
             case Kind.Wail:     EnsureWailVisuals();     wailScanTimer = 0f; wailRoot.SetActive(true); break;
             case Kind.Phase:    EnsurePhaseVisuals();    phaseRoot.SetActive(true); break;
             case Kind.Anchor:   EnsureAnchorVisuals();   anchorRoot.SetActive(true); break;
+            case Kind.Shuriken: EnsureShurikenVisuals(); shurikenRoot.SetActive(true); break;
         }
     }
 
@@ -347,6 +363,87 @@ public class CardAimIndicator : MonoBehaviour
             Color rc = enemyHit ? impactEnemyColor : impactWallColor;
             rc.a *= (0.75f + 0.25f * Mathf.Sin(t * 7f)) * dim;
             impactRing.color = rc;
+        }
+    }
+
+    // ------------------------------------------------------------------ SHURIKEN
+
+    private void EnsureShurikenVisuals()
+    {
+        if (shurikenRoot != null) return;
+
+        shurikenRoot = MakeContainer("Aim_Shuriken");
+
+        shurikenDotsSR = new SpriteRenderer[Mathf.Max(3, shurikenDots)];
+        for (int i = 0; i < shurikenDotsSR.Length; i++)
+            shurikenDotsSR[i] = MakeSpriteChild(shurikenRoot.transform, "Dot" + i, GetDotSprite(), sortingOrder);
+
+        shurikenHitRing = MakeSpriteChild(shurikenRoot.transform, "HitRing", GetRingSprite(), sortingOrder + 1);
+    }
+
+    // ⚠️ THIS MUST MIRROR PlayerController.ThrowShuriken EXACTLY — same origin, same aim, same
+    // range. It is the only promise the player gets before committing a charge, and an aimed card
+    // whose preview disagrees with its shot is worse than no preview at all.
+    private void UpdateShuriken(float dim)
+    {
+        Camera c = Camera.main;
+        if (c == null) { shurikenRoot.SetActive(false); return; }
+        if (!shurikenRoot.activeSelf) shurikenRoot.SetActive(true);
+
+        Vector2 origin = player.ShurikenOrigin;
+        Vector2 aim = (Vector2)c.ScreenToWorldPoint(Input.mousePosition) - origin;
+        if (aim.sqrMagnitude < 0.0001f) aim = new Vector2(player.isFacingRight ? 1f : -1f, 0f);
+        aim.Normalize();
+
+        const float MAX_RANGE = 22f * 1.3f;   // Shuriken.SPEED * Shuriken.LIFE
+        const float RADIUS = 0.42f * 0.55f;   // collider radius * spawn scale
+
+        Vector2 start = origin + aim * 0.45f;
+        Vector2 end = start + aim * MAX_RANGE;
+        bool enemy = false;
+
+        int n = Physics2D.CircleCast(start, RADIUS, aim, NoFilter, castHits, MAX_RANGE);
+        for (int i = 0; i < n; i++)
+        {
+            Collider2D col = castHits[i].collider;
+            if (col.GetComponentInParent<PlayerController>() != null) continue;
+            if (col.GetComponent<Portal>() != null) continue;
+            IDamageable dmg = col.GetComponentInParent<IDamageable>();
+            if (dmg == null && col.isTrigger) continue;      // pickups and zones are passed through
+
+            enemy = dmg != null;
+            end = castHits[i].point;
+            break;
+        }
+
+        // Evenly spaced dots along the true flight line, thinning toward the far end so the line
+        // reads as a throw rather than as a laser sight.
+        float len = Vector2.Distance(start, end);
+        Color line = enemy ? shurikenEnemyColor : shurikenColor;
+        for (int i = 0; i < shurikenDotsSR.Length; i++)
+        {
+            float t = (i + 0.5f) / shurikenDotsSR.Length;
+            Vector2 p = Vector2.Lerp(start, end, t);
+            shurikenDotsSR[i].transform.position = new Vector3(p.x, p.y, 0f);
+            shurikenDotsSR[i].transform.localScale = Vector3.one * Mathf.Lerp(0.16f, 0.07f, t);
+
+            Color dc = line;
+            dc.a *= (1f - 0.55f * t) * dim;
+            shurikenDotsSR[i].color = dc;
+        }
+
+        // The impact mark only appears when the throw actually meets something — an endpoint ring
+        // hanging in empty air 28 units away would claim a hit that is not going to happen.
+        bool lands = len < MAX_RANGE - 0.05f;
+        shurikenHitRing.enabled = lands;
+        if (lands)
+        {
+            float t = Time.unscaledTime;
+            shurikenHitRing.transform.position = new Vector3(end.x, end.y, 0f);
+            shurikenHitRing.transform.localScale = Vector3.one * (0.42f * (1f + 0.15f * Mathf.Sin(t * 8f)));
+            Color rc = line;
+            rc.a *= (0.75f + 0.25f * Mathf.Sin(t * 8f)) * dim;
+            shurikenHitRing.color = rc;
         }
     }
 
