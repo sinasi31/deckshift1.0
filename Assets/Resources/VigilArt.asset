@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 643437912b25a38419255b016695f187, type: 3}
+  m_Name: VigilArt
+  m_EditorClassIdentifier: 
+  wallTexture: {fileID: 2800000, guid: 696dadb57c80a0744be25cd33ceff002, type: 3}
+  wallDirt: {fileID: -1933495746, guid: 788b01b24b947f74b9c18245e3cf1ef3, type: 3}
+  pillar: {fileID: 1988360651, guid: daa359c07b4be2f47b477ca2857b031a, type: 3}
+  recess: {fileID: -511315995, guid: daa359c07b4be2f47b477ca2857b031a, type: 3}
+  plinth: {fileID: -180041637, guid: daa359c07b4be2f47b477ca2857b031a, type: 3}
+  torch: {fileID: 965583602, guid: daa359c07b4be2f47b477ca2857b031a, type: 3}
+  flame: {fileID: 21300000, guid: e781795189f5fe04bad87c1a68d19243, type: 3}
+  banner: {fileID: 1677028262, guid: daa359c07b4be2f47b477ca2857b031a, type: 3}
+  beam: {fileID: 985202949, guid: daa359c07b4be2f47b477ca2857b031a, type: 3}
+  floor: {fileID: -1261564076, guid: daa359c07b4be2f47b477ca2857b031a, type: 3}

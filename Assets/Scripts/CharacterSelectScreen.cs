@@ -69,11 +69,53 @@ public class CharacterSelectScreen : MonoBehaviour
         public CharacterStagePortrait portrait;
         public RectTransform root;
         public Image niche, floor, rim;
+        public Image torch, flame;          // the diegetic light — flame burns only on the chosen one
         public RawImage figure;
         public TextMeshProUGUI label;
         public float lit;                // 0..1, eased
         public float x;
     }
+
+    // Real game art (see VigilArt). Null is a supported state — every use is guarded and the screen
+    // falls back to the procedural shapes it had before.
+    private VigilArt art;
+    private static Sprite wallSprite;
+    private static Sprite[] flameFrames;
+
+    /// <summary>
+    /// The torch flame, sliced out of the pack's FX sheet.
+    ///
+    /// ⚠️ **`TX FX Torch Flame` is an UNSLICED 128x128 ANIMATION SHEET, not one flame.** Unity
+    /// reports it as a single sprite, so using it whole draws a grid of ~36 tiny flames — which is
+    /// exactly what the first pass rendered above each torch and it looked like specks of dust.
+    ///
+    /// Measured by blitting it to a RenderTexture and reading the alpha (the source is not
+    /// readable): six clean empty columns, and six uneven horizontal bands whose coverage rises to
+    /// the middle and tapers away — a flame animation growing and shrinking. **Row 2 (y 42–64) is
+    /// the one band with content in all six columns** (0.17–0.21 coverage), so that row is a clean
+    /// six-frame cycle of full-size flames. Cycling one known-good row beats slicing all 36 and
+    /// hoping the grid is exact — a misaligned frame would read as the flame sliding sideways.
+    /// </summary>
+    private static Sprite[] FlameFrames(Sprite sheet)
+    {
+        if (flameFrames != null) return flameFrames;
+        if (sheet == null) return null;
+
+        Texture2D tex = sheet.texture;
+        const int COLS = 6;
+        float fw = tex.width / (float)COLS;
+
+        flameFrames = new Sprite[COLS];
+        for (int c = 0; c < COLS; c++)
+            flameFrames[c] = Sprite.Create(tex, new Rect(c * fw, 42f, fw, 22f),
+                                           new Vector2(0.5f, 0.15f), 100f);
+        return flameFrames;
+    }
+
+    // ⚠️ Measured on screen, not computed. The pack wall is lit for a torch-lit room; at anything
+    // near full value it becomes a bright grey field, flattens the screen and destroys the one thing
+    // this theme has — the lamp being the only light in it.
+    private static readonly Color WallTint = new Color(0.34f, 0.34f, 0.39f, 1f);
 
     // ------------------------------------------------------------------ open / close
 
@@ -172,15 +214,9 @@ public class CharacterSelectScreen : MonoBehaviour
         Stretch(content);
         group = content.gameObject.AddComponent<CanvasGroup>();
 
-        // The hall: near-black stone, darker at the top so the eye falls to the row.
-        Image back = AddImage(content, "Hall", FlatUI.Pixel(), Stone, true);
-        Stretch(back.rectTransform);
+        art = Resources.Load<VigilArt>("VigilArt");
 
-        Image ceiling = AddImage(content, "Ceiling", FlatUI.VerticalFade(), StoneDeep, false);
-        ceiling.rectTransform.anchorMin = new Vector2(0f, 0.45f);
-        ceiling.rectTransform.anchorMax = new Vector2(1f, 1f);
-        ceiling.rectTransform.offsetMin = ceiling.rectTransform.offsetMax = Vector2.zero;
-
+        BuildHall();
         BuildAlcoves();
         BuildLamp();
         BuildInfo();
@@ -198,6 +234,109 @@ public class CharacterSelectScreen : MonoBehaviour
         t.rectTransform.anchoredPosition = new Vector2(0f, -52f);
         t.rectTransform.sizeDelta = new Vector2(900f, 52f);
         t.characterSpacing = 12f;
+    }
+
+    /// <summary>
+    /// The hall, built from the game's OWN dungeon art rather than flat colour.
+    ///
+    /// ⚠️ **THE WALL IS ONE SEAMLESS 8x8 PICTURE, NOT A REPEATING TILE.** `TX Tileable - Dungeon
+    /// Wall` is a 256x256 block the artist drew to tile as a whole; its 64 sub-sprites are pieces of
+    /// that picture, and tiling any single one repeats a fragment and reads as a checkerboard. This
+    /// is the same mistake that made generated rooms never look like the hand-made ones — the level
+    /// importer held six of the sixty-four pieces and scattered them. So the WHOLE texture is used as
+    /// one tiled sprite: correct by construction, and one Image instead of ~500 cells.
+    ///
+    /// ⚠️ **It is tinted DEEP.** Vigil is near-black with one warm lamp, and the pack wall is lit for
+    /// a torch-lit room. Left at full value it is a bright grey field that flattens the whole screen
+    /// and kills the only thing this theme has — the lamp being the sole light. Tint measured on
+    /// screen, not computed (see the linear-colour-space rule).
+    /// </summary>
+    private void BuildHall()
+    {
+        // Base coat behind everything, so a missing texture still gives stone rather than nothing.
+        Image back = AddImage(content, "Hall", FlatUI.Pixel(), Stone, true);
+        Stretch(back.rectTransform);
+
+        if (art != null && art.wallTexture != null)
+        {
+            Texture2D tex = art.wallTexture;
+            if (wallSprite == null)
+                wallSprite = Sprite.Create(tex, new Rect(0f, 0f, tex.width, tex.height),
+                                           new Vector2(0.5f, 0.5f), 100f);
+
+            Image wall = AddImage(content, "WallTiles", wallSprite, WallTint, false);
+            wall.type = Image.Type.Tiled;      // ⚠️ never Simple — Simple stretches one block over the screen
+            Stretch(wall.rectTransform);
+
+            // Grime, in the outer margins the alcoves never occupy.
+            //
+            // ⚠️ NEAR NATIVE SIZE. The sprite is 38x27; the first pass blew it to 420x420 — a 15x
+            // enlargement — and a stain that big stopped reading as a stain and became angular
+            // shapes that looked like broken masonry floating in mid-air. Pixel art enlarged past
+            // ~2x stops being the thing it is a picture of.
+            if (art.wallDirt != null)
+            {
+                float[] gx = { -820f, 800f, -700f, 880f };
+                float[] gy = {  300f, 210f, -140f,-260f };
+                for (int i = 0; i < gx.Length; i++)
+                {
+                    Image d = AddImage(content, "Grime" + i, art.wallDirt,
+                                       new Color(1f, 1f, 1f, 0.05f), false);
+                    d.rectTransform.anchorMin = d.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+                    d.rectTransform.sizeDelta = new Vector2(76f, 54f);
+                    d.rectTransform.anchoredPosition = new Vector2(gx[i], gy[i]);
+                }
+            }
+
+            // A timber across the ceiling — one horizontal that stops the top being an empty void.
+            if (art.beam != null)
+            {
+                Image b = AddImage(content, "Beam", art.beam, new Color(0.30f, 0.28f, 0.30f, 1f), false);
+                b.type = Image.Type.Tiled;
+                b.rectTransform.anchorMin = new Vector2(0f, 1f);
+                b.rectTransform.anchorMax = new Vector2(1f, 1f);
+                b.rectTransform.pivot = new Vector2(0.5f, 1f);
+                b.rectTransform.offsetMin = new Vector2(0f, -40f);
+                b.rectTransform.offsetMax = new Vector2(0f, -8f);
+            }
+
+            // The floor the row stands on, so the alcoves are in a place rather than on a field.
+            if (art.floor != null)
+            {
+                Image f = AddImage(content, "Floor", art.floor, new Color(0.26f, 0.25f, 0.27f, 1f), false);
+                f.type = Image.Type.Tiled;
+                f.rectTransform.anchorMin = new Vector2(0f, 0.5f);
+                f.rectTransform.anchorMax = new Vector2(1f, 0.5f);
+                f.rectTransform.pivot = new Vector2(0.5f, 1f);
+                f.rectTransform.sizeDelta = new Vector2(0f, 26f);
+                f.rectTransform.anchoredPosition = new Vector2(0f, ROW_Y - ALCOVE_H * 0.5f + 30f);
+            }
+        }
+
+        // Darkening from the top so the eye falls to the row. Drawn OVER the wall — the texture
+        // needs to fade into black at the ceiling, not sit at uniform value behind a gradient.
+        Image ceiling = AddImage(content, "Ceiling", FlatUI.VerticalFade(), StoneDeep, false);
+        ceiling.rectTransform.anchorMin = new Vector2(0f, 0.42f);
+        ceiling.rectTransform.anchorMax = new Vector2(1f, 1f);
+        ceiling.rectTransform.offsetMin = ceiling.rectTransform.offsetMax = Vector2.zero;
+
+        // Banners hang BETWEEN alcoves, in the gaps — vertical rhythm in the one band the layout
+        // leaves empty at any roster size.
+        if (art != null && art.banner != null)
+        {
+            int n = Mathf.Max(1, CharacterRoster.All.Count);
+            float step = ALCOVE_W + ALCOVE_GAP;
+            for (int i = 0; i <= n; i++)
+            {
+                float x = -(n * 0.5f) * step + i * step;
+                Image bn = AddImage(content, "Banner" + i, art.banner,
+                                    new Color(0.34f, 0.20f, 0.20f, 0.85f), false);
+                bn.rectTransform.anchorMin = bn.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+                bn.rectTransform.pivot = new Vector2(0.5f, 1f);
+                bn.rectTransform.sizeDelta = new Vector2(64f, 126f);
+                bn.rectTransform.anchoredPosition = new Vector2(x, ROW_Y + ALCOVE_H * 0.5f + 34f);
+            }
+        }
     }
 
     private void BuildAlcoves()
@@ -219,15 +358,35 @@ public class CharacterSelectScreen : MonoBehaviour
             a.root.anchoredPosition = new Vector2(a.x, ROW_Y);
             a.root.sizeDelta = new Vector2(ALCOVE_W, ALCOVE_H);
 
-            // The niche: a recess cut into the wall, darker than the wall around it.
+            // The niche: a recess cut into the wall, darker than the wall around it. Still the
+            // procedural arch — it is the hit target and the shape that reads at any roster size,
+            // and the pack has no alcove sprite this tall.
             a.niche = AddImage(a.root, "Niche", ArchSprite(), StoneDeep, true);
             a.niche.type = Image.Type.Simple;
             Stretch(a.niche.rectTransform);
+
+            // Real cave-mouth art INSIDE the arch, so the recess is cut stone rather than a shape.
+            if (art != null && art.recess != null)
+            {
+                Image rec = AddImage(a.root, "Recess", art.recess, new Color(0.16f, 0.16f, 0.19f, 0.9f), false);
+                rec.rectTransform.anchorMin = rec.rectTransform.anchorMax = new Vector2(0.5f, 0f);
+                rec.rectTransform.pivot = new Vector2(0.5f, 0f);
+                rec.rectTransform.sizeDelta = new Vector2(ALCOVE_W * 0.92f, 150f);
+                rec.rectTransform.anchoredPosition = new Vector2(0f, 26f);
+            }
 
             // A hairline of catch-light around the arch — without it the recess has no edge at all
             // against a wall this dark, and the row reads as flat rectangles.
             a.rim = AddImage(a.root, "Rim", ArchRimSprite(), StoneEdge, false);
             Stretch(a.rim.rectTransform);
+
+            // ⚠️ NO PILLARS HERE, AND THAT IS A DECISION. `Pillar 01 A` was tried both stretched
+            // (a 3x vertical smear of a carved column) and TILED, and tiling an ATLASED sprite
+            // repeats the pillar's capital rather than its shaft — both read as brackets stuck to
+            // the wall at chest height, not as columns. The arch, banners, plinth and torch already
+            // carry the architecture, so forcing one more prop to be something it is not drawn as
+            // would have cost more than it paid. If a real column is wanted later it needs a
+            // purpose-drawn shaft sprite, not this one repeated.
 
             a.portrait = CharacterStagePortrait.Create(a.data, i, PORTRAIT_W, PORTRAIT_H);
             a.figure = AddRaw(a.root, "Figure", a.portrait != null ? a.portrait.Texture : null);
@@ -241,12 +400,51 @@ public class CharacterSelectScreen : MonoBehaviour
             a.figure.rectTransform.sizeDelta = new Vector2(PORTRAIT_W, PORTRAIT_H);
 
             // The ledge each figure stands on, so they are in the alcove rather than floating.
-            a.floor = AddImage(a.root, "Ledge", FlatUI.Pixel(), StoneEdge, false);
-            a.floor.rectTransform.anchorMin = new Vector2(0.08f, 0f);
-            a.floor.rectTransform.anchorMax = new Vector2(0.92f, 0f);
-            a.floor.rectTransform.pivot = new Vector2(0.5f, 0f);
-            a.floor.rectTransform.offsetMin = new Vector2(0f, 30f);
-            a.floor.rectTransform.offsetMax = new Vector2(0f, 34f);
+            // A real stone plinth where we have one; the flat bar is the fallback.
+            if (art != null && art.plinth != null)
+            {
+                a.floor = AddImage(a.root, "Plinth", art.plinth, new Color(0.34f, 0.33f, 0.36f, 1f), false);
+                a.floor.rectTransform.anchorMin = a.floor.rectTransform.anchorMax = new Vector2(0.5f, 0f);
+                a.floor.rectTransform.pivot = new Vector2(0.5f, 0f);
+                a.floor.rectTransform.sizeDelta = new Vector2(ALCOVE_W * 0.80f, 52f);
+                a.floor.rectTransform.anchoredPosition = new Vector2(0f, 14f);
+            }
+            else
+            {
+                a.floor = AddImage(a.root, "Ledge", FlatUI.Pixel(), StoneEdge, false);
+                a.floor.rectTransform.anchorMin = new Vector2(0.08f, 0f);
+                a.floor.rectTransform.anchorMax = new Vector2(0.92f, 0f);
+                a.floor.rectTransform.pivot = new Vector2(0.5f, 0f);
+                a.floor.rectTransform.offsetMin = new Vector2(0f, 30f);
+                a.floor.rectTransform.offsetMax = new Vector2(0f, 34f);
+            }
+
+            // ⚠️ THE TORCH IS THE POINT OF THIS PASS. Vigil's inversion is that light marks the
+            // selection, and until now that light had no SOURCE — it was a glow sprite floating in
+            // the dark. Every alcove now carries a real bracket, and only the chosen one burns, so
+            // the light is a thing in the room instead of a UI effect. The flame's alpha and scale
+            // are driven by `a.lit` in Update, which means the fire travels the row with the
+            // selection rather than cutting.
+            if (art != null && art.torch != null)
+            {
+                // 8x35 native. Held near 2x — pixel art pushed much past that stops reading as the
+                // object it is a picture of (the 15x grime stain in the first pass proved it).
+                a.torch = AddImage(a.root, "Torch", art.torch, new Color(0.34f, 0.32f, 0.32f, 1f), false);
+                a.torch.rectTransform.anchorMin = a.torch.rectTransform.anchorMax = new Vector2(0.5f, 1f);
+                a.torch.rectTransform.pivot = new Vector2(0.5f, 1f);
+                a.torch.rectTransform.sizeDelta = new Vector2(18f, 78f);
+                a.torch.rectTransform.anchoredPosition = new Vector2(0f, -4f);
+
+                Sprite[] frames = FlameFrames(art.flame);
+                if (frames != null && frames[0] != null)
+                {
+                    a.flame = AddImage(a.root, "Flame", frames[0], new Color(1f, 1f, 1f, 0f), false);
+                    a.flame.rectTransform.anchorMin = a.flame.rectTransform.anchorMax = new Vector2(0.5f, 1f);
+                    a.flame.rectTransform.pivot = new Vector2(0.5f, 0f);   // grows UPWARD from the bracket
+                    a.flame.rectTransform.sizeDelta = new Vector2(52f, 56f);
+                    a.flame.rectTransform.anchoredPosition = new Vector2(0f, -10f);
+                }
+            }
 
             a.label = AddText(a.root, "Name", a.data.characterName.ToUpperInvariant(), 22f, TextDim,
                               TextAlignmentOptions.Center);
@@ -361,6 +559,14 @@ public class CharacterSelectScreen : MonoBehaviour
 
         HandleKeys();
 
+        // ⚠️ THE PANEL IS DERIVED FROM `index`, NOT PUSHED AT IT. `RefreshInfo` self-guards on
+        // `lastShown`, so calling it every frame is free — and it is the only way the name, trait and
+        // starting deck cannot fall out of step with the lamp. They already had: the alcove CLICK
+        // handler sets `index` directly and never refreshed, so clicking a character moved the light
+        // onto them while the panel kept describing the previous one. Requiring every mutation site
+        // to remember is the same losing pattern as a hand-kept list of `IsOpen` flags.
+        RefreshInfo();
+
         // ⚠️ Unscaled throughout. This screen can be reached with the game paused behind it, and on
         // scaled time every one of these would sit frozen at its resting value.
         float dt = Time.unscaledDeltaTime;
@@ -408,6 +614,32 @@ public class CharacterSelectScreen : MonoBehaviour
                 a.rim.color = Color.Lerp(StoneEdge, Lamp, k * 0.55f);
             if (a.label != null)
                 a.label.color = Color.Lerp(TextDim, TextLit, k);
+
+            // The torch: cold iron when dark, catching its own firelight when lit.
+            if (a.torch != null)
+                a.torch.color = Color.Lerp(new Color(0.30f, 0.29f, 0.31f, 1f),
+                                           new Color(1f, 0.86f, 0.62f, 1f), k * 0.75f);
+
+            // The flame. ⚠️ It must actually ANIMATE — a fire held on one frame at a steady alpha
+            // reads as a decal of a fire. It cycles the sheet's six frames, and each torch runs on
+            // its own offset so the row doesn't flicker in unison like a strobe. The small scale
+            // wobble on top keeps it from looping visibly at six frames.
+            if (a.flame != null)
+            {
+                Sprite[] frames = flameFrames;
+                float t = Time.unscaledTime;
+                if (frames != null && frames.Length > 0)
+                {
+                    int off = i * 2;                                    // per-torch phase offset
+                    int f = (Mathf.FloorToInt(t * 12f) + off) % frames.Length;
+                    if (frames[f] != null) a.flame.sprite = frames[f];
+                }
+                float wob = 1f + 0.06f * Mathf.Sin(t * 9.1f + i * 2.3f);
+                // Tinted toward the lamp colour: the sheet's flame is near-white at its core, which
+                // on its own reads as a candle rather than a torch.
+                a.flame.color = new Color(1f, 0.86f, 0.62f, k * 0.95f);
+                a.flame.rectTransform.localScale = new Vector3(1f, wob, 1f) * Mathf.Lerp(0.75f, 1f, k);
+            }
 
             // Only the chosen figure BREATHES. Everything else is a statue.
             if (a.portrait != null) a.portrait.SetAwake(i == index);

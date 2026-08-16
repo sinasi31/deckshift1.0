@@ -145,12 +145,49 @@ character wakes and breathes while the rest stay frozen in cold blue shadow.
   It confirmed instantly from the Enter that pressed PLAY; guarded with `openedFrame`. Same family as
   `PauseScreen`'s Escape memory, from the other direction.
 
-**Open: the real-asset pass on this screen is STARTED, NOT DONE.** The designer asked for it to be
-built from actual game art rather than procedural shapes. Found so far: `TX Tileable - Dungeon Wall`
-(64 sprites, seamless 8×8 — see the level importer's `BackWallIndex`), `TX Dungeon Wall Deco` (17),
-`TX Dungeon Wall Dirt` (15), `TX FX Torch Flame`, `TX FX Candle Flame`. **The agreed idea is a real
-torch above every alcove with only the selected one lit**, which makes the light diegetic instead of
-a UI effect. Still needed: prop sprites for a torch bracket, banners, floor and arch.
+### The real-asset pass — DONE 2026-08-17 (`VigilArt`)
+
+The hall is now built from the game's own dungeon art instead of procedural shapes: the tiled stone
+wall, hanging banners, a stone plinth per alcove, a cave-mouth recess, a floor strip, a ceiling
+timber, and **a real torch over every alcove whose flame burns only on the chosen one**. That last
+one is the point of the pass — Vigil's inversion is that light marks the selection, and until now
+that light had no SOURCE; it was a glow sprite floating in the dark.
+
+⚠️ **`Assets/Resources/VigilArt.asset` carries the sprite references** because none of this art is in
+a `Resources/` folder. Same pattern and same reason as `UIType.asset`; rebuilt by **Deckshift →
+Rebuild Vigil Art**. **Every field is optional and each use is guarded** — a missing asset falls back
+to the old procedural shapes rather than leaving the player unable to pick a character.
+
+⚠️ **`TX FX Torch Flame` is an UNSLICED 128×128 ANIMATION SHEET.** Unity reports it as ONE sprite, so
+drawing it whole renders a grid of ~36 tiny flames — which is exactly what the first pass put above
+each torch, and it looked like specks of dust. Measured by blitting to a RenderTexture and reading
+the alpha (the source is not readable): six clean empty columns, and six uneven horizontal bands
+whose coverage rises to the middle and tapers — a flame growing and shrinking. **Row 2 (y 42–64) is
+the one band with content in all six columns**, so the screen cycles that row as a six-frame loop.
+Cycling one known-good row beats slicing all 36 and hoping the grid is exact; a misaligned frame
+reads as the flame sliding sideways.
+
+⚠️ **PIXEL ART ENLARGED PAST ~2× STOPS READING AS THE THING IT DEPICTS.** The 38×27 grime sprite was
+blown to 420×420 (15×) and became angular shapes that looked like broken masonry floating in mid-air.
+Held near native now. Same reason the torch is 18×78 from an 8×35 source, not 26×96.
+
+⚠️ **`Image.Type.Tiled` on an ATLASED sprite repeats the wrong part.** `Pillar 01 A` tiled up a shaft
+repeated the pillar's *capital*, so both alcoves grew brackets at chest height. Stretching it instead
+gave a 3× vertical smear. **Pillars were dropped** — the arch, banners, plinth and torch already carry
+the architecture, and forcing a prop to be something it is not drawn as costs more than it pays. A
+real column needs a purpose-drawn shaft sprite.
+
+⚠️ **The wall is ONE seamless 8×8 picture, so the WHOLE 256×256 texture is tiled as a single sprite** —
+tiling any one of its 64 sub-sprites repeats a fragment of a larger image and reads as a
+checkerboard. This is the same mistake that made generated rooms never look hand-made. Tint is
+measured on screen (`WallTint` 0.34): at 0.20 the texture was invisible, and near full value it
+becomes a bright grey field that kills the one thing this theme has.
+
+**Fixed in the same pass:** the alcove CLICK handler set `index` without calling `RefreshInfo`, so
+clicking a character moved the light onto them while the name, trait and starting deck kept
+describing the previous one. `RefreshInfo` self-guards on `lastShown`, so it is now called every
+frame from `Update` — **the panel is DERIVED from `index` rather than pushed at it**, which is the
+only version that cannot rot when a new mutation site is added.
 
 ⚠️ **Two bugs on this screen were found and fixed 2026-08-16 — do not reintroduce them.** It parented
 to `FindFirstObjectByType<Canvas>()`, which in a gameplay scene returns a **world-space enemy health
