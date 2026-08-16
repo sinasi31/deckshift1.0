@@ -694,6 +694,173 @@ public static class ProcSfx
 
     // Small Schroeder reverb (3 damped combs -> 1 allpass) for a tight, warm stone room, then a
     // one-pole master low-pass. Damping keeps the tail warm/candlelit.
+    // =============================================================================================
+    // UI — the interface's own voice.
+    //
+    // THE FAMILY RULE, and it is a different KIND of rule from the others. Every family above is
+    // defined by a MATERIAL: magic by harmonic bell partials, metal by inharmonic bar modes, stone
+    // by noise and sub, paper by having no pitched component at all, the pause pair by a choked
+    // envelope. A UI sound has no material — it is not a thing in the world, it is the interface.
+    //
+    // So this family is defined by PITCH MOTION instead. All six share ONE voice, literally the
+    // same `WoodTap` call, and differ only in which way the pitch moves and by how much. That is
+    // what makes them a learnable language rather than six noises — and it is the right mechanism
+    // for the job, because these are the only sounds in the game that must be told apart FROM EACH
+    // OTHER. A world sound only has to be distinguishable from other materials.
+    //
+    // ⚠️ THE VOICE IS SOFT STRUCK WOOD, and that is a deliberate claim on the one material the
+    // world does not already use. Metal is the forge, glass and bells are magic, stone is the
+    // rooms, paper is the quest board. Wood is unclaimed, warm, and belongs in a candlelit
+    // dungeon — where a clean synth blip would sound like it came from a different game.
+    //
+    // ⚠️ THEY MUST BE SMALL AND DRY. These play hundreds of times a session. Anything with shimmer
+    // or a long tail becomes torture by minute ten, which is why the reverb here is the driest in
+    // the file and the decays are the shortest.
+    //
+    // ⚠️ CANCEL AND REFUSE ARE NOT THE SAME SOUND, and conflating them is the usual mistake.
+    // CANCEL is the player choosing to back out — consonant, unremarkable, no fault implied.
+    // REFUSE is the game saying no — the only DISSONANT sound in the family. And refuse must not
+    // read as damage or failure either; it means "you can't do that", not "you got hurt".
+    //
+    // ⚠️ OPEN AND CLOSE ARE THE SAME FIGURE INVERTED — the identical three notes, backwards. Two
+    // unrelated sounds would not read as a pair, and the pairing is what tells the player that the
+    // thing that arrived is the thing that just left.
+
+    private static AudioClip uiMove, uiConfirm, uiCancel, uiRefuse, uiOpen, uiClose;
+
+    /// <summary>Moving a selection. Neutral, no pitch motion, quiet enough to hold a key through.</summary>
+    public static AudioClip UIMove
+    {
+        get { if (uiMove == null) uiMove = BuildUIMove(); return uiMove; }
+    }
+
+    /// <summary>Committing. Rising perfect fifth — the most consonant way up, so it reads as resolution.</summary>
+    public static AudioClip UIConfirm
+    {
+        get { if (uiConfirm == null) uiConfirm = BuildUIConfirm(); return uiConfirm; }
+    }
+
+    /// <summary>Backing out by choice. Falling fourth: downward, but consonant — this is not an error.</summary>
+    public static AudioClip UICancel
+    {
+        get { if (uiCancel == null) uiCancel = BuildUICancel(); return uiCancel; }
+    }
+
+    /// <summary>The game saying no. A minor second sounded together, damped hard. The only dissonance here.</summary>
+    public static AudioClip UIRefuse
+    {
+        get { if (uiRefuse == null) uiRefuse = BuildUIRefuse(); return uiRefuse; }
+    }
+
+    /// <summary>A panel arriving. Three notes up.</summary>
+    public static AudioClip UIOpen
+    {
+        get { if (uiOpen == null) uiOpen = BuildUIOpen(); return uiOpen; }
+    }
+
+    /// <summary>The same three notes, backwards.</summary>
+    public static AudioClip UIClose
+    {
+        get { if (uiClose == null) uiClose = BuildUIClose(); return uiClose; }
+    }
+
+    // The one voice. Every UI sound in the family is this function and nothing else, so the family
+    // physically cannot drift apart the way a set of hand-tuned one-offs would.
+    //
+    // Struck wood is INHARMONIC but only mildly so — far less than metal's bar modes, which is what
+    // keeps it reading as a soft tap rather than a clank. The tiny noise transient is the mallet
+    // contact; without it the tone starts from nothing and sounds synthesised rather than struck.
+    private static void WoodTap(float[] buf, float atSeconds, float hz, float amp, float decay,
+                                System.Random rng)
+    {
+        int start = Mathf.RoundToInt(atSeconds * SampleRate);
+        if (start >= buf.Length) return;
+
+        // Mild inharmonic partials — a struck wooden bar, not a metal one.
+        float[] ratio = { 1f, 2.83f, 4.94f };
+        float[] gain  = { 1f, 0.26f, 0.09f };
+
+        for (int i = start; i < buf.Length; i++)
+        {
+            float t = (float)(i - start) / SampleRate;
+            float env = Mathf.Exp(-decay * t);
+            if (env < 0.0008f) break;
+
+            float body = 0f;
+            for (int k = 0; k < ratio.Length; k++)
+            {
+                // Higher partials die faster, which is most of what makes a tap sound wooden.
+                body += Mathf.Sin(2f * Mathf.PI * hz * ratio[k] * t) * gain[k] * Mathf.Exp(-decay * 1.9f * k * t);
+            }
+
+            // Mallet contact: a couple of milliseconds of noise, gone almost immediately.
+            float tap = 0f;
+            if (t < 0.004f)
+                tap = (float)(rng.NextDouble() * 2.0 - 1.0) * 0.35f * (1f - t / 0.004f);
+
+            buf[i] += (body * 0.42f + tap) * env * amp;
+        }
+    }
+
+    private static AudioClip BuildUIMove()
+    {
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.13f)];
+        var rng = new System.Random(9101);
+        // Deliberately the quietest sound in the game. It fires on every arrow key.
+        WoodTap(dry, 0f, 700f, 0.085f, 58f, rng);
+        return Finalize(dry, 0.055f, 6200f);
+    }
+
+    private static AudioClip BuildUIConfirm()
+    {
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.30f)];
+        var rng = new System.Random(9102);
+        WoodTap(dry, 0f,     620f, 0.155f, 34f, rng);
+        WoodTap(dry, 0.062f, 930f, 0.150f, 30f, rng);   // x1.5 — perfect fifth up
+        return Finalize(dry, 0.085f, 6800f);
+    }
+
+    private static AudioClip BuildUICancel()
+    {
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.30f)];
+        var rng = new System.Random(9103);
+        WoodTap(dry, 0f,     780f, 0.145f, 34f, rng);
+        WoodTap(dry, 0.062f, 585f, 0.140f, 30f, rng);   // x0.75 — perfect fourth down
+        return Finalize(dry, 0.085f, 6200f);
+    }
+
+    private static AudioClip BuildUIRefuse()
+    {
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.24f)];
+        var rng = new System.Random(9104);
+        // Sounded TOGETHER, not in sequence: a beating minor second is the dissonance, and playing
+        // the two notes one after the other would just read as another little melody.
+        WoodTap(dry, 0f,      600f, 0.135f, 46f, rng);
+        WoodTap(dry, 0.006f,  636f, 0.130f, 46f, rng);  // ~x1.06 — minor second
+        return Finalize(dry, 0.05f, 5200f);             // driest and dullest: it should not ring
+    }
+
+    private static AudioClip BuildUIOpen()
+    {
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.42f)];
+        var rng = new System.Random(9105);
+        WoodTap(dry, 0f,     520f, 0.120f, 30f, rng);
+        WoodTap(dry, 0.055f, 693f, 0.125f, 28f, rng);
+        WoodTap(dry, 0.110f, 780f, 0.130f, 24f, rng);
+        return Finalize(dry, 0.10f, 7000f);
+    }
+
+    private static AudioClip BuildUIClose()
+    {
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.42f)];
+        var rng = new System.Random(9106);
+        // The identical three pitches of UIOpen, in reverse.
+        WoodTap(dry, 0f,     780f, 0.125f, 30f, rng);
+        WoodTap(dry, 0.055f, 693f, 0.120f, 28f, rng);
+        WoodTap(dry, 0.110f, 520f, 0.118f, 24f, rng);
+        return Finalize(dry, 0.10f, 6400f);
+    }
+
     private static float[] ApplyReverbAndWarmth(float[] dry, float wet, float masterLpHz)
     {
         int n = dry.Length;

@@ -12,7 +12,7 @@ using TMPro;
 // panel is the bar opened up, not a different place. It reuses RelicIcon for filled slots, so a
 // relic looks identical here and in the HUD, and rarity reads the same way (coloured strip under
 // the socket) in both.
-public class RelicManagePanel : MonoBehaviour
+public class RelicManagePanel : GameScreen
 {
     public static RelicManagePanel instance;
     private static KeyCode toggleKey = KeyCode.I;
@@ -32,8 +32,7 @@ public class RelicManagePanel : MonoBehaviour
     private readonly List<Image> selectRings = new List<Image>();
     private readonly List<RelicData> cellRelics = new List<RelicData>();
     private RelicData selected;
-    private bool isOpen;
-    private GameObject cachedHud;   // cached while active in Show(); Find() can't see it once hidden
+    // isOpen, and the pause / game-state / HUD / drawer bookkeeping, now live in GameScreen.
 
     // Height came down from 470: with the ornate border gone the detail area was mostly empty
     // panel, and a relic description is only ever a line or two.
@@ -60,18 +59,7 @@ public class RelicManagePanel : MonoBehaviour
         instance.Build();
     }
 
-    private static Canvas FindRootCanvas()
-    {
-        Canvas[] all = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
-        Canvas fallback = null;
-        foreach (Canvas c in all)
-        {
-            if (c == null) continue;
-            if (fallback == null) fallback = c;
-            if (c.isRootCanvas && c.renderMode == RenderMode.ScreenSpaceOverlay) return c;
-        }
-        return fallback;
-    }
+    // FindRootCanvas now lives in GameScreen.
 
     private void Update()
     {
@@ -191,14 +179,7 @@ public class RelicManagePanel : MonoBehaviour
         gameObject.SetActive(true);
         transform.SetAsLastSibling();
 
-        if (GameManager.instance != null)
-        {
-            GameManager.instance.RequestPause();                       // stops physics (timeScale 0)
-            GameManager.instance.SetGameState(GameState.Paused);       // blocks player input (jump/move/cards)
-        }
-        if (cachedHud == null) cachedHud = GameObject.Find("GameplayHUD");   // active now, cache for Hide
-        if (cachedHud != null) cachedHud.SetActive(false);
-        if (HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(true);
+        AcquireDisplay();
 
         RebuildSlots();
         UpdateDetail();
@@ -212,13 +193,11 @@ public class RelicManagePanel : MonoBehaviour
         isOpen = false;
         LastToggleFrame = Time.frameCount;
 
-        if (GameManager.instance != null)
-        {
-            GameManager.instance.ReleasePause();
-            GameManager.instance.SetGameState(GameState.Playing);
-        }
-        if (cachedHud != null) cachedHud.SetActive(true);
-        if (HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(false);
+        // ⚠️ This screen used to hardcode all three of these — SetGameState(Playing), SetActive(true)
+        // and an ungated SetLocked(false) — rather than restoring what was actually there. Opened on
+        // top of another screen it would have handed the HUD and the drawer back while the outer
+        // screen still needed them hidden and locked. GameScreen restores the recorded values.
+        ReleaseDisplay();
 
         gameObject.SetActive(false);
     }

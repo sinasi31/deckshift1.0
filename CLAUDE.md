@@ -899,6 +899,41 @@ migrating: open/close balanced, no pause leak over three cycles, double-open and
 and — the load-bearing case — opening the board *on top of* the relic panel and closing it leaves the
 HUD hidden and the outer screen's pause intact.
 
+### The UI sound family (2026-08-16) — defined by PITCH MOTION, not by material
+
+Six sounds in `ProcSfx`: `UIMove` / `UIConfirm` / `UICancel` / `UIRefuse` / `UIOpen` / `UIClose`,
+fired from `GameScreen`.
+
+⚠️ **This family's rule is a different KIND of rule from the others.** Every existing family is
+defined by a MATERIAL — magic by harmonic bell partials, metal by inharmonic bar modes, stone by
+noise + sub, paper by having no pitched component at all, the pause pair by a choked envelope. **A UI
+sound has no material**: it is not a thing in the world, it is the interface. So this family is
+defined by **pitch motion** instead — all six share one voice (literally the same `WoodTap` call) and
+differ only in which way the pitch moves. That is what makes them a learnable *language*, and it is
+the right mechanism because these are the only sounds in the game that must be told apart **from each
+other**; a world sound only has to be distinguishable from other materials.
+
+⚠️ **The voice is soft struck WOOD**, deliberately claiming the one material the world does not use
+(metal = forge, glass/bell = magic, stone = rooms, paper = quest board). A clean synth blip would
+sound like it came from a different game.
+
+⚠️ **CANCEL AND REFUSE ARE NOT THE SAME SOUND.** Cancel is the player choosing to back out —
+consonant, no fault implied. Refuse is the *game* saying no, and is the only dissonant sound in the
+family. Refuse must also not read as damage: it means "you can't", not "you got hurt".
+
+⚠️ **Open and Close are the same three notes inverted**, not two unrelated sounds — the pairing is
+what says the thing that arrived is the thing that left.
+
+⚠️ **A screen with a BESPOKE open sound must override `PlaysDefaultOpenCloseSound` to false**, or it
+plays two. The quest board's paper rustle and the pause screen's halt/release are signatures and beat
+the generic pair; the generic pair exists for screens that would otherwise be silent.
+
+**Audition without Play mode:** **Deckshift → Bake UI SFX Previews** writes the six to
+`Assets/ProcSfxPreview/*.wav` (throwaway folder). Verified by measurement rather than ear —
+Move is the quietest (peak 0.038 vs 0.072–0.088), Confirm's 930Hz overtakes its 620Hz while Cancel's
+585Hz overtakes its 780Hz, Open/Close are 520→780 and 780→520, and Refuse carries both 600Hz and
+636Hz simultaneously (a beating minor second, not a melody).
+
 ### Typography — `UIType.cs` (2026-08-16), two stated faces and a size scale
 
 **`UIType` is the single source of truth for what the UI is set in.** Before it, the font was decided

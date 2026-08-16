@@ -74,6 +74,8 @@ public abstract class GameScreen : MonoBehaviour
         if (holdsDisplay) return;      // idempotent: a double Show must not stack two pauses
         holdsDisplay = true;
 
+        if (PlaysDefaultOpenCloseSound) PlayUI(ProcSfx.UIOpen);
+
         if (!OwnsGameplay) return;
 
         GameManager gm = GameManager.instance;
@@ -95,6 +97,8 @@ public abstract class GameScreen : MonoBehaviour
     {
         if (!holdsDisplay) return;     // idempotent: a double Hide must not release a pause twice
         holdsDisplay = false;
+
+        if (PlaysDefaultOpenCloseSound) PlayUI(ProcSfx.UIClose);
 
         if (!OwnsGameplay) return;
 
@@ -241,6 +245,53 @@ public abstract class GameScreen : MonoBehaviour
             yield return null;
         }
         g.alpha = to;
+    }
+
+    // =====================================================================================
+    // Sound — the UI vocabulary (see the UI family in ProcSfx)
+    //
+    // Six sounds sharing one voice, meaning carried by pitch motion. Firing open/close from here is
+    // the point: it is how a new screen gets the vocabulary without inventing one, which is exactly
+    // how the project ended up with sound on the pause screen and silence everywhere else.
+    // =====================================================================================
+
+    private AudioSource uiAudio;
+
+    /// <summary>
+    /// Whether this screen uses the generic open/close pair.
+    ///
+    /// ⚠️ **A screen with a BESPOKE open sound must return false, or it plays two.** The quest
+    /// board's paper rustle and the pause screen's halt/release are that screen's signature and
+    /// beat the generic pair — the generic one exists for screens that would otherwise be silent.
+    /// </summary>
+    protected virtual bool PlaysDefaultOpenCloseSound { get { return true; } }
+
+    /// <summary>Moving a selection. Fires constantly, so it is deliberately the quietest.</summary>
+    protected void PlayMove() { PlayUI(ProcSfx.UIMove); }
+
+    /// <summary>Committing to something.</summary>
+    protected void PlayConfirm() { PlayUI(ProcSfx.UIConfirm); }
+
+    /// <summary>The player choosing to back out. NOT the same as <see cref="PlayRefuse"/>.</summary>
+    protected void PlayCancel() { PlayUI(ProcSfx.UICancel); }
+
+    /// <summary>The game saying no — can't afford it, slots full, already taken.</summary>
+    protected void PlayRefuse() { PlayUI(ProcSfx.UIRefuse); }
+
+    private void PlayUI(AudioClip clip)
+    {
+        if (clip == null) return;
+
+        if (uiAudio == null)
+        {
+            // 2D and built in code, like the boss's source: a UI sound must be equally audible
+            // wherever the player happens to be standing in the room behind the panel.
+            uiAudio = gameObject.AddComponent<AudioSource>();
+            uiAudio.playOnAwake = false;
+            uiAudio.spatialBlend = 0f;
+        }
+
+        SfxManager.PlayOn(uiAudio, clip);
     }
 
     /// <summary>

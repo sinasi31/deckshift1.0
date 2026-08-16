@@ -75,6 +75,10 @@ public class QuestBoardScreen : GameScreen
     private float fitScale = 1f;
     // isOpen, and the pause / game-state / HUD / drawer bookkeeping, now live in GameScreen.
 
+    // The board opens on a paper rustle and accepts on a wax stamp — its own material, and better
+    // than the generic pair. Taking both would just play two sounds on top of each other.
+    protected override bool PlaysDefaultOpenCloseSound { get { return false; } }
+
     // One pinned contract.
     private class Slip
     {
@@ -602,11 +606,18 @@ public class QuestBoardScreen : GameScreen
     private void TryAccept(Slip s)
     {
         QuestSystem qs = QuestSystem.instance;
-        if (qs == null || !s.interactable) return;
-        if (!qs.AcceptQuest(s.data)) return;
+
+        // ⚠️ A refused click used to return in SILENCE, so clicking a contract while the board was
+        // full — or one already taken — did nothing at all and looked broken rather than refused.
+        // Refuse is the game saying no; the wax stamp below is the yes.
+        if (qs == null || !s.interactable) { PlayRefuse(); return; }
+        if (!qs.AcceptQuest(s.data)) { PlayRefuse(); return; }
 
         s.hovered = false;
         s.interactable = false;
+
+        // Keeps its own confirm: a seal pressed into wax is this screen's signature and beats the
+        // generic one, exactly like the paper rustle beats the generic open.
         SfxManager.PlayOn(audioSource, ProcSfx.WaxStamp, 0.9f);
 
         StartCoroutine(SealRoutine(s));
