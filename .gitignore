@@ -56,3 +56,5 @@
 
 # Crashlytics generated folder
 crashlytics-build.properties
+# Screen Gallery output (Deckshift → Screen Gallery) — captures + contact sheets, regenerable
+/ScreenGallery/

@@ -81,7 +81,7 @@ public class CharacterSelectScreen : MonoBehaviour
     {
         if (instance == null)
         {
-            Canvas canvas = FindFirstObjectByType<Canvas>();
+            Canvas canvas = FindRootCanvas();
             if (canvas == null)
             {
                 // ⚠️ Never strand the player on a dead menu button. Same rule the run map follows:
@@ -97,6 +97,31 @@ public class CharacterSelectScreen : MonoBehaviour
             instance.Build();
         }
         instance.Show(onConfirmed);
+    }
+
+    /// <summary>
+    /// The Canvas this screen belongs on — the root Screen-Space-Overlay one.
+    ///
+    /// ⚠️ This used to be `FindFirstObjectByType&lt;Canvas&gt;()`, which is only safe in a scene that
+    /// happens to contain exactly one Canvas. It worked in the main menu and was silently broken
+    /// everywhere else: a gameplay scene carries a WORLD-SPACE Canvas per enemy health bar (18 of
+    /// them in SampleScene), and `FindFirstObjectByType` returned one of those. The screen then
+    /// built itself inside a health bar at 0.01 scale — measured 76.7x24 units — so it rendered
+    /// invisibly while `Open` still reported success and armed its confirm callback.
+    ///
+    /// Same helper `ShopScreenUI` already uses; keep the two in step.
+    /// </summary>
+    private static Canvas FindRootCanvas()
+    {
+        Canvas[] all = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
+        Canvas fallback = null;
+        foreach (Canvas c in all)
+        {
+            if (c == null) continue;
+            if (fallback == null) fallback = c;
+            if (c.isRootCanvas && c.renderMode == RenderMode.ScreenSpaceOverlay) return c;
+        }
+        return fallback;
     }
 
     private void Show(System.Action cb)
@@ -612,6 +637,13 @@ public class CharacterSelectScreen : MonoBehaviour
         t.color = c;
         t.alignment = align;
         t.raycastTarget = false;
+
+        // ⚠️ Every other screen in the game routes its text through this. Missing it here is why the
+        // select screen rendered in TMP's default Liberation Sans while the rest of the game is in
+        // the pixel face — an opt-in convention that silently drops any screen that forgets it.
+        TMP_FontAsset font = FlatUI.UIFont();
+        if (font != null) t.font = font;
+
         return t;
     }
 

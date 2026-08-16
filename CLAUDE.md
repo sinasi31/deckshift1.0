@@ -1151,7 +1151,22 @@ Verified, not assumed. The tilemaps render with **`Sprite-Lit-Default` (URP 2D l
 
 `LevelManager.roomPrefabs` holds the pool of room prefabs. **Element 0 must be the hub;** elements 1..n are the run's combat levels. The boss room is NOT in this list — it has its own `bossRoomPrefab` slot.
 
-**Verified pool contents (2026-08-08):** `[0] hub, [1] efeslevel1, [2] efeslevel2, [3] efeslevel3, [4] EfeVrl4, [5] EfeVrl5, [6] EfeVrl6, [7] EfeVrl7, [8] GenLevel7, [9] GenLevel8, [10] GenLevel9` + `bossRoomPrefab = BossRoom`. So the run is **10 combat levels**. All satisfy the room contract (CameraBounds / GirisNoktasi / ExitDoor), and only `hub` has a `HubMarker`.
+**Verified pool contents (re-verified 2026-08-16):** `[0] hub, [1] efeslevel1, [2] efeslevel2, [3] efeslevel3, [4] EfeVrl4, [5] EfeVrl5, [6] EfeVrl6, [7] EfeVrl7, [8] GenLevel7, [9] GenLevel8, [10] GenLevel9, [11] GenLevel10` + `bossRoomPrefab = BossRoom`. So the run is **11 combat levels**. All satisfy the room contract (CameraBounds / GirisNoktasi / ExitDoor), and only `hub` has a `HubMarker`.
+
+⚠️ **THIS LIST HAS NOW BEEN WIPED THREE TIMES, AND THE THIRD TIME SURVIVED A WHOLE SESSION.** On
+2026-08-16 it was found holding a **single** entry — `herangibisi`, a scratch room saved into
+`Assets/Cainos/Pixel Art Monster - Dungeon/Prefab/`, with **no `CameraBounds`** and no `HubMarker`.
+Consequences, none of which announce themselves as a pool problem: there is **no hub** (so no sandbox
+first room, no quest board, no forge), every room in the run is the same room, and because
+`CameraBounds` is missing the camera **never clamps** — at 21:9 you see straight past the room's art
+into undressed space. The only clue in the console is one Turkish line, `CameraBounds objesi
+bulunamadı!`, which reads like ordinary noise.
+
+It was introduced by commit `477c8b7` ("osbir", 2026-08-14) — the pool was 12 as recently as `4d80c8f`
+— and the entire "characters" session ran on top of it without noticing. **Restored by resolving the
+GUIDs recorded in `4d80c8f`**, so the list is byte-identical rather than re-picked by filename; the
+`herangibisi` prefab was left on disk untouched. **When anything about the run feels wrong — no hub,
+repeated rooms, a camera that shows the void — read this list before debugging the map or the camera.**
 
 **GenLevel7/8/9 were brought up to the current rules IN PLACE (2026-08-14)** — never by re-import, for the reason immediately below. Four things had drifted, all found by auditing against GenLevel10 (the only generated room built under current rules):
 
@@ -1553,6 +1568,46 @@ extend this tool, keep that principle: *trust live values, not modification reco
 Verified by regression test: temporarily re-introducing the `warningSoundClip` null override made the
 auditor flag it immediately. Note that restoring a value by **assigning** it creates a PINNED override —
 always fix these with `PrefabUtility.RevertPropertyOverride`, not by re-typing the value.
+
+### Screen gallery (2026-08-16) — photograph every screen at every aspect
+
+`Assets/Scripts/Editor/ScreenGallery.cs`, menu **Deckshift → Screen Gallery**. Walks all 13 full-screen
+UIs, captures each at **4:3 / 16:9 / 21:9**, and writes an HTML contact sheet to
+`<project>/ScreenGallery/<timestamp>/` (gitignored). It is the **baseline** for the planned typography
+and `GameScreen` work, and the **regression net** afterwards — every screen here is procedural, so
+nothing else catches one that silently stopped opening, dropped out of the font system, or overflows a
+narrow aspect.
+
+⚠️ **It requires Play mode and deliberately will not start one.** Entering play mode domain-reloads and
+would wipe the run's state mid-flight.
+
+⚠️ **Waits are WALL CLOCK, never `Time.deltaTime`.** Every screen pauses the game (`timeScale = 0`) and
+animates on unscaled time, so a scaled wait hangs forever on the first modal. It also shoots after a
+settle delay rather than on the build frame — a screenshot taken on the frame a UI is built shows the
+AUTHORED colours, not the animated ones.
+
+⚠️ **Aspect is changed by driving the Game View's own size dropdown** (reflection into
+`UnityEditor.GameView.selectedSizeIndex`), so the capture is genuinely 2560x1080 rather than a
+letterboxed 16:9. That matters because the canvas matches on HEIGHT, so **width is what flexes and
+width is what breaks screens**. The original size is restored on finish or abort.
+
+⚠️ **It stages the run first** (gold, scrap, relics, a damaged card, a blessed card, an exhausted card,
+a shopkeeper) because several screens deliberately collapse to one explanatory line when empty — an
+empty forge is a misleading thing to photograph as "the forge". All of it is play-mode state, discarded
+on Stop.
+
+⚠️ **A screen that fails to open records the failure and the run continues.** A regression net that
+aborts on the first broken screen reports one problem per run.
+
+⚠️ **The close path is reflection onto a private `Hide()`/`Close()`.** Every screen owns its own
+dismissal and none expose a public close, so the tool reaches in. `ScreenDef.DestroyOnClose` exists for
+screens whose `Hide()` is not a full teardown. **If a shared screen base class ever lands, this whole
+section collapses into one virtual call** — that is the strongest argument for building it.
+
+**A leaking screen is the failure mode to fear, so it is checked explicitly.** `CameraCensus` records
+every enabled camera drawing to the screen before the run and warns if a screen leaves a new one behind.
+A screen that leaks something *rendering* does not fail loudly — it composites itself into every capture
+that follows and the run finishes "successfully" with wrong pictures.
 
 ### Visual inspection via MCP screenshots (2026-07-18)
 
