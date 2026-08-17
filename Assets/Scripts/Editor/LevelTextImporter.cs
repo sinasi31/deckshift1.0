@@ -82,25 +82,34 @@ public static class LevelTextImporter
         { 'L', "Assets/YeniLeveller/Lever.prefab" },          // lever; importer wires it to the NEAREST gate (On=Open, Off=Close)
     };
 
+    // 'A' Shift Altar. It is NOT in MarkerPrefabs because it needs post-processing the generic path
+    // doesn't do — it gets collected and wired to the nearest gate. It IS a real prefab though, so
+    // its look and collider live in one place instead of being re-declared here.
+    private const string AltarPrefabPath = "Assets/YeniLeveller/ShiftAltar.prefab";
+
     // Non-prefab structural markers, built procedurally:
     //   '=' one-way platform tiles (jump up through, land on top)
     //   'G' gate cell — vertical runs of G become one sliding Gate (portcullis)
-    //   'A' Shift Altar — pay Shift, fires OnPaid (wired to the nearest gate)
     private const string PropsTexturePath = "Assets/Cainos/Pixel Art Platformer - Dungeon/Texture/TX Dungeon Props.png";
     private const string GateSpriteName = "TX Dungeon Props - Gate 01";
-    private const string AltarSpriteName = "TX Dungeon Props - Wall Altar 01 Lit";
+    // (AltarSpriteName removed 2026-08-09 — the altar's sprite now lives on ShiftAltar.prefab.)
     private const int InteractableLayer = 12; // "Interactable" (PlayerController.interactableLayer)
 
     // Markers that stand ON the ground: after spawning, the instance is shifted
     // so the bottom of its measured visual bounds sits exactly on the cell floor.
     // (Enemies here don't fall — most have kinematic physics — so placement must
-    // be exact.) Floaty pickups ('+', 'g') and flyers ('b') stay at cell center.
-    // 'E' (elevator) and 'K' (wrecking ball) are NOT grounded: they stay at cell
-    // center — the elevator's rest position and the ball's hang point are tuned
-    // by hand in the Inspector.
+    // be exact.)
+    //
+    // ⚠️ GOLD ('g') IS GROUNDED, SHIFT CRYSTALS ('+') ARE NOT — designer 2026-08-13. A pile of coins
+    // hovering at a cell centre reads as a bug; a Shift crystal hovering reads as magic. This is a
+    // per-object judgement about what the thing IS, not a technical distinction, so it lives here
+    // rather than being derived from anything.
+    //
+    // Flyers ('b') stay at cell centre. 'E' (elevator) and 'K' (wrecking ball) are NOT grounded
+    // either: the elevator's rest position and the ball's hang point are tuned by hand.
     private static readonly HashSet<char> GroundedMarkers = new HashSet<char>
     {
-        'X', 'm', 'r', 'l', 'M', 'z', 'Z', 's', 'C', 'D', '^', 'W', 'T', 'F', 'w', 'c', 't', '$', 'B', 'L',
+        'X', 'm', 'r', 'l', 'M', 'z', 'Z', 's', 'C', 'D', 'g', '^', 'W', 'T', 'F', 'w', 'c', 't', '$', 'B', 'L',
     };
 
     // ---- Tile roles ---------------------------------------------------------------------------
@@ -197,9 +206,17 @@ public static class LevelTextImporter
     // 195 (the same corner plus one diagonal), which has n=27 and picks Extra_114 seventeen times.
     private static readonly Dictionary<int, string> MaskTiles = new Dictionary<int, string>
     {
-        {14,"Ground Dirt_11"}, {16,"Ground_11"}, {28,"Ground Dirt_13"},
+        // ⚠️ MASKS 28 AND 112 USED TO RESOLVE TO "Ground Dirt_13", WHICH IS A 0.4 x 0.4 PEBBLE.
+        // The measurement was not wrong about what the designer painted there — but they paint it as
+        // DECORATION sitting on top of a surface tile, and this table places exactly one tile per
+        // cell, so it came out as a speck of art on a cell with full Grid collision. That is an
+        // invisible wall: a solid corner the player can bump into with almost nothing drawn on it.
+        // Both masks have N air (28 = S+SE+E, 112 = W+SW+S), i.e. a corner with open sky above, so
+        // they take the designer's normal floor-surface tile instead.
+        // Rule worth keeping: never let a tile smaller than a cell into this table.
+        {14,"Ground Dirt_11"}, {16,"Ground_11"}, {28,"Ground Extra_144"},
         {31,"Ground Extra_156"}, {60,"Ground Extra_148"}, {63,"Ground Extra_188"},
-        {68,"Ground_11"}, {95,"Ground Dirt_11"}, {112,"Ground Dirt_13"},
+        {68,"Ground_11"}, {95,"Ground Dirt_11"}, {112,"Ground Extra_144"},
         {120,"Ground Extra_146"}, {124,"Ground Extra_162"}, {125,"Ground Extra_144"},
         {126,"Ground Extra_162"}, {127,"Ground Extra_164"}, {135,"Ground Extra_112"},
         {159,"Ground Extra_172"}, {195,"Ground Extra_114"}, {199,"Ground Extra_96"},
@@ -237,14 +254,89 @@ public static class LevelTextImporter
         Dirt("12"), Dirt("3"), Grnd("1"), Grnd("0"),
     };
 
-    // Platform RUNS of 2+ cells, and wall-attached shelves. Overwhelmingly Ground_13 repeated
-    // (50 of 113), which is why runs read as one continuous ledge rather than cap/middle/cap.
-    private static readonly string[] PlatformRunTiles =
+    // ---- FREE-STANDING PLATFORMS ARE STAMPED AS WHOLE SHAPES, NOT TILED PER CELL --------------
+    //
+    // ⚠️ THE CAINOS GROUND PALETTE IS A SET OF PRE-DRAWN PLATFORMS, NOT A SET OF 1x1 BRICKS.
+    // Ground_1 is a 2x2 BOX, Ground_8 is a 3-tall PILLAR, Ground_11 is a 3-wide LEDGE, Ground_0 is a
+    // 3x3 BLOCK. Painting them per-cell from the mask table stamps a whole 3-wide platform into
+    // EVERY cell of a run, so a 3-cell ledge drew three overlapping copies of the same art.
+    //
+    // Worse, it always drew the SAME one. Every horizontal-run configuration in the mask tables
+    // resolves to Ground_11 (masks 4, 68 and 64 all land on it), so every mid-air platform in every
+    // generated room was the identical 3-wide ledge repeated — the designer's "the only mid-air
+    // platforms you use are the same ones, over and over again". A PlatformRunTiles table existed
+    // but was NEVER REFERENCED by the painter, so its variety never reached a room.
+    //
+    // Now a free-standing platform is measured and stamped as ONE tile matching its footprint,
+    // which is how the art was drawn to be used, and gives the whole vocabulary back: single blocks,
+    // 2-tall pillars, boxes, wide ledges.
+    //
+    // ⚠️ EVEN-SIZED PIECES STRADDLE THE GRID AND MUST BE NUDGED. A tilemap centres a sprite's pivot
+    // at cell+(0.5,0.5), so odd sizes (1, 3) land on cell boundaries but even ones (2) sit half a
+    // cell off. OffX/OffY push those back via Tilemap.SetTransformMatrix — verified that
+    // TilemapCollider2D honours the matrix, so collision moves with the art rather than staying
+    // where the art used to be.
+    private struct PlatformShape
     {
-        Grnd("13"), Grnd("13"), Grnd("13"), Grnd("13"), Grnd("13"), Grnd("13"), Grnd("13"), Grnd("13"),
-        Dirt("11"), Dirt("11"),
-        Grnd("11"), Dirt("14"), Grnd("10"),
+        public int W, H;              // footprint in CELLS
+        public int AnchorX, AnchorY;  // which cell of the footprint carries the tile
+        public float OffX, OffY;      // half-cell correction for even sizes
+        public string[] Tiles;        // interchangeable variants
+    }
+
+    private static readonly PlatformShape[] PlatformShapes =
+    {
+        // one block
+        new PlatformShape { W=1, H=1, AnchorX=0, AnchorY=0,
+            Tiles = new[]{ "Ground_9", "Ground_10", "Ground_9", "Ground_10", "Ground Dirt_11", "Ground Dirt_7" } },
+        // 2 wide
+        new PlatformShape { W=2, H=1, AnchorX=0, AnchorY=0, OffX=0.5f,
+            Tiles = new[]{ "Ground_3", "Ground Dirt_3" } },
+        // 3 wide ledge
+        new PlatformShape { W=3, H=1, AnchorX=1, AnchorY=0,
+            Tiles = new[]{ "Ground_11", "Ground_12", "Ground Dirt_14", "Ground Dirt_12" } },
+        // 2 block vertical
+        // ⚠️ AnchorY IS 1, NOT 0. Text rows count DOWNWARD but the tilemap counts UPWARD, and a
+        // +0.5 Y nudge grows the tile UP from its stamped cell — so it has to be stamped on the
+        // BOTTOM row of the footprint, which is the LAST text row. Anchored at 0 the piece landed
+        // one full cell high: measured 1 of 2 cells solid with 1 cell of collision hanging in the
+        // air above. Only the vertically-even shapes are affected; odd ones stamp at their middle,
+        // which is the middle either way round.
+        new PlatformShape { W=1, H=2, AnchorX=0, AnchorY=1, OffY=0.5f,
+            Tiles = new[]{ "Ground_2", "Ground_4", "Ground_5", "Ground Dirt_5", "Ground Dirt_2", "Ground Dirt_4" } },
+        // 3 tall pillar
+        new PlatformShape { W=1, H=3, AnchorX=0, AnchorY=1,
+            Tiles = new[]{ "Ground_8" } },
+        // the box — AnchorY=1 for the same reason as the 2-tall piece above
+        new PlatformShape { W=2, H=2, AnchorX=0, AnchorY=1, OffX=0.5f, OffY=0.5f,
+            Tiles = new[]{ "Ground_1", "Ground Dirt_1" } },
+        // big block
+        new PlatformShape { W=3, H=3, AnchorX=1, AnchorY=1,
+            Tiles = new[]{ "Ground_0", "Ground Dirt_0" } },
     };
+
+    // ⚠️ THREE VARIANTS WERE REMOVED FROM THE LISTS ABOVE BECAUSE THEIR COLLISION DOES NOT FILL
+    // THEIR DECLARED FOOTPRINT (measured 2026-08-14, by stamping each one on a bare tilemap and
+    // probing every cell with Physics2D.OverlapPoint):
+    //
+    //     Ground Dirt_10   2x2   only 1 of 4 cells solid
+    //     Ground_6         3x3         8 of 9
+    //     Ground Dirt_6    3x3         8 of 9
+    //
+    // These are oversized tiles, so they keep colliderType = Sprite (TileVariantGenerator refuses
+    // to give an oversized tile full-cell Grid collision — see the note there). Sprite collision
+    // traces the ALPHA OUTLINE, and these three are drawn as irregular rounded rocks rather than
+    // filled blocks, so the corners of the footprint are simply not there. A platform stamped with
+    // one of them looks solid and is not: the player falls through part of it.
+    //
+    // Found when a 2x2 box added to GenLevel8 came out with 3 of its 4 cells empty. The other 17
+    // variants all measured complete, so the shapes themselves are sound — only these three.
+    //
+    // ⚠️ ANY NEW VARIANT ADDED TO PlatformShapes MUST BE MEASURED THE SAME WAY. "It is the right
+    // pixel size" is NOT enough: Ground Dirt_10 measures 2.06 x 2.03, which looks perfect.
+
+    // Platforms bigger than this are rock masses, not ledges — they keep the mask painting.
+    private const int MaxPlatformCells = 12;
 
     // Walkable top of a thick mass. Extra_162 is the designer's primary (147 uses); the old table
     // led with Extra_144, which is only their third choice.
@@ -298,17 +390,166 @@ public static class LevelTextImporter
         Bis("97"), Bis("97"), Bis("189"), Bis("189"), Bis("173"), Bis("173"), Bis("100"),
     };
 
-    // Backdrop: the same wall tiles BGPalette's pre-painted background uses.
+    // Backdrop.
+    //
+    // ⚠️ "TX Tileable - Dungeon Wall" IS ONE SEAMLESS 8x8 PICTURE, NOT A BAG OF INTERCHANGEABLE
+    // TILES. Tile N is the piece at row N/8, column N%8 of a single wall texture, and it only looks
+    // like a wall when the 64 pieces are laid out in that order and repeated. The importer used to
+    // hold SIX of them and scatter those six at random, which is why generated rooms never looked
+    // like the hand-made ones — it was shuffling six fragments of a jigsaw instead of assembling it.
+    //
+    // The designer's Assets/LevelSinasi/BGPalette.prefab is the reference: measured off it, the
+    // pattern repeats every 8 cells on BOTH axes with the row running downward. BackWallIndex
+    // reproduces exactly that, so any room of any size gets a continuous wall.
     private const string WallDir = "Assets/Cainos/Pixel Art Platformer - Dungeon/Tileset Pallete/TP Dungeon Wall/";
-    private static readonly string[] BackWallTiles =
+    private const int BackWallPeriod = 8;
+
+    private static readonly string[] BackWallTiles = BuildBackWallTiles();
+
+    private static string[] BuildBackWallTiles()
     {
-        WallDir + "TX Tileable - Dungeon Wall_15.asset",
-        WallDir + "TX Tileable - Dungeon Wall_17.asset",
-        WallDir + "TX Tileable - Dungeon Wall_31.asset",
-        WallDir + "TX Tileable - Dungeon Wall_32.asset",
-        WallDir + "TX Tileable - Dungeon Wall_33.asset",
-        WallDir + "TX Tileable - Dungeon Wall_35.asset",
-    };
+        var a = new string[BackWallPeriod * BackWallPeriod];
+        for (int i = 0; i < a.Length; i++)
+            a[i] = WallDir + "TX Tileable - Dungeon Wall_" + i + ".asset";
+        return a;
+    }
+
+    // Index into BackWallTiles for a cell, reproducing the palette's tiling. Row counts DOWNWARD
+    // (index 0 is the top-left piece), which is why y is negated.
+    private static int BackWallIndex(int x, int y)
+    {
+        int col = ((x % BackWallPeriod) + BackWallPeriod) % BackWallPeriod;
+        int row = (((-y) % BackWallPeriod) + BackWallPeriod) % BackWallPeriod;
+        return row * BackWallPeriod + col;
+    }
+
+    // Finds every free-standing platform and stamps it as whole pre-drawn pieces (see
+    // PlatformShapes). Fills `consumed[col,row]` so the per-cell mask painter skips those cells.
+    //
+    // "Free-standing" means a connected group of '#' that does NOT touch the grid border — i.e. a
+    // mid-air ledge rather than part of the room's rock shell — and that exactly fills its bounding
+    // box. Anything else falls through to the mask painter, which handles masses correctly.
+    //
+    // Long runs are DECOMPOSED rather than skipped: a 7-wide ledge becomes 3+3+1 or 3+2+2, chosen
+    // from the piece list, so even oversized platforms stop being one tile repeated.
+    private static int StampPlatformShapes(Tilemap tilemap, int width, int height,
+                                           Func<int, int, char> At, Func<string, TileBase> Resolve,
+                                           bool[,] consumed)
+    {
+        Func<int, int, bool> Solid = (c, r) =>
+            c >= 0 && c < width && r >= 0 && r < height && At(c, r) == '#';
+
+        int stamped = 0;
+        var visited = new bool[width, height];
+        var cells = new List<Vector2Int>();
+
+        for (int row = 0; row < height; row++)
+        for (int col = 0; col < width; col++)
+        {
+            if (visited[col, row] || !Solid(col, row)) continue;
+
+            // Flood-fill this component (4-connected).
+            cells.Clear();
+            var stack = new Stack<Vector2Int>();
+            stack.Push(new Vector2Int(col, row));
+            visited[col, row] = true;
+            bool touchesBorder = false;
+
+            while (stack.Count > 0)
+            {
+                Vector2Int p = stack.Pop();
+                cells.Add(p);
+                if (p.x == 0 || p.y == 0 || p.x == width - 1 || p.y == height - 1) touchesBorder = true;
+
+                var n = new[] { new Vector2Int(p.x+1,p.y), new Vector2Int(p.x-1,p.y),
+                                new Vector2Int(p.x,p.y+1), new Vector2Int(p.x,p.y-1) };
+                foreach (var q in n)
+                {
+                    if (q.x < 0 || q.y < 0 || q.x >= width || q.y >= height) continue;
+                    if (visited[q.x, q.y] || !Solid(q.x, q.y)) continue;
+                    visited[q.x, q.y] = true;
+                    stack.Push(q);
+                }
+            }
+
+            if (touchesBorder || cells.Count > MaxPlatformCells) continue;
+
+            int minX = int.MaxValue, maxX = int.MinValue, minY = int.MaxValue, maxY = int.MinValue;
+            foreach (var p in cells)
+            {
+                minX = Math.Min(minX, p.x); maxX = Math.Max(maxX, p.x);
+                minY = Math.Min(minY, p.y); maxY = Math.Max(maxY, p.y);
+            }
+            int w = maxX - minX + 1, h = maxY - minY + 1;
+            if (cells.Count != w * h) continue;          // not a solid rectangle — leave to the mask painter
+
+            // Split into pieces the palette actually has art for.
+            var pieces = new List<Vector3Int>();          // x, y (text row), packed shape index
+            if (!Decompose(minX, minY, w, h, pieces)) continue;
+
+            foreach (var piece in pieces)
+            {
+                PlatformShape s = PlatformShapes[piece.z];
+                string name = s.Tiles[Math.Abs((piece.x * 73856093) ^ (piece.y * 19349663)) % s.Tiles.Length];
+                TileBase tb = Resolve(name);
+                if (tb == null) continue;
+
+                int cx = piece.x + s.AnchorX;
+                int textRow = piece.y + s.AnchorY;
+                var cell = new Vector3Int(cx, height - 1 - textRow, 0);
+
+                tilemap.SetTile(cell, tb);
+                if (s.OffX != 0f || s.OffY != 0f)
+                {
+                    tilemap.SetTileFlags(cell, TileFlags.None);
+                    tilemap.SetTransformMatrix(cell, Matrix4x4.Translate(new Vector3(s.OffX, s.OffY, 0f)));
+                }
+                stamped++;
+
+                for (int dy = 0; dy < s.H; dy++)
+                for (int dx = 0; dx < s.W; dx++)
+                    consumed[piece.x + dx, piece.y + dy] = true;
+            }
+        }
+        return stamped;
+    }
+
+    // Greedy split of a w x h rectangle into available pieces. Exact matches win outright; 1-wide
+    // and 1-tall runs are chopped into 3s/2s/1s; anything else is refused so the mask painter keeps it.
+    private static bool Decompose(int x0, int y0, int w, int h, List<Vector3Int> outPieces)
+    {
+        for (int i = 0; i < PlatformShapes.Length; i++)
+            if (PlatformShapes[i].W == w && PlatformShapes[i].H == h)
+            { outPieces.Add(new Vector3Int(x0, y0, i)); return true; }
+
+        if (h == 1) return Chop(w, true, x0, y0, outPieces);
+        if (w == 1) return Chop(h, false, x0, y0, outPieces);
+        return false;
+    }
+
+    private static bool Chop(int len, bool horizontal, int x0, int y0, List<Vector3Int> outPieces)
+    {
+        int at = 0;
+        while (at < len)
+        {
+            int remaining = len - at;
+            // Take 3 where it fits, but never leave a remainder of exactly 1 after a 3 when a 2+2
+            // split is available — long ledges then read as varied pieces instead of 3,3,3,1.
+            int take = remaining >= 3 ? (remaining == 4 ? 2 : 3) : remaining;
+            int idx = ShapeIndex(horizontal ? take : 1, horizontal ? 1 : take);
+            if (idx < 0) return false;
+            outPieces.Add(horizontal ? new Vector3Int(x0 + at, y0, idx) : new Vector3Int(x0, y0 + at, idx));
+            at += take;
+        }
+        return true;
+    }
+
+    private static int ShapeIndex(int w, int h)
+    {
+        for (int i = 0; i < PlatformShapes.Length; i++)
+            if (PlatformShapes[i].W == w && PlatformShapes[i].H == h) return i;
+        return -1;
+    }
 
     // Chebyshev distance from a solid cell to the nearest open one, capped at `cap`.
     // Used to leave deep interiors unpainted — see the note at the call site.
@@ -527,7 +768,18 @@ public static class LevelTextImporter
             TileBase tb = Resolve(n);
             if (tb == null) { broken.Add(n + "  (asset missing)"); return; }
             Tile asTile = tb as Tile;
-            if (asTile != null && asTile.sprite == null) broken.Add(n + "  (SPRITE IS NULL — would paint an invisible cell)");
+            if (asTile == null) return;
+            if (asTile.sprite == null) { broken.Add(n + "  (SPRITE IS NULL — would paint an invisible cell)"); return; }
+
+            // ⚠️ AND IT MUST FILL ITS CELL. "Ground Dirt_13" is a 0.4 x 0.4 pebble that the designer
+            // paints ON TOP of a surface tile as decoration; this table places one tile per cell, so
+            // using it as a solid cell drew a speck over full collision — an invisible wall. A null
+            // sprite and a too-small sprite fail the same way (solid where nothing is drawn), so
+            // both are caught here.
+            float w = asTile.sprite.rect.width / asTile.sprite.pixelsPerUnit;
+            float h = asTile.sprite.rect.height / asTile.sprite.pixelsPerUnit;
+            if (w < 0.95f || h < 0.95f)
+                broken.Add(n + $"  (sprite is only {w:F2}x{h:F2} cells — too small to be a solid cell)");
         };
         foreach (var kv in MaskTiles) Check(kv.Value);
         foreach (string n in Mask4Tiles) Check(n);
@@ -550,9 +802,10 @@ public static class LevelTextImporter
         if (camBoundsPrefab == null) missing.Add($"CameraBounds -> {CameraBoundsPrefabPath}");
 
         Sprite gateSprite = LoadPropSprite(GateSpriteName);
-        Sprite altarSprite = LoadPropSprite(AltarSpriteName);
         if (hasGate && gateSprite == null) missing.Add($"'G' gate sprite '{GateSpriteName}' in {PropsTexturePath}");
-        if (hasAltar && altarSprite == null) missing.Add($"'A' altar sprite '{AltarSpriteName}' in {PropsTexturePath}");
+
+        var altarPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AltarPrefabPath);
+        if (hasAltar && altarPrefab == null) missing.Add($"'A' -> {AltarPrefabPath}");
 
         if (missing.Count > 0)
             throw new Exception("Prefab paths in LevelTextImporter are stale, fix them:\n" + string.Join("\n", missing));
@@ -577,8 +830,13 @@ public static class LevelTextImporter
             // backdrop/decoration by hand). When on, it must live on the "Background"
             // sorting LAYER (like BGPalette's backdrop): several sprites (e.g.
             // ExitDoor at Default order -1) get swallowed by a Default-layer backdrop.
-            bool backwallOn = directives.TryGetValue("backwall", out string bwv)
-                && (bwv.Trim().ToLowerInvariant() == "on" || bwv.Trim().ToLowerInvariant() == "true");
+            // DEFAULT ON since 2026-08-13. It used to be opt-in because the generated backdrop was
+            // six wall fragments scattered at random and looked wrong, so the designer preferred to
+            // paint backdrops by hand. Now that it assembles the real seamless wall (BackWallIndex),
+            // a generated room should have one by default. "!backwall: off" still turns it off.
+            string bwv;
+            bool backwallOn = !directives.TryGetValue("backwall", out bwv)
+                || !(bwv.Trim().ToLowerInvariant() == "off" || bwv.Trim().ToLowerInvariant() == "false");
             Tilemap backMap = null;
             if (backwallOn)
             {
@@ -621,7 +879,12 @@ public static class LevelTextImporter
                 effector.surfaceArc = 170f;
             }
 
-            int tileCount = 0;
+            // Whole-shape pass FIRST: it claims the free-standing platforms so the per-cell mask
+            // painter below leaves them alone.
+            var consumed = new bool[width, height];
+            int tileCount = StampPlatformShapes(tilemap, width, height, At, Resolve, consumed);
+            var spikeDone = new bool[width, height];   // a '^' run is spawned once, at its left end
+
             var entityCounts = new Dictionary<string, int>();
             var gateColumns = new Dictionary<int, List<int>>(); // col -> rows with 'G'
             var levers = new List<Lever>();
@@ -632,8 +895,9 @@ public static class LevelTextImporter
                 int cellY = height - 1 - row; // row 0 is the TOP line of the file
                 for (int col = 0; col < width; col++)
                 {
+                    // Assembled, not shuffled — see BackWallIndex.
                     if (backMap != null)
-                        backMap.SetTile(new Vector3Int(col, cellY, 0), Pick(backWall, col, cellY));
+                        backMap.SetTile(new Vector3Int(col, cellY, 0), backWall[BackWallIndex(col, cellY)]);
 
                     char c = At(col, row);
                     if (c == '.' || c == ' ')
@@ -641,6 +905,9 @@ public static class LevelTextImporter
 
                     if (c == '#')
                     {
+                        // Already drawn as a whole pre-drawn platform piece.
+                        if (consumed[col, row]) continue;
+
                         bool airUp = !IsSolid(col, row - 1);
                         bool airDown = !IsSolid(col, row + 1);
                         bool airLeft = !IsSolid(col - 1, row);
@@ -748,18 +1015,13 @@ public static class LevelTextImporter
 
                     if (c == 'A')
                     {
-                        var altarGo = new GameObject("ShiftAltar");
+                        // Instantiated from the prefab rather than assembled here, so the altar's
+                        // sprite, sorting order, layer and trigger box are defined once.
+                        var altarGo = (GameObject)PrefabUtility.InstantiatePrefab(altarPrefab);
+                        altarGo.name = "ShiftAltar";
                         altarGo.transform.SetParent(root.transform);
                         altarGo.transform.position = worldPos;
-                        altarGo.layer = InteractableLayer;
-                        var asr = altarGo.AddComponent<SpriteRenderer>();
-                        asr.sprite = altarSprite;
-                        asr.sortingOrder = 2;
-                        var trigger = altarGo.AddComponent<BoxCollider2D>();
-                        trigger.isTrigger = true;
-                        trigger.size = new Vector2(1.2f, 1.7f);
-                        trigger.offset = new Vector2(0f, 0.55f);
-                        altars.Add(altarGo.AddComponent<ShiftAltar>());
+                        altars.Add(altarGo.GetComponent<ShiftAltar>());
                         GroundToSurface(altarGo, cellY);
                         entityCounts.TryGetValue("ShiftAltar", out int na);
                         entityCounts["ShiftAltar"] = na + 1;
@@ -773,6 +1035,38 @@ public static class LevelTextImporter
                         spawn.transform.SetParent(root.transform); // must be a DIRECT child of the room root
                         spawn.transform.position = worldPos;
                         GroundToSurface(spawn, cellY); // player pivot is at the feet; spawn at floor level
+                        continue;
+                    }
+
+                    // ⚠️ SPIKES ARE WIDER THAN A CELL, SO ONE PER CELL MAKES THEM OVERLAP.
+                    // The spikers prefab measures 1.55 units across; dropping one on every '^' cell
+                    // spaced them 1.0 apart, so each sat a third of the way inside its neighbour and
+                    // the bed read as a mangled pile rather than a row of spikes. A run of '^' is now
+                    // laid end-to-end: as many as fit at the prefab's real width, spread evenly so
+                    // the run is covered edge to edge without any two intersecting.
+                    if (c == '^' && prefabCache.ContainsKey('^'))
+                    {
+                        if (spikeDone[col, row]) continue;
+
+                        int cEnd = col;
+                        while (cEnd + 1 < width && At(cEnd + 1, row) == '^') cEnd++;
+                        for (int cc = col; cc <= cEnd; cc++) spikeDone[cc, row] = true;
+
+                        GameObject spikePrefab = prefabCache['^'];
+                        float runW = cEnd - col + 1;
+                        float spikeW = Mathf.Max(0.05f, MeasuredSize(spikePrefab).x);
+                        int count = Mathf.Max(1, Mathf.FloorToInt(runW / spikeW + 0.001f));
+                        float pitch = runW / count;
+
+                        for (int i = 0; i < count; i++)
+                        {
+                            var sp = (GameObject)PrefabUtility.InstantiatePrefab(spikePrefab);
+                            sp.transform.SetParent(root.transform);
+                            sp.transform.position = new Vector3(col + pitch * (i + 0.5f), cellY + 0.5f, 0f);
+                            GroundToSurface(sp, cellY);
+                            entityCounts.TryGetValue(spikePrefab.name, out int sn);
+                            entityCounts[spikePrefab.name] = sn + 1;
+                        }
                         continue;
                     }
 
@@ -878,11 +1172,6 @@ public static class LevelTextImporter
                 altar.signalTarget = g2.transform; // the signal orb flies here on payment
             }
 
-            // Decoration pass. Hand-built rooms carry 55-124 props each — 70-86% of everything
-            // in them (census in LevelDesignRules.md 2b). A room that ships with bare tiles
-            // gets judged naked against them, which is exactly what happened.
-            DressRoom(root, At, IsSolid, width, height, levelName, entityCounts, warnings);
-
             // Camera zone: one BoxCollider2D covering the whole grid (with margin).
             var camBounds = (GameObject)PrefabUtility.InstantiatePrefab(camBoundsPrefab);
             camBounds.name = "CameraBounds"; // LevelManager finds it by this exact name
@@ -980,232 +1269,24 @@ public static class LevelTextImporter
         go.transform.position += new Vector3(0f, dy, 0f);
     }
 
-    // ================= Decoration pass =================
-    //
-    // Dresses a freshly built room the way the hand-built ones are dressed. Measured from
-    // efeslevel1-3 and EfeVrl4-6 (Tools/LevelLab -- objects): ~68 props per room, split
-    // 44% small floor clutter / 23% large floor furniture / 24% wall decoration /
-    // 6% ceiling hangings / 3% wall dirt, drawn from a wide variety rather than repeats.
-    //
-    // Safe by construction: every Cainos Dungeon Props prefab is a pure visual with NO
-    // collider, so nothing placed here can change what the player can reach. Anything that
-    // IS functional (platforms, ladders, traps, gates, chests, doors) is blocklisted.
-
-    private const string PropsFolder = "Assets/Cainos/Pixel Art Platformer - Dungeon/Prefab/Props";
-    private const string WallDecoFolder = "Assets/Cainos/Pixel Art Platformer - Dungeon/Prefab/Wall Deco";
-    private const string WallDirtFolder = "Assets/Cainos/Pixel Art Platformer - Dungeon/Prefab/Wall Dirt";
-
-    // Ground tilemap renders at GroundSortingOrder (1); the player's body is at 1000.
-    // Sitting decoration at 2 keeps it above the tiles and always behind the player.
-    private const int DecorSortingOrder = 2;
-
-    // One prop per ~18 cells reproduces the hand-built density (~68 in a 48x26 room).
-    private const float CellsPerProp = 18f;
-
-    private static readonly string[] CeilingKeywords =
-        { "Chandelier", "Ceiling Chain", "Lamp", "Hanger", "Cage", "Manacle" };
-    private static readonly string[] WallKeywords =
-        { "Painting", "Window", "Banner", "Wall Altar", "Torch", "Wall Cave", "Shelf Side", "Key Holder", "Rack" };
-    private static readonly string[] FurnitureKeywords =
-        { "Table", "Chair", "Bench", "Stool", "Bed", "Bookshelf", "Cupboard", "Cabinet", "Shelf",
-          "Barrel", "Crate", "Coffin", "Statue", "Stove", "Fireplace", "Chimney", "Pillar", "Beam",
-          "Caudron", "Lectern", "Pulpit" };
-    private static readonly string[] ClutterKeywords =
-        { "Book", "Bottle", "Pot", "Jar", "Bag", "Basket", "Bone", "Skull", "Coin Pile", "Debris",
-          "Fry Pan", "Kettle", "Bowl", "Bucket", "Cup", "Candle", "Silver", "Rotten Food",
-          "Package", "Knife", "Arrow", "Chopping Board", "Bookend" };
-
-    // Functional or gameplay objects that happen to live in the same folder. Never auto-place.
-    private static readonly string[] DecorBlocklist =
-        { "Platform", "Ladder", "Stairs", "Trapdoor", "Switch", "Gate", "Elevator",
-          "Spike", "Trap", "Chest", "Door", "Fence", "Stage", "Toilet", "Sword", "Spear" };
-
-    private static bool MatchesAny(string name, string[] keys)
+    // Combined visual size of a prefab, ignoring particles/trails — the same measurement
+    // GroundToSurface uses, exposed so placement can space objects by how wide they really are.
+    private static Vector2 MeasuredSize(GameObject go)
     {
-        foreach (string k in keys)
-            if (name.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0) return true;
-        return false;
-    }
-
-    private static List<GameObject> LoadPalette(string folder, string[] keywords)
-    {
-        var list = new List<GameObject>();
-        if (!AssetDatabase.IsValidFolder(folder)) return list;
-
-        foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { folder }))
+        Bounds? b = null;
+        void Add(Bounds nb)
         {
-            string path = AssetDatabase.GUIDToAssetPath(guid);
-            string name = Path.GetFileNameWithoutExtension(path);
-            if (MatchesAny(name, DecorBlocklist)) continue;
-            if (keywords != null && !MatchesAny(name, keywords)) continue;
-
-            var go = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-            if (go != null) list.Add(go);
+            if (b == null) { b = nb; return; }
+            var bb = b.Value; bb.Encapsulate(nb); b = bb;
         }
-        return list;
-    }
-
-    /// <summary>Deterministic per level name, so re-importing a level gives the same dressing.</summary>
-    private static int StableSeed(string s)
-    {
-        unchecked
+        foreach (var r in go.GetComponentsInChildren<Renderer>(true))
         {
-            int h = 17;
-            foreach (char c in s) h = h * 31 + c;
-            return h;
+            if (r is ParticleSystemRenderer || r is TrailRenderer) continue;
+            Add(r.bounds);
         }
-    }
-
-    private static void Shuffle<T>(IList<T> list, System.Random rng)
-    {
-        for (int i = list.Count - 1; i > 0; i--)
-        {
-            int j = rng.Next(i + 1);
-            (list[i], list[j]) = (list[j], list[i]);
-        }
-    }
-
-    private static void DressRoom(GameObject root, Func<int, int, char> at, Func<int, int, bool> isSolid,
-                                  int width, int height, string levelName,
-                                  Dictionary<string, int> entityCounts, List<string> warnings)
-    {
-        var clutter = LoadPalette(PropsFolder, ClutterKeywords);
-        var furniture = LoadPalette(PropsFolder, FurnitureKeywords);
-        var wallDecor = LoadPalette(PropsFolder, WallKeywords);
-        wallDecor.AddRange(LoadPalette(WallDecoFolder, null));
-        var ceiling = LoadPalette(PropsFolder, CeilingKeywords);
-        var dirt = LoadPalette(WallDirtFolder, null);
-
-        if (clutter.Count == 0 && furniture.Count == 0)
-        {
-            warnings.Add("Decoration pass found no props — is the Cainos Dungeon pack still at "
-                         + PropsFolder + "? Room saved undressed.");
-            return;
-        }
-
-        // Keep the spawn and the exit clear — nobody wants to wake up inside a wardrobe.
-        var keepClear = new List<Vector2Int>();
-        for (int row = 0; row < height; row++)
-            for (int col = 0; col < width; col++)
-                if (at(col, row) == 'S' || at(col, row) == 'X')
-                    keepClear.Add(new Vector2Int(col, row));
-
-        bool TooCloseToDoorway(int col, int row)
-        {
-            foreach (var k in keepClear)
-                if (Mathf.Abs(k.x - col) <= 2 && Mathf.Abs(k.y - row) <= 1) return true;
-            return false;
-        }
-
-        // ---- collect candidate spots ----
-        var floorSpots = new List<Vector2Int>();
-        var wallSpots = new List<Vector2Int>();
-        var ceilSpots = new List<Vector2Int>();
-
-        for (int row = 0; row < height; row++)
-        {
-            for (int col = 0; col < width; col++)
-            {
-                if (isSolid(col, row)) continue;
-                if (at(col, row) != '.' && at(col, row) != ' ') continue;   // a marker lives here
-                if (TooCloseToDoorway(col, row)) continue;
-
-                bool floorBelow = isSolid(col, row + 1);
-                bool airAbove = !isSolid(col, row - 1);
-                bool solidLeft = isSolid(col - 1, row);
-                bool solidRight = isSolid(col + 1, row);
-
-                if (floorBelow && airAbove) floorSpots.Add(new Vector2Int(col, row));
-                else if ((solidLeft || solidRight) && !floorBelow) wallSpots.Add(new Vector2Int(col, row));
-
-                if (isSolid(col, row - 1) && !isSolid(col, row + 1) && !floorBelow)
-                    ceilSpots.Add(new Vector2Int(col, row));
-            }
-        }
-
-        var rng = new System.Random(StableSeed(levelName));
-        Shuffle(floorSpots, rng);
-        Shuffle(wallSpots, rng);
-        Shuffle(ceilSpots, rng);
-
-        int budget = Mathf.RoundToInt(width * height / CellsPerProp);
-        int wantClutter = Mathf.RoundToInt(budget * 0.44f);
-        int wantFurniture = Mathf.RoundToInt(budget * 0.23f);
-        int wantWall = Mathf.RoundToInt(budget * 0.24f);
-        int wantCeiling = Mathf.RoundToInt(budget * 0.06f);
-        int wantDirt = Mathf.RoundToInt(budget * 0.03f);
-
-        var decorRoot = new GameObject("Decoration");
-        decorRoot.transform.SetParent(root.transform);
-        decorRoot.transform.localPosition = Vector3.zero;
-
-        int placed = 0;
-        int floorCursor = 0, wallCursor = 0, ceilCursor = 0;
-
-        void PlaceFloor(List<GameObject> palette, int count)
-        {
-            if (palette.Count == 0) return;
-            for (int i = 0; i < count && floorCursor < floorSpots.Count; i++, floorCursor++)
-            {
-                var cell = floorSpots[floorCursor];
-                int cellY = height - 1 - cell.y;
-                var go = Spawn(palette[rng.Next(palette.Count)], decorRoot,
-                               new Vector3(cell.x + 0.5f, cellY + 0.5f, 0f), rng.Next(2) == 0);
-                GroundToSurface(go, cellY);
-                placed++;
-            }
-        }
-
-        PlaceFloor(clutter, wantClutter);
-        PlaceFloor(furniture, wantFurniture);
-
-        // Wall props hug the face they are attached to.
-        for (int i = 0; i < wantWall && wallCursor < wallSpots.Count && wallDecor.Count > 0; i++, wallCursor++)
-        {
-            var cell = wallSpots[wallCursor];
-            int cellY = height - 1 - cell.y;
-            bool onLeft = isSolid(cell.x - 1, cell.y);
-            float x = cell.x + (onLeft ? 0.25f : 0.75f);
-            Spawn(wallDecor[rng.Next(wallDecor.Count)], decorRoot, new Vector3(x, cellY + 0.5f, 0f), !onLeft);
-            placed++;
-        }
-
-        for (int i = 0; i < wantCeiling && ceilCursor < ceilSpots.Count && ceiling.Count > 0; i++, ceilCursor++)
-        {
-            var cell = ceilSpots[ceilCursor];
-            int cellY = height - 1 - cell.y;
-            Spawn(ceiling[rng.Next(ceiling.Count)], decorRoot, new Vector3(cell.x + 0.5f, cellY + 0.9f, 0f), false);
-            placed++;
-        }
-
-        for (int i = 0; i < wantDirt && wallCursor < wallSpots.Count && dirt.Count > 0; i++, wallCursor++)
-        {
-            var cell = wallSpots[wallCursor];
-            int cellY = height - 1 - cell.y;
-            Spawn(dirt[rng.Next(dirt.Count)], decorRoot, new Vector3(cell.x + 0.5f, cellY + 0.5f, 0f), rng.Next(2) == 0);
-            placed++;
-        }
-
-        entityCounts["(decoration props)"] = placed;
-
-        if (placed < budget / 2)
-            warnings.Add($"Decoration pass placed only {placed} of a target {budget} props — the room "
-                         + "has few floor/wall faces to dress. Consider more small ledges and alcoves.");
-    }
-
-    private static GameObject Spawn(GameObject prefab, GameObject parent, Vector3 pos, bool flipX)
-    {
-        var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-        go.transform.SetParent(parent.transform);
-        go.transform.position = pos;
-        if (flipX)
-        {
-            var s = go.transform.localScale;
-            go.transform.localScale = new Vector3(-s.x, s.y, s.z);
-        }
-        foreach (var sr in go.GetComponentsInChildren<SpriteRenderer>())
-            sr.sortingOrder += DecorSortingOrder;
-        return go;
+        if (b == null)
+            foreach (var c in go.GetComponentsInChildren<Collider2D>(true)) Add(c.bounds);
+        return b == null ? Vector2.one : new Vector2(b.Value.size.x, b.Value.size.y);
     }
 
     private static Sprite LoadPropSprite(string spriteName)

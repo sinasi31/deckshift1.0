@@ -19,6 +19,9 @@ public class DeckManager : MonoBehaviour
     public PlayerController player;
 
     [Header("Deste Ayarlarý")]
+    // FALLBACK ONLY once a character is assigned on the Player — the character's own startingDeck
+    // wins. Kept because it is also the designer's testing tool: clear the character field and this
+    // list is the deck again, exactly as before characters existed.
     public List<CardData> startingDeck;
 
     [Header("Special Cards")]
@@ -29,7 +32,27 @@ public class DeckManager : MonoBehaviour
     private List<RuntimeCard> discardPile = new List<RuntimeCard>();
     private List<RuntimeCard> exhaustPile = new List<RuntimeCard>();
 
+    // BASE capacity. Read HandCapacity, never this — a character's trait can raise it.
     public int handCapacity = 4;
+
+    // ⚠️ THE ONE PLACE HAND SIZE IS DECIDED. Every full-hand check goes through here, so a trait
+    // that grants a slot cannot be honoured by the draw and then forgotten by, say, the Teacher's
+    // Pet pull or the Stagger check. Same reasoning as CardEnhancements.EffectiveCost.
+    public int HandCapacity
+    {
+        get
+        {
+            int bonus = (player != null && player.character != null)
+                ? player.character.handCapacityBonus : 0;
+            return Mathf.Max(1, handCapacity + bonus);
+        }
+    }
+
+    // Character trait hook. Like HandCapacity, it is read rather than mirrored into a field, so it
+    // can never fall out of step with the character actually being played.
+    public bool RecallCostIsLocked =>
+        player != null && player.character != null && player.character.recallCostNeverRises;
+
     private int selectedIndex = -1;
     private bool isReloading = false;
 
@@ -40,6 +63,20 @@ public class DeckManager : MonoBehaviour
     // that need a handle on their own card (Glass Parry's refund) can capture it. Only
     // valid during that call; null at all other times.
     public RuntimeCard CardBeingPlayed { get; private set; }
+
+    // The card CREDITED with the damage currently being resolved. Read by
+    // RelicManager.ModifyPlayerDamage (Finisher / Opener / Grudge / Momentum / Heavy Hitter) and by
+    // EnemyHealth.Die (Grudge / Toll Booth).
+    //
+    // ⚠️ IT IS NOT THE SAME THING AS CardBeingPlayed, and the difference is projectiles. Most card
+    // damage resolves synchronously inside ExecuteAction, where CardBeingPlayed is live — but a
+    // Fireball lands whole seconds later, long after that has been cleared. So the projectile
+    // carries its own source card and sets this around its hit. Anything else that spawns a delayed
+    // damage source must do the same, or its blessings silently do nothing.
+    //
+    // It must be nulled again afterwards. Leaving it set would credit the NEXT damage in the game —
+    // a spike, a pogo bounce — to a card that had nothing to do with it.
+    public RuntimeCard AttributedCard { get; set; }
 
     // Getterlar
     public List<RuntimeCard> GetDrawPile() { return drawPile; }
@@ -56,14 +93,23 @@ public class DeckManager : MonoBehaviour
 
     private void Start()
     {
-
-        foreach (CardData data in startingDeck)
+        foreach (CardData data in ResolveStartingDeck())
         {
-            drawPile.Add(new RuntimeCard(data));
+            if (data != null) drawPile.Add(new RuntimeCard(data));
         }
         ShuffleDeck();
         ReloadHand(); // Baþlangýçta animasyon olsun
         ResetRecallCost();
+    }
+
+    // The character's deck is the run's deck; `startingDeck` is the fallback. An EMPTY character
+    // deck falls back rather than starting the run with no cards at all — a half-authored character
+    // asset should look wrong in the Inspector, not softlock the run.
+    private List<CardData> ResolveStartingDeck()
+    {
+        CharacterData c = player != null ? player.character : null;
+        if (c != null && c.startingDeck != null && c.startingDeck.Count > 0) return c.startingDeck;
+        return startingDeck;
     }
 
     public void SelectCard(int index)
@@ -108,10 +154,10 @@ public class DeckManager : MonoBehaviour
         int cost = data.shiftCost;
         if (SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.KineticDiscount))
             cost = Mathf.Max(0, cost - 1);
-        // Blompo: "On the House" zeroes the cost. CardAimIndicator mirrors this in
-        // EffectiveShiftCost — keep the two in sync or the affordability dimming lies.
-        if (playedCard.enhancement == CardEnhancement.OnTheHouse)
-            cost = 0;
+        // Blompo's blessings that change what a card costs. CardAimIndicator and BlompoScreen call
+        // the SAME function, so the affordability dimming and the readouts can no longer disagree
+        // with what is actually charged.
+        cost = Mathf.Max(0, CardEnhancements.EffectiveCost(playedCard, cost));
         if (isNextCardFree)
         {
             cost = 0;
@@ -119,27 +165,39 @@ public class DeckManager : MonoBehaviour
         if (player.GetCurrentShift() < cost) return;
         if (!playedCard.isInfinite && playedCard.currentUses <= 0) return;
 
-        // Blompo: "Extra Spicy" scales the action's damage value.
-        float actionValue = data.actionValue;
-        if (playedCard.enhancement == CardEnhancement.ExtraSpicy)
-            actionValue *= CardEnhancements.EXTRA_SPICY_MULT;
+        // Blompo: cast-time damage multipliers (Ritual, Glass, Loaded Dice). Applied to the value
+        // handed to the action, so they scale every target of an AoE and not just the first.
+        float actionValue = CardEnhancements.ModifyActionValue(playedCard, data.actionValue);
 
         CardBeingPlayed = playedCard;
+        AttributedCard = playedCard;
         bool success = player.ExecuteAction(data.actionType, actionValue, out bool keepInHand);
         CardBeingPlayed = null;
+        AttributedCard = null;
 
-        // Shift is deducted only when the action actually executed — Blocked plays
-        // (conflict refusal) and Failed plays (e.g. Comet Dive while grounded) cost
-        // nothing. The affordability check above still gates execution up front.
-        // Portal stays exempt: TryPlacePortal spends its own cost on second placement.
-        if (success && data.actionType != CardActionType.Portal)
-        {
-            if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
-                player.SpendShift(cost);
-        }
+        // Oath tracking. Noted on `success` alone rather than inside the !keepInHand branch below,
+        // because a card that stays in hand (Portal's first placement) has still been PLAYED as far
+        // as "clear a room without playing a card" is concerned. Blocked and failed plays don't
+        // count — nothing happened, and refusing a card shouldn't break an oath.
+        if (success && QuestSystem.instance != null)
+            QuestSystem.instance.NoteCardPlayed(IsStagger(playedCard));
 
         if (success && !keepInHand)
         {
+            // Shift is deducted only when the action actually executed AND the card is actually
+            // leaving the hand — Blocked plays (conflict refusal) and Failed plays (e.g. Comet Dive
+            // while grounded) cost nothing. The affordability check above still gates up front.
+            //
+            // ⚠️ THIS LIVES INSIDE THE !keepInHand BLOCK ON PURPOSE. Every card except Portal
+            // returns keepInHand = false, so for all of them this is identical to charging on
+            // `success` alone. Portal is the one card that reports success while STAYING in hand
+            // (its first placement), and putting the spend here is what lets it be charged once, on
+            // the second placement, by the same code path as everything else. It used to charge
+            // itself inside TryPlacePortal, which is why "On the House" and First One's Free did
+            // nothing on it. Do not hoist this back out.
+            if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
+                player.SpendShift(cost);
+
             OnCardPlayed?.Invoke(index);
             player.FlashCardPlay();
 
@@ -149,19 +207,23 @@ public class DeckManager : MonoBehaviour
             {
                 isNextCardFree = false;
             }
-            // Blompo: "Kickback" refunds Shift on play. Gated by the hub rule like every other
-            // resource change — the sandbox neither charges nor pays out.
-            if (playedCard.enhancement == CardEnhancement.Kickback)
-            {
-                if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
-                    player.AddShift(CardEnhancements.KICKBACK_SHIFT);
-            }
 
-            // Blompo: "Double Dip" casts a second time. Only ever offered on cards that hold no
-            // ConflictFlags (CardEnhancements.IsInstantCard), so unlike Echo Chamber below this
-            // second cast can't be silently refused by TryExecute.
-            if (playedCard.enhancement == CardEnhancement.DoubleDip)
-                player.ExecuteAction(data.actionType, actionValue, out bool _);
+            // Blompo: payouts and prices that land on play (Compound Interest, Donor Card), plus
+            // recording what this play actually cost so Toll Booth can refund the real number.
+            CardEnhancements.NotePlayed(playedCard, cost);
+            cardsPlayedThisRoom++;
+
+            // Blompo: "Understudy" pulls its bound partner into hand.
+            if (playedCard.enhancement == CardEnhancement.Understudy)
+                DrawSpecificCard(playedCard.understudyPartner);
+
+            // Blompo: "Echo" recasts after a delay. ⚠️ THE DELAY IS THE MECHANISM, not flavour —
+            // an immediate second cast is refused by CardActionExecutor.TryExecute whenever the
+            // first is still holding ConflictFlags, which is exactly why the old Double Dip could
+            // only ever be offered on the five flagless cards. Two seconds is comfortably past
+            // every card's effect window, so Echo works on the whole deck.
+            if (playedCard.enhancement == CardEnhancement.Echo)
+                StartCoroutine(EchoRoutine(data.actionType, actionValue));
 
             // Stagger is exempt: a coin flip that secretly doubles the blood price of the one card
             // you play when you're already out of resources reads as a bug, not as a skill paying
@@ -176,7 +238,10 @@ public class DeckManager : MonoBehaviour
                 player.ExecuteAction(data.actionType, actionValue, out bool _);
             }
             bool inHub = LevelManager.instance != null && LevelManager.instance.IsCurrentRoomHub();
-            if (!playedCard.isInfinite && !inHub) playedCard.currentUses--;
+            // Blompo: several blessings can skip the charge (Sleight of Hand, Slow Burn, the first
+            // Teacher's Pet play each room). `- 1` because this card's own play was just counted.
+            bool spendCharge = CardEnhancements.ShouldSpendCharge(playedCard, cardsPlayedThisRoom - 1);
+            if (!playedCard.isInfinite && !inHub && spendCharge) playedCard.currentUses--;
 
             // ⚠️ STAGGER ENTERS NO PILE. It is not a card the player owns — it is conjured into the
             // hand whenever Shift hits zero and evaporates when spent. Letting it fall through to
@@ -189,7 +254,22 @@ public class DeckManager : MonoBehaviour
                 return;
             }
 
-            if (inHub || (playedCard.isInfinite || playedCard.currentUses > 0) && (!data.singleUse || playedCard.isInfinite))
+            // Blompo: "Clingy" never leaves the hand at all — it goes straight back, so it costs a
+            // hand slot forever in exchange for always being available. Once it runs dry it falls
+            // through to the normal routing below and burns out like anything else.
+            if (CardEnhancements.StaysInHand(playedCard))
+            {
+                hand.Add(playedCard);
+            }
+            else if (inHub || (playedCard.isInfinite || playedCard.currentUses > 0) && (!data.singleUse || playedCard.isInfinite))
+            {
+                discardPile.Add(playedCard);
+            }
+            // Blompo: "Last Call" — the first burnout of the run refills the card instead. Checked
+            // ahead of Reclaimer's Clamp on purpose: this is once per RUN and card-specific, the
+            // Clamp is once per ROOM and applies to anything, so spending the narrower one first
+            // leaves the broader one available for a different card.
+            else if (CardEnhancements.RescueFromExhaust(playedCard))
             {
                 discardPile.Add(playedCard);
             }
@@ -205,6 +285,9 @@ public class DeckManager : MonoBehaviour
             else
             {
                 exhaustPile.Add(playedCard);
+
+                // Blompo: death benefits ("Inheritance" passes its remaining life to another card).
+                CardEnhancements.OnExhausted(playedCard);
 
                 // A card burning out leaves scrap behind — a small consolation so losing a card
                 // isn't a total loss, deliberately far below what it costs to salvage one back
@@ -228,6 +311,74 @@ public class DeckManager : MonoBehaviour
             CheckForStaggerCondition();
         }
     }
+    // ---- Blompo support ------------------------------------------------------------------------
+
+    // How many cards have been played in the current room. Slow Burn reads it; PlayerController's
+    // room hook resets it. Deliberately NOT reused from QuestSystem's identical counter — that one
+    // is per-OATH bookkeeping and is reset by oath logic, so borrowing it would couple a blessing
+    // to whether the player happens to be carrying a contract.
+    private int cardsPlayedThisRoom;
+
+    // Called once per room, from PlayerController.OnNewRoomEnter.
+    public void BeginRoomForEnhancements()
+    {
+        cardsPlayedThisRoom = 0;
+
+        List<RuntimeCard> all = new List<RuntimeCard>();
+        all.AddRange(drawPile); all.AddRange(hand); all.AddRange(discardPile);
+        CardEnhancements.BeginRoom(all);
+
+        PullTeachersPets();
+    }
+
+    // "Teacher's Pet" is always in the opening hand. Pulled AFTER the normal draw rather than by
+    // rigging the shuffle, so it cannot break the draw's own accounting; if the hand is already
+    // full the pet displaces the last ordinary card, which goes back to the draw pile.
+    private void PullTeachersPets()
+    {
+        for (int i = drawPile.Count - 1; i >= 0; i--)
+        {
+            RuntimeCard c = drawPile[i];
+            if (!CardEnhancements.WantsOpeningHand(c)) continue;
+            if (hand.Contains(c)) continue;
+            if (hand.Count >= HandCapacity)
+            {
+                RuntimeCard bumped = null;
+                for (int h = hand.Count - 1; h >= 0; h--)
+                    if (!CardEnhancements.WantsOpeningHand(hand[h]) && !IsStagger(hand[h])) { bumped = hand[h]; break; }
+                if (bumped == null) return;          // hand is all pets; leave it alone
+                hand.Remove(bumped);
+                drawPile.Add(bumped);
+            }
+            drawPile.RemoveAt(i);
+            hand.Add(c);
+        }
+        OnHandChanged?.Invoke(false);
+    }
+
+    // "Understudy": pull the bound partner out of wherever it is and into hand.
+    private void DrawSpecificCard(RuntimeCard target)
+    {
+        if (target == null || hand.Contains(target) || hand.Count >= HandCapacity) return;
+
+        if (drawPile.Remove(target) || discardPile.Remove(target))
+        {
+            hand.Add(target);
+            OnHandChanged?.Invoke(true);
+        }
+        // Not found means it is exhausted, or it is the card that was just played. Silently doing
+        // nothing is right: the bond is a bonus, and failing it must never block the play.
+    }
+
+    // "Echo": recast after a delay, so the first cast's ConflictFlags have expired.
+    private System.Collections.IEnumerator EchoRoutine(CardActionType type, float value)
+    {
+        yield return new WaitForSeconds(CardEnhancements.ECHO_DELAY);
+        if (player == null || GameManager.instance == null) yield break;
+        if (GameManager.instance.currentState != GameState.Playing) yield break;
+        player.ExecuteAction(type, value, out bool _);
+    }
+
     // Lets systems that mutate cards IN PLACE ask the hand UI to redraw. Blompo needs this: a
     // blessing changes an existing RuntimeCard without adding/removing/playing anything, so no
     // normal hand event fires and the new badge would not appear until the next redraw.
@@ -390,10 +541,24 @@ public class DeckManager : MonoBehaviour
             if (!inHub)
             {
                 player.SpendShift(currentRecallCost);
-                currentRecallCost++;
+                // The Ninja's "Fast Hands": the price never climbs, so cycling the hand is a real
+                // strategy instead of something the escalation quietly teaches you not to do. The
+                // recall still COSTS — it just stops getting worse.
+                if (!RecallCostIsLocked) currentRecallCost++;
                 OnRecallCostChanged?.Invoke(currentRecallCost);
             }
         }
+
+        // Oath tracking, placed after every early-return above so a REFUSED recall (not enough
+        // Shift) doesn't break the No Take-Backs oath — the player didn't get one.
+        if (QuestSystem.instance != null) QuestSystem.instance.NoteRecall();
+
+        // Recall discards the hand, so a Portal that placed its first half and never its second
+        // would leave that half orphaned in the room with firstPortalInstance still pointing at it.
+        // The next Portal drawn in the same room would then place the SECOND portal on its first
+        // click and charge for it.
+        player.CancelPendingPortal();
+        player.ClearReturnAnchor();   // same reasoning for Second Thoughts' marker
 
         // 5. Asıl işlemi başlat
         ReloadHand();
@@ -421,7 +586,7 @@ public class DeckManager : MonoBehaviour
         List<RuntimeCard> retained = new List<RuntimeCard>();
         for (int i = 0; i < hand.Count; i++)
         {
-            if (hand[i] != null && (hand[i].enhancement == CardEnhancement.Clingy || IsStagger(hand[i])))
+            if (hand[i] != null && (CardEnhancements.RetainsThroughRecall(hand[i]) || IsStagger(hand[i])))
                 retained.Add(hand[i]);
             else
                 discardPile.Add(hand[i]);
@@ -429,7 +594,7 @@ public class DeckManager : MonoBehaviour
         hand.Clear();
         hand.AddRange(retained);
 
-        for (int i = hand.Count; i < handCapacity; i++)
+        for (int i = hand.Count; i < HandCapacity; i++)
         {
             if (drawPile.Count == 0 && discardPile.Count > 0)
             {
@@ -454,7 +619,7 @@ public class DeckManager : MonoBehaviour
 
     public void DrawCard()
     {
-        if (hand.Count >= handCapacity) return;
+        if (hand.Count >= HandCapacity) return;
 
         if (drawPile.Count == 0)
         {

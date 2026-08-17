@@ -10,6 +10,33 @@ public class RuntimeCard
     // enhancement there would upgrade the card in every future run and dirty the asset on disk.
     public CardEnhancement enhancement = CardEnhancement.None;
 
+    // ---- per-blessing runtime state --------------------------------------------------------------
+    // Several blessings accumulate across the run, so they need somewhere to keep score. It lives
+    // here for the same reason the enhancement does: it is per-copy and per-run. With two Fireballs
+    // in the deck, one can be a Grudge that has killed forty things and the other untouched.
+
+    // Grudge: flat damage this card has earned by killing. Grows forever.
+    public int grudgeBonus;
+
+    // Time Will Come (gains a charge per room unplayed) and Compound Interest (pays Shift equal to
+    // the wait) are both driven by this. One counter serves both — they ask the same question.
+    public int roomsSincePlayed;
+
+    // Last Call: the rescue is once per run.
+    public bool lastCallUsed;
+
+    // Teacher's Pet: its FIRST play each room spends no charge.
+    public bool playedThisRoom;
+
+    // Toll Booth refunds what this play actually cost, which is not recomputable later (First One's
+    // Free, Kinetic Discount and the hub rule can all have zeroed it), so it is recorded on play.
+    public int lastCostPaid;
+
+    // Understudy: the card this one is bound to. Playing this draws that one.
+    // ⚠️ A reference to another RuntimeCard, not a CardData — the bond is to that specific COPY, so
+    // binding to one of your two Fireballs does not summon the other.
+    public RuntimeCard understudyPartner;
+
     public RuntimeCard(CardData data)
     {
         cardData = data;
@@ -17,5 +44,16 @@ public class RuntimeCard
         isInfinite = false;
         isSelected = false;
         enhancement = CardEnhancement.None;
+    }
+
+    // Used by Twin, which puts a second copy of this card in the deck.
+    public RuntimeCard Clone()
+    {
+        RuntimeCard c = new RuntimeCard(cardData);
+        c.currentUses = currentUses;
+        c.isInfinite = isInfinite;
+        c.enhancement = enhancement;
+        c.grudgeBonus = grudgeBonus;
+        return c;
     }
 }

@@ -13,6 +13,8 @@ public class MeleeEnemyAI : MonoBehaviour
     public float damage = 15f;           // Vurduğunda kaç can gidecek?
     public float damageDelay = 0.3f;     // Animasyon başladıktan kaç saniye sonra kılıç yere iniyor?
     public float knockbackPower = 5f;    // Vurunca oyuncuyu ne kadar geri itecek?
+    [Tooltip("How tall the swing reaches. Roughly one body — a player clearly above this is missed.")]
+    public float attackHeight = EnemyMelee.DefaultHeight;
 
     [Header("Edge Detection")]
     public LayerMask groundLayer;
@@ -67,8 +69,8 @@ public class MeleeEnemyAI : MonoBehaviour
                     // Play the swing sound at the moment the attack starts.
                     SfxManager.PlayAtPoint(attackSound, transform.position, attackVolume);
 
-                    // YENİ: Kılıcı kaldırdığı an hasar hesaplama sürecini başlat
-                    StartCoroutine(DealDamageRoutine());
+                    // The swing commits to a direction NOW. See EnemyMelee.TryHit.
+                    StartCoroutine(DealDamageRoutine(player.position.x >= transform.position.x ? 1f : -1f));
                 }
             }
             else
@@ -80,32 +82,16 @@ public class MeleeEnemyAI : MonoBehaviour
         }
     }
 
-    // YENİ: Hasar Verme Süreci
-    IEnumerator DealDamageRoutine()
+    // Hasar Verme Süreci — the swing lands `damageDelay` after it starts.
+    IEnumerator DealDamageRoutine(float swingDir)
     {
-        // 1. Kılıcın havadan yere inmesi için gereken süreyi bekle
         yield return new WaitForSeconds(damageDelay);
-
-        // 2. Bu süre içinde düşman öldüyse veya oyuncu yok olduysa iptal et
         if (player == null || controller.IsDead) yield break;
 
-        // 3. Vuruş anında oyuncu hala menzilde mi kontrol et? (Oyuncu zekice geri kaçmış olabilir)
-        float currentDistance = Vector2.Distance(transform.position, player.position);
-
-        // +0.5f ufak bir tolerans payıdır, tam sınırdayken boşa gitmesin diye
-        if (currentDistance <= attackRange + 0.5f)
-        {
-            // Senin PlayerController kodundaki TakeDamage ve Knockback sistemlerini çağırıyoruz
-            PlayerController pc = player.GetComponent<PlayerController>();
-            if (pc != null)
-            {
-                pc.TakeDamage(damage);
-
-                // Oyuncuyu vurduğumuz yönün tersine doğru fırlat
-                Vector2 knockbackDir = (player.position - transform.position).normalized;
-                pc.ApplyKnockback(knockbackDir * knockbackPower);
-            }
-        }
+        // One honest box in front of the attacker, tested against the player's real collider.
+        // The old check was a circle around this enemy's FEET with a hidden +0.5 on the range —
+        // it hit through the enemy's back and from a body-length overhead. See EnemyMelee.
+        EnemyMelee.TryHit(transform, swingDir, attackRange, damage, knockbackPower, attackHeight);
     }
 
     private bool IsEdgeAhead(float dirX)
@@ -119,7 +105,7 @@ public class MeleeEnemyAI : MonoBehaviour
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, aggroRange);
 
-        Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, attackRange);
+        // The box that actually decides the hit, not a circle that only approximates it.
+        EnemyMelee.DrawGizmo(transform, attackRange, attackHeight);
     }
 }

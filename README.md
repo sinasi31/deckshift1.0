@@ -15,15 +15,20 @@ Each jump consumes one Shift, turning movement into a limited resource and forci
 
 - **Deckbuilding + Platforming**
   - Cards are used for both combat and traversal
-  - Players add one card to their deck at the end of each level
+  - Cards have finite **charges**; a spent card exhausts and must be recovered with **scrap**
+  - New cards come from chests, the shop and quest payouts
 
 - **Risk–Reward Level Design**
-  - Optional rewards such as slot machines and Shift Crystals
-  - Limited Shift prevents collecting everything in a single run
+  - Optional rewards are usually off the mandatory path, so reaching them costs Shift
+  - A branching **run map** lets you plan a route: Skirmish / Fight / Elite, with the harder branches the only way to resupply
+
+- **Contracts**
+  - Quests taken at a pinned board in the hub, including **oaths** — streak contracts that ask you to give something up (no cards for three rooms, no Recall, a Shift budget per room)
+  - They pay in things the shop doesn't sell: permanent max Shift, max HP, cards, scrap
 
 - **Roguelike Structure**
   - 3 Acts (planned; **Act 1 "Oxidation District" prototype is playable**)
-  - A run is: hub → several hand-crafted levels → an **Act boss** as the finale
+  - A run is: hub → a routed series of levels → an **Act boss** as the finale
   - Shops, enemies, quests, relics, and run upgrades
 
 ---
@@ -57,16 +62,19 @@ Each Act ends with a boss. **Act 1's boss — the Moss Knight** — is implement
 
 ---
 
-## 🎰 Slot Machines
+## 🔩 Scrap & the Forge
 
-- Each slot machine has 3 reels
-- Reels contain numbers from 1 to 7 and one Skull symbol
-- If any Skull appears, no item is awarded
-- Otherwise, reel values are summed to determine item rarity
-  - Low total → Common
-  - Medium total → Rare
-  - High total → Epic
-  - 7-7-7 → Legendary (Jackpot)
+Killing enemies drops **scrap** — a separate currency from gold, and the only thing that repairs a deck.
+
+- **Gold** comes from piles placed in levels and buys NEW power at the shop
+- **Scrap** comes from kills and buys SUSTAIN: charges back onto cards you already own, and cards dragged out of the exhaust pile
+- The two never mix. Maintenance always loses to acquisition when they share a wallet
+
+---
+
+## 🎲 Relics
+
+Up to **5 relic slots**. Taking a sixth forces a sell-or-decline decision, so a loadout is curated rather than accumulated — 19 relics so far, offered by chests and the shop.
 
 ---
 
@@ -84,7 +92,7 @@ Example Upgrade:
 
 - Engine: Unity 6 (URP, 2D renderer)
 - Language: C#
-- Project Status: Active prototype — Act 1 vertical slice (~10 cards, several hand-crafted levels, one full boss)
+- Project Status: Active prototype — Act 1 vertical slice (~14 playable cards, 19 relics, 10 combat levels + hub + boss room, one full boss)
 - Art is pixel-art (Cainos asset packs) plus procedural, code-built effects (VFX, HUD chips, boss/chest bursts); focus is on gameplay systems and player decision-making
 
 ---

@@ -43,6 +43,11 @@ public class Chest : MonoBehaviour, IInteractable
 
         isOpened = true;
 
+        // Drop the prompt the instant it's opened — the player is still standing inside the
+        // trigger, so nothing else would take it down until they walked away and it would sit
+        // there over an open, empty chest.
+        if (prompt != null) prompt.SetActive(false);
+
         if (animator != null)
             animator.SetBool(animatorBoolParam, true);
 
@@ -133,9 +138,12 @@ public class Chest : MonoBehaviour, IInteractable
         return relic;
     }
 
+    // ⚠️ `!isOpened` matters. Without it the "press E" keycap came back every time the player walked
+    // into a chest they had already emptied, inviting an interaction that does nothing — Interact()
+    // returns immediately once isOpened. CardChest already guarded this; this one didn't.
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.CompareTag("Player") && prompt != null)
+        if (!isOpened && other.CompareTag("Player") && prompt != null)
             prompt.SetActive(true);
     }
 

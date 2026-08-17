@@ -308,6 +308,42 @@ public class LevelManager : MonoBehaviour
         RunMapScreen.OpenForChoice(SpawnNextRoom);
     }
 
+    // Wipes everything the departing room put into the scene but does NOT own.
+    //
+    // ⚠️ DESTROYING `currentRoom` ONLY DESTROYS WHAT IS PARENTED UNDER IT. Anything spawned at
+    // runtime with `Instantiate(prefab)` and no parent becomes a SCENE-ROOT object and simply
+    // survives the room change — it then turns up in the next room, and in the hub. Reported by the
+    // designer twice over: enemy health bars floating in later rooms, and the Moss Knight's summoned
+    // slimes following the player into the hub when the fight was left unfinished.
+    //
+    // The `TemporaryObject` marker was the existing answer, and it is the wrong SHAPE of answer on
+    // its own: it only cleans up things whose author remembered to stamp them, so every future
+    // runtime spawn is one forgotten line away from the same bug. Sweeping by TYPE covers the
+    // spawns nobody remembered, including ones not written yet.
+    //
+    // Sweeping every enemy unconditionally is safe because the room is destroyed on the very next
+    // line — the room's own enemies were going anyway. Note these are destroyed, not killed: Die()
+    // never runs, so leaving a room deliberately pays no scrap and completes no bounty.
+    private void ClearRuntimeSpawns()
+    {
+        foreach (TemporaryObject obj in FindObjectsByType<TemporaryObject>(FindObjectsSortMode.None))
+            Destroy(obj.gameObject);
+
+        foreach (EnemyHealth enemy in FindObjectsByType<EnemyHealth>(FindObjectsSortMode.None))
+            Destroy(enemy.gameObject);
+
+        // Health bars are parentless by design (see EnemyHealthBar). They also delete themselves
+        // once their target is gone, so this is belt-and-braces — it just gets them in the same
+        // frame rather than on the next one.
+        foreach (EnemyHealthBar bar in FindObjectsByType<EnemyHealthBar>(FindObjectsSortMode.None))
+            Destroy(bar.gameObject);
+
+        // Anything still in flight. A bolt that outlives its shooter would otherwise arrive in the
+        // next room and hit the player there.
+        foreach (Projectile shot in FindObjectsByType<Projectile>(FindObjectsSortMode.None))
+            Destroy(shot.gameObject);
+    }
+
     public void SpawnNextRoom()
     {
         // Room-end Held payoffs (Dead Weight): fire while the ending room's hand still
@@ -316,8 +352,7 @@ public class LevelManager : MonoBehaviour
         if (currentRoom != null && !IsCurrentRoomHub() && DeckManager.instance != null)
             DeckManager.instance.OnRoomEnd();
 
-        TemporaryObject[] junk = FindObjectsByType<TemporaryObject>(FindObjectsSortMode.None);
-        foreach (TemporaryObject obj in junk) Destroy(obj.gameObject);
+        ClearRuntimeSpawns();
 
         if (currentRoom != null) Destroy(currentRoom);
 

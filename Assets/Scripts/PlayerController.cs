@@ -26,7 +26,13 @@ public class PlayerController : MonoBehaviour
     public float groundCheckRadius = 0.2f;
     public Transform ceilingCheck;
     public float ceilingCheckRadius = 0.2f;
+
+    // Ground + Enemy. Enemies are in here on purpose so the player can land on their heads (see
+    // Pogo Boots), but that makes it the WRONG mask for anything asking "is there terrain here".
     public LayerMask groundLayer;
+
+    [Tooltip("Terrain only. Used where an enemy must NOT count as level geometry — the wall check.")]
+    public LayerMask terrainLayer = 1 << 3;   // Ground
 
     [Header("Air Settings")]
     public int maxAirJumps = 1;
@@ -56,6 +62,16 @@ public class PlayerController : MonoBehaviour
     internal Vector3 currentRoomEntryPoint;
 
     private float _headBounceCooldown;
+
+    // Pogo Boots chain state, both cleared the moment the player touches the ground.
+    // See TriggerHeadBounce for why these exist.
+    private readonly HashSet<int> _bouncedThisAirtime = new HashSet<int>();
+    private int _bounceChain;
+
+    [Header("Pogo Boots (head bounce)")]
+    [Tooltip("Upward impulse per bounce as a fraction of a normal jump, by position in the chain. " +
+             "The last value repeats once the chain runs past the end of the array.")]
+    public float[] pogoChainFalloff = { 0.70f, 0.55f, 0.42f, 0.32f };
 
     [Header("Gold Settings")]
     public int currentGold = 0;
@@ -120,10 +136,37 @@ public class PlayerController : MonoBehaviour
 
     [Header("Portal Settings")]
     public GameObject portalPrefab;
-    public float portalMaxRange = 10f;
+
+    // Portal used to be the biggest skip in the game and the only card whose reach depended on the
+    // player's MONITOR: the first portal had no range limit at all, so it could go anywhere the
+    // mouse reached — the camera's half-width, which is 9.3 units at 4:3 but 16.3 at 21:9. With the
+    // link range on top, total reach was 24-31 units against a spawn-to-exit separation the level
+    // laws set at ~20. Anchoring the first portal to the PLAYER fixes both at once: the apparatus is
+    // now placed around you rather than painted across the room, and the numbers are the same on
+    // every display.
+    [Tooltip("How far from the PLAYER the first portal may be placed, in world units (1 unit = 1 tile). " +
+             "This is the 'set it down near you' radius — it is what makes Portal's reach independent " +
+             "of screen aspect ratio. Matches the Phase bubble so both cards read as the same idea.")]
+    public float portalPlaceRange = 6f;
+
+    [Tooltip("How far the SECOND portal may be placed from the first — i.e. the size of the hop. " +
+             "This is the number that decides how much level Portal can skip; tune this one first.")]
+    public float portalMaxRange = 15f;
+
     private Portal firstPortalInstance;
     // Read-only view for CardAimIndicator's portal ghost (first vs second placement preview).
     internal Portal FirstPortalInstance => firstPortalInstance;
+
+    [Header("Return Anchor (Second Thoughts)")]
+    // Deliberately has NO range limit, which is the whole difference from Portal. The return end is
+    // always somewhere the player has already stood, so it can never carry them forward through a
+    // room — it can only undo a trip they already paid for. That makes unlimited range safe by
+    // construction, and it's what the card is for: commit to a detour, come back cheap.
+    private Vector2 returnAnchorPos;
+    private bool hasReturnAnchor;
+    private ReturnAnchorVFX returnAnchorVfx;
+    internal bool HasReturnAnchor => hasReturnAnchor;
+    internal Vector2 ReturnAnchorPos => returnAnchorPos;
 
     [Header("Wall Settings")]
     public Transform wallCheck;
@@ -132,6 +175,18 @@ public class PlayerController : MonoBehaviour
     public Vector2 wallJumpForce = new Vector2(10f, 15f);
     private bool isWallDetected;
     private bool isWallSliding;
+    private bool wallSlideAnimActive;
+    private float nextScrapeTime;
+
+    // Wall sliding is a RELIC, not a base ability (designer 2026-08-11). The state machine, the
+    // sensor and the tuning fields all existed but nothing ever entered the state, so wall-jumping
+    // has never been in the game — which makes it free to hand out as a pickup instead.
+    public const string WallSlideRelicID = "GeckoGloves";
+
+    private bool CanWallSlide()
+    {
+        return RelicManager.instance != null && RelicManager.instance.HasRelic(WallSlideRelicID);
+    }
 
     [Header("Quest Tracking")]
     private bool tookDamageThisRoom = false;
@@ -212,9 +267,36 @@ public class PlayerController : MonoBehaviour
     public PlayerState currentState;
     internal bool isGrounded;
 
+    [Header("Jump Forgiveness")]
+    // Two standard platformer affordances. Neither is a mechanic the player learns — when they work
+    // you don't notice them, you just stop having moments where you swear you pressed jump and the
+    // character dropped anyway.
+    //
+    // ⚠️ THEY MATTER MORE HERE THAN IN AN ORDINARY PLATFORMER, because in this game a jump that
+    // fails on a timing gap does not just cost you a retry — it costs SHIFT, twice: once for the
+    // failed input if it fired at all, and again for the re-attempt. That is a run-long resource
+    // being spent on input latency rather than on decisions.
+    [Tooltip("Seconds after walking off a ledge during which a jump still counts as grounded.")]
+    public float coyoteTime = 0.10f;
+    [Tooltip("Seconds a jump press is remembered for, so pressing just before landing still fires.")]
+    public float jumpBufferTime = 0.12f;
+
+    private float coyoteTimer;
+    private float jumpBufferTimer;
+
+    [Header("Character")]
+    // The played character: the run's starting deck and one passive trait. Left null, the game
+    // plays exactly as it did before characters existed (DeckManager falls back to its own
+    // startingDeck), which is what makes this safe to ship without a select screen yet.
+    public CharacterData character;
+
     [Header("Combat Settings")]
     public GameObject fireballPrefab;
     public Transform firePoint;
+    [SerializeField] private AudioClip shurikenThrowSound;
+    // The pack's own shuriken art, so the thrown star is the same object that was in the hand.
+    // Left empty, Shuriken falls back to its procedural star.
+    [SerializeField] private Sprite shurikenSprite;
     public float wailRange = 10f;
     [SerializeField] internal float fireballCastDelay = 0.12f;
     public float biteRange = 1.5f;
@@ -307,6 +389,21 @@ public class PlayerController : MonoBehaviour
     public GameObject gravityAuraEffect;        // looping anti-gravity aura prefab (GravityAuraVFX), played for the reversal duration
     private GameObject gravityAuraInstance;
 
+    [Header("Phase")]
+    // Phase is bounded to a bubble anchored where it was cast. Without one it is the strongest
+    // traversal tool in the game by a wide margin: 8-directional flight at full moveSpeed for the
+    // card's 2s duration reaches ~16 world units through solid rock in any direction, which is more
+    // than the 20-tile spawn-to-exit separation the level design laws are built on. The bubble keeps
+    // Phase as "get through that wall into that pocket" and stops it being "skip the room".
+    [Tooltip("How far the player may travel from the cast point while phasing, in world units " +
+             "(1 unit = 1 tile). Anchored at the BODY CENTER the moment the card is played; it does " +
+             "NOT follow the player. Pushing the edge slides along it rather than stopping dead. " +
+             "⚠️ The Phase card's description names this number — update the card asset if you change it.")]
+    public float phaseMaxRadius = 6f;
+    private Vector2 phaseAnchor;
+    private PhaseBoundary phaseBoundary;    // live only while phasing; OnTeleported re-anchors it
+    internal bool IsPhasing => isPhasing;
+
     [Header("Phase Visual")]
     [SerializeField] internal SkinnedMeshRenderer[] phaseVisuals;
     private Coroutine phaseVisualCoroutine;
@@ -326,6 +423,16 @@ public class PlayerController : MonoBehaviour
             originalVisualLocalPos = visualModel.transform.localPosition;
             originalVisualScaleX = visualModel.transform.localScale.x;
         }
+
+        // ⚠️ THE SELECT SCREEN'S PICK OVERRIDES THE PREFAB. The prefab's `character` field is the
+        // fallback for entering play mode straight into SampleScene, which is how this project is
+        // actually developed — but a run started from the main menu must play whoever was chosen
+        // there, and that choice arrives a scene load away through CharacterSelection.
+        if (CharacterSelection.Chosen != null) character = CharacterSelection.Chosen;
+
+        // Re-dress the rig for the played character. In Awake so the player is never seen wearing
+        // the wrong outfit for a frame; a no-op when no character or no preset is assigned.
+        CharacterAppearance.Apply(this, character);
     }
 
     void Start()
@@ -345,6 +452,10 @@ public class PlayerController : MonoBehaviour
         // Dying mid-Phase kills PhaseRoutine before its cleanup runs, so the death
         // path must restore the matrix itself (audit_report.md Critical #2).
         playerHealth.OnDied += RestorePhaseLayerCollisions;
+
+        // A pending first portal / return anchor must not outlive the run that placed it.
+        playerHealth.OnDied += CancelPendingPortal;
+        playerHealth.OnDied += ClearReturnAnchor;
 
         if (visualModel != null)
         {
@@ -373,6 +484,8 @@ public class PlayerController : MonoBehaviour
         {
             currentAirJumps = 0;
             freeAirJumpUsed = false;
+            _bouncedThisAirtime.Clear();
+            _bounceChain = 0;
         }
         isWallDetected = WallCheck();
 
@@ -429,10 +542,18 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            if (Input.GetButtonDown("Jump"))
-            {
-                HandleJumpInput();
-            }
+            // Coyote time: refreshed while grounded, bleeds away once you step off.
+            if (isGrounded) coyoteTimer = coyoteTime;
+            else coyoteTimer -= Time.deltaTime;
+
+            // Jump buffering: the press is remembered rather than consumed on the frame it arrives.
+            if (Input.GetButtonDown("Jump")) jumpBufferTimer = jumpBufferTime;
+            else jumpBufferTimer -= Time.deltaTime;
+
+            // Retried every frame while the buffer is live, and cleared only when a jump ACTUALLY
+            // happened — so a press made a moment too early survives until landing, and a press
+            // that could not be paid for (0 Shift) simply expires instead of firing later.
+            if (jumpBufferTimer > 0f && HandleJumpInput()) jumpBufferTimer = 0f;
 
             if (currentState == PlayerState.Idle || currentState == PlayerState.Running || currentState == PlayerState.Jumping)
                 moveInput = Input.GetAxisRaw("Horizontal");
@@ -576,6 +697,54 @@ public class PlayerController : MonoBehaviour
 
         animator.SetFloat("VelocityY", rb.linearVelocity.y);
         animator.SetBool("IsGrounded", isGrounded);
+
+        UpdateWallSlideAnimation();
+    }
+
+    // The wall-slide pose, borrowed from the Cainos pack's LADDER CLIMB layer.
+    //
+    // There is no wall-slide clip in the pack and commissioning one isn't on the table, but the
+    // ladder-climb pose is already a character pressed flat against a vertical surface with both
+    // arms up — which is exactly the read we want. Setting ClimbingSpeedMul to 0 FREEZES it on a
+    // single frame, turning a climb cycle into a hold. That one parameter is the difference between
+    // "climbing an invisible ladder" and "gripping a wall".
+    //
+    // Facing already points into the wall: the slide can only start while pushing toward the wall
+    // the sensor found, and the sensor casts along `isFacingRight`.
+    private void UpdateWallSlideAnimation()
+    {
+        bool sliding = currentState == PlayerState.WallSliding;
+
+        if (sliding != wallSlideAnimActive)
+        {
+            wallSlideAnimActive = sliding;
+            animator.SetBool("IsClimbingLadder", sliding);
+            animator.SetFloat("ClimbingSpeedMul", sliding ? 0f : 1f);
+        }
+
+        if (sliding) EmitWallScrape();
+    }
+
+    // Grit scraped off the wall. The frozen pose alone reads as being STUCK to the wall — nothing
+    // says which way you're travelling — so this supplies the motion cue.
+    private void EmitWallScrape()
+    {
+        if (Time.time < nextScrapeTime) return;
+        nextScrapeTime = Time.time + 0.045f;
+
+        float dirX = isFacingRight ? 1f : -1f;
+        float halfWidth = capsuleCollider != null ? capsuleCollider.size.x * 0.5f : 0.25f;
+
+        // On the wall face, at a random height up the body, so it looks like a contact patch rather
+        // than a single emitter point.
+        Vector2 at = (Vector2)transform.position
+                   + new Vector2(dirX * halfWidth, Random.Range(0.25f, 1.45f));
+
+        int layerID = 0, order = 5;
+        SpriteRenderer any = GetComponentInChildren<SpriteRenderer>();
+        if (any != null) { layerID = any.sortingLayerID; order = any.sortingOrder + 1; }
+
+        WallScrapeVFX.Spawn(at, dirX, layerID, order);
     }
 
     // Feeds the Cainos swim blend tree so it picks the forward / backward / up / down
@@ -590,38 +759,52 @@ public class PlayerController : MonoBehaviour
         animator.SetFloat("VelocityY", rb.linearVelocity.y);
     }
 
-    private void HandleJumpInput()
+    // Returns true only if a jump actually happened, which is what lets the buffer above know
+    // whether to clear itself or keep waiting.
+    private bool HandleJumpInput()
     {
         if (currentState == PlayerState.WallSliding)
         {
-            PerformWallJump();
+            return PerformWallJump();
         }
-        else if (isGrounded)
+
+        // ⚠️ `coyoteTimer > 0` is the ONLY change to the grounded test, and it must stay that way.
+        // Do NOT "fix" isGrounded to clear itself on jumping while you are in here: PerformJump's
+        // horizontal impulse is dead code precisely because the next FixedUpdate still sees
+        // isGrounded == true and overwrites it with the walking speed. Make isGrounded honest and
+        // every jump silently gains a large horizontal boost, and every gap in every level in the
+        // game becomes trivially clearable.
+        if (isGrounded || coyoteTimer > 0f)
         {
-            PerformJump(defaultJumpForce);
+            if (!PerformJump(defaultJumpForce)) return false;
+            // Spend the coyote window. Without this, the leftover timer would hand out a second
+            // free jump immediately after the first — a double jump nobody asked for.
+            coyoteTimer = 0f;
+            return true;
         }
-        else
+
+        bool hasWings = SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.SpectralWings);
+
+        if (hasWings && !freeAirJumpUsed)
         {
-            bool hasWings = SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.SpectralWings);
+            freeAirJumpUsed = true;
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
+            rb.AddForce(new Vector2(0f, defaultJumpForce), ForceMode2D.Impulse);
+            ChangeState(PlayerState.Jumping);
 
-            if (hasWings && !freeAirJumpUsed)
-            {
-                freeAirJumpUsed = true;
-                rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
-                rb.AddForce(new Vector2(0f, defaultJumpForce), ForceMode2D.Impulse);
-                ChangeState(PlayerState.Jumping);
-
-                SfxManager.PlayOn(audioSource, jumpSound);
-                Debug.Log("SPECTRAL WINGS: Bedava Zıplama!");
-                return;
-            }
-
-            if (currentAirJumps < maxAirJumps && currentShift > 0)
-            {
-                currentAirJumps++;
-                PerformJump(defaultJumpForce);
-            }
+            SfxManager.PlayOn(audioSource, jumpSound);
+            Debug.Log("SPECTRAL WINGS: Bedava Zıplama!");
+            return true;
         }
+
+        if (currentAirJumps < maxAirJumps && currentShift > 0)
+        {
+            if (!PerformJump(defaultJumpForce)) return false;
+            currentAirJumps++;
+            return true;
+        }
+
+        return false;
     }
 
     private void FixedUpdate()
@@ -631,7 +814,8 @@ public class PlayerController : MonoBehaviour
 
         if (isPhasing)
         {
-            rb.linearVelocity = new Vector2(moveInput * moveSpeed * slowFactor, verticalInput * moveSpeed * slowFactor);
+            rb.linearVelocity = ClampPhaseVelocity(
+                new Vector2(moveInput * moveSpeed * slowFactor, verticalInput * moveSpeed * slowFactor));
         }
         else if (isSwimming && currentState != PlayerState.Dashing && currentState != PlayerState.KnockedBack && currentState != PlayerState.CometDiving)
         {
@@ -687,7 +871,29 @@ public class PlayerController : MonoBehaviour
 
     private void HandleStateTransitions()
     {
-        if (currentState == PlayerState.WallSliding && (!isWallDetected || moveInput == 0))
+        // ---- wall slide ----------------------------------------------------------------------
+        // ENTRY. This is what never existed: WallSliding was handled in three places and set in
+        // none, so the whole mechanic was unreachable. Conditions, and why each is here:
+        //   · the relic          — it's a pickup, not a base ability
+        //   · airborne + falling — you catch a wall on the way DOWN, never on the way up
+        //   · pushing into it    — holding away should drop you, or walls become flypaper
+        //   · not mid-action     — a dash or a dive through a corridor must not snag on the wall
+        bool fallingNow = isGravityReversed ? rb.linearVelocity.y > 0f : rb.linearVelocity.y < 0f;
+        bool pushingIntoWall = moveInput != 0f && (moveInput > 0f) == isFacingRight;
+
+        if (currentState != PlayerState.WallSliding
+            && !isGrounded && isWallDetected && fallingNow && pushingIntoWall && CanWallSlide()
+            && currentState != PlayerState.Dashing
+            && currentState != PlayerState.CometDiving
+            && currentState != PlayerState.KnockedBack)
+        {
+            ChangeState(PlayerState.WallSliding);
+        }
+
+        // EXIT. Note this tests `!pushingIntoWall`, not `moveInput == 0` as it originally did:
+        // letting go drops you, but so does actively holding AWAY from the wall. Without that,
+        // steering off a wall left you still stuck to it and walls behaved like flypaper.
+        if (currentState == PlayerState.WallSliding && (!isWallDetected || !pushingIntoWall || !CanWallSlide()))
             ChangeState(PlayerState.Jumping);
 
         if (isGrounded && (currentState == PlayerState.Jumping || currentState == PlayerState.KnockedBack || currentState == PlayerState.WallSliding))
@@ -780,7 +986,9 @@ public class PlayerController : MonoBehaviour
         return LastExecuteResult == CardExecuteResult.Success;
     }
 
-    private void PerformJump(float jumpForce)
+    // Returns true if the jump actually fired. The bool matters: at 0 Shift this refuses, and the
+    // jump buffer must not treat a refusal as a jump or the press is silently swallowed.
+    private bool PerformJump(float jumpForce)
     {
         if (currentShift > 0)
         {
@@ -792,13 +1000,35 @@ public class PlayerController : MonoBehaviour
                 SfxManager.PlayOn(audioSource, jumpSound);
                 audioSource.pitch = 1f;
             }
+            // ⚠️ Through SpendShift, NOT `currentShift--`. Jumping is the single largest Shift
+            // expense in the game, and decrementing the field directly skipped the quest hook that
+            // hangs off SpendShift — so the Featherweight oath ("spend 8 Shift or less in a room")
+            // was silently not counting jumps at all.
             if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
-                currentShift--;
+                SpendShift(1);
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
             float jumpDir = isGravityReversed ? -1f : 1f;
-            rb.AddForce(new Vector2(moveInput * jumpForce * 1f, jumpDir * jumpForce), ForceMode2D.Impulse);
+
+            // ⚠️ PURELY VERTICAL, AND THE HORIZONTAL TERM WAS REMOVED ON PURPOSE (2026-08-14).
+            //
+            // This used to add `moveInput * jumpForce` sideways as well. On a GROUNDED jump that was
+            // dead code — isGrounded is still true on the next FixedUpdate, which hard-sets
+            // horizontal velocity to moveInput * moveSpeed and erases it about 20ms later.
+            //
+            // Coyote time reaches this from the other side and would have revived it. A coyote jump
+            // happens while isGrounded is FALSE, so FixedUpdate takes the AIR branch instead, which
+            // only lerps toward moveSpeed at ~7% per step — the impulse would have survived for the
+            // best part of a second. A coyote jump would have flown noticeably further than the
+            // ordinary jump it is meant to be indistinguishable from, and every gap in the game
+            // would have been clearable by deliberately stepping off the edge first.
+            //
+            // Safe to delete outright because maxAirJumps is 0, so the ground branch is the only
+            // caller: verified no behaviour change for a normal jump.
+            rb.AddForce(new Vector2(0f, jumpDir * jumpForce), ForceMode2D.Impulse);
             ChangeState(PlayerState.Jumping);
+            return true;
         }
+        return false;
     }
 
     internal IEnumerator DashIFrames(float duration) => playerHealth.GrantInvincibility(duration);
@@ -865,6 +1095,24 @@ public class PlayerController : MonoBehaviour
     {
         tookDamageThisRoom = false;
         ResetFallTracking();
+
+        // The portal object itself carries TemporaryObject and is destroyed with the room, but the
+        // reference would survive as a Unity fake-null. Clearing it explicitly also takes the range
+        // ring down and keeps the "pending portal" state a per-room thing by construction.
+        CancelPendingPortal();
+
+        // Same for the return anchor: a marker pointing into the previous room is worse than none.
+        ClearReturnAnchor();
+
+        // Starts the oath recorder for this room (no-cards / no-recall / low-shift / no-stagger).
+        // Hooked here rather than in LevelManager so it can't be missed by any path that puts the
+        // player into a room.
+        if (QuestSystem.instance != null) QuestSystem.instance.BeginRoom();
+
+        // Blompo blessings that pay out per room (Time Will Come, Only Child, Compound Interest's
+        // counter, Teacher's Pet's opening-hand pull, Slow Burn's per-room tally). Hooked at the
+        // same point and for the same reason as the oaths above.
+        if (DeckManager.instance != null) DeckManager.instance.BeginRoomForEnhancements();
     }
 
     // Clears Meteor Greaves fall tracking so a teleport (fall-respawn, room spawn) isn't
@@ -915,16 +1163,50 @@ public class PlayerController : MonoBehaviour
         return Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
     }
 
-    private void PerformWallJump()
+    // ⚠️ A WALL JUMP COSTS SHIFT, exactly like an ordinary jump.
+    //
+    // The relic grants the SLIDE for free — that's the utility, and it only ever slows a fall. The
+    // JUMP has to be paid for. Deckshift's whole thesis is that vertical movement is a resource, and
+    // a free wall jump is an unlimited climb: exactly the hole Pogo Boots' Shift refund opened, and
+    // a wall is far easier to find than an enemy to bounce on.
+    private bool PerformWallJump()
     {
+        if (currentShift <= 0) return false;
+
+        if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
+            SpendShift(1);
+
         Flip();
-        rb.linearVelocity = new Vector2(wallJumpForce.x * (isFacingRight ? 1f : -1f), wallJumpForce.y);
+        float jumpDir = isGravityReversed ? -1f : 1f;
+        rb.linearVelocity = new Vector2(wallJumpForce.x * (isFacingRight ? 1f : -1f),
+                                        wallJumpForce.y * jumpDir);
         ChangeState(PlayerState.Jumping);
+
+        if (audioSource != null && jumpSound != null)
+        {
+            audioSource.pitch = Random.Range(0.9f, 1.0f);   // a shade lower than a ground jump
+            SfxManager.PlayOn(audioSource, jumpSound);
+            audioSource.pitch = 1f;
+        }
+        return true;
     }
 
+    // ⚠️ TERRAIN ONLY, and deliberately NOT `groundLayer`.
+    //
+    // `groundLayer` is Ground + Enemy, so this used to treat any Enemy-layer enemy as a wall — you
+    // could wall-slide and wall-jump off some enemies and not others, purely by which layer that
+    // prefab happened to be authored on. A wall is a wall.
+    //
+    // The origin also used to sit at local y = -0.0098, i.e. just BELOW the capsule's bottom. With
+    // Physics2D.queriesStartInColliders on (it is, by default) the ray therefore started INSIDE the
+    // floor tile the player was standing on and reported a hit at distance 0 — measured: WallCheck()
+    // returned true while standing on open, flat ground. The sensor now sits at mid-body, where a
+    // wall check belongs.
     private bool WallCheck()
     {
-        return Physics2D.Raycast(wallCheck.position, Vector2.right * (isFacingRight ? 1f : -1f), wallCheckDistance, groundLayer);
+        if (wallCheck == null) return false;
+        return Physics2D.Raycast(wallCheck.position, Vector2.right * (isFacingRight ? 1f : -1f),
+                                 wallCheckDistance, terrainLayer);
     }
 
     private void OnDrawGizmos()
@@ -997,7 +1279,156 @@ public class PlayerController : MonoBehaviour
 
         Fireball fireballScript = fireballInstance.GetComponent<Fireball>();
         if (fireballScript != null)
+        {
             fireballScript.damage = damageFromCard;
+            // Stamp the card that fired it. The shot outlives the play, so this is the only way its
+            // blessings (Finisher, Grudge, Toll Booth…) can still apply when it finally lands.
+            if (DeckManager.instance != null)
+                fireballScript.sourceCard = DeckManager.instance.AttributedCard;
+        }
+    }
+
+    // The Ninja's aimed throw.
+    //
+    // ⚠️ AIM COMES FROM THE CURSOR, AND THE CURSOR IS ALREADY WHERE THE PLAYER WANTS IT. Cards are
+    // cast with a LEFT CLICK, so the mouse at the moment of the cast IS the aim — this needs no
+    // extra input mode, no charge-up and no confirm step. The aim indicator draws the same line
+    // beforehand, so what you see before the click is what you get.
+    public void ThrowShuriken(float damageFromCard)
+    {
+        if (mainCamera == null) return;
+
+        Vector2 origin = ShurikenOrigin;
+        Vector2 aim = (Vector2)mainCamera.ScreenToWorldPoint(Input.mousePosition) - origin;
+        if (aim.sqrMagnitude < 0.0001f) aim = new Vector2(isFacingRight ? 1f : -1f, 0f);
+        aim.Normalize();
+
+        // Turn to the throw. Throwing left while facing right reads as a bug, and facing is what
+        // every other system reads for direction anyway.
+        if (aim.x > 0.01f && !isFacingRight) Flip();
+        else if (aim.x < -0.01f && isFacingRight) Flip();
+
+        RuntimeCard src = DeckManager.instance != null ? DeckManager.instance.AttributedCard : null;
+
+        if (throwRoutine != null) StopCoroutine(throwRoutine);
+        throwRoutine = StartCoroutine(ThrowRoutine(aim, damageFromCard, src));
+    }
+
+    private Coroutine throwRoutine;
+
+    // ⚠️ THE STAR LEAVES ON THE ARM'S SNAP, NOT ON THE KEYPRESS. Spawning it immediately made the
+    // shuriken outrun the animation — it was already gone before he moved. The aim is captured at
+    // the press (so it is still exactly where the cursor was), and only the release waits.
+    private IEnumerator ThrowRoutine(Vector2 aim, float damage, RuntimeCard src)
+    {
+        BeginThrowPose();
+        yield return new WaitForSeconds(THROW_RELEASE);
+
+        // Re-read the hand: it has moved during the wind-up, and throwing from where it WAS looks
+        // like the star spawned beside him.
+        Vector2 origin = ShurikenOrigin;
+
+        SfxManager.PlayOn(audioSource, shurikenThrowSound);
+        HideHeldWeapon(0.28f);
+        Shuriken.Spawn(origin + aim * 0.3f, aim, damage, src, shurikenSprite);
+
+        EndThrowPose();
+        throwRoutine = null;
+    }
+
+    // ⚠️ THE STAR IN HIS HAND IS THE STAR THAT FLIES. The held weapon is hidden for the length of
+    // the throw and comes back after — so the projectile reads as the object he was holding rather
+    // than as a second one conjured out of nowhere. Cosmetic only; nothing else looks at it.
+    private Coroutine heldWeaponHide;
+
+    private void HideHeldWeapon(float seconds)
+    {
+        SpriteRenderer[] parts = HeldWeaponRenderers();
+        if (parts == null || parts.Length == 0) return;
+
+        if (heldWeaponHide != null) StopCoroutine(heldWeaponHide);
+        heldWeaponHide = StartCoroutine(HideHeldWeaponRoutine(parts, seconds));
+    }
+
+    private IEnumerator HideHeldWeaponRoutine(SpriteRenderer[] parts, float seconds)
+    {
+        foreach (SpriteRenderer sr in parts) if (sr != null) sr.enabled = false;
+        yield return new WaitForSeconds(seconds);
+        // Re-shown unconditionally: a throw interrupted by death or a room change must never leave
+        // the character permanently empty-handed.
+        foreach (SpriteRenderer sr in parts) if (sr != null) sr.enabled = true;
+        heldWeaponHide = null;
+    }
+
+    private SpriteRenderer[] HeldWeaponRenderers()
+    {
+        Transform slot = HeldWeaponSlot;
+        return slot != null ? slot.GetComponentsInChildren<SpriteRenderer>(true) : null;
+    }
+
+    private Transform HeldWeaponSlot
+    {
+        get
+        {
+            if (cachedWeaponSlot != null) return cachedWeaponSlot;
+            if (visualModel == null) return null;
+            foreach (Transform t in visualModel.GetComponentsInChildren<Transform>(true))
+                if (t.name == "Weapon Slot") { cachedWeaponSlot = t; break; }
+            return cachedWeaponSlot;
+        }
+    }
+    private Transform cachedWeaponSlot;
+
+    // Thrown from the HAND, so the star leaves from where the player can see it leave. Falls back
+    // to the body centre if the rig has no weapon slot.
+    //
+    // ⚠️ NOT `firePoint`. That sits out at the wand hand on the facing side — right for a forward
+    // cast, wrong for a 360° throw, where aiming straight up or down launches the star off to one
+    // side of the player. The aim indicator reads this SAME property, so the preview and the throw
+    // start from one origin and can never disagree.
+    internal Vector2 ShurikenOrigin
+    {
+        get
+        {
+            Transform slot = HeldWeaponSlot;
+            if (slot != null) return slot.position;
+
+            if (bodyCapsule == null) bodyCapsule = GetComponent<CapsuleCollider2D>();
+            return bodyCapsule != null
+                ? (Vector2)transform.position + bodyCapsule.offset
+                : (Vector2)transform.position;
+        }
+    }
+
+    // ⚠️ ATTACK ACTION 13 IS **THROW**, NOT 14. 14 is Cast — the wizard's two-handed spell pose,
+    // which is what this used before and is exactly why it looked wrong AND ran long: Cast is a 1.0s
+    // clip that self-exits at 80%, so every star cost nearly a second of standing still.
+    //
+    // Throw is a wind-up / hold / release set (Throw Start -> Throw Loop -> Throw End), driven by
+    // IsAttacking: true winds up and holds, false releases. So a quick throw is simply a very short
+    // hold. `AttackSpeedMul` scales both halves, and at 2.2 the whole action lands near 0.45s
+    // against Cast's ~1.3s.
+    private const int THROW_ACTION = 13;
+    private const float THROW_SPEED = 2.2f;
+    private const float THROW_RELEASE = 0.13f;   // hold before the arm snaps forward
+
+    private void BeginThrowPose()
+    {
+        if (animator == null) return;
+        animator.SetFloat("AttackSpeedMul", THROW_SPEED);
+        animator.SetInteger("AttackAction", THROW_ACTION);
+        animator.SetBool("IsAttacking", true);
+    }
+
+    private void EndThrowPose()
+    {
+        if (animator == null) return;
+        // Dropping IsAttacking is what fires Throw End — the release itself, not a tidy-up.
+        animator.SetBool("IsAttacking", false);
+        // ⚠️ Put the multiplier back. It is a GLOBAL animator parameter shared by every attack
+        // state, so leaving it at 2.2 would quietly double-speed the Fireball cast for any
+        // character who picked up a Shuriken.
+        animator.SetFloat("AttackSpeedMul", 1f);
     }
 
     internal IEnumerator FireballCastRoutine(float damageFromCard)
@@ -1032,15 +1463,135 @@ public class PlayerController : MonoBehaviour
     {
         if (amount <= 0) return;
         currentShift = Mathf.Max(0, currentShift - amount);
+
+        // Every Shift cost in the game funnels through here — jumps, cards, recall, portals — so
+        // the Featherweight oath gets a complete per-room total from one hook. Callers already gate
+        // this on the hub rule, so sandbox spending is never counted.
+        if (QuestSystem.instance != null) QuestSystem.instance.NoteShiftSpent(amount);
     }
 
-    internal bool TryPlacePortal(out bool keepCard, int shiftCost)
+    // Would the player's capsule fit standing with its FEET at `feetPos`? Shared by every card that
+    // puts the player somewhere: a portal and a return anchor are both places you ARRIVE at, so the
+    // honest test is the player's own body, not a point sample. Nothing else would stop you
+    // teleporting into the middle of a wall, and unlike Phase (which has EjectFromGeometry) neither
+    // card has any recovery, so that was a dead run.
+    //
+    // Uses terrainLayer, NOT groundLayer: groundLayer deliberately contains Enemy so the player can
+    // land on heads, and an enemy wandering past should not veto a placement.
+    internal bool PlayerFitsAt(Vector2 feetPos)
+    {
+        if (capsuleCollider == null) return true;
+        Vector2 center = feetPos + capsuleCollider.offset;
+        return !Physics2D.OverlapBox(center, capsuleCollider.size * 0.9f, 0f, terrainLayer);
+    }
+
+    // Every teleport in the game should funnel through here. Currently: Portal traversal (via
+    // Teleportable), Second Thoughts' return, and the out-of-bounds fall respawn.
+    //
+    // ⚠️ THE PHASE RE-ANCHOR IS LOAD-BEARING. The Phase bubble is anchored in WORLD space, so a
+    // teleport taken mid-Phase would drop the player outside it and ClampPhaseVelocity would haul
+    // them straight back — silently undoing the trip they just paid for. Portalling while phasing
+    // did exactly that until this existed. Moving the bubble with them is the honest reading: the
+    // limit is "how far you may travel under your own power", not "where you happen to be".
+    internal void OnTeleported()
+    {
+        ResetFallTracking();   // a teleport is not a fall — don't Meteor Greaves on the next landing
+
+        if (!isPhasing) return;
+        phaseAnchor = BiteCenter;
+        if (phaseBoundary != null) phaseBoundary.Reanchor(phaseAnchor);
+    }
+
+    // Second Thoughts. First play drops the anchor and keeps the card; the second snaps back to it
+    // from anywhere in the room and spends the card. Mirrors Portal's two-stage shape on purpose —
+    // one card teaching the pattern makes the other easier to read.
+    internal bool TryReturnAnchor(out bool keepCard)
+    {
+        keepCard = false;
+
+        if (!hasReturnAnchor)
+        {
+            returnAnchorPos = rb.position;             // the FEET: exactly where the player will be put back
+            hasReturnAnchor = true;
+            returnAnchorVfx = ReturnAnchorVFX.Spawn(returnAnchorPos);
+            keepCard = true;                           // dropping the marker is free; the trip costs
+            return true;
+        }
+
+        // The spot the player stood on can stop being standable — a gate closing over it is the
+        // realistic case. Refuse rather than teleport them into it: a refused play costs nothing and
+        // keeps the card, so the anchor stays available once whatever it is has moved.
+        if (!PlayerFitsAt(returnAnchorPos))
+        {
+            keepCard = true;
+            return false;
+        }
+
+        // ⚠️ BOTH, NOT JUST THE TRANSFORM. Physics2D.autoSyncTransforms is OFF in this project, so a
+        // transform write leaves rb.position reporting the OLD spot until the next physics step.
+        // ClampPhaseVelocity reads rb.position, so returning mid-Phase would spend that step
+        // believing the player was far outside their bubble and drag them to its edge.
+        rb.position = returnAnchorPos;
+        transform.position = returnAnchorPos;
+        rb.linearVelocity = Vector2.zero;              // otherwise you arrive still falling at speed
+        OnTeleported();
+        ClearReturnAnchor();
+        return true;
+    }
+
+    // Drops the marker without taking the trip. Called when the card leaves the hand unspent
+    // (Recall), and on room change / death, for the same reasons as CancelPendingPortal.
+    internal void ClearReturnAnchor()
+    {
+        hasReturnAnchor = false;
+        if (returnAnchorVfx != null) { returnAnchorVfx.Dismiss(); returnAnchorVfx = null; }
+    }
+
+    // The single source of truth for "may a portal go here right now?". CardAimIndicator calls this
+    // exact method for its preview, so the ghost can never disagree with what the click will do.
+    internal bool IsPortalPlacementValid(Vector2 spot)
+    {
+        if (!PlayerFitsAt(spot)) return false;
+
+        return firstPortalInstance == null
+            ? Vector2.Distance(BiteCenter, spot) <= portalPlaceRange       // first: near the PLAYER
+            : Vector2.Distance(firstPortalInstance.transform.position, spot) <= portalMaxRange;
+    }
+
+    // Throws away a first portal that never got its pair. Without this the pending portal and its
+    // range ring sat in the room forever and firstPortalInstance stayed set, so the NEXT Portal play
+    // in that room placed the second half and charged for it — the card silently did something other
+    // than what it looked like it was doing. Called on deselect, Recall, room change and death.
+    internal void CancelPendingPortal()
+    {
+        if (firstPortalInstance == null) return;
+        Destroy(firstPortalInstance.gameObject);
+        firstPortalInstance = null;
+    }
+
+    // ⚠️ THIS NO LONGER SPENDS SHIFT. It used to charge its own cost, which meant it only knew about
+    // the Kinetic discount and silently ignored Blompo's "On the House" and the First One's Free
+    // relic — the latter being consumed on the second placement while the player was charged anyway.
+    // DeckManager.PlayCard now pays for Portal exactly like every other card (see the spend inside
+    // its `success && !keepInHand` block), so every discount applies for free and the cost lives in
+    // ONE place. That also retires the old trap where Portal's price was stored twice, in `shiftCost`
+    // (what the card face and the affordability gate used) and `actionValue` (what was really
+    // charged) — two fields that had to agree and were never checked against each other.
+    internal bool TryPlacePortal(out bool keepCard)
     {
         keepCard = false;
         if (portalPrefab == null) return false;
         if (mainCamera == null) return false;
 
         Vector2 mousePos = mainCamera.ScreenToWorldPoint(Input.mousePosition);
+
+        // Out of range or inside rock: refuse without cost and keep the card. The aim indicator has
+        // already been showing this spot as invalid, so a refusal here is never a surprise.
+        if (!IsPortalPlacementValid(mousePos))
+        {
+            keepCard = true;
+            return false;
+        }
 
         if (firstPortalInstance == null)
         {
@@ -1049,43 +1600,16 @@ public class PlayerController : MonoBehaviour
             firstPortalInstance.spriteRenderer.color = Color.gray;
             firstPortalInstance.ShowRangeCircle(portalMaxRange);
 
-            keepCard = true;
+            keepCard = true;      // first placement is free; the card is spent on the second
             return true;
         }
-        else
-        {
-            float distance = Vector2.Distance(firstPortalInstance.transform.position, mousePos);
-            if (distance > portalMaxRange)
-            {
-                keepCard = true;
-                return false;
-            }
 
-            int finalCost = shiftCost;
+        GameObject p2 = Instantiate(portalPrefab, mousePos, Quaternion.identity);
+        firstPortalInstance.Link(p2.GetComponent<Portal>());
+        firstPortalInstance = null;
 
-            if (SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.KineticDiscount))
-            {
-                finalCost = Mathf.Max(0, finalCost - 1);
-            }
-
-            if (currentShift < finalCost)
-            {
-                keepCard = true;
-                return false;
-            }
-
-            if (LevelManager.instance == null || !LevelManager.instance.IsCurrentRoomHub())
-                SpendShift(finalCost);
-
-            GameObject p2 = Instantiate(portalPrefab, mousePos, Quaternion.identity);
-            Portal secondPortal = p2.GetComponent<Portal>();
-
-            firstPortalInstance.Link(secondPortal);
-            firstPortalInstance = null;
-
-            keepCard = false;
-            return true;
-        }
+        keepCard = false;
+        return true;
     }
 
     // Returns true if the bite landed on a target. Returns false when nothing damageable is in
@@ -1236,9 +1760,49 @@ public class PlayerController : MonoBehaviour
         return true;
     }
 
+    // Keeps a phasing player inside the bubble anchored at the cast point (see phaseMaxRadius).
+    //
+    // Two halves, and both are needed. The VELOCITY projection strips the outward component so
+    // pressing the edge SLIDES along it: a dead stop reads as the controls breaking, and the player
+    // still has to be able to travel around the inside of the bubble to find somewhere solid to
+    // land before the timer runs out. The POSITION backstop exists because a tangential slide cuts
+    // a chord across the circle, creeping a fraction of a unit outward every step — small per step,
+    // but it compounds across the whole cast, and anything else that moves the player (knockback,
+    // a hazard) would otherwise leave them permanently outside with no way back in.
+    private Vector2 ClampPhaseVelocity(Vector2 desired)
+    {
+        if (phaseMaxRadius <= 0f) return desired;
+
+        Vector2 bodyOffset = capsuleCollider != null ? capsuleCollider.offset : Vector2.zero;
+        Vector2 body = rb.position + bodyOffset;
+        Vector2 outward = body - phaseAnchor;
+        float dist = outward.magnitude;
+
+        if (dist < 0.0001f) return desired;             // sitting on the anchor; no outward axis yet
+
+        Vector2 n = outward / dist;
+
+        if (dist > phaseMaxRadius)
+            rb.position = phaseAnchor + n * phaseMaxRadius - bodyOffset;
+
+        float radial = Vector2.Dot(desired, n);
+        if (radial <= 0f) return desired;               // heading back inward is always allowed
+
+        // Don't interfere at all unless this step would actually leave the bubble.
+        if (((body + desired * Time.fixedDeltaTime) - phaseAnchor).sqrMagnitude
+            <= phaseMaxRadius * phaseMaxRadius) return desired;
+
+        return desired - n * radial;                    // tangent only: slide along the boundary
+    }
+
     internal IEnumerator PhaseRoutine(float duration)
     {
         isPhasing = true;
+
+        // Anchor the bubble on the BODY CENTER, not the transform (which sits at the feet), so the
+        // drawn boundary is centred on the player and matches what ClampPhaseVelocity enforces.
+        phaseAnchor = BiteCenter;
+        phaseBoundary = PhaseBoundary.Spawn(phaseAnchor, phaseMaxRadius, this);
 
         float originalGravity = rb.gravityScale;
         rb.gravityScale = 0f;
@@ -1264,14 +1828,14 @@ public class PlayerController : MonoBehaviour
             yield return new WaitForSeconds(0.1f);
             extensionTime += 0.1f;
         }
-        if (IsCollidingWithGround())
-        {
-            float ejectDir = isGravityReversed ? -1f : 1f;
-            transform.position += new Vector3(0, 0.5f * ejectDir, 0);
-        }
+        if (IsCollidingWithGround()) EjectFromGeometry();
 
         if (phaseVisualCoroutine != null) { StopCoroutine(phaseVisualCoroutine); phaseVisualCoroutine = null; }
         RestorePhaseVisuals();
+
+        // Normal exit. The boundary also self-collapses if it sees isPhasing go false without this
+        // running (dying mid-Phase kills the coroutine before it reaches here).
+        if (phaseBoundary != null) { phaseBoundary.Collapse(); phaseBoundary = null; }
 
         Physics2D.IgnoreLayerCollision(playerLayer, groundLayerIndex, false);
         Physics2D.IgnoreLayerCollision(playerLayer, enemyLayerIndex, false);
@@ -1322,12 +1886,115 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    // Getting the player OUT of solid geometry when Phase expires inside a wall.
+    //
+    // ⚠️ THE OLD VERSION NUDGED 0.5 UNITS UP AND HOPED. It never checked that the destination was
+    // free, and half a unit does not clear a 2-thick wall, so a player who ran Phase out deep inside
+    // rock stayed embedded and could not move at all — a dead run with no way to recover. The
+    // designer hit exactly that.
+    //
+    // This searches outward in rings for a position the capsule actually FITS in, nearest first,
+    // and only then moves. Because it verifies the destination, it cannot leave the player somewhere
+    // still solid; because it fans out in every direction it handles walls and ceilings, not just
+    // floors; and because it ends in a guaranteed fallback the player can never be stuck for good.
+    private void EjectFromGeometry()
+    {
+        Vector3 safe;
+        if (TryFindSafePosition(out safe))
+        {
+            transform.position = safe;
+        }
+        else
+        {
+            // Nothing within the search radius — a pocket sealed on every side, which shouldn't
+            // happen but must not be a lost run if it does. The room's entry point is the one
+            // position guaranteed to be standable, and it's the same recovery a fall uses.
+            transform.position = currentRoomEntryPoint;
+            Debug.LogWarning("[Phase] No free space near the player; recovered to the room entry point.");
+        }
+
+        // Kill the velocity that carried them in. Ejecting upward while still travelling downward
+        // fast enough can tunnel straight back into the same geometry on the next physics step.
+        if (rb != null) rb.linearVelocity = Vector2.zero;
+    }
+
+    // Rings outward from the player, nearest first. Within each ring the directions are ordered by
+    // how close they are to "up" (or down, under reversed gravity), so given two equally near exits
+    // the player surfaces ON TOP of the geometry, which is what they expect.
+    private bool TryFindSafePosition(out Vector3 result)
+    {
+        result = transform.position;
+
+        const float STEP = 0.25f;
+        const int RINGS = 28;                       // reaches 7 units — wider than any wall in the pool
+        float flip = isGravityReversed ? -1f : 1f;
+
+        for (int r = 1; r <= RINGS; r++)
+        {
+            float radius = r * STEP;
+            for (int i = 0; i < EjectDirections.Length; i++)
+            {
+                Vector2 d = EjectDirections[i];
+                Vector3 candidate = transform.position
+                                  + new Vector3(d.x * radius, d.y * radius * flip, 0f);
+                if (IsPositionClear(candidate))
+                {
+                    result = candidate;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // Straight up first, then fanning symmetrically out to the sides, with straight down last.
+    private static readonly Vector2[] EjectDirections = BuildEjectDirections();
+
+    private static Vector2[] BuildEjectDirections()
+    {
+        const float STEP_DEG = 22.5f;
+        List<Vector2> dirs = new List<Vector2> { Vector2.up };
+        for (float a = STEP_DEG; a < 180f; a += STEP_DEG)
+        {
+            float rad = a * Mathf.Deg2Rad;
+            float s = Mathf.Sin(rad), c = Mathf.Cos(rad);
+            dirs.Add(new Vector2(s, c));    // lean right
+            dirs.Add(new Vector2(-s, c));   // mirror left
+        }
+        dirs.Add(Vector2.down);
+        return dirs.ToArray();
+    }
+
+    // Would the capsule be free of solid geometry if it stood here? Deliberately uses the SAME box
+    // and mask as IsCollidingWithGround, so a position this call approves is one that call agrees is
+    // not stuck — otherwise the search could "succeed" somewhere still considered embedded.
+    private bool IsPositionClear(Vector3 worldPos)
+    {
+        if (capsuleCollider == null) return true;
+        return !Physics2D.OverlapBox(CapsuleCenterAt(worldPos), capsuleCollider.size * 0.9f, 0f, groundLayer);
+    }
+
     private bool IsCollidingWithGround()
     {
         if (capsuleCollider == null) return false;
-        Bounds b = capsuleCollider.bounds;
         // 0.9f shrink avoids a false positive from the player barely touching the floor normally
-        return Physics2D.OverlapBox(b.center, b.size * 0.9f, 0f, groundLayer);
+        return Physics2D.OverlapBox(CapsuleCenterAt(transform.position), capsuleCollider.size * 0.9f, 0f, groundLayer);
+    }
+
+    // Where the player's capsule would sit if the transform were at `worldPos`.
+    //
+    // ⚠️ DERIVED FROM THE TRANSFORM, NOT FROM `capsuleCollider.bounds`. Unity's
+    // `Physics2D.autoSyncTransforms` is OFF by default, so a collider's `bounds` still report the
+    // player's PREVIOUS position until the next physics step — and the whole point of the eject is
+    // to test positions the player has not moved to yet, then move and re-check. Reading `bounds`
+    // made the search measure every candidate from a stale origin, so it "found" a clear spot,
+    // teleported there, and left the player just as embedded as before.
+    //
+    // This is exact because the player root is guaranteed to be scale (1,1,1) — a hard project rule
+    // (see the Facing System: facing is applied to visualModel, never to the root).
+    private Vector2 CapsuleCenterAt(Vector3 worldPos)
+    {
+        return (Vector2)worldPos + capsuleCollider.offset;
     }
 
     // Re-enables the layer pairs PhaseRoutine ignores. Runs unconditionally on death:
@@ -1407,17 +2074,43 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    // Pogo Boots. REBALANCED 2026-08-10 — read this before touching the numbers.
+    //
+    // The old version granted `AddShift(1)` on every bounce with only a 0.3s cooldown, which made
+    // this the ONLY free Shift regeneration in the game. In a game whose stated identity is that
+    // Shift does not regenerate on its own and carries over for the whole run, that quietly turned
+    // every room containing enemies into a refuelling station: a 40 HP melee enemy is five bounces
+    // at 8 damage each, so a room of six was worth roughly half a full Shift bar for nothing.
+    //
+    // Three changes, and they are meant to work together:
+    //   NO SHIFT REFUND    — the hole in the core resource, closed. The boots are a movement toy;
+    //                        movement is what they pay in.
+    //   ONE BOUNCE PER ENEMY PER AIRTIME — camping a single slime until it dies was the degenerate
+    //                        line and it was also the boring one. Chaining ACROSS several enemies
+    //                        is the trick worth rewarding, so that is the only thing still allowed.
+    //   DECAYING CHAIN     — each successive bounce before touching the ground lifts less, so a
+    //                        chain can't sustain itself indefinitely across a dense room.
     private void TriggerHeadBounce(EnemyHealth eHealth)
     {
         if (!eHealth.canBeHeadBounced) return;
         if (Time.time < _headBounceCooldown) return;
 
+        // HashSet.Add returns false when the enemy is already in the set, so this is both the
+        // "have I bounced this one already?" test and the record of it.
+        if (!_bouncedThisAirtime.Add(eHealth.GetInstanceID())) return;
+
         _headBounceCooldown = Time.time + 0.3f;
         eHealth.TakeDamage(8f);
+
+        float lift = 0.70f;
+        if (pogoChainFalloff != null && pogoChainFalloff.Length > 0)
+            lift = pogoChainFalloff[Mathf.Min(_bounceChain, pogoChainFalloff.Length - 1)];
+        _bounceChain++;
+
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0f);
         float bounceDir = isGravityReversed ? -1f : 1f;
-        rb.AddForce(Vector2.up * defaultJumpForce * 0.7f * bounceDir, ForceMode2D.Impulse);
-        AddShift(1);
+        rb.AddForce(Vector2.up * defaultJumpForce * lift * bounceDir, ForceMode2D.Impulse);
+
         if (CameraShake.instance != null) CameraShake.instance.Shake(0.1f, 0.2f);
     }
 

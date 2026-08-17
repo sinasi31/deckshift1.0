@@ -73,6 +73,12 @@ public class ExitDoor : MonoBehaviour
                 if (QuestSystem.instance != null) QuestSystem.instance.ReportEvent(QuestType.NoDamageRoom, 1);
             }
 
+            // Judge the per-room oaths. ⚠️ OUTSIDE the flawless-clear block above — this has to run
+            // whether or not the player took damage, or an oath would only ever be scored on rooms
+            // that also happened to be damage-free. Hub-excluded for the same reason the flawless
+            // check is: nothing is spent in the sandbox, so every oath would pass there for free.
+            if (!isHub && QuestSystem.instance != null) QuestSystem.instance.EndRoom();
+
             // Straight to the map. No card reward screen — see LevelManager.AdvanceToNextRoom.
             if (LevelManager.instance != null)
             {

@@ -138,6 +138,43 @@ public static class MapGlyphs
         return ring;
     }
 
+    // ---- engraving primitives --------------------------------------------------------------------
+    // The plate is read as METAL WITH SHAPES CUT INTO IT, so a node is not a symbol sitting on a
+    // surface — it is a socket punched into one. Three pieces build that, and the order matters:
+    // a filled recess, then a rim drawn TWICE at small opposite offsets (dark on the lit side,
+    // light on the shaded side). Reversing those two makes the socket pop OUT as a boss instead of
+    // sinking in, which is the whole difference between an engraved chart and a sticker sheet.
+
+    private static Sprite disc, socketRim, bloom;
+
+    // Filled disc with a soft edge — the recessed floor of a node socket.
+    public static Sprite Disc()
+    {
+        if (disc != null) return disc;
+        disc = Build(72, (dx, dy, d, ang) => Mathf.Clamp01((0.94f - d) * 9f));
+        return disc;
+    }
+
+    // Thicker and softer than Ring(): this is a bevelled wall catching light, not a drawn outline.
+    public static Sprite SocketRim()
+    {
+        if (socketRim != null) return socketRim;
+        socketRim = Build(72, (dx, dy, d, ang) => Band(d, 0.88f, 0.11f));
+        return socketRim;
+    }
+
+    // Soft radial falloff. The acid still working at the frontier — the map's only moving thing.
+    public static Sprite Bloom()
+    {
+        if (bloom != null) return bloom;
+        bloom = Build(96, (dx, dy, d, ang) =>
+        {
+            float a = Mathf.Clamp01(1f - d);
+            return a * a * a;   // cubed: keeps the haze tight instead of washing the whole plate
+        });
+        return bloom;
+    }
+
     public static Sprite ForNode(MapNodeType type)
     {
         switch (type)

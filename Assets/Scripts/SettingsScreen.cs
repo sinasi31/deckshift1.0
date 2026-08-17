@@ -83,6 +83,7 @@ public class SettingsScreen : MonoBehaviour
     private TextMeshProUGUI hintLabel;
 
     private bool isOpen;
+    private float fitScale = 1f;   // <1 when the canvas is smaller than the window — see FitScale
     private GameObject cachedHud;
     private bool hudWasActive;
     private float cursorY, cursorTargetY;
@@ -264,8 +265,8 @@ public class SettingsScreen : MonoBehaviour
                   () => GameSettings.HitStopStrength, v => GameSettings.HitStopStrength = v);
         AddToggle("DAMAGE NUMBERS", "Show the damage dealt floating off each enemy you hit.",
                   () => GameSettings.DamageNumbers, v => GameSettings.DamageNumbers = v);
-        AddToggle("ENEMY HEALTH NUMBERS", "Show exact HP on enemy health bars. The bars stay either way.",
-                  () => GameSettings.EnemyHealthNumbers, v => GameSettings.EnemyHealthNumbers = v);
+        AddToggle("ENEMY HEALTH BARS", "Show a health bar above every enemy, with its exact HP.",
+                  () => GameSettings.EnemyHealthBars, v => GameSettings.EnemyHealthBars = v);
         AddToggle("CARD AIM PREVIEW", "Show where a selected card will land before you play it.",
                   () => GameSettings.CardAimPreview, v => GameSettings.CardAimPreview = v);
 
@@ -512,11 +513,30 @@ public class SettingsScreen : MonoBehaviour
         if (cachedHud != null) cachedHud.SetActive(false);
         if (hudWasActive && HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(true);
 
+        fitScale = FitScale();
+
         RefreshAll();
         SetSelected(0, false);
 
         StopAllCoroutines();
         StartCoroutine(OpenAnim());
+    }
+
+    // Shrinks the panel uniformly if the canvas is smaller than it. A SCALE, not a resize: every
+    // row here sits at a fixed offset from the window centre, so a narrower window would overlap
+    // its own label/control/value columns instead of reflowing. (The run map does resize, because
+    // its chart is anchored and genuinely reflows.)
+    //
+    // At 1240x940 this only bites below a 1.15 aspect — narrower than any display in use — so it is
+    // a guard rather than a fix for anything observed. Costs nothing and means no display can ever
+    // cut off a settings control.
+    private float FitScale()
+    {
+        RectTransform parent = transform as RectTransform;
+        if (parent == null) return 1f;
+        Rect r = parent.rect;
+        if (r.width <= 1f || r.height <= 1f) return 1f;
+        return Mathf.Clamp(Mathf.Min(r.width * 0.97f / WIN_W, r.height * 0.97f / WIN_H), 0.4f, 1f);
     }
 
     private void Hide()
@@ -547,11 +567,11 @@ public class SettingsScreen : MonoBehaviour
             t += Time.unscaledDeltaTime;   // the screen pauses the game; scaled time is frozen
             float k = Mathf.Clamp01(t / dur);
             group.alpha = k;
-            window.localScale = Vector3.one * Mathf.Lerp(0.985f, 1f, k);
+            window.localScale = Vector3.one * fitScale * Mathf.Lerp(0.985f, 1f, k);
             yield return null;
         }
         group.alpha = 1f;
-        window.localScale = Vector3.one;
+        window.localScale = Vector3.one * fitScale;
     }
 
     // ---- input -----------------------------------------------------------------------------------

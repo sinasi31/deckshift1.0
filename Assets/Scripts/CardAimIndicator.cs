@@ -70,7 +70,25 @@ public class CardAimIndicator : MonoBehaviour
     [SerializeField] private float wailRippleMaxRadius = 6f;
     [SerializeField] private float wailRipplePeriod = 1.1f;
 
-    private enum Kind { None, Fireball, Dash, Bite, Portal, Platform, Freefall, Wail }
+    [Header("Phase")]
+    // Matches PhaseBoundary's violet so the preview and the live bubble read as the same thing.
+    [SerializeField] private Color phaseColor = new Color(0.72f, 0.55f, 1f, 0.75f);
+    [SerializeField] private float phaseRingWidth = 0.05f;
+
+    [Header("Return Anchor")]
+    // Amber, matching ReturnAnchorVFX — and deliberately clear of the violet Phase bubble and the
+    // cyan portal ring, so the three world markers never read as each other.
+    [SerializeField] private Color anchorColor = new Color(1f, 0.72f, 0.28f, 0.85f);
+
+    [Header("Shuriken")]
+    // Cold steel, deliberately clear of Fireball's orange: the two are both "a shot from here to
+    // there" and the only difference is that this one goes where you point, so they must not read
+    // as the same card.
+    [SerializeField] private Color shurikenColor = new Color(0.82f, 0.88f, 0.96f, 0.8f);
+    [SerializeField] private Color shurikenEnemyColor = new Color(1f, 0.28f, 0.2f, 0.95f);
+    [SerializeField] private int shurikenDots = 9;
+
+    private enum Kind { None, Fireball, Dash, Bite, Portal, Platform, Freefall, Wail, Phase, Anchor, Shuriken }
     private Kind activeKind = Kind.None;
 
     // All layers, triggers included — same as the game code's OverlapCircleAll(..., ~0).
@@ -114,6 +132,8 @@ public class CardAimIndicator : MonoBehaviour
     // --- Portal visuals ---
     private GameObject portalRoot;
     private SpriteRenderer portalGhost;
+    private LineRenderer portalBound;          // the bubble the next portal must land inside
+    private bool portalBoundsBuilt;
 
     // --- Platform visuals ---
     private GameObject platformRoot;
@@ -125,6 +145,31 @@ public class CardAimIndicator : MonoBehaviour
     private SpriteRenderer freefallFill;
     private float freefallScanTimer;
     private bool freefallHit;
+
+    // --- Phase visuals ---
+    private GameObject phaseRoot;
+    private LineRenderer phaseRing;
+    private SpriteRenderer phaseFill;
+
+    // --- Shuriken visuals ---
+    private GameObject shurikenRoot;
+    private SpriteRenderer[] shurikenDotsSR;
+    private SpriteRenderer shurikenHitRing;
+
+    // --- Return Anchor visuals ---
+    private GameObject anchorRoot;
+    private LineRenderer anchorTether;         // player -> anchor, so you can find it from anywhere
+    private LineRenderer anchorDecal;          // the small flat spot on the ground
+    private LineRenderer[] anchorRings;        // contracting rings — the "you come back here" motion
+    private SpriteRenderer anchorCore;
+    private const int ANCHOR_SEGMENTS = 40;
+    // ⚠️ FLAT ENOUGH TO BE ON THE FLOOR. At 0.4 the outer ring reached the player's waist and read as
+    // a hoop AROUND the character instead of a mark beneath them — a ground decal in a side-on game
+    // has to be much flatter than the maths suggests before the eye puts it on the floor plane.
+    private const float ANCHOR_FLATTEN = 0.24f;
+    private const float ANCHOR_SPOT_R = 0.62f; // where the rings land, and the size of the decal
+    private const float ANCHOR_RING_START = 1.8f;
+    private const float ANCHOR_RING_PERIOD = 1.5f;
 
     // --- Glass Wail visuals ---
     private GameObject wailRoot;
@@ -170,6 +215,9 @@ public class CardAimIndicator : MonoBehaviour
             case CardActionType.PlatformCreate: SetKind(Kind.Platform); UpdatePlatform(dim); break;
             case CardActionType.FreefallBlade:  SetKind(Kind.Freefall); UpdateFreefall(dim); break;
             case CardActionType.GlassWail:      SetKind(Kind.Wail);     UpdateWail(dim);     break;
+            case CardActionType.Phase:          SetKind(Kind.Phase);    UpdatePhase(dim);    break;
+            case CardActionType.ReturnAnchor:   SetKind(Kind.Anchor);   UpdateAnchor(dim);   break;
+            case CardActionType.Shuriken:       SetKind(Kind.Shuriken); UpdateShuriken(dim); break;
             default:                            SetKind(Kind.None);                          break;
         }
     }
@@ -183,7 +231,8 @@ public class CardAimIndicator : MonoBehaviour
         int cost = card.cardData.shiftCost;
         if (SkillManager.instance != null && SkillManager.instance.HasSkill(SkillType.KineticDiscount))
             cost = Mathf.Max(0, cost - 1);
-        if (card.enhancement == CardEnhancement.OnTheHouse) cost = 0;
+        // Same function PlayCard charges through, so the dimming cannot drift from the real price.
+        cost = Mathf.Max(0, CardEnhancements.EffectiveCost(card, cost));
         if (deck.isNextCardFree) cost = 0;
         return player.GetCurrentShift() >= cost;
     }
@@ -201,6 +250,9 @@ public class CardAimIndicator : MonoBehaviour
         if (platformRoot != null) platformRoot.SetActive(kind == Kind.Platform);
         if (freefallRoot != null) freefallRoot.SetActive(kind == Kind.Freefall);
         if (wailRoot != null) wailRoot.SetActive(kind == Kind.Wail);
+        if (phaseRoot != null) phaseRoot.SetActive(kind == Kind.Phase);
+        if (anchorRoot != null) anchorRoot.SetActive(kind == Kind.Anchor);
+        if (shurikenRoot != null) shurikenRoot.SetActive(kind == Kind.Shuriken);
 
         switch (kind)
         {
@@ -211,6 +263,9 @@ public class CardAimIndicator : MonoBehaviour
             case Kind.Platform: EnsurePlatformVisuals(); if (platformRoot != null) platformRoot.SetActive(true); break;
             case Kind.Freefall: EnsureFreefallVisuals(); freefallScanTimer = 0f; freefallRoot.SetActive(true); break;
             case Kind.Wail:     EnsureWailVisuals();     wailScanTimer = 0f; wailRoot.SetActive(true); break;
+            case Kind.Phase:    EnsurePhaseVisuals();    phaseRoot.SetActive(true); break;
+            case Kind.Anchor:   EnsureAnchorVisuals();   anchorRoot.SetActive(true); break;
+            case Kind.Shuriken: EnsureShurikenVisuals(); shurikenRoot.SetActive(true); break;
         }
     }
 
@@ -308,6 +363,87 @@ public class CardAimIndicator : MonoBehaviour
             Color rc = enemyHit ? impactEnemyColor : impactWallColor;
             rc.a *= (0.75f + 0.25f * Mathf.Sin(t * 7f)) * dim;
             impactRing.color = rc;
+        }
+    }
+
+    // ------------------------------------------------------------------ SHURIKEN
+
+    private void EnsureShurikenVisuals()
+    {
+        if (shurikenRoot != null) return;
+
+        shurikenRoot = MakeContainer("Aim_Shuriken");
+
+        shurikenDotsSR = new SpriteRenderer[Mathf.Max(3, shurikenDots)];
+        for (int i = 0; i < shurikenDotsSR.Length; i++)
+            shurikenDotsSR[i] = MakeSpriteChild(shurikenRoot.transform, "Dot" + i, GetDotSprite(), sortingOrder);
+
+        shurikenHitRing = MakeSpriteChild(shurikenRoot.transform, "HitRing", GetRingSprite(), sortingOrder + 1);
+    }
+
+    // ⚠️ THIS MUST MIRROR PlayerController.ThrowShuriken EXACTLY — same origin, same aim, same
+    // range. It is the only promise the player gets before committing a charge, and an aimed card
+    // whose preview disagrees with its shot is worse than no preview at all.
+    private void UpdateShuriken(float dim)
+    {
+        Camera c = Camera.main;
+        if (c == null) { shurikenRoot.SetActive(false); return; }
+        if (!shurikenRoot.activeSelf) shurikenRoot.SetActive(true);
+
+        Vector2 origin = player.ShurikenOrigin;
+        Vector2 aim = (Vector2)c.ScreenToWorldPoint(Input.mousePosition) - origin;
+        if (aim.sqrMagnitude < 0.0001f) aim = new Vector2(player.isFacingRight ? 1f : -1f, 0f);
+        aim.Normalize();
+
+        const float MAX_RANGE = 22f * 1.3f;   // Shuriken.SPEED * Shuriken.LIFE
+        const float RADIUS = 0.42f * 0.55f;   // collider radius * spawn scale
+
+        Vector2 start = origin + aim * 0.45f;
+        Vector2 end = start + aim * MAX_RANGE;
+        bool enemy = false;
+
+        int n = Physics2D.CircleCast(start, RADIUS, aim, NoFilter, castHits, MAX_RANGE);
+        for (int i = 0; i < n; i++)
+        {
+            Collider2D col = castHits[i].collider;
+            if (col.GetComponentInParent<PlayerController>() != null) continue;
+            if (col.GetComponent<Portal>() != null) continue;
+            IDamageable dmg = col.GetComponentInParent<IDamageable>();
+            if (dmg == null && col.isTrigger) continue;      // pickups and zones are passed through
+
+            enemy = dmg != null;
+            end = castHits[i].point;
+            break;
+        }
+
+        // Evenly spaced dots along the true flight line, thinning toward the far end so the line
+        // reads as a throw rather than as a laser sight.
+        float len = Vector2.Distance(start, end);
+        Color line = enemy ? shurikenEnemyColor : shurikenColor;
+        for (int i = 0; i < shurikenDotsSR.Length; i++)
+        {
+            float t = (i + 0.5f) / shurikenDotsSR.Length;
+            Vector2 p = Vector2.Lerp(start, end, t);
+            shurikenDotsSR[i].transform.position = new Vector3(p.x, p.y, 0f);
+            shurikenDotsSR[i].transform.localScale = Vector3.one * Mathf.Lerp(0.16f, 0.07f, t);
+
+            Color dc = line;
+            dc.a *= (1f - 0.55f * t) * dim;
+            shurikenDotsSR[i].color = dc;
+        }
+
+        // The impact mark only appears when the throw actually meets something — an endpoint ring
+        // hanging in empty air 28 units away would claim a hit that is not going to happen.
+        bool lands = len < MAX_RANGE - 0.05f;
+        shurikenHitRing.enabled = lands;
+        if (lands)
+        {
+            float t = Time.unscaledTime;
+            shurikenHitRing.transform.position = new Vector3(end.x, end.y, 0f);
+            shurikenHitRing.transform.localScale = Vector3.one * (0.42f * (1f + 0.15f * Mathf.Sin(t * 8f)));
+            Color rc = line;
+            rc.a *= (0.75f + 0.25f * Mathf.Sin(t * 8f)) * dim;
+            shurikenHitRing.color = rc;
         }
     }
 
@@ -532,6 +668,8 @@ public class CardAimIndicator : MonoBehaviour
         if (portalRoot != null) return;
         if (player.portalPrefab == null) return;
 
+        portalBoundsBuilt = false;
+
         // Steal the portal's look straight from the prefab so the ghost always matches.
         Portal prefabPortal = player.portalPrefab.GetComponent<Portal>();
         SpriteRenderer srcSr = prefabPortal != null && prefabPortal.spriteRenderer != null
@@ -545,8 +683,23 @@ public class CardAimIndicator : MonoBehaviour
         portalGhost.sortingLayerID = srcSr.sortingLayerID;
         portalGhost.sortingOrder = srcSr.sortingOrder + 5;
         portalGhost.transform.localScale = srcSr.transform.lossyScale;
+
+        // The bubble the next portal must land inside. Same LineRenderer treatment as the Phase
+        // boundary — a constant world-space width stays crisp at both the small place radius and
+        // the much larger link radius, where a scaled sprite ring would go soft.
+        portalBound = MakeLineChild(portalRoot.transform, "Bound", 0.06f, sortingOrder - 1);
+        portalBound.loop = true;
+        portalBound.positionCount = BITE_SEGMENTS;
+        portalBoundsBuilt = true;
     }
 
+    // Shows BOTH halves of the placement rule the player is currently subject to: the bubble the
+    // portal must land inside, and whether the exact spot under the cursor would be accepted.
+    //
+    // ⚠️ Validity is asked of PlayerController.IsPortalPlacementValid — the same method
+    // TryPlacePortal itself calls — rather than re-deriving the distance test here. This preview and
+    // the click can therefore never disagree, which matters more for Portal than for any other card:
+    // a refused placement costs nothing but looks identical to a bug if the ghost said it was fine.
     private void UpdatePortal(float dim)
     {
         if (portalRoot == null || portalGhost == null) return;
@@ -556,19 +709,30 @@ public class CardAimIndicator : MonoBehaviour
         Vector2 mouse = cam.ScreenToWorldPoint(Input.mousePosition);
         portalGhost.transform.position = new Vector3(mouse.x, mouse.y, 0f);
 
-        // First placement is free-form (spawns gray); the second must land inside the
-        // first portal's range circle or TryPlacePortal refuses it.
+        // Before the first placement the bubble is around the PLAYER (portalPlaceRange); once the
+        // first portal is down it becomes the hop radius around THAT portal (portalMaxRange).
         Portal first = player.FirstPortalInstance;
-        Color c;
-        if (first == null)
-            c = portalFirstColor;
-        else
-            c = Vector2.Distance(first.transform.position, mouse) <= player.portalMaxRange
-                ? portalValidColor
-                : portalInvalidColor;
+        Vector2 center = first == null ? player.BiteCenter : (Vector2)first.transform.position;
+        float radius = first == null ? player.portalPlaceRange : player.portalMaxRange;
 
+        bool valid = player.IsPortalPlacementValid(mouse);
+
+        Color c = valid ? (first == null ? portalFirstColor : portalValidColor) : portalInvalidColor;
         c.a *= (0.75f + 0.25f * Mathf.Sin(Time.unscaledTime * 5f)) * dim;
         portalGhost.color = c;
+
+        if (portalBoundsBuilt && portalBound != null)
+        {
+            float breath = 1f + 0.015f * Mathf.Sin(Time.unscaledTime * 2.4f);
+            float r = radius * breath;
+            for (int i = 0; i < BITE_SEGMENTS; i++)
+            {
+                float a = (float)i / BITE_SEGMENTS * Mathf.PI * 2f;
+                portalBound.SetPosition(i, new Vector3(center.x + Mathf.Cos(a) * r, center.y + Mathf.Sin(a) * r, 0f));
+            }
+            Color bc = valid ? portalValidColor : portalInvalidColor;
+            portalBound.startColor = portalBound.endColor = new Color(bc.r, bc.g, bc.b, bc.a * 0.7f * dim);
+        }
     }
 
     // ------------------------------------------------------------------ PLATFORM CREATE
@@ -735,6 +899,143 @@ public class CardAimIndicator : MonoBehaviour
             Vector3 p = wailTargets[i].transform.position + Vector3.up * 0.9f;
             wailGlints[i].transform.position = p;
             wailGlints[i].color = new Color(wailColor.r, wailColor.g, wailColor.b, pulse * dim);
+        }
+    }
+
+    // ------------------------------------------------------------------ PHASE
+
+    private void EnsurePhaseVisuals()
+    {
+        if (phaseRoot != null) return;
+
+        phaseRoot = MakeContainer("Aim_Phase");
+
+        phaseRing = MakeLineChild(phaseRoot.transform, "Ring", phaseRingWidth, sortingOrder);
+        phaseRing.loop = true;
+        phaseRing.positionCount = BITE_SEGMENTS;
+
+        phaseFill = MakeSpriteChild(phaseRoot.transform, "Fill", GetDotSprite(), sortingOrder - 1);
+    }
+
+    // Where the phase bubble WILL be anchored: centred on the body, following the player until
+    // they cast. Mirrors PlayerController.PhaseRoutine (anchor = BiteCenter) and the radius it
+    // clamps to — if phaseMaxRadius or the anchor point changes there, change it here too or the
+    // preview starts lying about where the player can reach.
+    private void UpdatePhase(float dim)
+    {
+        Vector2 center = player.BiteCenter;
+        float radius = player.phaseMaxRadius;
+
+        float breath = 1f + 0.015f * Mathf.Sin(Time.unscaledTime * 2.4f);
+        float r = radius * breath;
+
+        for (int i = 0; i < BITE_SEGMENTS; i++)
+        {
+            float a = (float)i / BITE_SEGMENTS * Mathf.PI * 2f;
+            phaseRing.SetPosition(i, new Vector3(center.x + Mathf.Cos(a) * r, center.y + Mathf.Sin(a) * r, 0f));
+        }
+
+        phaseRing.startColor = phaseRing.endColor = new Color(phaseColor.r, phaseColor.g, phaseColor.b, phaseColor.a * dim);
+
+        phaseFill.transform.position = new Vector3(center.x, center.y, 0f);
+        phaseFill.transform.localScale = Vector3.one * (r * 2f);
+        phaseFill.color = new Color(phaseColor.r, phaseColor.g, phaseColor.b, 0.04f * dim);
+    }
+
+    // ------------------------------------------------------------------ RETURN ANCHOR
+
+    private void EnsureAnchorVisuals()
+    {
+        if (anchorRoot != null) return;
+
+        anchorRoot = MakeContainer("Aim_Anchor");
+
+        anchorTether = MakeLineChild(anchorRoot.transform, "Tether", 0.045f, sortingOrder - 2);
+        anchorTether.positionCount = 2;
+
+        anchorCore = MakeSpriteChild(anchorRoot.transform, "Core", GetDotSprite(), sortingOrder - 1);
+
+        anchorDecal = MakeLineChild(anchorRoot.transform, "Decal", 0.05f, sortingOrder + 1);
+        anchorDecal.loop = true;
+        anchorDecal.positionCount = ANCHOR_SEGMENTS;
+
+        anchorRings = new LineRenderer[2];
+        for (int i = 0; i < anchorRings.Length; i++)
+        {
+            anchorRings[i] = MakeLineChild(anchorRoot.transform, "Ring" + i, 0.055f, sortingOrder);
+            anchorRings[i].loop = true;
+            anchorRings[i].positionCount = ANCHOR_SEGMENTS;
+        }
+    }
+
+    // ⚠️ THE MOTION IS THE DESCRIPTION. A first pass drew one fat soft ring around the player and the
+    // designer called it out: an enclosing ring reads as an area-of-effect, which is the wrong idea
+    // entirely — the card marks a POINT and later pulls you back to it. So the rings now CONTRACT
+    // inward and snuff out on the spot, which is the card's whole sentence in one gesture, and it is
+    // deliberately the inverse of Glass Wail's expanding ripples and of the Phase bubble's static
+    // boundary. Nothing else in the game moves inward.
+    //
+    // It is also much smaller than before. The old ring was 3.4 units wide and sat around the
+    // player's own legs, so it claimed an area AND was occluded by the character standing in it. A
+    // tight decal says "this exact spot" and leaves the player readable.
+    //
+    // Two states, and the second matters most: once an anchor exists the decision is "do I want to
+    // be back THERE?", which is unanswerable without seeing where "there" is. The tether covers that
+    // — the card has no range limit, so the anchor is regularly off-screen.
+    private void UpdateAnchor(float dim)
+    {
+        if (anchorRoot == null) return;
+
+        bool placed = player.HasReturnAnchor;
+        Vector2 target = placed ? player.ReturnAnchorPos : (Vector2)transform.position;
+        Vector3 c = new Vector3(target.x, target.y + 0.12f, 0f);
+
+        float breathe = 0.75f + 0.25f * Mathf.Sin(Time.unscaledTime * 3f);
+
+        SetEllipse(anchorDecal, c, ANCHOR_SPOT_R, ANCHOR_SPOT_R * ANCHOR_FLATTEN);
+        Color dc = anchorColor;
+        dc.a *= breathe * dim;
+        anchorDecal.startColor = anchorDecal.endColor = dc;
+
+        for (int i = 0; i < anchorRings.Length; i++)
+        {
+            float t = Mathf.Repeat(Time.unscaledTime / ANCHOR_RING_PERIOD + (float)i / anchorRings.Length, 1f);
+            float r = Mathf.Lerp(ANCHOR_RING_START, ANCHOR_SPOT_R, t * t);   // accelerates as it arrives
+            SetEllipse(anchorRings[i], c, r, r * ANCHOR_FLATTEN);
+
+            // Zero at both ends so the loop point is invisible — a ring snapping back out would
+            // undo the inward reading the whole effect depends on.
+            float fade = Mathf.Clamp01(t / 0.25f) * Mathf.Clamp01((1f - t) / 0.2f);
+            Color rc = anchorColor;
+            rc.a *= fade * 0.85f * dim;
+            anchorRings[i].startColor = anchorRings[i].endColor = rc;
+        }
+
+        anchorCore.transform.position = c;
+        anchorCore.transform.localScale = new Vector3(ANCHOR_SPOT_R * 2.4f, ANCHOR_SPOT_R * 2.4f * ANCHOR_FLATTEN, 1f);
+        anchorCore.color = new Color(anchorColor.r, anchorColor.g, anchorColor.b, 0.12f * breathe * dim);
+
+        // No tether before placement — the marker lands at the player's own feet, so a line from
+        // them to themselves would be noise.
+        anchorTether.enabled = placed;
+        if (placed)
+        {
+            anchorTether.SetPosition(0, new Vector3(transform.position.x, transform.position.y + 0.5f, 0f));
+            anchorTether.SetPosition(1, c);
+            Color tc = anchorColor;
+            tc.a *= 0.3f * breathe * dim;
+            anchorTether.startColor = anchorTether.endColor = tc;
+        }
+    }
+
+    // Flattened ring on the ground plane. Shared by the decal and the contracting rings so they
+    // can never disagree about what "on the floor" looks like.
+    private static void SetEllipse(LineRenderer lr, Vector3 center, float rx, float ry)
+    {
+        for (int i = 0; i < lr.positionCount; i++)
+        {
+            float a = (float)i / lr.positionCount * Mathf.PI * 2f;
+            lr.SetPosition(i, new Vector3(center.x + Mathf.Cos(a) * rx, center.y + Mathf.Sin(a) * ry, center.z));
         }
     }
 

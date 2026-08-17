@@ -13,6 +13,8 @@ public class SlimeAI : MonoBehaviour
     public float damage = 10f;
     public float damageDelay = 0.2f;
     public float knockbackPower = 4f;
+    [Tooltip("How tall the lunge reaches. A slime is short, so this is lower than a humanoid's.")]
+    public float attackHeight = 1.2f;
 
     [Header("Idle Patrol")]
     public float patrolFlipInterval = 2.5f;
@@ -83,7 +85,7 @@ public class SlimeAI : MonoBehaviour
                     // Play the attack sound at the moment the attack starts.
                     SfxManager.PlayAtPoint(attackSound, transform.position, attackVolume);
 
-                    StartCoroutine(DealDamageRoutine());
+                    StartCoroutine(DealDamageRoutine(player.position.x >= transform.position.x ? 1f : -1f));
                 }
             }
         }
@@ -104,23 +106,13 @@ public class SlimeAI : MonoBehaviour
         controller.inputMove.x = patrolDir;
     }
 
-    IEnumerator DealDamageRoutine()
+    IEnumerator DealDamageRoutine(float swingDir)
     {
         yield return new WaitForSeconds(damageDelay);
-
         if (player == null || controller.IsDead) yield break;
 
-        float currentDistance = Vector2.Distance(transform.position, player.position);
-        if (currentDistance <= attackRange + 0.5f)
-        {
-            PlayerController pc = player.GetComponent<PlayerController>();
-            if (pc != null)
-            {
-                pc.TakeDamage(damage);
-                Vector2 knockbackDir = (player.position - transform.position).normalized;
-                pc.ApplyKnockback(knockbackDir * knockbackPower);
-            }
-        }
+        // A box in front, not a circle around the slime's feet with a hidden +0.5. See EnemyMelee.
+        EnemyMelee.TryHit(transform, swingDir, attackRange, damage, knockbackPower, attackHeight);
     }
 
     private bool IsEdgeAhead(float dirX)
@@ -133,7 +125,6 @@ public class SlimeAI : MonoBehaviour
     {
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, aggroRange);
-        Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, attackRange);
+        EnemyMelee.DrawGizmo(transform, attackRange, attackHeight);
     }
 }

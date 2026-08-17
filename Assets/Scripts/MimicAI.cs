@@ -19,6 +19,8 @@ public class MimicAI : MonoBehaviour
     [SerializeField] private float attackDamage = 15f;
     [SerializeField] private float damageDelay = 0.3f;
     [SerializeField] private float knockbackPower = 5f;
+    [Tooltip("How tall the bite reaches. A chest is low to the ground.")]
+    [SerializeField] private float attackHeight = 1.3f;
 
     [Header("Edge Detection")]
     [SerializeField] private LayerMask groundLayer;
@@ -130,7 +132,7 @@ public class MimicAI : MonoBehaviour
                 {
                     controller.inputAttack = true;
                     lastAttackTime = Time.time;
-                    StartCoroutine(DealDamageRoutine());
+                    StartCoroutine(DealDamageRoutine(player.position.x >= transform.position.x ? 1f : -1f));
                 }
             }
             else
@@ -164,21 +166,13 @@ public class MimicAI : MonoBehaviour
             Reveal();
     }
 
-    private IEnumerator DealDamageRoutine()
+    private IEnumerator DealDamageRoutine(float swingDir)
     {
         yield return new WaitForSeconds(damageDelay);
         if (player == null || controller.IsDead) yield break;
 
-        float currentDistance = Vector2.Distance(transform.position, player.position);
-        if (currentDistance <= attackRange + 0.5f)
-        {
-            if (playerController != null)
-            {
-                playerController.TakeDamage(attackDamage);
-                Vector2 knockbackDir = (player.position - transform.position).normalized;
-                playerController.ApplyKnockback(knockbackDir * knockbackPower);
-            }
-        }
+        // A box in front, not a circle around the mimic's feet with a hidden +0.5. See EnemyMelee.
+        EnemyMelee.TryHit(transform, swingDir, attackRange, attackDamage, knockbackPower, attackHeight);
     }
 
     private bool IsEdgeAhead(float dirX)
@@ -195,7 +189,6 @@ public class MimicAI : MonoBehaviour
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, aggroRange);
 
-        Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, attackRange);
+        EnemyMelee.DrawGizmo(transform, attackRange, attackHeight);
     }
 }

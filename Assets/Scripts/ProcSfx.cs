@@ -547,6 +547,133 @@ public static class ProcSfx
         return Finalize(dry, 0f, 11000f);
     }
 
+    private static AudioClip paperRustle, waxStamp;
+
+    // Opening the quest board: a sheaf of pinned paper disturbed by the door.
+    public static AudioClip PaperRustle
+    {
+        get { if (paperRustle == null) paperRustle = BuildPaperRustle(); return paperRustle; }
+    }
+
+    // Accepting a contract: a seal pressed into wax.
+    public static AudioClip WaxStamp
+    {
+        get { if (waxStamp == null) waxStamp = BuildWaxStamp(); return waxStamp; }
+    }
+
+    // These two are the only sounds in the game with NO PITCHED COMPONENT AT ALL, and that is what
+    // makes them a distinct family rather than a variation on the stone hits. Magic is harmonic,
+    // metal is inharmonic-but-pitched, stone is barely pitched, the pause pair is defined by its
+    // envelope — paper simply has no note in it. Give either of these a tone and it stops being
+    // paper immediately.
+    //
+    // A rustle is a cluster of short noise bursts, not one long one: a continuous shaped hiss reads
+    // as wind, and only the granularity says "many separate sheets".
+    private static AudioClip BuildPaperRustle()
+    {
+        const float dur = 0.62f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(5531);
+
+        const int bursts = 14;
+        var at = new float[bursts];
+        var decay = new float[bursts];
+        var amp = new float[bursts];
+        var hz = new float[bursts];
+        for (int k = 0; k < bursts; k++)
+        {
+            // Front-loaded: the disturbance settles rather than building.
+            float u = (float)rng.NextDouble();
+            at[k] = u * u * dur * 0.85f;
+            decay[k] = 34f + (float)rng.NextDouble() * 46f;
+            amp[k] = 0.5f + (float)rng.NextDouble() * 0.5f;
+            hz[k] = 2200f + (float)rng.NextDouble() * 4200f;
+        }
+
+        float svfLow = 0f, svfBand = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+
+            float env = 0f;
+            float centre = 0f, wsum = 0f;
+            for (int k = 0; k < bursts; k++)
+            {
+                float bt = ts - at[k];
+                if (bt <= 0f) continue;
+                float e = Mathf.Exp(-decay[k] * bt) * amp[k];
+                env += e;
+                centre += hz[k] * e; wsum += e;
+            }
+            if (env <= 0.0001f) { dry[i] = 0f; continue; }
+            centre = wsum > 0f ? centre / wsum : 3600f;
+
+            // Resonant band-pass following whichever burst is loudest right now.
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+            float f = 2f * Mathf.Sin(Mathf.PI * Mathf.Min(centre, SampleRate * 0.45f) / SampleRate);
+            svfLow += f * svfBand;
+            float high = noise - svfLow - 0.55f * svfBand;   // low Q: paper is broad, not whistly
+            svfBand += f * high;
+
+            // Global taper so the last bursts don't end abruptly.
+            dry[i] = svfBand * Mathf.Min(env, 1.4f) * (1f - Mathf.Clamp01(ts / dur)) * 0.085f;
+        }
+
+        return Finalize(dry, 0.08f, 12000f);   // nearly dry — a board is against a wall, not in a hall
+    }
+
+    // The press. Three layers, and the ORDER of their decays is what sells it as one physical
+    // action rather than three sounds: the wax gives way first (a fast dull squash), the seal
+    // bottoms out on the paper underneath (a low thock), and the sheet itself creases last.
+    private static AudioClip BuildWaxStamp()
+    {
+        const float dur = 0.42f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(8264);
+
+        // Crease ticks: a handful of tiny snaps in the first 140ms.
+        const int ticks = 6;
+        var tickAt = new float[ticks];
+        var tickHz = new float[ticks];
+        for (int k = 0; k < ticks; k++)
+        {
+            tickAt[k] = 0.012f + (float)rng.NextDouble() * 0.13f;
+            tickHz[k] = 3400f + (float)rng.NextDouble() * 3800f;
+        }
+
+        float lp = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+
+            // SQUASH — noise through a low-pass that closes fast. Soft material displacing.
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+            float cutoff = Mathf.Lerp(2600f, 380f, Mathf.Clamp01(ts / 0.05f));
+            lp += (1f - Mathf.Exp(-2f * Mathf.PI * cutoff / SampleRate)) * (noise - lp);
+            float squash = lp * Mathf.Exp(-28f * ts) * 0.30f;
+
+            // THOCK — the seal reaching the desk through the paper. Pitch drops as it settles, but
+            // it stays under 90 Hz where it reads as weight rather than as a note.
+            float thock = Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(88f, 52f, Mathf.Clamp01(ts / 0.12f)) * ts)
+                        * Mathf.Exp(-19f * ts) * 0.16f;
+
+            // CREASE — paper snapping under the pressure.
+            float crease = 0f;
+            for (int k = 0; k < ticks; k++)
+            {
+                float t2 = ts - tickAt[k];
+                if (t2 <= 0f) continue;
+                crease += Mathf.Sin(2f * Mathf.PI * tickHz[k] * t2) * Mathf.Exp(-150f * t2);
+            }
+
+            dry[i] = squash + thock + crease * 0.022f;
+        }
+
+        return Finalize(dry, 0.12f, 9000f);
+    }
+
     private static AudioClip Finalize(float[] dry, float reverbWet, float masterLpHz)
     {
         float[] s = ApplyReverbAndWarmth(dry, reverbWet, masterLpHz);

@@ -33,6 +33,13 @@ public enum CardActionType
     GlassParry       = 16,
     DeadWeight       = 17,
     FreefallBlade    = 18,
+    // "Second Thoughts". Two-stage like Portal, but the return end is always somewhere the player
+    // has ALREADY STOOD, so unlike Portal it can never advance them through a room — which is why
+    // it needs no range limit at all.
+    ReturnAnchor     = 19,
+    // The Ninja's card. Unlike Fireball it is AIMED: the shot flies toward the cursor, in any
+    // direction, rather than straight ahead along the player's facing.
+    Shuriken         = 20,
 }
 
 public enum SkillType

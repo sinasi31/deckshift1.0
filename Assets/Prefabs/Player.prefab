@@ -87,7 +87,7 @@ Transform:
   m_GameObject: {fileID: 5046179867843327484}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.00975, z: 0}
+  m_LocalPosition: {x: 0, y: 0.84233874, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -220,6 +220,9 @@ MonoBehaviour:
   groundLayer:
     serializedVersion: 2
     m_Bits: 2056
+  terrainLayer:
+    serializedVersion: 2
+    m_Bits: 8
   maxAirJumps: 0
   platformPrefab: {fileID: 2884497646027804218, guid: 0c30a27df86ca3d4485ef29c36533548, type: 3}
   swimSpeed: 5
@@ -227,6 +230,11 @@ MonoBehaviour:
   swimSurfaceOffset: 1.2
   swimSettleStrength: 8
   swimExitDuration: 0.35
+  pogoChainFalloff:
+  - 0.7
+  - 0.55
+  - 0.42
+  - 0.32
   currentGold: 500
   currentScrap: 0
   audioSource: {fileID: 7872518250570301061}
@@ -265,9 +273,10 @@ MonoBehaviour:
   adrenalineSpeedMult: 2
   ghostDelay: 0.05
   portalPrefab: {fileID: 908333651306973326, guid: 794d2df75acd43b45bb5028c806b3b7e, type: 3}
+  portalPlaceRange: 6
   portalMaxRange: 15
   wallCheck: {fileID: 182352444585531103}
-  wallCheckDistance: 0.5
+  wallCheckDistance: 0.32
   wallSlideSpeed: 2
   wallJumpForce: {x: 10, y: 15}
   moveSpeed: 8
@@ -287,8 +296,13 @@ MonoBehaviour:
   speedBoostMultiplier: 4
   adrenalineAuraEffect: {fileID: 7401582936470158293, guid: c1f4a7d92b8e406c95a3d1e6f7b0c284, type: 3}
   currentState: 0
+  coyoteTime: 0.1
+  jumpBufferTime: 0.12
+  character: {fileID: 11400000, guid: 21b96c1d04ec32147ae371aee3de4593, type: 2}
   fireballPrefab: {fileID: 6847861146471343392, guid: c410de68076b28846bb5e156129b8267, type: 3}
   firePoint: {fileID: 7525573285496672760}
+  shurikenThrowSound: {fileID: 0}
+  shurikenSprite: {fileID: 1030694015, guid: b217a154a8231e54bbb50405bdfafbaf, type: 3}
   wailRange: 10
   fireballCastDelay: 0.12
   biteRange: 1.5
@@ -321,6 +335,7 @@ MonoBehaviour:
   staggerEffect: {fileID: 0}
   visualFlipYOffset: 1.6875
   gravityAuraEffect: {fileID: 5910283746501928374, guid: d2a7e9c4b1f3406a8c5d2e1b3f4a6c70, type: 3}
+  phaseMaxRadius: 6
   phaseVisuals:
   - {fileID: 9072995722623145862}
   - {fileID: 9072995722623145958}
@@ -660,6 +675,12 @@ MonoBehaviour:
   wailColor: {r: 0.75, g: 0.95, b: 1, a: 0.6}
   wailRippleMaxRadius: 6
   wailRipplePeriod: 1.1
+  phaseColor: {r: 0.72, g: 0.55, b: 1, a: 0.75}
+  phaseRingWidth: 0.05
+  anchorColor: {r: 1, g: 0.72, b: 0.28, a: 0.85}
+  shurikenColor: {r: 0.82, g: 0.88, b: 0.96, a: 0.8}
+  shurikenEnemyColor: {r: 1, g: 0.28, b: 0.2, a: 0.95}
+  shurikenDots: 9
 --- !u!1001 &259556885127125483
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1218,6 +1239,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 4376744426795614935, guid: 5509adfb025d9e44294a6087e6be0cfe, type: 3}
+    - {fileID: 9092304220377807177, guid: 5509adfb025d9e44294a6087e6be0cfe, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:

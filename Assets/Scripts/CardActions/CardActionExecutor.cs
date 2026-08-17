@@ -44,6 +44,8 @@ public class CardActionExecutor : MonoBehaviour
             { CardActionType.GlassParry,     new GlassParryAction()     },
             { CardActionType.DeadWeight,     new DeadWeightAction()     },
             { CardActionType.FreefallBlade,  new FreefallBladeAction()  },
+            { CardActionType.ReturnAnchor,   new ReturnAnchorAction()   },
+            { CardActionType.Shuriken,       new ShurikenAction()       },
         };
     }
 
