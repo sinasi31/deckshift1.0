@@ -1314,10 +1314,14 @@ The Scrap Forge and Blompo used to build their own card chips: a FlatUI plate wi
 
 | | charges | cost | sprite |
 |---|---|---|---|
-| **gem (canonical)** | **(0.2188, 0.8796)** | **(0.8330, 0.8623)** | `freefallblade_0`, 118×200, aspect **0.590** |
+| **gem (canonical)** | **(0.2188, 0.8796)** | **(0.8330, 0.8767)** | `freefallblade_0`, 118×200, aspect **0.590** |
 | classic (legacy) | (0.173, 0.921) | (0.848, 0.905) | `fireball_0`, 1024×1536, aspect **0.667** |
 
-⚠️ **The canonical positions were measured by BOUNDING BOX, not centroid.** Both shapes are symmetrical — the ball is a true **42×42 circle**, the crystal a **26×40 diamond** — so the bbox centre IS the centre, whereas a centroid is dragged off by highlights and facets that fail a strict colour test. They disagreed by 0.014 on the ball's x and 0.009 on the gem's y. (Method: blit the sprite to a RenderTexture and read it back — the source textures are not import-readable. Scan the FULL sprite height: a window clipped to the top band cut off the ball's bottom and skewed the first measurement.)
+⚠️ **MEASURE ON THE RENDERED CARD, NOT ON THE SPRITE.** The first pass scanned the sprite for strongly-coloured pixels. That is fine for the ball (a saturated disc, and its value was confirmed correct to 0.3px) and **wrong for the crystal**: a diamond tapers to dark, desaturated tips, the strict colour test missed the top one, and the resulting "centre" put the Shift digit **14.5px low on a 900px card — about 8% of the crystal's height.** That is what the designer reported as the numbers not being centred. Rendering the real card and measuring the medallion **and** the digit ink in the SAME image removes every mapping assumption at once — it answers "is the number on the medallion?" directly instead of inferring it.
+
+⚠️ **The tool that settled it: a ROW-WIDTH PROFILE, not a bounding box or a centroid.** A circle and a diamond both reach their widest row exactly at their vertical centre, so the peak row *is* the answer, and it is immune to the rim, highlights and facets that drag a centroid or inflate a bbox. On the ball the three methods disagreed — bbox said x=814, centroid said 811.1, and the mode of the row midpoints said 811 with a symmetric profile, which is the truth. Capture with `ScreenCapture.CaptureScreenshot`, then read the PNG back with `File.ReadAllBytes` + `Texture2D.LoadImage` to sample it.
+
+⚠️ **A residual of ~2px on a 900px card is the GLYPH, not the placement, and must not be "corrected".** Both medallions now land within 1.5px, and the leftover is each digit's own bearing — measured from the font asset, the worst digit is 0.63px vertical and 0.19px horizontal at hand size. It also differs per digit, so tuning it against one number over-fits.
 
 ⚠️ **`CardFace` is the single source for every screen INCLUDING the hand.** `CardUI.Setup` calls `CardFace.PlaceMedallion` on its two prefab labels rather than trusting their authored positions, so the hand and the forge cannot drift apart.
 

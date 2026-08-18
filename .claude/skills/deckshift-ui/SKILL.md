@@ -344,6 +344,26 @@ the art doesn't use: only Epic/Legendary blessings pulse.
   118×200 (0.590) — so the newer art letterboxes to **88.5%** of the host width
   and every medallion number drifted outward off its socket. Measure against the
   DRAWN size (`CardFace.DrawnArtSize`), never the host.
+- ⚠️ **TO CENTRE SOMETHING ON A SHAPE, MEASURE THE RENDERED FRAME — not the
+  source art.** Scanning the sprite for strongly-coloured pixels finds a
+  saturated disc fine, but a shape that tapers to dark, desaturated tips (a
+  diamond, a gem, a flame) loses its ends to the colour test, and the "centre"
+  comes out shifted. The card's Shift digit ended up 14.5px low on a 900px card
+  — 8% of the medallion's height — from exactly this. Render it, capture, and
+  measure the SHAPE and the THING YOU ARE CENTRING in the same image; that
+  answers "is it on it?" directly instead of inferring it through a chain of
+  rect maths.
+- ⚠️ **Use a ROW-WIDTH PROFILE, not a bounding box or a centroid.** Circles and
+  diamonds both reach their widest row exactly at their vertical centre, so the
+  peak row is the answer — and unlike a bbox it is not inflated by a rim, and
+  unlike a centroid it is not dragged by interior highlights. On one ball the
+  three methods gave x = 814 (bbox), 811.1 (centroid) and 811 (profile mode);
+  the profile was the symmetric, correct one. Read a capture back with
+  `File.ReadAllBytes` + `Texture2D.LoadImage` to sample pixels.
+- ⚠️ **Know when the residual is the GLYPH and stop.** After correcting, ~2px on
+  a 900px card remained — that is each digit's own bearing (worst case 0.63px
+  vertical at hand size, measured from the font asset's glyph metrics), it
+  differs per digit, and "fixing" it over-fits to whichever number you tested.
 - ⚠️ **A TWO-DIGIT NUMBER IS ~1.93× THE WIDTH OF ONE DIGIT.** Measured in the
   display face at 100pt: widest digit `0` = 58.2px, `10` = 110.8, `99` = 112.2,
   `100` = 176.0, `∞` = 70.9. Any socket, badge or medallion drawn for one digit

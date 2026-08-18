@@ -39,14 +39,23 @@ public static class CardFace
     // `Classic` and the chooser with it and keep `Gem` as the only layout.**
     public struct Medallions { public Vector2 Uses, Cost; }
 
-    // ⚠️ Measured off the canonical sprite by BOUNDING BOX, not centroid. Both shapes are
-    // symmetrical — the ball is a true 42x42 circle, the crystal a 26x40 diamond — so the bbox
-    // centre IS the centre, whereas the centroid is pulled off by highlights and facets that fail a
-    // strict colour test (they disagreed by 0.014 on the ball's x and 0.009 on the gem's).
+    // ⚠️ **MEASURED ON THE RENDERED CARD, NOT ON THE SPRITE — that correction is the whole point
+    // of these numbers.** The first pass scanned the sprite for strongly-coloured pixels, which is
+    // fine for the ball (a saturated disc) and WRONG for the crystal: a diamond tapers to dark,
+    // desaturated tips, the strict colour test missed the top one, and the resulting "centre" sat
+    // 14.5px low on a 900px card — about 8% of the crystal's height, which is what the designer
+    // saw. Rendering the real card and measuring the medallion AND the digit ink in the SAME image
+    // removes every mapping assumption at once.
+    //
+    // Method that settled it: capture the frame, load the PNG back, and take a row-width profile
+    // down each shape. A circle and a diamond both reach their widest row exactly at their vertical
+    // centre, so the peak row IS the answer — and it is immune to the rim, highlights and facets
+    // that drag a centroid or inflate a bounding box. (Bounding box put the ball's x at 814 and the
+    // centroid at 811.1; the mode of the row midpoints is 811, and the profile is symmetric there.)
     private static readonly Medallions Gem = new Medallions
     {
-        Uses = new Vector2(0.2188f, 0.8796f),   // red ball,      42x42 of a 118x200 sprite
-        Cost = new Vector2(0.8330f, 0.8623f),   // blue crystal,  26x40
+        Uses = new Vector2(0.2188f, 0.8796f),   // red ball — verified: true centre (0.2194, 0.8794)
+        Cost = new Vector2(0.8330f, 0.8767f),   // blue crystal — widest row peaks here
     };
 
     // ⚠️ Legacy keeps the ORIGINAL hand-authored values, so this stays a visual no-op on the 14 old
@@ -203,7 +212,10 @@ public static class CardFace
         Vector2 drawn = DrawnArtSize(host, artImage.sprite);
 
         RectTransform rt = label.rectTransform;
-        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+        // ⚠️ The PIVOT is set here too, not just the anchors. `anchoredPosition` places the
+        // pivot, so a label whose pivot is not centred lands half its own rect away from the
+        // medallion — and these are prefab objects whose pivot this code does not own.
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = MedallionOffset(host, artImage.sprite, cost);
 
         label.enableWordWrapping = false;   // "10" has no break opportunity, but do not tempt it
