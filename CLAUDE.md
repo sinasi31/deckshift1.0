@@ -1536,17 +1536,37 @@ They are oversized, so `TileVariantGenerator` correctly refuses them full-cell G
 
 ⚠️ **`Ground Dirt_13 Solid` was the same class of bug and is also gone** — a 0.44 × 0.38 pebble carrying FULL-CELL Grid collision, so the player stood **0.62 units above a pebble**. Every instance sat at the outer edge of a floor run, i.e. exactly the surface you walk onto. This is very likely the designer's "2-3 tiles where the colliders are off and the player seems to float".
 
-### Doors: the gate SWINGS, the exit is the grand one (rebuilt 2026-08-19)
+### Doors: the gate SWINGS, the exit is an OPEN ARCHWAY (rebuilt 2026-08-19)
 
-The two doors had swapped roles. The mid-level **gate** wore `TX Dungeon Props - Gate 01` — the
-grandest door in the pack, big double leaves under a stone arch — while the **exit**, the single most
-important thing in a room, was a murky sprite from a different art pack that you could barely find on
-the wall. They are now the other way round.
+The mid-level **gate** was a closed thing wearing the grandest door in the pack, while the **exit** —
+the single most important thing in a room — was a murky sprite from a different art pack you could
+barely find on the wall. Both were wrong, and in opposite directions.
 
 | | before | after |
 |---|---|---|
-| **Gate** (`G`) | Gate 01 sprite on a bare SpriteRenderer, slid into the floor and faded | `PF Dungeon Props - Door Wood 01`, **swings** on the pack's own Animator |
-| **ExitDoor** | `main_lev_build_110` (PlatformerSet1) | **Gate 01** |
+| **Gate** (`G`) | `Gate 01` sprite on a bare SpriteRenderer, slid into the floor and faded | `PF Dungeon Props - Door Wood 01`, **swings** on the pack's own Animator |
+| **ExitDoor** | `main_lev_build_110` (PlatformerSet1), blurry and squashed | **open stone archway**: `Door Frame 01 A` + `Door Wood Inside 01` |
+
+⚠️ **THE EXIT HAS NO DOOR IN IT, AND THAT IS THE DESIGN.** You walk *through* an exit, so anything
+that reads as "closed" is lying about what it does. `Door Wood Inside 01` is the passage texture that
+normally sits BEHIND a wooden door — dark brick with a short flight of **steps rising into it** — so
+the exit reads as a way onward rather than a barrier.
+
+⚠️ **`Door Wood Inside 01` EXISTS ONLY AS A SPRITE. There is no prefab for it** (unlike almost every
+other prop in the pack), which is why it does not turn up when you search the Prefab/Props folder. It
+is in `TX Dungeon Props.png`, 36×64px, base-pivoted.
+
+⚠️ **Two candidates were built, shown and REJECTED before this one — do not re-propose them.**
+`Gate 01`'s grand double doors: still a *closed door*, and its own `Sky`/`Light Shaft` children are
+invisible behind its opaque leaf, so the prefab buys nothing over the bare sprite. `Door Iron Fence
+01`: bars over a bright cyan sky — loud and eye-catching, but bars read as *blocked*, and the cyan is
+a brand-new hue in a palette that is already nearly spent (see UI System). The exit deliberately
+introduces **no new colour at all**.
+
+**It is deliberately unlit.** A warm `Light2D` in the archway was tried and left out: the designer
+picked this texture on its own merits, and the exit's job is to be a believable part of the room. If
+it proves hard to find in a big room, a low warm point light in the passage is the one-line change —
+but that is a play-test call, not an assumption.
 
 **`Gate.cs` now has TWO movements and picks between them by looking at its own visual:** a Cainos
 `Door` component among its children ⇒ **swing** (drive `Door.IsOpened`, switch the blocking collider
@@ -1587,11 +1607,10 @@ closed door (39×68 against the 37×66 the prefab shows at edit time, an imperce
 it renders correctly, screenshot-verified. Only the NAME is wrong. Chasing it will waste a session.
 
 **The gate's visual is a prefab instance now**, so a different door is a one-line change to
-`GateDoorPrefabPath` plus a re-run of the conversion. `Door Iron Fence 01` (a barred portcullis with a
-light shaft behind it) was built and compared and is the strongest alternative — it is the only
-candidate you can **see through**, which shows the player what they cannot reach yet. It was passed
-over because the designer chose wood for its authored animation, and because its bright cyan sky panel
-competes with the blue/purple Shift crystals.
+`GateDoorPrefabPath` plus a re-run of the conversion. `Door Iron Fence 01` (a barred portcullis) was
+built and compared and is the strongest alternative for the GATE specifically — a gate is a thing you
+cannot pass, so bars are honest there, and it is the only candidate you can see through. Wood won on
+the designer's call because its open/close animation is authored art.
 
 #### ⚠️ `ExitDoor.prefab` CONTAINED A NESTED COPY OF ITSELF — in 37 of 39 rooms
 
@@ -1612,17 +1631,24 @@ Deleted. Verified first that **zero** room instances carried any override on the
 that all 38 room ExitDoors are linked instances of the shared prefab, so one edit propagated — the
 same mechanism as the `GirisNoktasi` door-Z fix.
 
-⚠️ **Gate 01 is BOTTOM-pivoted; the old exit sprite was CENTRE-pivoted.** Dropping the new sprite onto
-the root would have raised the door half its height in all 38 rooms. The art therefore moved to an
-offset `Visual` child and the root's SpriteRenderer was removed. **Check `sprite.pivot` before
-swapping any sprite onto an existing transform.**
+⚠️ **Every Cainos prop is BOTTOM-pivoted; the old exit sprite was CENTRE-pivoted.** Dropping a new
+sprite straight onto the root would have raised the door half its height in all 38 rooms. The art
+therefore lives on a `Visual` child offset to `-DRAWN_H/2`, and the root's own SpriteRenderer was
+removed. **Check `sprite.pivot` before swapping any sprite onto an existing transform.**
 
 The prefab also carried a **non-uniform root scale (5.92, 7.75, 3.59)** applied to a **32×41 sprite at
 PPU 100** — so the exit door was blown up ~2.5× (hence blurry next to crisp brick) *and* squashed 24%
 horizontally. Root scale is now `(1,1,1)` with the collider expressed directly in world units
 (2.00 × 3.37, unchanged), and the art sized so its **drawn height is identical to the old door's
 3.18** — which is what let all 38 rooms keep their placement with nothing to reposition. Verified in
-GenLevel8: the door bottom still lands at exactly y = 37.00.
+GenLevel8: the frame bottom still lands at exactly y = 37.00.
+
+⚠️ **WORKFLOW TRAP, cost several wrong screenshots: a scratch scene can end up with TWO room
+instances.** `GameObject.Find("ROOM")` returns only the first, so hiding "the" exit door hid one and
+left an identical second one rendering — which showed up as mystery iron bars over compositions that
+contained no bars, and made three comparison shots quietly worthless. When staging a visual
+comparison, **destroy every matching root first and assert the count**, and if something appears on
+screen that your code cannot draw, enumerate the live renderers near that position before theorising.
 
 ### Level Validator (2026-08-07) — run this BEFORE importing a level
 
