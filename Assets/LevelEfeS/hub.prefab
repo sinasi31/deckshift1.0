@@ -7199,24 +7199,12 @@ PrefabInstance:
       value: ExitDoor
       objectReference: {fileID: 0}
     - target: {fileID: 5782022400635495652, guid: d02cc9258c1aafd459931a5ac7ed4ae1, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 3.8788624
-      objectReference: {fileID: 0}
-    - target: {fileID: 5782022400635495652, guid: d02cc9258c1aafd459931a5ac7ed4ae1, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 5.009092
-      objectReference: {fileID: 0}
-    - target: {fileID: 5782022400635495652, guid: d02cc9258c1aafd459931a5ac7ed4ae1, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 2.317683
-      objectReference: {fileID: 0}
-    - target: {fileID: 5782022400635495652, guid: d02cc9258c1aafd459931a5ac7ed4ae1, type: 3}
       propertyPath: m_LocalPosition.x
       value: 40.102
       objectReference: {fileID: 0}
     - target: {fileID: 5782022400635495652, guid: d02cc9258c1aafd459931a5ac7ed4ae1, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 11.65
+      value: 12.241
       objectReference: {fileID: 0}
     - target: {fileID: 5782022400635495652, guid: d02cc9258c1aafd459931a5ac7ed4ae1, type: 3}
       propertyPath: m_LocalPosition.z
