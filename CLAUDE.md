@@ -1062,7 +1062,7 @@ The settle originally used an *expanding* ring, which the designer called bland 
 
 ⚠️ **UI children are NOT clipped, so FX geometry is bounded by the WINDOW, not the stage.** A first pass used a 520px ring radius and scattered runes across the whole screen, outside the panel, onto the backdrop. The stage sits 60px below centre in a 762-tall window, so there is only ~321px of room downward — anything that must travel further does so on an ellipse squashed in Y (`VERT_SQUASH`). Check this whenever you add UI FX.
 
-**Sound design note:** magic is **harmonic** (bell/chime partials 1,2,3,4,5.1), metal is **inharmonic** (bar modes 1,2.76,5.40,8.93 — see `ProcSfx.ScrapPickup`). That ratio choice is the whole difference between "charm" and "clank"; keep the two families distinct so a blessing and a scrap pickup are never confusable.
+**Sound design note:** magic is **harmonic** (bell/chime partials 1,2,3,4,5.1), metal is **inharmonic** (bar modes 1,2.76,5.40,8.93 — see `ProcSfx.ScrapPickup`). The **gate** family (2026-08-19) is the only one that is deliberately TWO materials at once — bar modes layered over stone grit, because a portcullis is iron running in a stone slot. That ratio choice is the whole difference between "charm" and "clank"; keep the two families distinct so a blessing and a scrap pickup are never confusable.
 
 ### The keeper talks back (`ShopScreenUI`, 2026-08-03)
 
@@ -1621,6 +1621,60 @@ If the gate's look is ever revisited, `Door Iron Fence 01` (a barred portcullis)
 compared and is the strongest alternative — a gate is a thing you cannot pass, so bars are honest
 there, and it is the only candidate you can see through, which shows the player what they cannot
 reach yet. Its cost is a bright cyan sky panel, a new hue in an almost-spent palette.
+
+#### The gate's movement, rebuilt from scratch (2026-08-19)
+
+The designer called the old animation "really lackluster and quite honestly bad". Diagnosed rather
+than guessed at, it had **three** separate faults, and each fix is worth keeping:
+
+⚠️ **1. IT WAS SILENT. All 13 gates had `moveSound` unassigned**, so a three-tonne slab dropped into
+the floor and made no noise at all. That was most of the problem, and no amount of motion tuning
+would have fixed it. There are now four procedural clips — see ProcSfx → GATE.
+
+⚠️ **2. IT FADED OUT, because it had to.** The gate sprite draws at Default order **2** while the
+Ground tilemap is order **1**, so it renders *over* the floor; without the fade you would watch a
+stone slab slide down across the floor tiles. But a fade reads as *dissolving*, which is the exact
+opposite of heavy. It is now **clipped by a `SpriteMask` at the floor line** and stays fully opaque
+(`alpha == 1` throughout, verified) — it genuinely disappears into the floor.
+
+  ⚠️ **Masking by the FLOOR TILEMAP was tried first and does not work: there is only ONE row of
+  ground tile under the gate.** Measured in GenLevel8 — y=20 is solid, y=19/18/17 are empty backdrop.
+  A 3-tall gate sinking 3 units would hang in open air below the floor, which is precisely why the
+  original fade existed. The mask is the fix; re-ordering the sprite is not.
+
+  ⚠️ **The mask is a SIBLING (parented to the room), never a child.** It is the *slot* — it belongs
+  to the floor and must not travel with the gate. Parenting it to the room also means the room
+  destroys it, so it cannot outlive the level (the class of bug `ClearRuntimeSpawns` exists for).
+
+  ⚠️ **It is only as WIDE as the gate, and that is load-bearing. Sprite masks ACCUMULATE** — a
+  renderer draws wherever *any* mask covers it, so one screen-wide mask would un-hide a second gate
+  sunk in its own slot elsewhere in the room. Measured across every multi-gate room, the closest two
+  gates are **8 units** apart, so a 3.48-wide local mask can never reach a neighbour.
+
+⚠️ **3. IT MOVED AT A CONSTANT RATE.** Five equal steps at equal spacing reads as a lift, not as a
+falling weight. The descent now accelerates on `k*k` (what gravity actually does) and the ratchet
+catches are spaced by **distance**, so they arrive faster and faster as it picks up speed.
+
+**The sequence is STRAIN → CATCH → DROP → SEAT, and `CatchHold` — a beat of complete stillness
+before it gives — is doing more work than any other single value in the file.** Weight is
+communicated by the pause *before* the movement, not by the movement. Closing is the inverse and
+deliberately slower (`HeaveTime` 1.05s vs `DropTime` 0.72s), easing *out* because it is being winched
+against its own weight, with the ratchet pitch falling as it slows where the drop's rises.
+
+⚠️ **`CameraShake.Shake` is `(INTENSITY, DURATION)` and the old gate passed them REVERSED.** Every
+other caller in the project has it right (boss death is `0.6, 1.6`). The old gate's hardest hit asked
+for 0.12 intensity over 0.14s while the Moss Knight's slam gets 0.28 over 0.8s — an order of
+magnitude under every other impact in the game, which is its own reason a falling slab registered as
+nothing. The seat is now `0.34, 0.60`.
+
+**Verified in play mode:** settles to exactly y=22.500 closed and 19.500 open; alpha stays 1.00
+throughout; when open the sprite's top edge lands at exactly the floor line (21.00) so it is entirely
+clipped; a hammered Open/Close/Open/Close settles correctly with the collider back on; dust motes
+drain to 0 rather than growing unbounded; and exactly one `SpriteMask` exists per gate.
+
+⚠️ **Testing this needs the clock slowed.** The whole sequence is ~1.1s, which is shorter than the
+round-trip of a single MCP call — at `Time.timeScale = 0.12` it still finished between two calls.
+0.02 is what actually lets you photograph the middle of it.
 
 #### ⚠️ `ExitDoor.prefab` CONTAINED A NESTED COPY OF ITSELF — in 37 of 39 rooms
 

@@ -674,6 +674,188 @@ public static class ProcSfx
         return Finalize(dry, 0.12f, 9000f);
     }
 
+    // =============================================================================================
+    // GATE — a stone slab running in an iron-shod channel.
+    //
+    // A FIFTH family, and deliberately the only one built from TWO materials at once. Every family
+    // above commits to one (magic = harmonic bell partials, metal = inharmonic bar modes, stone =
+    // noise + sub, paper = no pitched component at all, UI = pitch motion). A portcullis is iron
+    // running in a stone slot, so these layer bar modes OVER grit — which is what stops a ratchet
+    // reading as a scrap pickup and the seat reading as a Meteor Greaves landing.
+    //
+    // FOUR clips, because a gate opening is a SEQUENCE and not a hit: it strains, the catch lets go,
+    // it ratchets down, it seats. The old gate played nothing at all, and that silence was most of
+    // why a three-tonne slab dropping into the floor felt like nothing was happening.
+
+    private static AudioClip gateGroan, gateRelease, gateRatchet, gateSeat;
+
+    // The mechanism taking the weight before anything moves. Deliberately has NO attack transient —
+    // it swells. A sound that arrives gradually is what makes the release that follows land.
+    public static AudioClip GateGroan
+    { get { if (gateGroan == null) gateGroan = BuildGateGroan(); return gateGroan; } }
+
+    // The catch letting go: the one sharp event in the whole sequence, so nothing else may compete.
+    public static AudioClip GateRelease
+    { get { if (gateRelease == null) gateRelease = BuildGateRelease(); return gateRelease; } }
+
+    // One pawl catch during the descent. Played a dozen times per open, so it is deliberately the
+    // quietest and driest clip in the game — give this a tail and the drop turns to mush.
+    public static AudioClip GateRatchet
+    { get { if (gateRatchet == null) gateRatchet = BuildGateRatchet(); return gateRatchet; } }
+
+    // The slab arriving. Lower and longer than MeteorImpact on purpose: that is a body hitting the
+    // floor, this is the floor taking a tonne of rock.
+    public static AudioClip GateSeat
+    { get { if (gateSeat == null) gateSeat = BuildGateSeat(); return gateSeat; } }
+
+    private static AudioClip BuildGateGroan()
+    {
+        const float dur = 0.55f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(20819);
+
+        float lp = 0f, hp = 0f;
+        float lpCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 520f / SampleRate);
+        float hpCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 150f / SampleRate);
+        float subPhase = 0f;
+
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+
+            // Swell in and ease out. No transient anywhere — this is load ARRIVING, not an impact.
+            float env = Mathf.Sin(Mathf.PI * Mathf.Clamp01(ts / dur));
+            env *= env;
+
+            // Stone bearing on stone: a narrow noise band with a slow wobble, as the faces bind.
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+            lp += lpCoef * (noise - lp);
+            hp += hpCoef * (lp - hp);
+            float grit = (lp - hp) * (0.75f + 0.25f * Mathf.Sin(2f * Mathf.PI * 11f * ts));
+
+            subPhase += 2f * Mathf.PI * 52f / SampleRate;   // the weight itself
+            float sub = Mathf.Sin(subPhase);
+
+            dry[i] = (grit * 0.42f + sub * 0.30f) * env;
+        }
+        return Finalize(dry, 0.20f, 3200f);   // dark: heard through rock, not through air
+    }
+
+    private static AudioClip BuildGateRelease()
+    {
+        const float dur = 0.34f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(60313);
+
+        float f0 = 168f;                                   // heavy iron => LOW fundamental
+        float[] ratio = { 1f, 2.76f, 5.40f, 8.93f };       // ideal free-bar modes = metal
+        float[] pAmp  = { 1f, 0.48f, 0.22f, 0.09f };
+        float[] pDec  = { 15f, 24f, 36f, 52f };
+
+        float lp = 0f;
+        float lpCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 4200f / SampleRate);
+        float subPhase = 0f;
+
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+
+            float body = 0f;
+            for (int p = 0; p < ratio.Length; p++)
+                body += Mathf.Sin(2f * Mathf.PI * f0 * ratio[p] * ts) * pAmp[p] * Mathf.Exp(-pDec[p] * ts);
+
+            lp += lpCoef * (noise - lp);
+            float grit = lp * Mathf.Exp(-70f * ts);
+
+            subPhase += 2f * Mathf.PI * 64f / SampleRate;
+            float sub = Mathf.Sin(subPhase) * Mathf.Exp(-13f * ts);
+
+            dry[i] = body * 0.20f + grit * 0.26f + sub * 0.30f;
+        }
+        return Finalize(dry, 0.18f, 6000f);
+    }
+
+    private static AudioClip BuildGateRatchet()
+    {
+        const float dur = 0.13f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(11279);
+
+        float f0 = 315f;
+        float[] ratio = { 1f, 2.76f, 5.40f };
+        float[] pAmp  = { 1f, 0.40f, 0.16f };
+        float[] pDec  = { 46f, 62f, 84f };                 // very fast: a tick, never a ring
+
+        float lp = 0f;
+        float lpCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 3400f / SampleRate);
+
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+
+            float body = 0f;
+            for (int p = 0; p < ratio.Length; p++)
+                body += Mathf.Sin(2f * Mathf.PI * f0 * ratio[p] * ts) * pAmp[p] * Mathf.Exp(-pDec[p] * ts);
+
+            lp += lpCoef * (noise - lp);
+            float grit = lp * Mathf.Exp(-150f * ts);
+
+            dry[i] = body * 0.11f + grit * 0.16f;
+        }
+        return Finalize(dry, 0.05f, 7000f);   // almost dry — a dozen of these must not smear
+    }
+
+    private static AudioClip BuildGateSeat()
+    {
+        const float dur = 1.30f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(77404);
+
+        float b0 = 96f;                                    // below MeteorImpact 132 = more mass
+        float[] ratio = { 1f, 1.71f, 2.43f };
+        float[] pAmp  = { 1f, 0.38f, 0.17f };
+        float[] pDec  = { 8f, 13f, 20f };
+
+        float crackLp = 0f;
+        float crackCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 6200f / SampleRate);
+        float debLp = 0f, debHp = 0f;
+        float debLpCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 1500f / SampleRate);
+        float debHpCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 220f / SampleRate);
+        float subPhase = 0f;
+
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+
+            crackLp += crackCoef * (noise - crackLp);
+            float crack = crackLp * Mathf.Exp(-260f * ts);
+
+            float subF = Mathf.Lerp(92f, 30f, Mathf.Clamp01(ts / 0.36f));
+            subPhase += 2f * Mathf.PI * subF / SampleRate;
+            float sub = Mathf.Sin(subPhase) * Mathf.Exp(-4.2f * ts);
+
+            float body = 0f;
+            for (int p = 0; p < ratio.Length; p++)
+                body += Mathf.Sin(2f * Mathf.PI * b0 * ratio[p] * ts) * pAmp[p] * Mathf.Exp(-pDec[p] * ts);
+
+            debLp += debLpCoef * (noise - debLp);
+            debHp += debHpCoef * (debLp - debHp);
+            float band = debLp - debHp;
+            float debris = band * Mathf.Exp(-3.4f * ts) * Mathf.Clamp01(ts / 0.025f)
+                         * (0.7f + 0.3f * Mathf.Sin(2f * Mathf.PI * 19f * ts));
+
+            dry[i] = crack * 0.22f + sub * 0.58f + body * 0.20f + debris * 0.18f;
+        }
+        return Finalize(dry, 0.30f, 4600f);   // wet and dark — a big room, heard from inside it
+    }
+
     private static AudioClip Finalize(float[] dry, float reverbWet, float masterLpHz)
     {
         float[] s = ApplyReverbAndWarmth(dry, reverbWet, masterLpHz);
