@@ -89,9 +89,15 @@ public static class LevelTextImporter
 
     // Non-prefab structural markers, built procedurally:
     //   '=' one-way platform tiles (jump up through, land on top)
-    //   'G' gate cell — vertical runs of G become one sliding Gate (portcullis)
+    //   'G' gate cell — vertical runs of G become one Gate (a hinged Cainos door that swings)
     private const string PropsTexturePath = "Assets/Cainos/Pixel Art Platformer - Dungeon/Texture/TX Dungeon Props.png";
-    private const string GateSpriteName = "TX Dungeon Props - Gate 01";
+    // ⚠️ The gate is a DOOR PREFAB, not a loose sprite, and that is the point: the Cainos door
+    // ships its own authored open/close Animator, which Gate.cs drives instead of sliding.
+    // (It used to be "TX Dungeon Props - Gate 01" painted onto a bare SpriteRenderer. That sprite
+    // is now the EXIT door — see Assets/Prefabs/ExitDoor.prefab — because it is the grandest door
+    // in the pack and the exit is the one door in a room that should look important.)
+    private const string GateDoorPrefabPath =
+        "Assets/Cainos/Pixel Art Platformer - Dungeon/Prefab/Props/PF Dungeon Props - Door Wood 01.prefab";
     // (AltarSpriteName removed 2026-08-09 — the altar's sprite now lives on ShiftAltar.prefab.)
     private const int InteractableLayer = 12; // "Interactable" (PlayerController.interactableLayer)
 
@@ -801,8 +807,8 @@ public static class LevelTextImporter
         var camBoundsPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(CameraBoundsPrefabPath);
         if (camBoundsPrefab == null) missing.Add($"CameraBounds -> {CameraBoundsPrefabPath}");
 
-        Sprite gateSprite = LoadPropSprite(GateSpriteName);
-        if (hasGate && gateSprite == null) missing.Add($"'G' gate sprite '{GateSpriteName}' in {PropsTexturePath}");
+        var gateDoorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(GateDoorPrefabPath);
+        if (hasGate && gateDoorPrefab == null) missing.Add($"'G' -> {GateDoorPrefabPath}");
 
         var altarPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AltarPrefabPath);
         if (hasAltar && altarPrefab == null) missing.Add($"'A' -> {AltarPrefabPath}");
@@ -1101,7 +1107,7 @@ public static class LevelTextImporter
                 }
             }
 
-            // ---------- Gates: vertical runs of 'G' become sliding portcullises ----------
+            // ---------- Gates: vertical runs of 'G' become one hinged door ----------
             var gates = new List<Gate>();
             foreach (var kv in gateColumns)
             {
@@ -1123,23 +1129,14 @@ public static class LevelTextImporter
                     var solid = gateGo.AddComponent<BoxCollider2D>();
                     solid.size = new Vector2(1f, h);
 
-                    var visual = new GameObject("Visual");
+                    var visual = (GameObject)PrefabUtility.InstantiatePrefab(gateDoorPrefab);
+                    visual.name = "Visual";
                     visual.transform.SetParent(gateGo.transform, false);
-                    var vsr = visual.AddComponent<SpriteRenderer>();
-                    vsr.sprite = gateSprite;
-                    vsr.sortingOrder = 2;
-                    float spriteH = gateSprite.bounds.size.y;
-                    if (spriteH > 0.01f)
-                    {
-                        float scale = h / spriteH;
-                        visual.transform.localScale = Vector3.one * scale;
-                        // Cainos props pivot at their BASE — recenter so the sprite's
-                        // visual middle sits on the gate's (collider) middle.
-                        visual.transform.localPosition = -(Vector3)gateSprite.bounds.center * scale;
-                    }
+                    FitDoorToOpening(visual, h);
 
                     var gate = gateGo.AddComponent<Gate>();
-                    gate.openOffset = new Vector2(0f, -h); // sinks fully into the floor
+                    // Only consulted by Gate's SLIDE fallback; a door swings and never travels.
+                    gate.openOffset = new Vector2(0f, -h);
                     gates.Add(gate);
                     runStart = i;
                 }
@@ -1287,6 +1284,46 @@ public static class LevelTextImporter
         if (b == null)
             foreach (var c in go.GetComponentsInChildren<Collider2D>(true)) Add(c.bounds);
         return b == null ? Vector2.one : new Vector2(b.Value.size.x, b.Value.size.y);
+    }
+
+    // Scales a door prefab to fill a 'G' run and centres it on the gate's collider.
+    //
+    // ⚠️ MEASURE THE COMBINED RENDERER BOUNDS, never one child. The Cainos door is four pieces
+    // (Door / Frame / Inside / Shadow) at different sizes, and the FRAME is the tallest — sizing
+    // off the door leaf alone leaves the arch standing proud of the opening.
+    //
+    // ⚠️ The particle Light Shaft on some door variants is deliberately excluded: it is a glow,
+    // not geometry, and it extends far below the frame. Including it shrinks the whole door and
+    // then lifts it off the floor. (Measured on Door Iron Fence 01: ~1 unit of float.)
+    //
+    // ⚠️ A door is ~2.4 units tall natively. Pixel art past ~2x stops reading as what it depicts,
+    // so a 'G' run taller than about 5 gets clamped rather than smeared — author tall barriers as
+    // two gates, or lower the run.
+    private static void FitDoorToOpening(GameObject door, float openingHeight)
+    {
+        Bounds b = default; bool any = false;
+        foreach (var sr in door.GetComponentsInChildren<SpriteRenderer>(true))
+        {
+            if (sr.sprite == null) continue;
+            if (!any) { b = sr.bounds; any = true; } else b.Encapsulate(sr.bounds);
+        }
+        if (!any || b.size.y < 0.01f) return;
+
+        float scale = Mathf.Min(openingHeight / b.size.y, 2f);
+        door.transform.localScale = Vector3.one * scale;
+
+        // Re-measure after scaling, then centre the ART on the collider (the gate's origin).
+        Bounds b2 = default; bool any2 = false;
+        foreach (var sr in door.GetComponentsInChildren<SpriteRenderer>(true))
+        {
+            if (sr.sprite == null) continue;
+            if (!any2) { b2 = sr.bounds; any2 = true; } else b2.Encapsulate(sr.bounds);
+        }
+        if (!any2) return;
+        Vector3 centreOffset = b2.center - door.transform.position;
+        door.transform.localPosition -= centreOffset;
+
+        foreach (var sr in door.GetComponentsInChildren<SpriteRenderer>(true)) sr.sortingOrder = 2;
     }
 
     private static Sprite LoadPropSprite(string spriteName)

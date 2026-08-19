@@ -1462,7 +1462,7 @@ Related: a missing-script warning for `CameraBoundsController` appears in the co
 
 `Assets/Scripts/Editor/LevelTextImporter.cs` adds menu **Deckshift → Import Level From Text…**: it reads an ASCII grid `.txt` (legend + example: `Assets/LevelTexts/TestRoom1.txt`) and builds a room prefab into `Assets/LevelGenerated/` satisfying the room contract (`CameraBounds` zone auto-sized to the grid, `GirisNoktasi` spawn, ExitDoor). Markers: `#` ground, `S` spawn (exactly one), `X` exit, `m/r/l/M/b` enemies plus the zombie tiers `z` Shambler / `Z` Rotbrute / `s` Spitter (added 2026-07-16; `b` = `YeniLeveller/BatMan.prefab` — the real flying bat with AeroBatAI; **`Assets/Prefabs/AeroBat.prefab` is a legacy husk with NO AI**, its dead missing-script component was removed 2026-07-13 because Unity refuses to save any new prefab containing missing scripts, which broke level import), `^/T/W` hazards, `+/g/C` pickups, and mechanics (added 2026-07-13): `E` Elevator (Cainos prop, floats at cell center — tune travel in Inspector), `F` UpdraftFan (draft zone ~3 tall, liftForce 20 ≈ 5-7 tiles of lift — chain fans as relays for taller climbs), `w` AcidWater (~6 wide pool, damage+slow), `K` WreckingBall (floats at cell center, tune anchor/swing), `c` CrumblingPlatform (**do NOT use in levels — its sprites are outdated; use `T` Trapdoor instead, designer 2026-07-14**), `t` Taret turret, `$` Shopkeeper_NPC, `B` Blompo (`Assets/Prefabs/Blompo.prefab`, added 2026-08-08 — NPCs are loot, see below) (its TMP/UI scripts live in Library/PackageCache — an Assets-only guid scan wrongly flags them "missing").
 
-**Interactive structure markers (2026-07-14):** `=` one-way platform tiles (own tilemap: TilemapCollider2D via CompositeCollider2D + one-way PlatformEffector2D on Ground layer; painted with the thin `_144` lip so they read differently from solid strips) · `G` gate cells (vertical G-runs become one sliding **Gate** — `Assets/Scripts/Gate.cs`, solid Ground-layer collider, slides down + fades on Open, Cainos Gate 01 sprite scaled to height) · `L` Lever (`YeniLeveller/Lever.prefab`; its `OnFlippedOn/Off` UnityEvents are now public) · `A` **Shift Altar** (**`Assets/YeniLeveller/ShiftAltar.prefab`** since 2026-08-09 — it used to be assembled inline by the importer, so its sprite/layer/collider were declared in editor code and existed nowhere you could look at or tweak. `Assets/Scripts/ShiftAltar.cs`: IInteractable on the Interactable layer (12), pays `shiftCost` Shift via `player.SpendShift`, free in hub per the umbrella rule, procedural floating TMP cost label, fires public `OnPaid`). ⚠️ **It is deliberately NOT in `MarkerPrefabs`** — the `'A'` branch still needs its own code path because it collects altars for the gate wiring below; it just instantiates the prefab now instead of building one. **The importer auto-wires each `L` and `A` to its NEAREST `G` gate** (lever On→Open/Off→Close, altar OnPaid→Open) via `UnityEventTools.AddPersistentListener` — rewire in Inspector if a level needs different pairing. Only header directive besides `!backwall` is `!name`. The importer pre-checks for missing scripts before saving and names the culprit object.
+**Interactive structure markers (2026-07-14):** `=` one-way platform tiles (own tilemap: TilemapCollider2D via CompositeCollider2D + one-way PlatformEffector2D on Ground layer; painted with the thin `_144` lip so they read differently from solid strips) · `G` gate cells (vertical G-runs become one **Gate** — `Assets/Scripts/Gate.cs`, solid Ground-layer collider; since 2026-08-19 the visual is the Cainos **wooden door prefab** and it SWINGS — see Doors below) · `L` Lever (`YeniLeveller/Lever.prefab`; its `OnFlippedOn/Off` UnityEvents are now public) · `A` **Shift Altar** (**`Assets/YeniLeveller/ShiftAltar.prefab`** since 2026-08-09 — it used to be assembled inline by the importer, so its sprite/layer/collider were declared in editor code and existed nowhere you could look at or tweak. `Assets/Scripts/ShiftAltar.cs`: IInteractable on the Interactable layer (12), pays `shiftCost` Shift via `player.SpendShift`, free in hub per the umbrella rule, procedural floating TMP cost label, fires public `OnPaid`). ⚠️ **It is deliberately NOT in `MarkerPrefabs`** — the `'A'` branch still needs its own code path because it collects altars for the gate wiring below; it just instantiates the prefab now instead of building one. **The importer auto-wires each `L` and `A` to its NEAREST `G` gate** (lever On→Open/Off→Close, altar OnPaid→Open) via `UnityEventTools.AddPersistentListener` — rewire in Inspector if a level needs different pairing. Only header directive besides `!backwall` is `!name`. The importer pre-checks for missing scripts before saving and names the culprit object.
 
 **Tile painting reproduces the hand-built visual language** (learned by auditing EfeVrl7's 546 painted tiles, 2026-07-13): an optional "BackWall" backdrop tilemap (**opt-in via `!backwall: on`** — the designer prefers adding backdrop/decoration by hand; when on it must be on the **"Background" sorting LAYER**, NOT Default: ExitDoor's sprite is Default order -1 and gets swallowed by a Default-layer backdrop), plus a "Ground" tilemap (layer 3, TilemapCollider2D, Default sortingOrder 1, z=1). Any 1-tile-thick run (air above AND below, wall-attached or floating) gets the `_112/_113/_114` strip treatment with caps on open ends; the gappy `_186` fill goes in exactly ONE row under a surface, deeper cells get dark `_185` (repeating `_186` looks like a broken colonnade). Frame cells (`#` connected to the grid edge) get role tiles from `Assets/LevelSinasi/biseyler/`: air-above → floor surface `_144`, air-below → ceiling face `_96`, wall faces → inner accent tiles `_188`/`_157` ONLY when backed by a real solid tile (2-thick walls), else the clean outer tiles `_189`/`_156` (the inner tiles have protruding brick nubs + bumpy collision — wrong for 1-thick walls), buried → `_153/_154` top rows, `_156/_189` outer walls, `_186/_185` floor fill. Free-standing `#` platforms: horizontal runs of 2+ get the **platform strip set `Extra_112/_113/_114`** (left cap / middle / right cap — learned from EfeVrl6's interior platforms); lone blocks and 1-wide pillars get chunky `Ground Dirt` block tiles (`#..#..#` = the hand-made stepping-stone style); buried rows of thick platforms get floor fill. NOTE: the edge-strip tiles look like sparse floating crumbs if painted in mid-air, and adjacent Dirt blocks melt into dark blobs — never tile either as strips.
 
@@ -1535,6 +1535,94 @@ They are oversized, so `TileVariantGenerator` correctly refuses them full-cell G
 ⚠️ **Being the right pixel size is NOT evidence.** `Ground Dirt_10` measures **2.06 × 2.03**, which looks perfect. Any new variant added to `PlatformShapes` must be probed, not eyeballed.
 
 ⚠️ **`Ground Dirt_13 Solid` was the same class of bug and is also gone** — a 0.44 × 0.38 pebble carrying FULL-CELL Grid collision, so the player stood **0.62 units above a pebble**. Every instance sat at the outer edge of a floor run, i.e. exactly the surface you walk onto. This is very likely the designer's "2-3 tiles where the colliders are off and the player seems to float".
+
+### Doors: the gate SWINGS, the exit is the grand one (rebuilt 2026-08-19)
+
+The two doors had swapped roles. The mid-level **gate** wore `TX Dungeon Props - Gate 01` — the
+grandest door in the pack, big double leaves under a stone arch — while the **exit**, the single most
+important thing in a room, was a murky sprite from a different art pack that you could barely find on
+the wall. They are now the other way round.
+
+| | before | after |
+|---|---|---|
+| **Gate** (`G`) | Gate 01 sprite on a bare SpriteRenderer, slid into the floor and faded | `PF Dungeon Props - Door Wood 01`, **swings** on the pack's own Animator |
+| **ExitDoor** | `main_lev_build_110` (PlatformerSet1) | **Gate 01** |
+
+**`Gate.cs` now has TWO movements and picks between them by looking at its own visual:** a Cainos
+`Door` component among its children ⇒ **swing** (drive `Door.IsOpened`, switch the blocking collider
+off); no `Door` ⇒ the original **slide** portcullis. The slide is kept as a genuine fallback, not dead
+code — the class header always described it as "a heavy stone portcullis", and that art may return.
+
+⚠️ **The two movements must never be mixed.** A door that swings *and* sinks into the floor reads as a
+bug, and the slide's alpha fade would dissolve a door the Animator is still animating. The swing path
+therefore never calls `SetAlpha` and never touches `transform.position` — verified: the gate's
+position is identical before, during and after a full open/close cycle.
+
+⚠️ **Opening drops the collider FIRST; closing restores it LAST.** The passage must never be solid at a
+moment the door visibly is not. The reverse ordering lets a player be stopped by an open doorway, or
+sealed inside a door still swinging shut. Verified across a hammered Open/Close/Open/Close with no
+frames in between: it settles collider-on, closed, and un-moved.
+
+⚠️ **`SwingSeconds` is 0.45 because the clips MEASURE 0.433s** (`AM Door Wood 01 - Open` / `- Close`,
+read off the controller). It is deliberately a hair longer, so the collider returns after the door has
+finished shutting rather than during.
+
+⚠️ **Size a door by its COMBINED renderer bounds, never by the door leaf.** The Cainos door is four
+pieces (Door / Frame / Inside / Shadow) and the **Frame** is the tallest at 2.41 units; sizing off the
+1.16×2.06 leaf leaves the arch standing proud of the opening. `LevelTextImporter.FitDoorToOpening`
+measures, scales, **re-measures**, then centres the art on the collider.
+
+⚠️ **Exclude particle Light Shafts from that measurement.** Some door variants (`Door Iron Fence 01`)
+carry a glow reaching far below the frame; including it shrinks the door *and* lifts it off the floor
+— measured ~1 unit of float. Only `SpriteRenderer`s with a non-null sprite count.
+
+⚠️ **Scale is CLAMPED at 2×.** A door is ~2.41 tall natively and `G` runs reach 5. Past ~2× pixel art
+stops reading as the thing it depicts. Happily **2× is an integer scale and looks crisper than the
+1.247× a 3-tall run needs** — so the tall gates are the good-looking ones. Author barriers above 5
+tall as two gates rather than raising the clamp.
+
+⚠️ **The pack's `AM Door Wood 01 - Closed` clip keys a sprite named `Door Wood Side 01 - 0`.** That
+looks like a Cainos authoring slip and it is NOT one to "fix" — the art is the correct front-facing
+closed door (39×68 against the 37×66 the prefab shows at edit time, an imperceptible difference) and
+it renders correctly, screenshot-verified. Only the NAME is wrong. Chasing it will waste a session.
+
+**The gate's visual is a prefab instance now**, so a different door is a one-line change to
+`GateDoorPrefabPath` plus a re-run of the conversion. `Door Iron Fence 01` (a barred portcullis with a
+light shaft behind it) was built and compared and is the strongest alternative — it is the only
+candidate you can **see through**, which shows the player what they cannot reach yet. It was passed
+over because the designer chose wood for its authored animation, and because its bright cyan sky panel
+competes with the blue/purple Shift crystals.
+
+#### ⚠️ `ExitDoor.prefab` CONTAINED A NESTED COPY OF ITSELF — in 37 of 39 rooms
+
+Found while swapping the sprite. This is the deferred "duplicate ExitDoor possible in some room
+prefabs" item, which badly understated it: the duplicate was baked into the shared prefab, so nearly
+every room had it. The root had a **child also called `ExitDoor`** carrying its own `BoxCollider2D`
+(trigger, enabled), its own `SpriteRenderer` (same sprite, same sorting order — so the door z-fought
+with itself and its transparent parts double-composited, a large part of why it looked so murky), and
+its own **`ExitDoor` script**.
+
+Both scripts polled `E` and both had the player in range, so one keypress ran `PerformExit()` twice:
+`ReportEvent(NoDamageRoom)` twice, `QuestSystem.EndRoom()` twice (double-counting oath streaks) and
+**`LevelManager.AdvanceToNextRoom()` twice**. Each instance has its own `hasBeenTriggered`, so that
+guard did not help. The two even pointed at different popups — root at `InteractPrompt`, child at a
+legacy `Canvas` — which is the fingerprint of an old version left parented under the new one.
+
+Deleted. Verified first that **zero** room instances carried any override on the nested child, and
+that all 38 room ExitDoors are linked instances of the shared prefab, so one edit propagated — the
+same mechanism as the `GirisNoktasi` door-Z fix.
+
+⚠️ **Gate 01 is BOTTOM-pivoted; the old exit sprite was CENTRE-pivoted.** Dropping the new sprite onto
+the root would have raised the door half its height in all 38 rooms. The art therefore moved to an
+offset `Visual` child and the root's SpriteRenderer was removed. **Check `sprite.pivot` before
+swapping any sprite onto an existing transform.**
+
+The prefab also carried a **non-uniform root scale (5.92, 7.75, 3.59)** applied to a **32×41 sprite at
+PPU 100** — so the exit door was blown up ~2.5× (hence blurry next to crisp brick) *and* squashed 24%
+horizontally. Root scale is now `(1,1,1)` with the collider expressed directly in world units
+(2.00 × 3.37, unchanged), and the art sized so its **drawn height is identical to the old door's
+3.18** — which is what let all 38 rooms keep their placement with nothing to reposition. Verified in
+GenLevel8: the door bottom still lands at exactly y = 37.00.
 
 ### Level Validator (2026-08-07) — run this BEFORE importing a level
 
@@ -2110,7 +2198,7 @@ Use this liberally to verify visual changes, diagnose "it looks wrong" reports, 
   - ⚠️ **AND THE REASON THE FIRST ATTEMPT SILENTLY FAILED IS WORTH KEEPING:** it tested candidates using `capsuleCollider.bounds`. **`Physics2D.autoSyncTransforms` is OFF by default**, so a collider's `bounds` still report the player's PREVIOUS position until the next physics step — and this code tests positions the player hasn't moved to yet, then moves and re-checks. The search "found" a clear spot, teleported there, and left the player just as embedded. Both `IsPositionClear` and `IsCollidingWithGround` now derive the box from `transform.position + capsuleCollider.offset` (exact, because the player root is guaranteed scale (1,1,1)). **Never read a collider's `bounds` in the same frame you moved its transform.**
 - ~~**Comet Dive identity loss**~~ — **RESOLVED (verified 2026-07-26).** Comet Dive was redesigned into an AoE **dive-blast** (`StartCometDive`/`LandCometDive`: fast downward slam → `Physics2D.OverlapCircleAll` damage at `cometRadius`/`cometDamage`, with a `CometDiveVFX` telegraph while falling). It is no longer the single-target head-bounce; the two are distinct.
 - ~~**Head bounce + gravity reversal**~~ — **RESOLVED (verified 2026-07-26).** All head-bounce branches now flip on `isGravityReversed` (see Head Bounce section). Head-bouncing works upside-down.
-- **Duplicate ExitDoor possible in some room prefabs:** defensive guards now in place but the scene-side duplicate (if any) hasn't been cleaned up.
+- ~~**Duplicate ExitDoor possible in some room prefabs**~~ — **RESOLVED 2026-08-19.** It was never "some rooms": the duplicate was baked into `Assets/Prefabs/ExitDoor.prefab` itself, so **37 of 39 rooms had it**, and one keypress ran `PerformExit()` twice. See Level System → Doors.
 
 ### ⚠️ Runtime spawns must not outlive their room (fixed 2026-08-11)
 

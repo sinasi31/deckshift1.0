@@ -2,12 +2,23 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-// A heavy stone portcullis. OPEN: anticipation jerk, then a ratcheting descent
-// into the floor — step, clunk, dust — fading away near the end. CLOSE: slams
-// back up with an overshoot bounce and a dust burst. Camera rumbles throughout.
-// Dust is procedural (house style: generated sprites, Update-driven motes).
-// Driven by Lever/ShiftAltar via Open()/Close()/Toggle(); the level importer
-// wires those automatically ('G' marker).
+// A gate the player must unlock. Driven by Lever/ShiftAltar via Open()/Close()/Toggle();
+// the level importer wires those automatically ('G' marker).
+//
+// TWO MOVEMENTS, picked automatically from what the visual actually IS:
+//
+//  * SWING (the default since 2026-08-19) — the visual is a Cainos door prefab, which ships
+//    its own authored open/close Animator. We drive that and simply switch the blocking
+//    collider off, because the door leaf swings into its own frame rather than travelling.
+//  * SLIDE (fallback) — the original portcullis: anticipation jerk, then a ratcheting
+//    descent into the floor, fading near the end; CLOSE slams back up with an overshoot.
+//    Kept for any gate whose visual is a plain sprite with no Door component.
+//
+// ⚠️ The two must NOT be mixed. A swinging door that also sinks into the floor reads as a
+// bug, and the slide's alpha fade would dissolve a door the Animator is still animating —
+// so the swing path never calls SetAlpha and never touches transform.position.
+//
+// Dust and camera rumble are shared (house style: generated sprites, Update-driven motes).
 public class Gate : MonoBehaviour
 {
     [Tooltip("Local offset the gate slides by when opening. The importer sets this to (0, -height) so it sinks into the floor.")]
@@ -24,6 +35,10 @@ public class Gate : MonoBehaviour
     private SpriteRenderer[] renderers;
     private float baseHalfHeight = 2f;
 
+    // The Cainos door prefab's own open/close Animator, when the visual is one. Null => slide.
+    private Cainos.PixelArtPlatformer_Dungeon.Door swingDoor;
+    private Collider2D blocker;
+
     // ---- dust motes (procedural, Update-driven) ----
     private class Mote
     {
@@ -39,6 +54,8 @@ public class Gate : MonoBehaviour
     {
         closedPos = transform.position;
         renderers = GetComponentsInChildren<SpriteRenderer>();
+        swingDoor = GetComponentInChildren<Cainos.PixelArtPlatformer_Dungeon.Door>(true);
+        blocker = GetComponent<Collider2D>();
         var box = GetComponent<BoxCollider2D>();
         if (box != null) baseHalfHeight = box.size.y * 0.5f;
         sfxSource = gameObject.AddComponent<AudioSource>();
@@ -51,8 +68,16 @@ public class Gate : MonoBehaviour
         if (startOpen)
         {
             isOpen = true;
-            transform.position = closedPos + (Vector3)openOffset;
-            SetAlpha(0f);
+            if (swingDoor != null)
+            {
+                swingDoor.IsOpened = true;
+                if (blocker != null) blocker.enabled = false;
+            }
+            else
+            {
+                transform.position = closedPos + (Vector3)openOffset;
+                SetAlpha(0f);
+            }
         }
     }
 
@@ -88,7 +113,37 @@ public class Gate : MonoBehaviour
         if (open == isOpen) return;
         isOpen = open;
         if (mover != null) StopCoroutine(mover);
-        mover = StartCoroutine(open ? OpenRoutine() : CloseRoutine());
+        if (swingDoor != null) mover = StartCoroutine(SwingRoutine(open));
+        else mover = StartCoroutine(open ? OpenRoutine() : CloseRoutine());
+    }
+
+    // The pack's AM Door * - Open/Close clips run a hair under half a second.
+    private const float SwingSeconds = 0.45f;
+
+    // A hinged door. The pack's Animator owns the whole movement, so the only thing left to own
+    // is WHEN the way through stops blocking — plus the weight around it.
+    //
+    // ⚠️ Opening drops the collider FIRST and closing restores it LAST, so the passage is never
+    // solid at a moment the door visibly is not. The reverse ordering would let a player be
+    // stopped by an open doorway, or sealed inside a door still swinging shut.
+    private IEnumerator SwingRoutine(bool open)
+    {
+        if (open)
+        {
+            Clunk(0.05f, 0.04f, 2);                       // the latch gives
+            if (blocker != null) blocker.enabled = false;
+            swingDoor.IsOpened = true;
+            yield return new WaitForSeconds(SwingSeconds);
+            Clunk(0.06f, 0.05f, 3);                       // ... and it comes to rest
+        }
+        else
+        {
+            swingDoor.IsOpened = false;
+            yield return new WaitForSeconds(SwingSeconds);
+            if (blocker != null) blocker.enabled = true;
+            Clunk(0.12f, 0.14f, 8);                       // SLAM
+        }
+        mover = null;
     }
 
     // Heavy descent: jerk up, then ratchet down step by step, fading near the end.
