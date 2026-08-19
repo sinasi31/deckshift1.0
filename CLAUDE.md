@@ -1007,6 +1007,47 @@ became a document that had been folded, carried and scribbled on.
 
 ⚠️ **Bulletin proves the strongest available inversion is VALUE, not hue.** Every other screen is a dark plate with light text on it; the quest board is a dark board with **pale paper pinned to it**, so its text ramp is INK (`TextBright` is nearly black) and the bright/dark areas have swapped places. That single structural choice makes it unmistakable at a glance while claiming almost no colour. Its wear is also the only wear in the game that says something about the **world** (other people took contracts here) rather than about the object. **Reach for this before reaching for another hue.**
 
+### `ExitMarker` — chalk on the wall, pointing at the way out (2026-08-20)
+
+**`Assets/Scripts/ExitMarker.cs`.** The generated rooms are ~2.5× the area of the hand-made ones and
+Level Design Law 7 deliberately puts the exit in a different region from the spawn, so the exit is
+usually off screen with nothing saying which way. The designer asked for "an arrow pointing towards it
+so the player knows where the level ends".
+
+**The material is CHALK ON STONE** — a wayfinding mark somebody scratched on the wall. It is drawn
+with `Parchment`'s pen (the same hand that annotates the run map) but with **the ground inverted**:
+Cartograph is dark ink on pale paper, this is pale chalk on dark rock.
+
+⚠️ **That inversion is a VALUE one, not a hue one, and it is why this costs nothing from the nearly
+spent hue budget.** It claims no colour at all — which is also the correct weight for something
+sitting over gameplay permanently, the same reason the relic bar is near-colourless.
+
+⚠️ **NOT RED, even though the map's annotations are.** On paper oxblood reads as *pen*; over gameplay
+red is already **damage** (health bar, damage numbers, hurt flashes), so a red arrow at the screen edge
+reads as "you are being hurt". Same lesson as the card's last-charge warning that could not be red
+because it sat on a red medallion: **pick a status colour against what it will appear on and mean.**
+
+**Two states, and the second is what makes it teach rather than nag:** off screen → an arrow rides the
+inset frame pointing at the door; on screen → the chalk **circles the arch once**, then goes away for
+good. Once you can see the archway there is nothing left to say.
+
+- ⚠️ Bootstraps through **`SceneBootstrap.Register`**, never a bare `RuntimeInitializeOnLoadMethod`.
+- Parented under **`GameplayHUD`**, so it inherits the HUD auto-hide for free.
+- ⚠️ **The on/off-screen test uses `WorldToViewportPoint`, NOT `screenPoint / Screen.width`.**
+  `Screen` reports the Game View *window* rather than the render target for at least a frame after a
+  resolution change — measured **2269×334 while the canvas was correctly 1440×1080** — so dividing by
+  it can be a whole aspect ratio out.
+- **Hysteresis** on that test (0.10 to notice, 0.02 to lose), or it flickers while the player walks
+  along the boundary, which is exactly where they spend their time.
+- The exit is **re-found whenever the cached one dies with its room** — derived, never pushed at it, so
+  a room spawned by any path is picked up with no wiring in `LevelManager`.
+- The one piece of motion is a slow nudge **along the pointing direction**, not a pulse: drift in the
+  direction of travel says "that way", a pulse only says "look at me".
+- Arrow geometry is **fractions of `ArrowLen`**, so resizing keeps the barbs on the head.
+
+Verified by screenshot at 4:3, 16:9 and 21:9. **Still open:** no `GameSettings` toggle — if it should
+be switchable off, that is a row in `SettingsScreen` plus a consumer in `LateUpdate`.
+
 ### Cartograph — the run map, rebuilt on paper (2026-08-14)
 
 ⚠️ **THE MAP TOOK THREE ATTEMPTS AND THE TWO FAILURES ARE THE LESSON.** It was a flat slate panel, then an acid-etched copper plate. Both were given a MATERIAL, both were carefully lit, and the designer rejected both as still reading like a diagram. **A material is not enough.** A map feels like a map because it is a **DOCUMENT** — printed, folded, carried, then scribbled on. Four things carry that, and stripping any one slides it back to a node graph:
@@ -1536,7 +1577,7 @@ They are oversized, so `TileVariantGenerator` correctly refuses them full-cell G
 
 ⚠️ **`Ground Dirt_13 Solid` was the same class of bug and is also gone** — a 0.44 × 0.38 pebble carrying FULL-CELL Grid collision, so the player stood **0.62 units above a pebble**. Every instance sat at the outer edge of a floor run, i.e. exactly the surface you walk onto. This is very likely the designer's "2-3 tiles where the colliders are off and the player seems to float".
 
-### Doors: the gate SLIDES, the exit is an OPEN ARCHWAY (rebuilt 2026-08-19)
+### Doors: the gate's LEAVES OPEN, the exit is an OPEN ARCHWAY (gate rebuilt again 2026-08-20)
 
 The mid-level **gate** was a closed thing wearing the grandest door in the pack, while the **exit** —
 the single most important thing in a room — was a murky sprite from a different art pack you could
@@ -1544,8 +1585,13 @@ barely find on the wall. Both were wrong, and in opposite directions.
 
 | | before | after |
 |---|---|---|
-| **Gate** (`G`) | `Gate 01` sprite, slid into the floor and faded | **unchanged** — `Gate 01` sprite, still slides (a swinging door was tried and reverted, below) |
+| **Gate** (`G`) | `Gate 01` sprite, slid the whole archway into the floor and faded | `Gate 01` art kept, but cut into **arch + two leaves**: the arch stays put and the **doors open** |
 | **ExitDoor** | `main_lev_build_110` (PlatformerSet1), blurry and squashed | **open stone archway**: `Door Frame 01 A` + `Door Wood Inside 01` |
+
+⚠️ **`TX Dungeon Props - Gate 01` IS NOT A PORTCULLIS.** It is a stone archway with a pair of solid
+wooden **double doors** hung inside it, ring handles and all. Every earlier design here treated it as
+a slab and slid it somewhere, which is why it kept looking wrong — you were watching an entire
+masonry arch sink into the ground. **A double door opens.** See "The gate opens like a door" below.
 
 ⚠️ **THE EXIT HAS NO DOOR IN IT, AND THAT IS THE DESIGN.** You walk *through* an exit, so anything
 that reads as "closed" is lying about what it does. `Door Wood Inside 01` is the passage texture that
@@ -1576,56 +1622,99 @@ the gate's original art was never the problem. **Do not "fix" the gate again wit
 about the gate itself.** All 13 gates were restored to byte-identical values (h=3 ⇒ scale 0.623,
 localPosition (-0.010, -1.500)) rather than re-picked by eye.
 
-**`Gate.cs` retains TWO movements and picks between them by looking at its own visual:** a Cainos
-`Door` component among its children ⇒ **swing** (drive `Door.IsOpened`, switch the blocking collider
-off); no `Door` ⇒ the **slide** portcullis. **The slide is the live path today** — nothing in the game
-has a `Door` component on a gate, so the swing branch is dormant. It is kept deliberately: it is
-written, tested, and it is what makes the gate's look a one-constant change
-(`LevelTextImporter.GateSpriteName` → a door prefab path). Verified after the revert: Open sinks the
-gate 22.5 → 19.5 and fades alpha to 0; Close slams it back to 22.5, alpha 1, collider re-enabled.
+⚠️ **THE SWING BRANCH IS GONE.** An older `Gate.cs` carried two movements and chose between them by
+looking for a Cainos `Door` component among its children. The 2026-08-19 rebuild deleted that, and the
+2026-08-20 rebuild replaced the survivor. There is now **one** movement (the leaves opening) and no
+`Door` component anywhere. Earlier versions of this file described the two-branch design as current;
+they were stale.
 
-⚠️ **(Dormant swing path.) The two movements must never be mixed.** A door that swings *and* sinks into the floor reads as a
-bug, and the slide's alpha fade would dissolve a door the Animator is still animating. The swing path
-therefore never calls `SetAlpha` and never touches `transform.position` — verified: the gate's
-position is identical before, during and after a full open/close cycle.
+If a hinged Cainos door prefab is ever tried again, three findings from that attempt still cost a
+session each: size a door by its **combined** renderer bounds, not the leaf (the Frame is the tallest
+piece at 2.41 units); **exclude particle Light Shafts** from that measurement (`Door Iron Fence 01`'s
+glow reaches below the frame and lifts the door ~1 unit off the floor); and the pack's
+`AM Door Wood 01 - Closed` clip keys a sprite *named* `Door Wood Side 01 - 0` — a Cainos naming slip,
+the art is correct, **do not chase it.**
 
-⚠️ **(Dormant swing path.) Opening drops the collider FIRST; closing restores it LAST.** The passage must never be solid at a
-moment the door visibly is not. The reverse ordering lets a player be stopped by an open doorway, or
-sealed inside a door still swinging shut. Verified across a hammered Open/Close/Open/Close with no
-frames in between: it settles collider-on, closed, and un-moved.
+#### The gate opens like a door (rebuilt 2026-08-20)
 
-⚠️ **`SwingSeconds` is 0.45 because the clips MEASURE 0.433s** (`AM Door Wood 01 - Open` / `- Close`,
-read off the controller). It is deliberately a hair longer, so the collider returns after the door has
-finished shutting rather than during.
+The designer reported that the gate "goes under the floor after it is opened, which makes it so the
+barricade is still below — does not make sense", and asked for it to be **completely gone** when the
+lever or altar fires. Two separate faults, and the second was never documented before:
 
-⚠️ **(Only if the swing path is re-enabled.) Size a door by its COMBINED renderer bounds, never by the door leaf.** The Cainos door is four
-pieces (Door / Frame / Inside / Shadow) and the **Frame** is the tallest at 2.41 units; sizing off the
-1.16×2.06 leaf leaves the arch standing proud of the opening. `LevelTextImporter.FitDoorToOpening`
-measures, scales, **re-measures**, then centres the art on the collider.
+⚠️ **1. IT SANK THE MASONRY.** The art is an arch with double doors in it (above). Now the arch stays
+bolted in the wall and the two **leaves** open, each narrowing toward its own hinge — which is exactly
+how this pack draws its own doors: `Door Wood 01` runs **37px wide down to 11px at a constant height**.
 
-⚠️ **(Only if the swing path is re-enabled.) Exclude particle Light Shafts from that measurement.** Some door variants (`Door Iron Fence 01`)
-carry a glow reaching far below the frame; including it shrinks the door *and* lifts it off the floor
-— measured ~1 unit of float. Only `SpriteRenderer`s with a non-null sprite count.
+⚠️ **2. THE COLLIDER NEVER MOVED — this was the actual bug.** Nothing in the old file ever touched the
+`BoxCollider2D`. Opening only translated the transform, so the solid box travelled with it and came to
+rest *below the floor*. Measured in GenLevel8: closed it spans y 21→24, open y 18→21, while the floor
+tile is only y 20→21 thick. **That left an invisible 1×2 wall standing in playable space under the
+floor, in every room with a gate.** The collider is now disabled on open.
 
-⚠️ **(Only if the swing path is re-enabled.) Scale is CLAMPED at 2×.** A door is ~2.41 tall natively and `G` runs reach 5. Past ~2× pixel art
-stops reading as the thing it depicts. Happily **2× is an integer scale and looks crisper than the
-1.247× a 3-tall run needs** — so the tall gates are the good-looking ones. Author barriers above 5
-tall as two gates rather than raising the clamp.
+⚠️ **Opening drops the collider FIRST; closing restores it LAST.** The passage must never be solid at a
+moment the doors visibly are not. The reverse ordering lets a player be stopped by an open doorway, or
+sealed inside a door still swinging shut.
 
-⚠️ **The pack's `AM Door Wood 01 - Closed` clip keys a sprite named `Door Wood Side 01 - 0`.** That
-looks like a Cainos authoring slip and it is NOT one to "fix" — the art is the correct front-facing
-closed door (39×68 against the 37×66 the prefab shows at edit time, an imperceptible difference) and
-it renders correctly, screenshot-verified. Only the NAME is wrong. Chasing it will waste a session.
+**The art is cut by `Editor/GateArtBaker` (Deckshift → Bake Gate Art)** into four pieces —
+`gate01_arch` (masonry with the opening punched out), `gate01_passage` (the dark beyond),
+`gate01_leafL` / `gate01_leafR` (pivoted on their hinges) — plus a **`GateArt` asset carrying the
+placement offsets**, all in `Assets/Resources/GateArt/`.
 
-If the gate's look is ever revisited, `Door Iron Fence 01` (a barred portcullis) was built and
-compared and is the strongest alternative — a gate is a thing you cannot pass, so bars are honest
-there, and it is the only candidate you can see through, which shows the player what they cannot
-reach yet. Its cost is a bright cyan sky panel, a new hue in an almost-spent palette.
+⚠️ **The offsets are baked BESIDE the sprites, never hardcoded in `Gate.cs`.** The leaves are cropped
+to their own bounds so they can pivot on their hinges, so their placement depends on where the cut
+landed — which the baker decides by reading the artwork. Hardcoding it fails silently as a door
+hanging a few pixels out of its frame the next time the art is re-cut.
 
-#### The gate's movement, rebuilt from scratch (2026-08-19)
+⚠️ **`Gate.cs` re-dresses the importer's single sprite AT RUNTIME**, so **no room prefab needed
+re-importing.** That is deliberate: GenLevel7/8/9 carry hand edits a re-import would destroy, and a
+re-import also renumbers every fileID out of `LevelManager.roomPrefabs`.
+
+⚠️ **The opening is found by walking inward from the silhouette through the masonry until it hits
+wood** (warm red-vs-blue), with a run threshold — the stone carries warm *highlights*, so a single
+warm pixel means nothing. Two traps: a "longest wood run" test breaks on the iron bands crossing the
+doors, and the arch's **keystone is warm-toned stone**, so without a vertical-contiguity filter the
+baker punches a hole through the crown and hands the leaves a slice of masonry.
+
+**The sequence is BOLT → STILL → STRAIN → SWING → STOP**, keeping the old gate's best idea: a beat of
+**complete stillness** before it gives. Weight is communicated by the pause before a thing moves.
+⚠️ **Closing is deliberately NOT a mirror** — it accelerates the whole way into a single slam as the
+leaves meet. Opening ends softly at the jambs, closing ends loudly in the middle, so the two are
+distinguishable with your eyes shut.
+
+⚠️ **The layer stack goes UP from the sprite's original sorting order, never down.** The Ground tilemap
+draws at Default order 1 and the gate art is wider than the 1-tile gap it stands in, so in a room where
+geometry flanks the opening a passage at order 0 is swallowed by the floor tiles either side.
+
+⚠️ **A gate may carry MORE THAN ONE visual.** GenLevel9 shipped with two identical `Visual` children
+stacked exactly (same sprite, position, scale, order) — the same duplicate-prop shape as the nested
+`ExitDoor`. Only the first is re-dressed, so the survivor draws a **closed** gate over the open one and
+the lever looks broken. The prefab is fixed and `Gate.cs` now disables and warns about any future
+duplicate rather than failing silently.
+
+⚠️ **The shudder must anchor to a position cached ONCE, not read the live transform.**
+`StopCoroutine` can cut it off mid-jitter, so each interruption adopted the leftover offset as its new
+rest pose: measured **0.002 units of permanent drift per interruption**, accumulating silently.
+
+Two calibration values, both measured on screen rather than computed (linear colour space, and world
+sprites render through the scene's 0.5-intensity global `Light2D`): the **passage** started at
+0.085/0.045 and read as a pure black hole, and the **leaf shading** at 0.52 fell to roughly the value
+of that passage so the doors stopped reading as wood. Now 0.24/0.12 and 0.74.
+
+If the gate's look is ever revisited, `Door Iron Fence 01` (a barred portcullis) was built and compared
+and is the strongest alternative — bars are honest for a thing you cannot pass, and it is the only
+candidate you can see through. Its cost is a bright cyan sky panel, a new hue in an almost-spent
+palette.
+
+#### The gate's movement, rebuilt from scratch (2026-08-19) — SUPERSEDED, kept for its lessons
+
+⚠️ **The gate no longer slides, so THE `SpriteMask` MACHINERY BELOW IS GONE** — there is no mask, no
+slot, and no alpha fade in `Gate.cs` any more. Read this section for *why* those choices were made,
+not as a description of the code. What still holds and is still live: the silence diagnosis, the
+one-row-of-floor measurement (it is why sinking could never work), "a constant rate reads as a lift",
+and the `CameraShake.Shake(INTENSITY, DURATION)` argument order.
 
 The designer called the old animation "really lackluster and quite honestly bad". Diagnosed rather
-than guessed at, it had **three** separate faults, and each fix is worth keeping:
+than guessed at, it had **three** separate faults:
 
 ⚠️ **1. IT WAS SILENT. All 13 gates had `moveSound` unassigned**, so a three-tonne slab dropped into
 the floor and made no noise at all. That was most of the problem, and no amount of motion tuning
@@ -1706,6 +1795,31 @@ horizontally. Root scale is now `(1,1,1)` with the collider expressed directly i
 (2.00 × 3.37, unchanged), and the art sized so its **drawn height is identical to the old door's
 3.18** — which is what let all 38 rooms keep their placement with nothing to reposition. Verified in
 GenLevel8: the frame bottom still lands at exactly y = 37.00.
+
+#### ⚠️ That root-scale change left TWO numbers behind, and both shipped (fixed 2026-08-20)
+
+Reported as "the door prefab is kind of bugged … they are much bigger than they used to be, and the
+prompt is much smaller". Both are the same leftover: two values had been tuned to cancel out the old
+(5.92, 7.75, 3.59) root scale, and neither was reset when the root went back to (1,1,1).
+
+- ⚠️ **`InteractPrompt.size` was `0.155` world units** — against **0.7** on ScrapForge/Blompo and 0.5
+  on the Lever. The keycap rendered at **9% of the player's height**. It only ever looked right in the
+  hub, because the leftover scale below happened to multiply it back up. Now **0.7**, and lifted to
+  `y + 2.10` so it clears the 3.18-tall arch.
+- ⚠️ **`hub.prefab`'s ExitDoor instance still carried scale (3.879, 5.009, 2.318).** Applied to the new
+  archway art that made the hub's door **9.77 × 15.93** where every other room's is 2.52 × 3.18 —
+  **9.5× the player's height instead of 1.9×**, with a 7.76 × 16.88 trigger. The hub is the first room
+  of every run, so this was the door the player saw most.
+
+**Reverted, not reassigned** (`PrefabUtility.RevertPropertyOverride`), so the instance tracks the
+source prefab again — reassigning creates a PINNED override that silently stops following the prefab.
+Position IS legitimately per-room, so that one is assigned: the hub floor measures **y = 10.651** by
+raycast and the art sits 1.59 above its root, giving **12.241**.
+
+⚠️ **Measure the hub floor by RAYCAST, not from the tilemap cells.** The hand-made rooms use *sprite*
+collision, so the cell boundary is not the surface — the cells at x=40 suggest y=12, the real surface
+is 10.651. And cast from *below* the mid-level platforms: a ray from y=34 hits a ledge at 28.651 and
+never reaches the floor.
 
 ⚠️ **WORKFLOW TRAP, cost several wrong screenshots: a scratch scene can end up with TWO room
 instances.** `GameObject.Find("ROOM")` returns only the first, so hiding "the" exit door hid one and

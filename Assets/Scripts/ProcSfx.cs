@@ -675,17 +675,22 @@ public static class ProcSfx
     }
 
     // =============================================================================================
-    // GATE — a stone slab running in an iron-shod channel.
+    // GATE — heavy banded doors hung in a stone arch.
     //
     // A FIFTH family, and deliberately the only one built from TWO materials at once. Every family
     // above commits to one (magic = harmonic bell partials, metal = inharmonic bar modes, stone =
-    // noise + sub, paper = no pitched component at all, UI = pitch motion). A portcullis is iron
-    // running in a stone slot, so these layer bar modes OVER grit — which is what stops a ratchet
-    // reading as a scrap pickup and the seat reading as a Meteor Greaves landing.
+    // noise + sub, paper = no pitched component at all, UI = pitch motion). A barred door in a stone
+    // opening is iron working against masonry, so these layer bar modes OVER grit — which is what
+    // stops a hinge creak reading as a scrap pickup and the stop reading as a Meteor Greaves landing.
     //
-    // FOUR clips, because a gate opening is a SEQUENCE and not a hit: it strains, the catch lets go,
-    // it ratchets down, it seats. The old gate played nothing at all, and that silence was most of
-    // why a three-tonne slab dropping into the floor felt like nothing was happening.
+    // FOUR clips, because a gate opening is a SEQUENCE and not a hit. The old gate played nothing at
+    // all, and that silence was most of why it felt like nothing was happening.
+    //
+    // ⚠️ These were written for a PORTCULLIS (strain → catch → ratchet down → seat) and are now
+    // sequenced by Gate.cs as a DOUBLE DOOR (bolt → strain → swing → stop, and a slam on the way
+    // back). The clips still fit — the materials did not change, only the choreography — so the
+    // names below describe the sound rather than the beat it happens to serve. Do not assume
+    // "Ratchet" means the gate ratchets; it is the dry repeatable tick, used as a hinge creak.
 
     private static AudioClip gateGroan, gateRelease, gateRatchet, gateSeat;
 
