@@ -2,55 +2,63 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-// A stone slab that sinks into a slot in the floor. Driven by Lever/ShiftAltar via
+// A pair of heavy wooden doors hung in a stone archway. Driven by Lever/ShiftAltar via
 // Open()/Close()/Toggle(); the level importer wires those automatically ('G' marker).
 //
-// REBUILT FROM SCRATCH 2026-08-19. The old version was a uniform five-step descent that faded the
-// gate out as it went, with no sound at all. Three things were wrong with it, and the fixes are the
-// whole design of this file:
+// REBUILT 2026-08-20. The previous version slid the whole thing DOWN into the floor and left it
+// there. Two things were wrong with that, and the second one is the real bug:
 //
-//  1. IT WAS SILENT. All 13 gates in the project had `moveSound` unassigned, so a three-tonne slab
-//     dropped into the floor and made no noise whatsoever. That was most of why it felt like
-//     nothing was happening. There are now four procedural clips (ProcSfx.Gate*) covering the four
-//     beats of the movement.
+//  1. IT SANK THE MASONRY. "TX Dungeon Props - Gate 01" is not a portcullis - it is a stone arch
+//     with a pair of solid wooden double doors hung inside it, ring handles and all. Sliding the
+//     entire archway into the ground is not something masonry does, which is exactly why the
+//     designer reported that it "does not make sense". A double door opens. So now the arch stays
+//     bolted in the wall and the two LEAVES open, each narrowing toward its own hinge - which is
+//     how this art pack draws its own door animations ("Door Wood 01" runs 37px wide down to 11px
+//     at a constant height). The pieces are cut by Editor/GateArtBaker.
 //
-//  2. IT FADED OUT. A stone slab does not become transparent. It faded because the sprite draws
-//     ABOVE the ground tilemap, so without the fade you would watch it slide down over the floor.
-//     It is now CLIPPED by a SpriteMask at the floor line instead, and stays fully opaque — it
-//     genuinely disappears into the floor. See BuildSlotMask.
+//  2. THE COLLIDER NEVER MOVED. Nothing in the old file ever touched the BoxCollider2D - opening
+//     just translated the transform, so the solid box travelled with it and came to rest in the
+//     open space BELOW the floor. Measured in GenLevel8: closed it spans y 21->24, open y 18->21,
+//     while the floor tile is only y 20->21 thick. That left an invisible 1x2 wall standing in
+//     playable space under the floor, in every room with a gate. The gate is now genuinely GONE
+//     when open: the collider is disabled, so the doorway is clear and nothing lingers anywhere.
 //
-//  3. IT MOVED AT A CONSTANT RATE. Five equal steps at equal spacing reads as a lift, not as a
-//     falling weight. The descent now ACCELERATES (k*k, which is what gravity actually does) and
-//     the ratchet catches are spaced by DISTANCE, so they arrive faster and faster as it picks up
-//     speed. That acceleration is the single thing that makes it read as heavy.
+// ORDERING RULE (inherited from the project's earlier swing work, and it still holds): opening
+// drops the collider FIRST, closing restores it LAST. The passage must never be solid at a moment
+// the doors visibly are not. The reverse ordering lets a player be stopped by an open doorway, or
+// sealed inside a door still swinging shut.
 //
-// The sequence is STRAIN -> CATCH -> DROP -> SEAT, and the CATCH (a beat of complete stillness
-// before it gives) is doing more work than any other part. Weight is communicated by the pause
-// before the movement, not by the movement.
+// The old sequence's best idea is kept: a beat of COMPLETE STILLNESS before the movement. Weight is
+// communicated by the pause before a thing gives, not by the travel itself.
 public class Gate : MonoBehaviour
 {
-    [Tooltip("Local offset the gate slides by when opening. The importer sets this to (0, -height) so it sinks into the floor.")]
-    public Vector2 openOffset = new Vector2(0f, -4f);
-
     [SerializeField] private bool startOpen = false;
-    [Tooltip("Ratchet catches over the full travel. They are spaced by DISTANCE, so a taller gate gets more of them.")]
-    [SerializeField] private float catchSpacing = 0.42f;
     [SerializeField, Range(0f, 2f)] private float volume = 1f;
 
-    // --- movement shape (seconds / world units) ---
-    private const float StrainRise = 0.16f;   // how far it presses UP against the catch first
-    private const float StrainTime = 0.26f;
-    private const float CatchHold  = 0.11f;   // the beat of stillness. do not remove.
-    private const float DropTime   = 0.72f;
-    private const float HeaveTime  = 1.05f;   // closing is SLOWER: it is being winched against gravity
-    private const float Overshoot  = 0.13f;
+    // --- movement shape (seconds) ---
+    private const float BoltTime = 0.26f;   // the bar drawing back; nothing has moved yet
+    private const float StillHold = 0.10f;  // the beat. do not remove.
+    private const float StrainTime = 0.30f; // they crack open, grudgingly
+    private const float SwingTime = 0.62f;
+    private const float ShutTime = 0.70f;   // closing accelerates into the slam
+    private const float CrackOpen = 0.13f;  // how far "cracked open" is, in openness units
 
-    private Vector3 closedPos;
+    // A door turned edge-on still shows its thickness, so the leaves never reach zero width. Going
+    // to 0 would make them vanish, which reads as the doors being deleted rather than opened.
+    private const float LeafOpenScale = 0.07f;
+
+    private BoxCollider2D solid;
     private bool isOpen;
     private Coroutine mover;
     private AudioSource sfxSource;
-    private float baseHalfHeight = 2f;
-    private SpriteMask slotMask;
+
+    private GateArt art;
+    private Transform visual;          // the importer's "Visual" child; carries the fit scale
+    private SpriteRenderer archSr, passageSr, leafLSr, leafRSr;
+    private Transform leafL, leafR;
+    private float visScale = 1f;
+    // Captured ONCE. The shudder must never read the live position as its rest pose - see Shudder.
+    private Vector3 visualHome;
 
     // ---- dust motes (procedural, Update-driven) ----
     private class Mote
@@ -65,15 +73,13 @@ public class Gate : MonoBehaviour
 
     void Awake()
     {
-        closedPos = transform.position;
-        var box = GetComponent<BoxCollider2D>();
-        if (box != null) baseHalfHeight = box.size.y * 0.5f;
+        solid = GetComponent<BoxCollider2D>();
 
         sfxSource = gameObject.AddComponent<AudioSource>();
         sfxSource.playOnAwake = false;
         sfxSource.spatialBlend = 0f;
 
-        BuildSlotMask();
+        BuildVisual();
     }
 
     void Start()
@@ -81,39 +87,117 @@ public class Gate : MonoBehaviour
         if (startOpen)
         {
             isOpen = true;
-            transform.position = closedPos + (Vector3)openOffset;
-            // No SetAlpha here any more: below the floor line the mask clips it away completely.
+            SetLeaves(1f);
+            if (solid != null) solid.enabled = false;
         }
     }
 
-    // The floor line the slab vanishes at. Everything ABOVE it is inside the mask and visible;
-    // everything below is outside it and simply is not drawn.
+    // Re-dress the importer's single-sprite gate into arch + passage + two leaves.
     //
-    // ⚠️ The mask is a SIBLING, not a child. It is the SLOT — it belongs to the floor and must not
-    // travel with the gate. Parenting it to our own parent also means the room owning it destroys
-    // it, so it cannot outlive the room (the class of bug LevelManager.ClearRuntimeSpawns exists for).
-    //
-    // ⚠️ It is only as WIDE as the gate, deliberately. Sprite masks ACCUMULATE: a renderer is drawn
-    // wherever ANY mask covers it, so a screen-wide mask on one gate would un-hide a second gate
-    // sunk into its own slot elsewhere. Measured across the project, the closest two gates in any
-    // room are 8 units apart, so a ~3.5-wide local mask can never reach a neighbour.
-    private void BuildSlotMask()
+    // Done at RUNTIME, from whatever the room prefab already has, rather than by changing the
+    // importer and re-importing the rooms. GenLevel7/8/9 carry hand edits that a re-import would
+    // destroy, and re-importing also renumbers every fileID, which drops them out of
+    // LevelManager.roomPrefabs (see CLAUDE.md). Touching only the component is free.
+    private void BuildVisual()
     {
-        var vis = GetComponentInChildren<SpriteRenderer>(true);
-        if (vis == null) return;
+        visual = transform.Find("Visual");
+        if (visual == null)
+        {
+            var anySr = GetComponentInChildren<SpriteRenderer>(true);
+            if (anySr != null) visual = anySr.transform;
+        }
+        if (visual == null) return;
 
-        float floorY = closedPos.y - baseHalfHeight;
-        float w = vis.bounds.size.x + 1.2f;
-        float h = baseHalfHeight * 2f + 2f;
+        archSr = visual.GetComponent<SpriteRenderer>();
+        if (archSr == null) return;
+        visScale = visual.localScale.x;
+        visualHome = visual.localPosition;
 
-        var go = new GameObject(name + " SlotMask");
-        go.transform.SetParent(transform.parent, true);
-        go.transform.position = new Vector3(closedPos.x, floorY + h * 0.5f, closedPos.z);
-        go.transform.localScale = new Vector3(w, h, 1f);
+        // ⚠️ A gate may carry MORE THAN ONE visual. GenLevel9 shipped with two identical "Visual"
+        // children stacked exactly on top of each other (same sprite, position, scale and sorting
+        // order) - the same duplicate-prop shape as the nested ExitDoor found in the room prefabs.
+        // Only the first gets re-dressed, so the survivor would go on drawing a CLOSED gate over
+        // the open one forever, and the room would look like the lever did nothing. The prefab is
+        // fixed, but this guard is what stops it being a silent failure the next time.
+        for (int i = 0; i < transform.childCount; i++)
+        {
+            var c = transform.GetChild(i);
+            if (c == visual) continue;
+            var stray = c.GetComponent<SpriteRenderer>();
+            if (stray == null) continue;
+            stray.enabled = false;
+            Debug.LogWarning("Gate '" + name + "': disabled a duplicate visual child '" + c.name +
+                             "'. Remove it from the room prefab - it was drawing a closed gate over the open one.");
+        }
 
-        slotMask = go.AddComponent<SpriteMask>();
-        slotMask.sprite = GetSquareSprite();
-        vis.maskInteraction = SpriteMaskInteraction.VisibleInsideMask;
+        art = Resources.Load<GateArt>("GateArt/gate01");
+        // Graceful degradation: with no baked art the gate keeps its original single sprite and
+        // still opens - it just does it by vanishing. A missing Resources folder must never leave
+        // a room unfinishable, which is what a permanently shut gate would do.
+        if (art == null || art.arch == null || art.leafL == null || art.leafR == null)
+        {
+            Debug.LogWarning("Gate: Resources/GateArt/gate01 missing - falling back to hide-on-open. " +
+                             "Run Deckshift -> Bake Gate Art.");
+            art = null;
+            return;
+        }
+
+        int baseOrder = archSr.sortingOrder;
+        archSr.sprite = art.arch;
+
+        // Back to front: passage, then the leaves over it, then the arch over everything.
+        //
+        // The stack goes UP from the sprite's original order, never down. The Ground tilemap draws
+        // at Default order 1 and the gate art is wider than the 1-tile gap it stands in, so in a
+        // room where geometry flanks the opening a passage at order 0 would be swallowed by the
+        // floor tiles either side. Going upward can only ever put these in front of things the
+        // single sprite was already in front of.
+        //
+        // Ordering among the three only has to get leaves-over-passage right: the pieces are
+        // complementary cuts of one image, so the arch never overlaps a leaf, even at full open
+        // (a leaf shrinks toward its jamb and so stays inside the opening).
+        passageSr = MakeLayer("Passage", art.passage, Vector2.zero, baseOrder, 0.02f);
+        leafLSr = MakeLayer("LeafL", art.leafL, art.leafLOffset, baseOrder + 1, 0.01f);
+        leafRSr = MakeLayer("LeafR", art.leafR, art.leafROffset, baseOrder + 1, 0.01f);
+        archSr.sortingOrder = baseOrder + 2;
+        leafL = leafLSr.transform;
+        leafR = leafRSr.transform;
+
+        SetLeaves(0f);
+    }
+
+    private SpriteRenderer MakeLayer(string layerName, Sprite sprite, Vector2 offset, int order, float z)
+    {
+        var go = new GameObject(layerName);
+        go.transform.SetParent(visual, false);
+        go.transform.localPosition = new Vector3(offset.x, offset.y, z);
+        go.transform.localScale = Vector3.one;
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite = sprite;
+        sr.sortingLayerID = archSr.sortingLayerID;
+        sr.sortingOrder = order;
+        return sr;
+    }
+
+    // openness: 0 = shut, 1 = fully open.
+    private void SetLeaves(float openness)
+    {
+        if (art == null || leafL == null) return;
+        float s = Mathf.Lerp(1f, LeafOpenScale, openness);
+        leafL.localScale = new Vector3(s, 1f, 1f);
+        leafR.localScale = new Vector3(s, 1f, 1f);
+
+        // A leaf turning away from the room catches less light. Without this the doors read as
+        // being squashed flat rather than as swinging, because a pure X-scale carries no depth cue.
+        //
+        // Kept deliberately shallow. A first pass went to 0.52 and, measured on a half-open frame
+        // in game, the leaves fell to roughly the value of the dark passage behind them - the doors
+        // stopped reading as wood and the whole opening became one dark smear. The scene's
+        // 0.5-intensity global Light2D already halves this, so the tint only has to hint.
+        float shade = Mathf.Lerp(1f, 0.74f, openness);
+        var tint = new Color(shade, shade, shade, 1f);
+        if (leafLSr != null) leafLSr.color = tint;
+        if (leafRSr != null) leafRSr.color = tint;
     }
 
     void Update()
@@ -147,139 +231,197 @@ public class Gate : MonoBehaviour
         if (open == isOpen) return;
         isOpen = open;
         if (mover != null) StopCoroutine(mover);
+        // Interrupting can cut Shudder off mid-jitter, so put the art back on its mark before the
+        // new sequence starts rather than trusting the killed routine to have cleaned up.
+        if (visual != null) visual.localPosition = visualHome;
         mover = StartCoroutine(open ? OpenRoutine() : CloseRoutine());
     }
 
-    // STRAIN -> CATCH -> DROP -> SEAT.
+    // BOLT -> STILL -> STRAIN -> SWING -> STOP.
     private IEnumerator OpenRoutine()
     {
-        Vector3 open = closedPos + (Vector3)openOffset;
+        // Collider FIRST (see the ordering rule at the top of this file). This is also the whole
+        // fix for the old "the barricade is still there" bug: from here on nothing about this gate
+        // is solid, no matter where its art happens to be mid-animation.
+        if (solid != null) solid.enabled = false;
 
-        // STRAIN — the mechanism takes the weight and the slab presses up against its catch.
-        // Deliberately audible before it is visible: the groan swells with no attack.
-        Play(ProcSfx.GateGroan, 0.85f);
-        yield return MoveOver(transform.position, closedPos + Vector3.up * StrainRise, StrainTime, true);
+        if (art == null) { yield return FallbackOpen(); yield break; }
 
-        // CATCH — complete stillness. This is the beat that sells the weight; without it the drop
-        // reads as a lift going down rather than as something being let go.
-        yield return new WaitForSeconds(CatchHold);
-
+        // BOLT - the bar draws back. The one sharp event in the sequence, so nothing competes.
         Play(ProcSfx.GateRelease, 1f);
-        Shake(0.13f, 0.20f);
-        SpawnDust(SlotPoint(), 5);
+        Shake(0.10f, 0.18f);
+        SpawnDust(SeamPoint(), 4);
+        yield return Shudder(BoltTime);
 
-        // DROP — accelerating (k*k is free fall), with pawl catches spaced by DISTANCE so they
-        // arrive faster and faster. Nothing about this loop is uniform, and that is the point.
-        Vector3 from = transform.position;
-        float travel = Mathf.Abs(from.y - open.y);
-        int catches = Mathf.Max(3, Mathf.RoundToInt(travel / Mathf.Max(0.05f, catchSpacing)));
-        int fired = 0;
-        float t = 0f;
+        // STILL - complete stillness before it gives. The old gate's best beat, kept.
+        yield return new WaitForSeconds(StillHold);
 
-        while (t < DropTime)
-        {
-            t += Time.deltaTime;
-            float k = Mathf.Clamp01(t / DropTime);
-            float eased = k * k;                       // gravity
-            transform.position = Vector3.Lerp(from, open, eased);
+        // STRAIN - they crack open, slowly, against their own weight. Ease IN: barely moving at
+        // first is what makes them feel heavy.
+        Play(ProcSfx.GateGroan, 0.85f, 0.92f);
+        yield return Sweep(0f, CrackOpen, StrainTime, Ease.In);
+        SpawnDust(SeamPoint(), 3);
 
-            EmitSlotDust(eased);
+        // SWING - smoothstep, so they gather speed and then lose it into the stops rather than
+        // travelling at a constant rate (which is what made the old movement read as a lift).
+        Play(ProcSfx.GateGroan, 1f, 0.74f);
+        yield return Sweep(CrackOpen, 1f, SwingTime, Ease.Smooth, true);
 
-            int shouldHave = Mathf.FloorToInt(eased * catches);
-            while (fired < shouldHave && fired < catches)
-            {
-                fired++;
-                // pitch rises as it speeds up — the pawl skipping faster over the rack
-                Play(ProcSfx.GateRatchet, 0.55f, 0.92f + 0.30f * eased);
-                Shake(0.05f + 0.04f * eased, 0.09f);
-                SpawnDust(SlotPoint(), 2);
-            }
-            yield return null;
-        }
-
-        transform.position = open;
-
-        // SEAT — the floor takes it.
-        Play(ProcSfx.GateSeat, 1f);
-        Shake(0.34f, 0.60f);   // a tonne of rock landing: on par with the Moss Knight slam
-        SpawnDust(SlotPoint(), 14);
+        // STOP - the leaves reach the jambs.
+        SetLeaves(1f);
+        Play(ProcSfx.GateSeat, 1f, 1.04f);
+        Shake(0.26f, 0.45f);
+        SpawnDust(JambPoint(-1f), 7);
+        SpawnDust(JambPoint(1f), 7);
         mover = null;
     }
 
-    // Closing is the inverse and is deliberately SLOWER and DECELERATING: the slab is being winched
-    // up against its own weight, so it loses speed as it rises instead of gaining it.
+    // The inverse, and deliberately NOT a mirror image: closing accelerates the whole way and ends
+    // in a single hard slam as the two leaves meet. Opening ends softly against the jambs; closing
+    // ends loudly in the middle. That is what lets the two be told apart with your eyes shut.
     private IEnumerator CloseRoutine()
     {
-        Vector3 from = transform.position;
-        Vector3 top = closedPos + Vector3.up * Overshoot;
+        if (art == null) { yield return FallbackClose(); yield break; }
 
-        Play(ProcSfx.GateGroan, 0.7f, 0.88f);
+        Play(ProcSfx.GateGroan, 0.8f, 1.06f);
+        yield return Sweep(CurrentOpenness(), 0f, ShutTime, Ease.In, true);
 
-        float travel = Mathf.Abs(from.y - top.y);
-        int catches = Mathf.Max(3, Mathf.RoundToInt(travel / Mathf.Max(0.05f, catchSpacing)));
-        int fired = 0;
-        float t = 0f;
+        // SLAM.
+        SetLeaves(0f);
+        Play(ProcSfx.GateSeat, 1f, 0.94f);
+        Shake(0.30f, 0.50f);
+        SpawnDust(SeamPoint(), 12);
 
-        while (t < HeaveTime)
-        {
-            t += Time.deltaTime;
-            float k = Mathf.Clamp01(t / HeaveTime);
-            float eased = 1f - (1f - k) * (1f - k);    // ease OUT — running out of strength
-            transform.position = Vector3.Lerp(from, top, eased);
+        // The bar dropping home after the leaves have met - the sound that says it is shut, not
+        // merely closed. Quieter and higher than the bolt that drew it back.
+        yield return new WaitForSeconds(0.14f);
+        Play(ProcSfx.GateRelease, 0.55f, 1.18f);
 
-            EmitSlotDust(1f - eased);
-
-            int shouldHave = Mathf.FloorToInt(eased * catches);
-            while (fired < shouldHave && fired < catches)
-            {
-                fired++;
-                // pitch FALLS as it slows: the exact inverse of the drop, so the two are told apart
-                // with the eyes shut.
-                Play(ProcSfx.GateRatchet, 0.5f, 1.18f - 0.28f * eased);
-                Shake(0.045f, 0.08f);
-                yield return new WaitForSeconds(0.02f);   // the winch pausing between pulls
-            }
-            yield return null;
-        }
-
-        // settle back down off the overshoot and seat hard.
-        yield return MoveOver(top, closedPos, 0.09f, false);
-        Play(ProcSfx.GateSeat, 0.9f, 1.06f);
-        Shake(0.28f, 0.45f);
-        SpawnDust(SlotPoint(), 10);
+        // Collider LAST.
+        if (solid != null) solid.enabled = true;
         mover = null;
     }
 
-    private IEnumerator MoveOver(Vector3 a, Vector3 b, float dur, bool easeOut)
+    private enum Ease { In, Out, Smooth }
+
+    // Drive openness from a to b, optionally creaking as it goes.
+    private IEnumerator Sweep(float a, float b, float dur, Ease ease, bool creak = false)
     {
+        float t = 0f;
+        int creaks = 0;
+        while (t < dur)
+        {
+            t += Time.deltaTime;
+            float x = Mathf.Clamp01(t / dur);
+            float k = ease == Ease.In ? x * x
+                    : ease == Ease.Out ? 1f - (1f - x) * (1f - x)
+                    : x * x * (3f - 2f * x);
+            float openness = Mathf.Lerp(a, b, k);
+            SetLeaves(openness);
+
+            if (creak)
+            {
+                EmitHingeDust(openness);
+                // three hinge creaks across the travel, spaced by DISTANCE rather than by time, so
+                // they crowd together while the doors are moving fastest.
+                int want = Mathf.FloorToInt(k * 3f);
+                while (creaks < want)
+                {
+                    creaks++;
+                    Play(ProcSfx.GateRatchet, 0.4f, 0.80f + 0.22f * k);
+                }
+            }
+            yield return null;
+        }
+        SetLeaves(b);
+    }
+
+    // Back out the current openness from the leaf scale, so an interrupted open closes from
+    // wherever it actually got to rather than snapping wide first.
+    private float CurrentOpenness()
+    {
+        if (leafL == null) return isOpen ? 0f : 1f;
+        float s = leafL.localScale.x;
+        return Mathf.Clamp01(Mathf.InverseLerp(1f, LeafOpenScale, s));
+    }
+
+    // The doors straining against the bar before anything opens: a sub-pixel rattle, not a move.
+    //
+    // ⚠️ The rest pose is the value cached at build time, NOT the position when the rattle starts.
+    // Set() kills a running routine with StopCoroutine, which can cut this off mid-jitter and skip
+    // the restore below - so a shudder that read the LIVE position would adopt the leftover jitter
+    // as its new home and drift a little further every time. Measured on a hammered
+    // Open/Close/Open/Close: 0.002 units of permanent drift per interruption, silently accumulating
+    // for as long as the room is loaded.
+    private IEnumerator Shudder(float dur)
+    {
+        if (visual == null) { yield return new WaitForSeconds(dur); yield break; }
         float t = 0f;
         while (t < dur)
         {
             t += Time.deltaTime;
-            float k = Mathf.Clamp01(t / dur);
-            if (easeOut) k = 1f - (1f - k) * (1f - k);
-            transform.position = Vector3.Lerp(a, b, k);
+            float fall = 1f - Mathf.Clamp01(t / dur);
+            float jitter = Random.Range(-0.022f, 0.022f) * fall;
+            visual.localPosition = visualHome + new Vector3(jitter, 0f, 0f);
             yield return null;
         }
-        transform.position = b;
+        visual.localPosition = visualHome;
     }
 
-    // Where the slab meets the floor — the mouth of the slot, and the only place debris makes sense.
-    private Vector3 SlotPoint()
+    // ---- fallbacks, used only if the baked art is missing ----
+    private IEnumerator FallbackOpen()
     {
-        return new Vector3(closedPos.x, closedPos.y - baseHalfHeight, 0f);
+        float t = 0f;
+        while (t < 0.4f) { t += Time.deltaTime; SetAlpha(1f - t / 0.4f); yield return null; }
+        SetAlpha(0f);
+        mover = null;
     }
 
-    // A trickle of grit thrown out of the slot the whole time it is moving, densest where it is
+    private IEnumerator FallbackClose()
+    {
+        float t = 0f;
+        while (t < 0.4f) { t += Time.deltaTime; SetAlpha(t / 0.4f); yield return null; }
+        SetAlpha(1f);
+        if (solid != null) solid.enabled = true;
+        mover = null;
+    }
+
+    private void SetAlpha(float a)
+    {
+        if (archSr == null) return;
+        var c = archSr.color; c.a = a; archSr.color = c;
+    }
+
+    // ---- points of interest, in world space, derived from the baked geometry ----
+
+    // Where the two leaves meet: dust when they part and when they slam.
+    private Vector3 SeamPoint()
+    {
+        if (visual == null) return transform.position;
+        float midY = art != null ? (art.openingBottom + art.openingTop) * 0.35f : 0f;
+        return visual.TransformPoint(new Vector3(0f, midY, 0f));
+    }
+
+    // A jamb: dust when a leaf reaches its stop. side = -1 left, +1 right.
+    private Vector3 JambPoint(float side)
+    {
+        if (visual == null) return transform.position;
+        if (art == null) return visual.position;
+        float x = side < 0f ? art.openingLeft : art.openingRight;
+        float midY = (art.openingBottom + art.openingTop) * 0.35f;
+        return visual.TransformPoint(new Vector3(x, midY, 0f));
+    }
+
+    // A trickle of grit off the hinges the whole time the doors are moving, densest where they are
     // fastest. The old gate only made dust at its clunks, so between them nothing was happening.
     private float dustAccum;
-    private void EmitSlotDust(float speed01)
+    private void EmitHingeDust(float openness)
     {
-        dustAccum += Time.deltaTime * (6f + 26f * speed01);
+        dustAccum += Time.deltaTime * (5f + 16f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(openness)));
         while (dustAccum >= 1f)
         {
             dustAccum -= 1f;
-            SpawnDust(SlotPoint(), 1);
+            SpawnDust(JambPoint(Random.value < 0.5f ? -1f : 1f), 1);
         }
     }
 
@@ -290,11 +432,9 @@ public class Gate : MonoBehaviour
         SfxManager.PlayOn(sfxSource, clip, vol * volume);
     }
 
-    // ⚠️ CameraShake.Shake is (INTENSITY, DURATION) — every other caller in the project passes it
-    // that way (boss death is 0.6 over 1.6s). The gate this replaced had the two REVERSED, so its
-    // "slam" asked for 0.12 intensity over 0.14s while the Moss Knight's slam gets 0.28 over 0.8s.
-    // Being an order of magnitude under every other impact in the game is part of why a falling
-    // stone slab registered as nothing.
+    // CameraShake.Shake is (INTENSITY, DURATION) - every other caller in the project passes it that
+    // way (boss death is 0.6 over 1.6s). An older gate had the two REVERSED, which is part of why a
+    // three-tonne door registered as nothing.
     private void Shake(float intensity, float duration)
     {
         if (CameraShake.instance != null) CameraShake.instance.Shake(intensity, duration);
@@ -302,20 +442,21 @@ public class Gate : MonoBehaviour
 
     private void SpawnDust(Vector3 pos, int count)
     {
+        float spread = 0.55f * Mathf.Max(0.2f, visScale);
         for (int i = 0; i < count; i++)
         {
             var go = new GameObject("GateDust");
-            go.transform.position = pos + new Vector3(Random.Range(-0.55f, 0.55f), Random.Range(0f, 0.14f), 0f);
+            go.transform.position = pos + new Vector3(Random.Range(-spread, spread), Random.Range(-0.1f, 0.14f), 0f);
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = GetDotSprite();
             sr.color = DustColor;
             sr.sortingOrder = 12;
-            float size = Random.Range(0.16f, 0.34f);
+            float size = Random.Range(0.16f, 0.34f) * Mathf.Max(0.35f, visScale);
             go.transform.localScale = Vector3.one * size;
             motes.Add(new Mote
             {
                 sr = sr,
-                vel = new Vector2(Random.Range(-1.6f, 1.6f), Random.Range(0.8f, 2.2f)),
+                vel = new Vector2(Random.Range(-1.6f, 1.6f), Random.Range(0.5f, 1.9f)),
                 life = 0f,
                 maxLife = Random.Range(0.35f, 0.65f),
                 size = size,
@@ -341,16 +482,5 @@ public class Gate : MonoBehaviour
         tex.SetPixels32(px); tex.Apply();
         dotSprite = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
         return dotSprite;
-    }
-
-    // flat white unit square, for the slot mask
-    private static Sprite squareSprite;
-    private static Sprite GetSquareSprite()
-    {
-        if (squareSprite != null) return squareSprite;
-        var tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-        tex.SetPixel(0, 0, Color.white); tex.Apply();
-        squareSprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 1f);
-        return squareSprite;
     }
 }

@@ -89,12 +89,12 @@ public static class LevelTextImporter
 
     // Non-prefab structural markers, built procedurally:
     //   '=' one-way platform tiles (jump up through, land on top)
-    //   'G' gate cell — vertical runs of G become one sliding Gate (portcullis)
+    //   'G' gate cell — vertical runs of G become one Gate: a stone arch with double doors in it
     private const string PropsTexturePath = "Assets/Cainos/Pixel Art Platformer - Dungeon/Texture/TX Dungeon Props.png";
-    // ⚠️ The gate is a PLAIN SPRITE with no Animator, which is what selects Gate.cs's SLIDE
-    // (portcullis) movement — see Gate.cs. A hinged Cainos door prefab was tried here and reverted
-    // 2026-08-19 at the designer's request; Gate.cs still supports that path if it ever comes back,
-    // and swapping this one constant for a door prefab is all it takes to re-enable it.
+    // ⚠️ This sprite is an ARCH WITH DOUBLE DOORS IN IT, not a portcullis. The importer only lays
+    // down the whole sprite; Gate.cs swaps it at runtime for the arch/leaf pieces cut by
+    // Editor/GateArtBaker and opens the leaves in place. If this constant is ever changed, re-run
+    // Deckshift → Bake Gate Art, which reads the same name.
     private const string GateSpriteName = "TX Dungeon Props - Gate 01";
     // (AltarSpriteName removed 2026-08-09 — the altar's sprite now lives on ShiftAltar.prefab.)
     private const int InteractableLayer = 12; // "Interactable" (PlayerController.interactableLayer)
@@ -1142,8 +1142,9 @@ public static class LevelTextImporter
                         visual.transform.localPosition = -(Vector3)gateSprite.bounds.center * scale;
                     }
 
+                    // Gate.cs re-dresses this single sprite into arch + passage + two leaves at
+                    // runtime and opens the leaves in place, so there is no travel to configure.
                     var gate = gateGo.AddComponent<Gate>();
-                    gate.openOffset = new Vector2(0f, -h); // sinks fully into the floor
                     gates.Add(gate);
                     runStart = i;
                 }
