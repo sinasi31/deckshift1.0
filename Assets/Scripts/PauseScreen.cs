@@ -8,30 +8,33 @@ using TMPro;
 
 // The pause screen — Escape.
 //
-// ══ DUST SHEET — the first screen built in SALVAGE ═══════════════════════════════════════════════
+// ══ THE HANGING BOARD — built in SALVAGE ═════════════════════════════════════════════════════════
 //
-// A sheet of canvas thrown over the frozen world, hung from a rope on wooden pegs.
+// A board of planks bound with iron straps, dropped in on two chains in front of the dungeon wall.
 //
-// ⚠️ IT IS THE ONLY SOFT SCREEN IN THE GAME, AND THAT IS THE WHOLE POINT. Under Salvage every screen
-// obeys the same five laws (scale, light, palette, two accents, wear) and differs only by WHAT THE
-// OBJECT IS. Everything else coming is rigid — planks, a notice board, an anvil, a banner, paper on
-// a grate. Pause is cloth. That single structural difference tells them apart with no new colour
-// spent, which is exactly what the old nine-theme "pick a material and invert something" rule kept
-// failing to do (it invented smoked glass, brass and frost, and burned a hue on each).
+// ⚠️ IT WAS A CLOTH SHEET FIRST, AND THE MOTION IS THE PART THAT SURVIVED. The designer's verdict on
+// the cloth: "i like the animation that plays when i press it, like the way it comes from the top,
+// but i just dont like the panel itself too much. i mean its not bad, but i want something better."
+// So the drop, the swing and the lift-away are unchanged — only the SURFACE was replaced. Why cloth
+// failed is legible in the screenshots: a canvas sheet is one flat value with soft folds, so there
+// is no structure to look at and no hard edge to make it feel built. Planks have seams, grain,
+// straps and bolts; wood and iron are the dungeon's core material pair; and text sits far better on
+// wood than on cloth. **Do not re-propose the sheet.** (`SalvageSurfaces.Sheet` is kept — it is a
+// good cloth and something else may want it.)
 //
-// Why cloth is the RIGHT object here rather than a nice one:
-//   · Pause is not a place you travel to, so it must not be a panel you opened. A sheet does not
-//     replace the room — it hangs in front of it, and the frozen game stays dimly visible past its
-//     edges. No other screen in the game shows you the world behind it.
-//   · Cloth has a motion vocabulary nothing else here owns: it DROPS, swings on its pins and settles.
-//     On resume it is PULLED AWAY rather than faded out — a far better exit than an alpha ramp, and
-//     it says "the world was always still there" in a way no dissolve can.
+// What the object is doing, and why it is this one:
+//   · Pause is not a place you travel to, so it must not be a panel you opened. It is a thing that
+//     DROPS IN FRONT OF YOU and stops the room, then is hauled back up when you carry on.
+//   · The exit is the strongest beat: on resume it is LIFTED AWAY rather than faded out. A dissolve
+//     says the screen was an image laid over the game; hauling the board up says the game was behind
+//     it the whole time.
 //   · The sound already fits. ProcSfx.PauseHalt is the one sound in the game defined by being CHOKED
-//     — a damper clamping the ring away in 180ms. That is literally what cloth does to a sound.
+//     — a damper clamping the ring away in 180ms — which is a heavy thing landing, not a chime.
 //
-// ⚠️ THE CONTENT IS PARENTED TO THE SHEET, so the text swings with the cloth it is printed on. Same
+// ⚠️ THE CONTENT IS PARENTED TO THE BOARD, so the text moves with the surface it is written on. Same
 // lesson as the quest board's slips: the rotation PIVOT carries the metaphor, and here the pivot is
-// the rope. Content that stayed level while the sheet swung would read as a texture behind a window.
+// the line it hangs from. Content that stayed level while the board swung would read as a texture
+// behind a window.
 //
 // It is also the run's STATUS READOUT, which is the real reason it earns the whole frame. Several of
 // these numbers — the exhausted count, the next Stagger price — are visible nowhere else in the game.
@@ -44,6 +47,18 @@ public class PauseScreen : MonoBehaviour
 {
     private static PauseScreen instance;
 
+    // ---- what is BEHIND the board ----------------------------------------------------------------
+    //
+    //   Wall — the dungeon's own masonry, tiled at world magnification and lit by an off-screen
+    //          torch. The screen reads as somewhere in the building.
+    //   Game — the frozen gameplay, dimmed to about a quarter, visible past the board's edges. Says
+    //          "the world is still there, you have just stopped" — no other screen does this.
+    //
+    // Kept switchable because the two say genuinely different things and the choice is the
+    // designer's; change the const and recompile.
+    private enum Ground { Wall, Game }
+    private const Ground GROUND = Ground.Wall;
+
     // ---- layout, in the canvas's 1920x1080 reference space, all centre-anchored -------------------
 
     // ⚠️ 1400 IS SET BY THE NARROWEST SUPPORTED ASPECT, NOT BY TASTE. Every CanvasScaler here matches
@@ -53,12 +68,10 @@ public class PauseScreen : MonoBehaviour
     // content is the menu hit plate at x -580, so 700 of half-width clears it by 120px.
     private const float SHEET_W = 1400f;
     private const float SHEET_TOP = 420f;
-    private const float SHEET_BOTTOM = -340f;
-    private const float ROPE_Y = 432f;
-
-    // Where the sheet is pinned, as fractions across its width. Five pegs: an odd count so one sits
-    // dead centre under the title, and the two outermost are inset so the corners hang free.
-    private static readonly float[] Pegs = { 0.06f, 0.28f, 0.50f, 0.72f, 0.94f };
+    // ⚠️ Sized to the CONTENT, not to the screen. The stat column ends at y -208, so this leaves
+    // about 60px of margin below the last row. The first pass ran to -340 and the bottom fifth of the
+    // board was bare planks — dead weight that made the panel read as oversized rather than as full.
+    private const float SHEET_BOTTOM = -272f;
 
     private const float TITLE_Y = 318f;
     private const float SUB_Y = 266f;
@@ -81,9 +94,9 @@ public class PauseScreen : MonoBehaviour
     private const float BAR_W = 110f;
     private const float BAR_VALUE_W = 108f;
 
-    // Below the hem, on the dark. The sheet's torn edge is the best thing on the screen and putting
-    // the hint under it is what makes you look at it.
-    private const float FOOTER_Y = -404f;
+    // Below the board, on the dark. Keeps the board.s bottom edge as the last thing ON the board.
+    // ⚠️ Not parented to it either — a hint that swung with the panel would be hard to read.
+    private const float FOOTER_Y = -336f;
 
     private class Entry
     {
@@ -100,7 +113,7 @@ public class PauseScreen : MonoBehaviour
 
     private RectTransform content, sheet, cloth, chalk;
     private Image underline;
-    private RectTransform printed;   // parent for everything drawn ON the cloth, so it swings with it
+    private RectTransform printed;   // parent for everything drawn ON the board, so it moves with it
     private CanvasGroup group;
     private TMP_FontAsset font;
     private AudioSource audioSource;
@@ -120,8 +133,11 @@ public class PauseScreen : MonoBehaviour
     // dt is clamped — the same guard the character-select figures needed.
     private float swingAngle, swingVel;
     private float dropY, dropVel;
-    private const float SwingK = 26f, SwingDamp = 3.1f;
-    private const float DropK = 78f, DropDamp = 11f;
+    // ⚠️ SLOWER AND HEAVIER THAN THE CLOTH VERSION (was K 26 / damp 3.1). A board of planks on iron
+    // chains has real mass: it should swing lazily and take its time settling. Cloth numbers on a
+    // heavy object read as tinny.
+    private const float SwingK = 15f, SwingDamp = 2.5f;
+    private const float DropK = 62f, DropDamp = 9.5f;
     private const float MaxStep = 1f / 30f;
 
     // ---- dust ------------------------------------------------------------------------------------
@@ -203,16 +219,20 @@ public class PauseScreen : MonoBehaviour
         Stretch(content);
         group = content.gameObject.AddComponent<CanvasGroup>();
 
-        // ⚠️ NOT opaque. Every other screen in the game blacks the world out; this one dims it to
-        // roughly a quarter and lets it show past the sheet's edges, because "the world is still
-        // there, you have just stopped" is the entire premise. Raycast ON so nothing behind can be
-        // clicked, and deliberately NOT a dismiss button — two of these entries are destructive and
-        // a click-anywhere-to-close would put them one stray click from being lost.
-        Image backdrop = AddImage(content, "Backdrop", null, new Color(0.030f, 0.025f, 0.021f, 0.78f), true);
+        // ⚠️ Raycast ON so nothing behind can be clicked through, and deliberately NOT a dismiss
+        // button — two of these entries are destructive and a click-anywhere-to-close would put them
+        // one stray click from being lost.
+        //
+        // In Sheet mode this is NOT opaque: it dims the frozen game to about a quarter and lets it
+        // show past the cloth's edges, because "the world is still there, you have just stopped" is
+        // that version's whole premise. The wall modes cover it instead.
+        Image backdrop = AddImage(content, "Backdrop", null,
+                                  GROUND == Ground.Game ? new Color(0.030f, 0.025f, 0.021f, 0.78f)
+                                                        : new Color(0.020f, 0.017f, 0.015f, 1f), true);
         Stretch(backdrop.rectTransform);
 
-        BuildRope();
-        BuildSheet();
+        if (GROUND == Ground.Wall) BuildWall();
+        BuildPanel();
         BuildDust();
 
         BuildTitle();
@@ -223,55 +243,88 @@ public class PauseScreen : MonoBehaviour
         content.gameObject.SetActive(false);
     }
 
-    // A rope strung across the room, running off both edges of the screen. ⚠️ It must overhang the
-    // canvas: a rope whose ends are visible is a prop floating in space, and at 21:9 the canvas is
-    // 2560 wide, so this is sized against the widest supported aspect rather than against 1920.
-    private void BuildRope()
+    // The dungeon wall, tiled at world magnification, lit by an off-screen torch from the upper left.
+    //
+    // ⚠️ Image.Type.Tiled is not optional — Simple stretches one 256px block across the whole screen.
+    // ⚠️ And the tint is measured, not computed: the character select found 0.15 leaves the masonry
+    // invisible (a flat void, throwing away the one piece of real game art on screen) and near full
+    // value gives a bright grey field. That screen settled on 0.25; this one sits under a menu rather
+    // than behind portraits, so it starts lower and gets calibrated by screenshot.
+    private void BuildWall()
     {
-        const float SPAN = 2720f;
-        const int SAG = 9;
+        Sprite wall = Salvage.Wall();
+        if (wall == null) { Debug.LogWarning("PauseScreen: SalvageArt.wall missing — run Deckshift/Bake Salvage Art."); return; }
 
-        Sprite rope = SalvageSurfaces.RopeSpan(Salvage.Tex(SPAN), SAG);
-        Image img = AddImage(content, "Rope", rope, Color.white, false);
-        img.rectTransform.sizeDelta = new Vector2(SPAN, Salvage.Px(rope.rect.height));
-        img.rectTransform.anchoredPosition = new Vector2(0f, ROPE_Y);
+        Image w = AddImage(content, "Wall", wall, new Color(0.190f, 0.186f, 0.205f, 1f), false);
+        w.type = Image.Type.Tiled;
+        Stretch(w.rectTransform);
+
+        // The torch. Law 2 says warm from the upper left, and on a bare wall that light is the only
+        // thing stopping the stone reading as wallpaper.
+        Image glow = AddImage(content, "TorchGlow", SalvageSurfaces.Bloom(),
+                              new Color(Salvage.Torch.r, Salvage.Torch.g, Salvage.Torch.b, 0.085f), false);
+        glow.rectTransform.sizeDelta = new Vector2(1900f, 1500f);
+        glow.rectTransform.anchoredPosition = new Vector2(-620f, 300f);
+
+        // ...and the far corner falling away from it.
+        Image dark = AddImage(content, "FarCorner", SalvageSurfaces.Bloom(),
+                              new Color(0f, 0f, 0f, 0.42f), false);
+        dark.rectTransform.sizeDelta = new Vector2(2600f, 1900f);
+        dark.rectTransform.anchoredPosition = new Vector2(560f, -360f);
+
     }
 
-    private void BuildSheet()
+    // The board: planks bound with iron, hung on two chains.
+    private void BuildPanel()
     {
         float h = SHEET_TOP - SHEET_BOTTOM;
 
-        // ⚠️ THE PIVOT IS THE ROPE. Everything about this screen's motion — the drop, the swing, the
-        // yank on resume — is a rotation about the line it hangs from. Pivoting at the centre makes
-        // a swinging sheet look like a spinning card, which is the exact failure the quest board's
+        // ⚠️ THE PIVOT IS WHERE IT HANGS FROM. Everything about this screen's motion — the drop in,
+        // the swing, the lift on resume — is a rotation about that line. Pivoting at the centre makes
+        // a swinging board look like a spinning card, which is the exact failure the quest board's
         // tack pivot exists to avoid.
-        sheet = AddPoint(content, "Sheet", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+        sheet = AddPoint(content, "Panel", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
         sheet.pivot = new Vector2(0.5f, 1f);
         sheet.sizeDelta = new Vector2(SHEET_W, h);
         sheet.anchoredPosition = new Vector2(0f, SHEET_TOP);
 
-        Sprite s = SalvageSurfaces.Sheet(Salvage.Tex(SHEET_W), Salvage.Tex(h), Pegs);
-        Image img = AddImage(sheet, "Cloth", s, Color.white, false);
+        // ⚠️ Chains are built FIRST so they draw behind the board — a chain link crossing in front of
+        // the planks reads as a chain lying on the board rather than one carrying it. They are
+        // children of the panel so they travel and swing with it; their tops run well off the top of
+        // the screen, so nothing gives away that the ceiling end is moving too.
+        Sprite chain = SalvageSurfaces.Chain(Salvage.Tex(520f));
+        float chainW = Salvage.Px(chain.rect.width);
+        for (int i = 0; i < 2; i++)
+        {
+            Image ch = AddImage(sheet, "Chain" + i, chain, Color.white, false);
+            ch.rectTransform.sizeDelta = new Vector2(chainW, Salvage.Px(chain.rect.height));
+            // ⚠️ Aligned with the IRON STRAPS, not merely near the corners — a chain bolts to the
+            // band, and one hanging in the middle of bare planks looks like it would tear straight out.
+            ch.rectTransform.anchorMin = ch.rectTransform.anchorMax = new Vector2(i == 0 ? 0.055f : 0.945f, 1f);
+            ch.rectTransform.pivot = new Vector2(0.5f, 0f);            // grows upward from the board
+            ch.rectTransform.anchoredPosition = new Vector2(0f, -10f); // tucked just under the top edge
+        }
+
+        Sprite board = SalvageSurfaces.PlankBoard(Salvage.Tex(SHEET_W), Salvage.Tex(h));
+        Image img = AddImage(sheet, "Board", board, Color.white, false);
         cloth = img.rectTransform;
         Stretch(cloth);
 
-        // The pegs sit ON the rope, gripping the cloth. They belong to the sheet, not the rope, so
-        // they travel with it as it swings — a peg that stayed put while the cloth moved would read
-        // as the cloth having torn off.
-        Sprite peg = SalvageSurfaces.Peg();
-        for (int i = 0; i < Pegs.Length; i++)
-        {
-            Image p = AddImage(sheet, "Peg" + i, peg, Color.white, false);
-            p.rectTransform.sizeDelta = new Vector2(Salvage.Px(peg.rect.width), Salvage.Px(peg.rect.height));
-            p.rectTransform.anchorMin = p.rectTransform.anchorMax = new Vector2(Pegs[i], 1f);
-            p.rectTransform.anchoredPosition = new Vector2(0f, -Salvage.Px(peg.rect.height) * 0.34f);
-        }
+        // A shadow the board casts on whatever is behind it. It is what stops the panel reading as
+        // painted onto the backdrop, and it is the cheapest depth cue available.
+        Image shadow = AddImage(sheet, "BoardShadow", SalvageSurfaces.Bloom(),
+                                new Color(0f, 0f, 0f, 0.45f), false);
+        shadow.rectTransform.anchorMin = Vector2.zero;
+        shadow.rectTransform.anchorMax = Vector2.one;
+        shadow.rectTransform.offsetMin = new Vector2(-70f, -90f);
+        shadow.rectTransform.offsetMax = new Vector2(70f, 40f);
+        shadow.transform.SetAsFirstSibling();
 
-        // Everything printed on the sheet hangs off it, so it swings with the cloth.
-        RectTransform onCloth = AddPoint(sheet, "OnCloth", new Vector2(0.5f, 1f),
+        // Everything printed on the board hangs off it, so it moves with the surface it is on.
+        RectTransform onBoard = AddPoint(sheet, "OnBoard", new Vector2(0.5f, 1f),
                                          new Vector2(0f, -SHEET_TOP), Vector2.zero);
-        onCloth.sizeDelta = Vector2.zero;
-        printed = onCloth;
+        onBoard.sizeDelta = Vector2.zero;
+        printed = onBoard;
     }
 
 
@@ -603,7 +656,7 @@ public class PauseScreen : MonoBehaviour
         {
             t += Time.unscaledDeltaTime;
             float k = Mathf.Clamp01(t / dur);
-            sheet.anchoredPosition = new Vector2(0f, startY + 780f * k * k);   // accelerating away
+            sheet.anchoredPosition = new Vector2(0f, startY + 780f * k * k);   // hauled up and away
             sheet.localRotation = Quaternion.Euler(0f, 0f, swingAngle * (1f - k) + k * 3.5f);
             group.alpha = 1f - k * k;
             yield return null;
@@ -786,6 +839,8 @@ public class PauseScreen : MonoBehaviour
     // The sheet is a pendulum on a spring, integrated on unscaled time because the game is frozen.
     private void TickCloth()
     {
+
+
         float dt = Mathf.Min(Time.unscaledDeltaTime, MaxStep);
 
         dropVel += (-DropK * dropY - DropDamp * dropVel) * dt;
@@ -795,11 +850,12 @@ public class PauseScreen : MonoBehaviour
         swingVel += (-SwingK * swingAngle - SwingDamp * swingVel) * dt;
         swingAngle += swingVel * dt;
 
-        // A breath of air on it, forever. Without this the sheet eventually goes dead still and
-        // stops being cloth; it is deliberately tiny — a permanent overlay must not compete with
-        // the game behind it, and this one is over frozen gameplay.
-        float idle = Mathf.Sin(Time.unscaledTime * 0.9f) * 0.16f
-                   + Mathf.Sin(Time.unscaledTime * 0.37f) * 0.10f;
+        // ⚠️ A BOARD ON CHAINS IS NOT CLOTH IN A DRAUGHT. The sheet version breathed at 0.16° + 0.10°
+        // on periods under two seconds, which on something with mass reads as jitter rather than as
+        // weight. This is a third of that amplitude at half the rate: a slow settling drift you
+        // notice only if you look for it, which is what a heavy hung thing actually does.
+        float idle = Mathf.Sin(Time.unscaledTime * 0.42f) * 0.055f
+                   + Mathf.Sin(Time.unscaledTime * 0.17f) * 0.040f;
 
         sheet.anchoredPosition = new Vector2(0f, SHEET_TOP + dropY);
         sheet.localRotation = Quaternion.Euler(0f, 0f, swingAngle + idle);

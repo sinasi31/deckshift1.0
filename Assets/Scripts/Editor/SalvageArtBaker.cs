@@ -63,6 +63,11 @@ public static class SalvageArtBaker
                                                    "TX Dungeon Props - Door Frame Iron Side 01");
         art.stone = WholeTexture("stone", Wall, log);
 
+        // The wall goes in whole, as a Texture2D reference — it is the one piece of real pack art a
+        // Salvage screen uses directly rather than sampling, because it is genuinely tileable.
+        art.wall = AssetDatabase.LoadAssetAtPath<Texture2D>(Wall);
+        log.Add("  wall   " + (art.wall != null ? art.wall.width + "x" + art.wall.height : "MISSING"));
+
         if (fresh)
         {
             Directory.CreateDirectory("Assets/Resources");

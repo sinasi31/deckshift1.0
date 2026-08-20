@@ -45,6 +45,11 @@ public class SalvageArt : ScriptableObject
         public Color Body => Sample(0.5f);
     }
 
+    // ⚠️ THE WHOLE 256x256 TEXTURE, USED AS ONE TILED SPRITE. It is a single seamless 8x8 picture,
+    // so tiling any one of its 64 sub-sprites repeats a fragment of a larger image and reads as a
+    // checkerboard — the same mistake that made generated rooms never look hand-made.
+    public Texture2D wall;  // TX Tileable - Dungeon Wall
+
     public Ramp linen;      // TX Village Props — Cloth 08. The dust sheet.
     public Ramp rope;       // TX Village Props — Clother Hanger Rope 01.
     public Ramp wood;       // TX Dungeon Props  — plank/beam browns.

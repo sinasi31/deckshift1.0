@@ -211,6 +211,158 @@ public static class SalvageSurfaces
         return 1f;
     }
 
+    // ---- plank board -----------------------------------------------------------------------------
+
+    /// <summary>
+    /// A board of horizontal planks bound with two iron straps — the surface a Salvage screen's
+    /// content is written on when it needs to be RIGID.
+    ///
+    /// ⚠️ WHY THIS REPLACED THE CLOTH SHEET. Cloth was chosen because pause is stillness and a sheet
+    /// hangs in front of the world rather than replacing it. The metaphor was right and the SURFACE
+    /// was wrong: the designer's verdict on it was "its not bad, but i want something better", and
+    /// the reason is legible in the screenshots — a canvas sheet is one flat value with soft folds,
+    /// so it has no structure to look at and no edge to make it feel built. Planks have seams, grain,
+    /// straps and bolts; wood and iron are the dungeon's core material pair; and text on wood reads
+    /// far better than text on cloth. The drop-from-above motion is kept exactly — that is the part
+    /// that was working.
+    /// </summary>
+    public static Sprite PlankBoard(int w, int h, int planks = 7, int seed = 5)
+    {
+        string key = "board_" + w + "x" + h + "_" + planks + "_" + seed;
+        Sprite cached;
+        if (Salvage.TryCached(key, out cached) && cached != null) return cached;
+
+        SalvageArt.Ramp wood = Salvage.Ramp("wood");
+        SalvageArt.Ramp iron = Salvage.Ramp("iron");
+
+        var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        var px = new Color[w * h];
+
+        float plankH = h / (float)planks;
+
+        // The straps. Kept off the content columns: the menu occupies roughly u 0.12..0.62 and the
+        // stat block u 0.62..0.92, so a strap in the middle would run straight through the numbers.
+        const float StrapA = 0.055f, StrapB = 0.945f;
+        float strapHalf = Salvage.Tex(26f) * 0.5f / w;
+
+        for (int y = 0; y < h; y++)
+        {
+            float v = 1f - y / (float)(h - 1);           // 0 at top
+
+            int plank = Mathf.Clamp((int)(y / plankH), 0, planks - 1);
+            float inPlank = (y - plank * plankH) / plankH;      // 0 at plank bottom, 1 at its top
+
+            // Each board is a different piece of timber, and that variation is most of what stops
+            // this reading as a flat brown rectangle.
+            float plankTone = Salvage.Grain(plank * 13.7f, 0f, seed + 5, 0.9f, 1);
+
+            for (int x = 0; x < w; x++)
+            {
+                float u = x / (float)(w - 1);
+
+                // Grain runs ALONG the plank, so the noise is stretched hard in x.
+                float grain = Salvage.Grain(x * 0.30f, y * 2.6f, seed, 0.55f, 3);
+
+                float shade = 0.94f
+                            + (grain - 0.5f) * 0.30f
+                            + (plankTone - 0.5f) * 0.26f;
+
+                // Key light, upper-left (Law 2).
+                shade += (-(u - 0.5f) * Salvage.LightDir.x + (0.5f - v) * Salvage.LightDir.y) * 0.30f;
+
+                // Seams. The shadow sits UNDER the plank above it, so each plank is dark along its
+                // top edge and catches a thin highlight along its bottom — that asymmetry is what
+                // makes them read as overlapping boards instead of as drawn stripes.
+                float seamPx = 2.2f / plankH;
+                if (inPlank > 1f - seamPx) shade *= 0.42f;
+                else if (inPlank < seamPx * 0.9f) shade *= 1.16f;
+
+                Color c = wood.Sample(0.30f + grain * 0.55f);
+                bool isIron = false;
+
+                // ---- iron straps ---------------------------------------------------------------
+                float dStrap = Mathf.Min(Mathf.Abs(u - StrapA), Mathf.Abs(u - StrapB));
+                if (dStrap < strapHalf)
+                {
+                    isIron = true;
+                    float across = dStrap / strapHalf;                 // 0 centre, 1 edge
+                    c = iron.Sample(0.30f + (1f - across) * 0.45f);
+                    shade = 1f + (0.5f - across) * 0.34f;
+                    if (across > 0.86f) shade *= 0.45f;                // the strap's own dark edge
+
+                    // Bolts, one per plank, alternating side to side so the row is not a column.
+                    float bolt = Mathf.Abs(inPlank - 0.5f);
+                    if (bolt < 0.17f && across < 0.55f)
+                    {
+                        float bx = across / 0.55f, by = bolt / 0.17f;
+                        float d = Mathf.Sqrt(bx * bx + by * by);
+                        if (d < 1f) { c = iron.Sample(d < 0.55f ? 0.95f : 0.10f); shade = d < 0.55f ? 1.25f : 0.55f; }
+                    }
+                }
+
+                // ---- board edge ------------------------------------------------------------------
+                int ex = Mathf.Min(x, w - 1 - x);
+                int ey = Mathf.Min(y, h - 1 - y);
+                if (ex < 2 || ey < 2)
+                {
+                    // Lit on the top and left, dark on the bottom and right: one rule, and it is what
+                    // gives a flat rectangle thickness.
+                    bool litEdge = (x < 2) || (y > h - 3);
+                    c = isIron ? iron.Sample(litEdge ? 0.9f : 0.05f) : wood.Sample(litEdge ? 0.85f : 0.05f);
+                    shade = litEdge ? 1.15f : 0.50f;
+                }
+
+                px[y * w + x] = Salvage.Lit(c, Mathf.Clamp(shade, 0.35f, 1.45f));
+            }
+        }
+
+        tex.SetPixels(px);
+        return Salvage.MakeSprite(tex, key);
+    }
+
+    /// <summary>
+    /// A hanging chain, 5 texture pixels wide, links repeating every 8. Alternating upright and
+    /// crosswise links — a chain drawn as a plain dashed line reads as a zip, and the alternation is
+    /// the only thing that sells it at this size.
+    /// </summary>
+    public static Sprite Chain(int lengthTexPx, int seed = 2)
+    {
+        string key = "chain_" + lengthTexPx + "_" + seed;
+        Sprite cached;
+        if (Salvage.TryCached(key, out cached) && cached != null) return cached;
+
+        SalvageArt.Ramp iron = Salvage.Ramp("iron");
+        const int W = 5, Cycle = 8;
+
+        var tex = new Texture2D(W, lengthTexPx, TextureFormat.RGBA32, false);
+        var px = new Color[W * lengthTexPx];
+        for (int i = 0; i < px.Length; i++) px[i] = new Color(0, 0, 0, 0);
+
+        Color lit = Salvage.Lit(iron.Sample(0.92f), 1.1f);
+        Color body = Salvage.Lit(iron.Sample(0.50f));
+        Color dark = Salvage.Lit(iron.Sample(0.06f));
+
+        for (int y = 0; y < lengthTexPx; y++)
+        {
+            int phase = y % Cycle;
+            if (phase < 5)
+            {
+                // Upright link: two sides, seen edge-on.
+                px[y * W + 1] = phase == 0 || phase == 4 ? dark : lit;   // Law 2: left side is lit
+                px[y * W + 3] = phase == 0 || phase == 4 ? dark : body;
+            }
+            else
+            {
+                // Crosswise link: a bar across.
+                for (int x = 0; x < W; x++)
+                    px[y * W + x] = x == 0 || x == W - 1 ? dark : (phase == 5 ? lit : body);
+            }
+        }
+
+        tex.SetPixels(px);
+        return Salvage.MakeSprite(tex, key);
+    }
+
     // ---- rope ------------------------------------------------------------------------------------
 
     /// <summary>
@@ -330,6 +482,37 @@ public static class SalvageSurfaces
         tex.SetPixels(px);
         Sprite s = Salvage.MakeSprite(tex, "rubbed");
         s.texture.filterMode = FilterMode.Bilinear;         // a falloff is the ONE thing not on the grid
+        return s;
+    }
+
+    /// <summary>
+    /// A soft radial falloff, for LIGHT — a torch throwing warmth onto a surface, or a broad shadow
+    /// where a surface falls away from it. ⚠️ Light is the one thing in Salvage that is not on the
+    /// pixel grid: a dithered gradient reads as a rendering fault, not as a lamp.
+    /// </summary>
+    public static Sprite Bloom()
+    {
+        Sprite cached;
+        if (Salvage.TryCached("bloom", out cached) && cached != null) return cached;
+
+        const int S = 128;
+        var tex = new Texture2D(S, S, TextureFormat.RGBA32, false);
+        var px = new Color[S * S];
+
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+            {
+                float dx = (x - (S - 1) * 0.5f) / ((S - 1) * 0.5f);
+                float dy = (y - (S - 1) * 0.5f) / ((S - 1) * 0.5f);
+                float d = Mathf.Clamp01(Mathf.Sqrt(dx * dx + dy * dy));
+                float a = 1f - d;
+                a = a * a * a * (3f - 2f * a);          // steeper than smoothstep: a core, then falloff
+                px[y * S + x] = new Color(1f, 1f, 1f, a);
+            }
+
+        tex.SetPixels(px);
+        Sprite s = Salvage.MakeSprite(tex, "bloom");
+        s.texture.filterMode = FilterMode.Bilinear;
         return s;
     }
 

@@ -90,7 +90,7 @@ Heart, Gear, Scroll, Map, Chest, three Keys, Coins, Rune Stone, Book, Lantern,
 gems, ingots. Same artist, same 32 PPU, same palette. Reach for these before
 drawing another procedural sigil.
 
-**Migration status:** `PauseScreen` is Salvage (Dust Sheet). Everything else is
+**Migration status:** `PauseScreen` is Salvage (the Hanging Board). Everything else is
 still on the table below and reads as the old system until converted.
 
 ---
@@ -130,10 +130,15 @@ what it is made of.
 ⚠️ **Under Salvage the inversions still matter, but they may no longer spend a
 HUE.** Light direction is fixed and the palette is sampled, so what separates two
 screens is the OBJECT, its silhouette and its motion. Worked example: the pause
-screen is the only **soft** thing in the game — everything else coming is rigid
-(planks, a board, an anvil, a banner) — and it is the only screen that lets you
-see the world behind it, and the only one that leaves by being **pulled away**
-instead of faded. Three separations, no colour spent.
+screen is the only one that **drops in from above and is hauled back up** — every
+other screen opens in place — and it is the only one that can show you the world
+behind it. Two separations, no colour spent.
+
+⚠️ **AND MOTION CAN SURVIVE A MATERIAL IT WAS DESIGNED FOR.** Pause was cloth
+first, and the designer's verdict was *"i like the animation … the way it comes
+from the top, but i just dont like the panel itself"*. The drop, the swing and
+the lift-away were kept verbatim and only the SURFACE was swapped for planks.
+When a screen is half-right, find out which half before rebuilding either.
 
 Warm/cold. Below/above. Rising/falling. Worn/pristine. Still/moving.
 Inside/outside the fiction.
@@ -949,17 +954,25 @@ Escape. **The old `PauseMenu` + `PauseMenuPanel` + `MenuManager` are DELETED** a
 
 **It is the only screen with NO window plate, and that is structural, not decorative.** Every other screen is a place you walked to inside the world, so each is a panel sitting on top of the game. Pause is not somewhere you go — it is the world being stopped — so it takes the whole frame. That choice separates it from every other screen before a single colour is picked.
 
-#### ⚠️ RE-SKINNED 2026-08-20 — it is now **DUST SHEET**, the first Salvage screen
+#### ⚠️ REBUILT 2026-08-20 — it is now **THE HANGING BOARD**, the first Salvage screen
 
-A sheet of canvas thrown over the frozen world, hung from a rope on wooden pegs. **The Halt theme, the frost edges, the hairline fractures and the suspended mote field are GONE** — do not restore them; they belonged to the superseded per-screen-material system. What survives from the old screen is everything below this box: the structural no-plate choice, the status readout, the two-step destructive entries, and every wiring rule.
+A board of planks bound with iron straps, dropped in on two chains in front of the dungeon wall. **The Halt theme, the frost edges, the hairline fractures and the suspended mote field are GONE** — do not restore them; they belonged to the superseded per-screen-material system. What survives from the old screen is everything below this box: the structural no-plate choice, the status readout, the two-step destructive entries, and every wiring rule.
 
-Why cloth, and why it is the screen that proves Salvage:
+⚠️ **IT WAS A CLOTH SHEET FOR ONE ITERATION. DO NOT RE-PROPOSE THE SHEET.** Designer: *"i like the animation that plays when i press it, like the way it comes from the top, but i just dont like the panel itself too much. i mean its not bad, but i want something better."* So the motion was kept verbatim and only the surface changed. Why cloth lost, and it is a general point about generated surfaces: **a canvas sheet is one flat value with soft folds — no structure to look at and no hard edge to make it feel built.** Planks have seams, grain, straps and bolts; wood and iron are the dungeon's core material pair; and text sits far better on wood than on cloth. (`SalvageSurfaces.Sheet` is kept — it is good cloth and something else may want it.)
 
-- **It is the only SOFT screen in the game.** Everything else coming is rigid — planks, a notice board, an anvil, a banner, paper on a grate. That one structural difference separates it with **no colour spent**, which is what the old rule kept failing to do.
-- **A sheet does not replace the room, it hangs in front of it.** The backdrop is deliberately **not opaque** (alpha 0.78) and the frozen game stays dimly visible past the sheet's edges. No other screen in the game shows you the world behind it.
-- **It leaves by being PULLED AWAY, not faded.** A dissolve says the screen was an image laid over the game; whipping the cloth up off the rope says the game was behind it the whole time.
+Why this object:
 
-⚠️ **THE PIVOT IS THE ROPE, and the content is parented to the sheet** so the text swings with the cloth it is printed on. Same lesson as the quest board's tack pivot: the rotation pivot carries the metaphor. Content that stayed level while the sheet swung would read as a texture behind a window.
+- **Pause is not a place you travel to**, so it must not be a panel you opened. It is a thing that DROPS IN FRONT OF YOU and stops the room, then gets hauled back up. It is the only screen in the game that arrives from outside the frame.
+- **It leaves by being LIFTED AWAY, not faded.** A dissolve says the screen was an image laid over the game; hauling the board up says the game was behind it the whole time.
+- **The backdrop is switchable** (`PauseScreen.Ground`): `Wall` tiles the dungeon's masonry at world scale under an off-screen torch; `Game` dims the frozen gameplay to a quarter and lets it show past the board's edges — the only screen in the game that does that.
+
+⚠️ **THE PIVOT IS WHERE IT HANGS FROM, and the content is parented to the board** so the text moves with the surface it is written on. Same lesson as the quest board's tack pivot: the rotation pivot carries the metaphor. Content that stayed level while the board swung would read as a texture behind a window.
+
+⚠️ **A HEAVY OBJECT NEEDS DIFFERENT SPRING NUMBERS FROM A LIGHT ONE.** Carrying the cloth's values (swing K 26, damp 3.1, idle 0.16° at ~2s) straight onto planks-and-chains read as tinny jitter. The board runs K 15 / damp 2.5 and idles at a third of the amplitude at half the rate. **Mass is expressed in the numbers, not in the sprite.**
+
+⚠️ **The chains anchor at the IRON STRAPS (u 0.055 / 0.945), not merely near the corners** — a chain bolted to bare planks looks like it would tear straight out — and they are built before the board so they draw *behind* it.
+
+⚠️ **The board is sized to its CONTENT, not to the screen.** The first pass ran 130px past the last stat row and that bare strip made the panel read as oversized rather than full.
 
 ⚠️ **The pause is released on the FIRST frame of the yank**, not at the end — so the game is already running for the ~0.2s the cloth takes to clear. That is the point, not a compromise. Two consequences that are easy to miss: `CloseAnim` must drop `blocksRaycasts` immediately (or the player's first click after resuming is eaten by a sheet halfway off screen), and `Open` must **re-arm** the group (or a screen opened during a yank comes up looking perfect and ignoring every click). `CloseAnim` also checks `isOpen` before deactivating, since Escape-mashing can re-open mid-flight.
 

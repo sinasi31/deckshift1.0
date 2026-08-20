@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9912f776f673cde43b0f856e34fbd234, type: 3}
   m_Name: SalvageArt
   m_EditorClassIdentifier: 
+  wall: {fileID: 2800000, guid: 696dadb57c80a0744be25cd33ceff002, type: 3}
   linen:
     id: linen
     source: 'TX Village Props.png :: TX Village Props - Cloth 08'

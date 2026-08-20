@@ -976,7 +976,7 @@ banners, chains and fireplaces and still reads as one world. **Consistency lives
 5. **Wear** — used **and repaired**. The repair currency is literally called scrap.
 
 Variety comes from **what the object is**, not from a colour: a hung sheet, a notice board, a
-workbench, a banner. **Migrated so far: `PauseScreen` only** (Dust Sheet). Everything else still
+workbench, a banner. **Migrated so far: `PauseScreen` only** (the Hanging Board). Everything else still
 renders in the superseded themes until converted.
 
 ⚠️ **`Assets/Cainos/Pixel Art Icon Pack - RPG` has 107 icons and 89 are referenced NOWHERE.** Same

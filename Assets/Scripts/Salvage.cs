@@ -139,6 +139,34 @@ public static class Salvage
 
     public static bool TryCached(string key, out Sprite s) { return cache.TryGetValue(key, out s); }
 
+    /// <summary>
+    /// The dungeon wall, as one tiled sprite at world magnification.
+    ///
+    /// ⚠️ THE SPRITE IS THE WHOLE 256x256 TEXTURE AND THE IMAGE MUST BE `Image.Type.Tiled`.
+    /// Simple stretches one block across the screen; a sub-sprite tiles a fragment of a larger
+    /// picture and reads as a checkerboard.
+    ///
+    /// ⚠️ AND IT IS BUILT AT SpritePPU, NOT AT 100. The character select builds the same wall at
+    /// ppu 100, which draws each block at 256 canvas px — 2.4x SMALLER than the identical bricks in
+    /// the game behind it. At SpritePPU a block is 617px and the masonry is exactly the size the
+    /// player sees in a room, which is the entire point of Law 1.
+    /// </summary>
+    public static Sprite Wall()
+    {
+        Sprite s;
+        if (TryCached("wall", out s) && s != null) return s;
+
+        SalvageArt art = SalvageArt.Get();
+        if (art == null || art.wall == null) return null;
+
+        Texture2D t = art.wall;
+        s = Sprite.Create(t, new Rect(0f, 0f, t.width, t.height),
+                          new Vector2(0.5f, 0.5f), SpritePPU, 0, SpriteMeshType.FullRect);
+        s.name = "wall";
+        cache["wall"] = s;
+        return s;
+    }
+
     /// <summary>1x1 white. The flat-fill workhorse.</summary>
     public static Sprite Pixel()
     {
