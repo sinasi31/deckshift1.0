@@ -106,7 +106,7 @@ Rigidbody2D:
   m_Simulated: 1
   m_UseFullKinematicContacts: 0
   m_UseAutoMass: 0
-  m_Mass: 3
+  m_Mass: 500
   m_LinearDamping: 0
   m_AngularDamping: 0.05
   m_GravityScale: 1
@@ -179,6 +179,7 @@ MonoBehaviour:
   stunSkinnedRenderers:
   - {fileID: 503869603664537011}
   damagePopupPrefab: {fileID: 2036397937272019125, guid: c4cd6b8e18cb9d141b1b0f9fa894bc1f, type: 3}
+  scrapDropOverride: -1
 --- !u!114 &5500000000000000012
 MonoBehaviour:
   m_ObjectHideFlags: 0

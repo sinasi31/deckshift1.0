@@ -1114,6 +1114,73 @@ And the player's carefully-placed capsule was **never consulted** for any of it.
 
 **`TakeDamage(float damage, Transform damageSource = null)` does not currently track damage source.** Spike or hazard kills would credit the player's kill counter the same as direct kills. Minor concern; flag if it becomes design-relevant.
 
+### ⚠️ The AI pass of 2026-08-20 — three things that were wrong for a long time
+
+The designer reported that enemies "don't mix well with terrain", "work kind of bad", and that **"the
+player can push the enemies around — this should not be able to happen."** All three were real.
+
+**1. THE PLAYER WAS A BULLDOZER.** Player is Dynamic at **mass 1.0**; enemies were Dynamic at 3–10.
+Two dynamic bodies resolve overlap by shoving *both*, and `PlayerController` **assigns
+`rb.linearVelocity` directly every FixedUpdate**, so a collision can never slow the player — all the
+resolution went into moving the enemy. Fixed by raising every enemy body to **mass 500**.
+
+⚠️ **Mass is free here, and that is the whole reason it is the right tool.** `MonsterController`
+assigns `rb.linearVelocity` directly and gravity is `gravityScale`-based, so **neither locomotion nor
+falling depends on mass** — it affects collision response and nothing else. Verified that nothing in
+the project ever pushes an enemy body with a force (the Moss Knight assigns velocity, which is
+mass-independent). Measured with a coasting player: **old mass shoved a Shambler 0.536 units, new
+mass 0.003.**
+
+⚠️ **SIDE EFFECT, AND IT IS A REAL GAMEPLAY CHANGE: the player is now BLOCKED by enemy bodies**
+(measured: the player stops at x 5.69 where it used to barge through to 6.23). Dash does not disable
+collision (only Phase does), so dashing into an enemy now stops you. If that reads badly, the
+alternative is to stop Player↔Enemy colliding at all — but that needs the layer split below fixed
+first, and it changes head-bounce/Pogo Boots.
+
+**2. MELEE ENEMIES ATTACKED BACKWARDS.** `MonsterController.cs:226` only writes `pm.Facing` while
+`inputMove.x != 0`, and every melee AI sets it to **zero** to stand and swing — so an enemy kept
+whatever facing it arrived with while `EnemyMelee` still resolved the hit on the player's real side.
+`RangedEnemyAI` and `ZombieSpitterAI` already carried an explicit per-frame facing line (with a
+comment naming the bug); **`MeleeEnemyAI`, `SlimeAI` and `MimicAI` never got it — 49 of the pool's 77
+enemies.** All three now face every frame. Verified: the enemy turns while `inputMove.x` is still
+0.00, proving the turn comes from the new line and not from the controller.
+
+⚠️ Partly masked in play, which is why it survived: knockback usually shoves the player back out of
+attack range, which restarts walking and re-faces the enemy. It bites when you get behind a *stopped*
+enemy — i.e. after a dash.
+
+**3. NOTHING COULD SEE.** No ground AI checked line of sight at all: spitters lobbed acid through
+solid rock, melee walked into the wall between them and the player, and **`Turret` was a bare
+`while(true)` with no range check and no LOS**, firing every `fireRate` seconds from room spawn.
+Projectiles travel `speed × lifeTime` = 10 × 3 = **30 units** against a ~25-unit screen, so turrets
+shot the player from off screen, out of walls, the whole time the room was loaded. `EnemySenses` is
+now the one place that answers "can it see me", and Turret gained `range` (13) + LOS.
+
+⚠️ **Sight ACQUIRES, memory KEEPS** (`EnemySenses.Memory` 2.5s). Gating the chase on "can see right
+now" makes a *worse* enemy — it freezes the instant you step behind a pillar and unfreezes after,
+which reads as a stutter rather than as awareness.
+
+⚠️ **CAST FROM THE CHEST, NOT THE FEET.** Enemy transforms are grounded at floor level by the level
+importer, so a ray from the origin starts inside the floor tile. Measured on a completely clear line:
+`eyeHeight 1.0 → CanSee true`, `eyeHeight 0.0 → CanSee FALSE`. Same class of bug as the player's old
+`wallCheck` returning true on flat ground.
+
+⚠️ **An unset `LayerMask` serializes as 0, which as a raycast mask means "hit nothing" — i.e. it would
+silently disable line of sight entirely.** `EnemySenses.ResolveBlockers` therefore falls back to
+Ground, so a forgotten Inspector slot degrades to CORRECT behaviour rather than to no behaviour.
+
+⚠️ **TESTING TRAP that produced two false results in a row.** `Physics2D.simulationMode` is
+`FixedUpdate`, so **`Physics2D.Simulate()` called from `execute_code` does nothing** — a push test
+using it reported 0.0000 for both the old and new mass and looked like proof. And placing the test
+player by offsetting from an enemy buries them inside terrain, so every LOS check returns false and
+looks like the feature is broken. **Stand the test player on a real floor found by raycast, and
+always run the control to confirm the test can still detect the bug.**
+
+**Still open, deliberately not done:** enemies still never jump (`inputJump` is written exactly once
+in the whole AI codebase, in `SlimeAI.cs`, as `false`), so they still stop dead at ledges; and
+`MeleeEnemyAI` still does not patrol, so 27 enemies stand frozen until aggroed. Both change
+difficulty and were left for the designer to call.
+
 ### Layer Convention Mismatch (Known Issue)
 
 **Verified against every enemy prefab 2026-07-18** (an earlier version of this file wrongly claimed MeleeEnemy was on Default — it is on Enemy):
