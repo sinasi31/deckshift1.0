@@ -16,7 +16,7 @@ This file is loaded automatically into Claude Code at the start of every session
 
 📐 **TWO LOADABLE SKILLS HOLD THE DETAIL. This file is the always-on summary; they are the working references.**
 
-- **`/deckshift-ui`** — house style and the inversion rule, the theme table, linear-colour-space calibration, uGUI traps, the wiring contract, a pre-delivery checklist, and a catalogue of every screen that exists. Invoke before building, restyling or debugging **any** screen, panel, HUD element, card face, world-space marker or UI VFX.
+- **`/deckshift-ui`** — the **Salvage** material system (see below), linear-colour-space calibration, uGUI traps, the wiring contract, a pre-delivery checklist, and a catalogue of every screen that exists. Invoke before building, restyling or debugging **any** screen, panel, HUD element, card face, world-space marker or UI VFX.
 - **`/deckshift-levels`** — the Level Design Laws with their reasoning, the ASCII importer and its tile-painting rules, the validator's measured movement budget, doors and gates, the room pool inventory, and the run map. Invoke before authoring, importing, validating or debugging a room, or before touching `LevelManager`, tiles, gates or the exit door.
 
 ⚠️ **These were split OUT of this file on 2026-08-20 because it had grown to ~75k tokens and was being loaded in full for every session, including ones that never touched a screen or a room.** Between them the two sections were 41% of the file. **When you learn something new about UI or levels, write it into the SKILL, not back into here** — otherwise this grows again and the split buys nothing. Only add here what must be true even when you are working on something else entirely.
@@ -946,6 +946,41 @@ pre-delivery checklist, **and (§8) the full catalogue of every screen that exis
 one paid for. **Invoke it (`/deckshift-ui`) before building, restyling, reviewing or debugging any
 screen, panel, HUD element, card face, world-space marker or UI VFX.** What follows is only what must
 be true even when you are not doing UI work.
+
+### ⚠️ SALVAGE — the one material system (2026-08-20). It replaced the nine-theme rule.
+
+The designer's brief: *"i want a settings menu, a pause menu, a blompo UI/VFX, the shop, the forge,
+the map, and every other UI asset … to feel like they would have been in the cainos packs. i want
+consistency in the visuals overall, not seperated to menus and the actual gameplay, but everything."*
+
+The old rule — **"every screen gets its own material, never the same skin, pick one and invert
+something"** — did exactly what it said, which is make screens look *unlike* each other: nine invented
+materials (smoked glass, brass, frost) and a hue budget that ran out. **Every settings screen built
+under it was rejected, and the rule was why.**
+
+⚠️ **THE FIX IS NOT ONE SUBSTRATE EVERYWHERE — that is monotony, and `Vigil` (stone alcoves, real
+dungeon art, a torch each) was rejected TWICE proving it.** The Cainos pack holds crates, pots,
+banners, chains and fireplaces and still reads as one world. **Consistency lives in the TREATMENT.**
+
+`Assets/Scripts/Salvage.cs` is the file; five laws no screen may disagree with:
+
+1. **Scale** — `Salvage.Scale` = **2.4107** (14 world units / 1080 canvas / 32 PPU). UI art is the
+   exact size the same art is in the game. `Salvage.SpritePPU` enforces it automatically.
+2. **Light** — warm, **upper left**, always.
+3. **Colour** — **sampled from the pack PNGs, never chosen** (`SalvageArt` + its baker). Measured
+   dungeon stone is **`#444548` cool-neutral**; the old "warm charcoal" was reasoned from the
+   district's *name* and is wrong against the art. Warmth comes from wood and torchlight only.
+4. **Accent** — **exactly two in the entire game**: `Salvage.Torch` (lit) and `Salvage.Shift`
+   (energised — the altar orb's cyan, the same that seals the gate). `Salvage.Wound` red is a
+   warning, not an accent. **No screen ever spends a new hue again.**
+5. **Wear** — used **and repaired**. The repair currency is literally called scrap.
+
+Variety comes from **what the object is**, not from a colour: a hung sheet, a notice board, a
+workbench, a banner. **Migrated so far: `PauseScreen` only** (Dust Sheet). Everything else still
+renders in the superseded themes until converted.
+
+⚠️ **`Assets/Cainos/Pixel Art Icon Pack - RPG` has 107 icons and 89 are referenced NOWHERE.** Same
+artist, same PPU, same palette. Use them before drawing another procedural sigil.
 
 ### Canvas hierarchy
 

@@ -39,7 +39,64 @@ What fixed it was pointing every choice at the world:
 - **Rules score across and fade at the ends**, never edge-to-edge like a CSS
   border.
 
-### Every screen gets its own material
+### ⛔ SUPERSEDED 2026-08-20 — SALVAGE REPLACES EVERYTHING IN THIS SUBSECTION
+
+**Do not build a new screen from the table below.** It is kept only so you can
+read a screen that has not been migrated yet, and so nobody re-derives the rule
+it encodes. That rule was:
+
+> Every screen gets its own material. Screens share the ideology and **never the
+> same skin**. Pick a material and invert something.
+
+It did exactly what it says, and what it says is *make the screens look unlike
+each other* — nine invented materials (smoked glass, brass, frost…) and a hue
+budget that ran out. **Every settings screen built under it was rejected, and
+the rule, not the execution, is why.** Designer, 2026-08-20:
+
+> "i want a settings menu, a pause menu, a blompo UI/VFX, the shop, the forge,
+> the map, and every other UI asset … to feel like they would have been in the
+> cainos packs. i want consistency in the visuals overall, not seperated to
+> menus and the actual gameplay, but everything."
+
+**The replacement is `Salvage.cs` — read it before any UI work.** Its thesis, and
+the thing both the old rule and the obvious fix get wrong:
+
+⚠️ **CONSISTENCY LIVES IN THE TREATMENT, NOT THE SUBSTRATE.** One substrate
+everywhere is *not* the answer — that reads as monotony, and this project has the
+receipt: **Vigil** was stone alcoves with real dungeon art and a torch per alcove,
+and it was rejected **twice**. But look at the Cainos dungeon pack itself: crates,
+pots, bottles, banners, chains, skeletons, candles, fireplaces — wildly different
+materials, reading as one world. Not because it is all stone. Because everything
+in it obeys the same handful of laws.
+
+So: screens may be made of anything the dungeon contains; they may not disagree
+about these five.
+
+| | law |
+|---|---|
+| **1 · Scale** | `Salvage.Scale` = **2.4107** — 14 world units over a 1080 canvas at 32 PPU. UI art is the exact size the same art is in the game. `Salvage.SpritePPU` enforces it, so no screen has to remember. Deliberately non-integer: the *world* already displays at this scale, so 2× or 3× would make UI pixels visibly a different size from world pixels. |
+| **2 · Light** | Warm, from the **upper left**, always. The old system had Iron lit from below, Arcane from above, Halt edges-inward and Bulletin from the left — four screens, four suns. |
+| **3 · Colour** | **Sampled from the pack PNGs, never chosen.** `SalvageArtBaker` → `SalvageArt` ramps. Measured dungeon stone is **`#444548` cool-neutral**; the old palette reasoned "warm charcoal, rust not brushed steel" from the *district's name* and was simply wrong against the art. The warmth in this game comes from wood (`#401D13`) and torchlight, never from the walls. |
+| **4 · Accent** | **Exactly two in the whole game.** `Salvage.Torch` (lit / present) and `Salvage.Shift` (energised / live — the altar orb's exact cyan, the same colour that seals the gate). **The hue budget stops existing; no screen ever spends a colour again.** `Salvage.Wound` red is a *warning*, not an accent, and is the only permitted third. |
+| **5 · Wear** | Used **and repaired** — not pristine, not derelict. The world's repair currency is literally called scrap. |
+
+**Variety then comes from WHAT THE OBJECT IS**, which is a property of the
+screen's purpose rather than a colour someone picked: a hung sheet, a notice
+board, a workbench, a banner, paper pinned across a grate.
+
+⚠️ **THE ONE FREE RESOURCE NOBODY WAS USING:** `Assets/Cainos/Pixel Art Icon
+Pack - RPG` holds **107 icons, 89 of them referenced nowhere in the project** —
+Heart, Gear, Scroll, Map, Chest, three Keys, Coins, Rune Stone, Book, Lantern,
+gems, ingots. Same artist, same 32 PPU, same palette. Reach for these before
+drawing another procedural sigil.
+
+**Migration status:** `PauseScreen` is Salvage (Dust Sheet). Everything else is
+still on the table below and reads as the old system until converted.
+
+---
+
+<details>
+<summary>The superseded per-screen material table (reference only)</summary>
 
 Screens share the *ideology* — flat procedural plates, restraint, directional
 light, a subtle particle drift, one meaningful accent — and **never the same
@@ -66,7 +123,17 @@ over the print in red pen by a visibly different hand. When a screen depicts a
 THING that exists in the world, ask what that thing has been *through*, not just
 what it is made of.
 
+</details>
+
 ### The inversions are the point
+
+⚠️ **Under Salvage the inversions still matter, but they may no longer spend a
+HUE.** Light direction is fixed and the palette is sampled, so what separates two
+screens is the OBJECT, its silhouette and its motion. Worked example: the pause
+screen is the only **soft** thing in the game — everything else coming is rigid
+(planks, a board, an anvil, a banner) — and it is the only screen that lets you
+see the world behind it, and the only one that leaves by being **pulled away**
+instead of faded. Three separations, no colour spent.
 
 Warm/cold. Below/above. Rising/falling. Worn/pristine. Still/moving.
 Inside/outside the fiction.
@@ -235,6 +302,43 @@ same instincts are wrong in the opposite direction. Measured while building it:
 
 The rule underneath all three: **contrast against the ground is what matters, not
 the alpha.** Never carry a value across from a dark theme to a light one.
+
+### Generating a Salvage surface — five traps, all paid for on the pause screen
+
+⚠️ **EVERY CAINOS SPRITE HAS A 1PX DARK OUTLINE, AND IT IS A DIFFERENT MATERIAL
+FROM THE THING IT OUTLINES.** Sampling a sprite rect swallows it. `Cloth 08` is
+grey linen (`#97918A`) inside a solid brown (`#563B25`) border on all four sides,
+so the first linen ramp had a brown bottom third and every shadowed part of the
+sheet came out blotched. `SalvageArtBaker` insets **2px** (the corners are
+stepped, so the outline is two pixels thick diagonally). If a baked ramp ever
+looks contaminated, this is why.
+
+⚠️ **A RAMP CARRIES THE MATERIAL; A MULTIPLIER CARRIES THE FORM.** Do not shade
+by walking the ramp. Measured, linen spans `#8A8179`..`#A29B91` — about **22
+luminance levels out of 255** — so driving folds, key light and drape through
+`Sample()` produced a sheet as flat as poured concrete. `Sample()` picks *which*
+linen; a `shade` float decides how lit it is.
+
+⚠️ **SMOOTH GRADIENTS READ AS SHEET METAL.** Carrying the form in wide soft
+gradients made cloth look like brushed steel. Matte surfaces need a fine crumple
+broken into the shade itself so the surface never resolves into a clean gradient,
+plus a few **hard** creases — the sharp lines are what the eye reads as fabric.
+
+⚠️ **A RADIAL FALLOFF STRETCHED TO A MENU ROW BECOMES A STREAK, NOT A BAND.**
+A 64×64 radial blob at 600×62 rendered as a horizontal smear with a hot core and
+read as a lens flare lying across the menu. Any soft shape that will be stretched
+to a very different aspect must fall off on each axis **independently**, with a
+flat plateau (`SalvageSurfaces.Edge`).
+
+⚠️ **A DASHED RECTANGLE ENCLOSING NOTHING IS MARCHING ANTS.** The stitched patch
+was a perfect rect whose interior was 8% brighter than the sheet, so all that was
+visible was its dashed border — it read as a UI selection box left on screen.
+Wear has to be a visibly **different** piece of material, with a boundary that
+wobbles and stitches spaced irregularly.
+
+⚠️ **AND WEAR GOES WHERE THE LAYOUT IS EMPTY AT EVERY CONTENT LENGTH.** The mend
+sits bottom-left because the menu bottoms out around v 0.67 and the stat column
+around v 0.70. A stain behind a column of numbers reads as a rendering fault.
 
 ### Rarity must separate on three channels at once
 
@@ -661,9 +765,15 @@ Lessons already paid for, don't re-learn them:
 - **Show the numbers a decision depends on.** Blompo's card-pick step listed only a bare charge count — no Shift cost, no maximum — so you chose which card to permanently alter without seeing what it cost or how much life it had. Chips now carry labelled SHIFT / CHARGES stats, and `StampChip` refreshes *both* on the bind frame because several blessings visibly change them.
 - **Empty states must collapse.** `LayoutSections` lays the screen out top-down and resizes the window to its content, so an empty section shrinks to one explanatory line. The fixed-height version had two large voids and looked broken — and that state is *common*, since early in a run nothing is damaged or exhausted.
 
-### ⚠️ OPEN DESIGNER NOTE: the menu screens don't feel like the WORLD yet (2026-08-17)
+### ⚠️ DESIGNER NOTE: the menu screens don't feel like the WORLD yet (2026-08-17)
 
-**Standing feedback, not a bug, and not yet actioned.** On accepting Marquee the designer said it is
+> **ANSWERED 2026-08-20 by SALVAGE (§1).** This note called it three days before the cause was
+> found, and it named the two screens — pause and settings — that then failed twice more before the
+> RULE, rather than either screen, turned out to be the problem. **`PauseScreen` is converted; every
+> other screen here is still the thing this note is complaining about.** Keep the note until the
+> migration is done; it is the standing brief for the rest of it.
+
+**Standing feedback, not a bug.** On accepting Marquee the designer said it is
 "a better screen, doesn't really fit the theme of the game and the world", and named **the pause
 menu and the settings menu** as feeling the same way — "they are fine for now, I would like to
 change them in the future for sure".
@@ -839,9 +949,25 @@ Escape. **The old `PauseMenu` + `PauseMenuPanel` + `MenuManager` are DELETED** a
 
 **It is the only screen with NO window plate, and that is structural, not decorative.** Every other screen is a place you walked to inside the world, so each is a panel sitting on top of the game. Pause is not somewhere you go — it is the world being stopped — so it takes the whole frame. That choice separates it from every other screen before a single colour is picked.
 
-The **suspended mote field** is the signature and the one thing to preserve: motes hang dead still, each still dragging the streak it had when the clock stopped, shivering about a pixel against it. It says "time is held" before a word has been read.
+#### ⚠️ RE-SKINNED 2026-08-20 — it is now **DUST SHEET**, the first Salvage screen
 
-⚠️ **The streak must be SHORT and the dot must lead.** The first pass ran 16–52px streaks behind a 3–6px dot and the screen read as **rain**, or worse as scratches on the lens — a long thin line is a line first and a particle second. A mote has to read as a POINT that happens to be smeared; the instant the smear is the bigger half, the idea is gone. Same reason the hairline fractures had to drop to a third of the motes' brightness and move out into the margins: at equal value the two effects collapse into one look and the whole screen just looks like a dirty lens.
+A sheet of canvas thrown over the frozen world, hung from a rope on wooden pegs. **The Halt theme, the frost edges, the hairline fractures and the suspended mote field are GONE** — do not restore them; they belonged to the superseded per-screen-material system. What survives from the old screen is everything below this box: the structural no-plate choice, the status readout, the two-step destructive entries, and every wiring rule.
+
+Why cloth, and why it is the screen that proves Salvage:
+
+- **It is the only SOFT screen in the game.** Everything else coming is rigid — planks, a notice board, an anvil, a banner, paper on a grate. That one structural difference separates it with **no colour spent**, which is what the old rule kept failing to do.
+- **A sheet does not replace the room, it hangs in front of it.** The backdrop is deliberately **not opaque** (alpha 0.78) and the frozen game stays dimly visible past the sheet's edges. No other screen in the game shows you the world behind it.
+- **It leaves by being PULLED AWAY, not faded.** A dissolve says the screen was an image laid over the game; whipping the cloth up off the rope says the game was behind it the whole time.
+
+⚠️ **THE PIVOT IS THE ROPE, and the content is parented to the sheet** so the text swings with the cloth it is printed on. Same lesson as the quest board's tack pivot: the rotation pivot carries the metaphor. Content that stayed level while the sheet swung would read as a texture behind a window.
+
+⚠️ **The pause is released on the FIRST frame of the yank**, not at the end — so the game is already running for the ~0.2s the cloth takes to clear. That is the point, not a compromise. Two consequences that are easy to miss: `CloseAnim` must drop `blocksRaycasts` immediately (or the player's first click after resuming is eaten by a sheet halfway off screen), and `Open` must **re-arm** the group (or a screen opened during a yank comes up looking perfect and ignoring every click). `CloseAnim` also checks `isOpen` before deactivating, since Escape-mashing can re-open mid-flight.
+
+⚠️ **The sheet is 1400 wide because 4:3 is 1440.** Canvases match on HEIGHT, so width is what flexes and width is what breaks screens. A sheet wider than 1440 loses its hanging edges at 4:3 — and those edges are most of what makes it read as an object rather than a background.
+
+**Selection is marked in CHALK** — a chevron plus an underline, in `Salvage.Chalk`, the exact colour and stroke sprite the world's exit marker uses. Two earlier attempts *lit* the row instead (an accent plate, then a "rubbed brighter" patch of cloth) and both failed: see §2's radial-falloff trap for why the rubbed version read as a lens flare.
+
+The old screen's signature was a **suspended** mote field saying "time is held". Its replacement says something more physical: **dust knocked off the sheet when it dropped**, falling and thinning to almost nothing over a few seconds, so the screen calms down instead of fidgeting for as long as you leave it open.
 
 ⚠️ **The root GameObject stays ACTIVE; only its `Content` child toggles.** `Update` has to run to catch the Escape that *opens* the screen, and a deactivated GameObject gets no `Update`. Same reason `SetContentVisible` (used while a sub-panel borrows the display) drops the CanvasGroup's alpha rather than deactivating anything.
 
