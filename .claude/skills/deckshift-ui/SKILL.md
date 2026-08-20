@@ -723,11 +723,17 @@ because it sat on a red medallion: **pick a status colour against what it will a
 **It shows an arrow riding the inset frame while the door is off screen, and nothing at all once the
 door is in view** — once you can see the archway there is nothing left to say.
 
-⚠️ **IT ALSO SETTLES BACK.** After 5s in a room the arrow eases from alpha 0.92 down to 0.42 over
-1.6s and stays there; a new room restarts the clock. The first seconds are when a player actually
-needs telling which way is out — after that it is a reference they glance at, not a thing that should
-keep asking. **This is the general shape for any persistent guidance mark: loud while it is teaching,
-quiet once it is only confirming.**
+⚠️ **IT ALSO SETTLES BACK, AND FAR FURTHER THAN FEELS RIGHT.** After **3s** in a room the arrow eases
+from alpha 0.92 down to **0.15** over 1.6s and stays there; a new room restarts the clock. The first
+pass at 5s / 0.42 was corrected by the designer to *"way more transparent, almost kind of invisible"*
+and *"5 seconds might be a little bit too long"*. **Verified on real dungeon art, not against black**
+— at 0.15 it is present if you look for it and completely ignorable if you are not, which is the
+target. The nudge motion is doing most of the work of keeping it findable at that value, so do not
+remove the motion to "tidy" the settled state.
+
+**This is the general shape for any persistent guidance mark: loud while it is teaching, nearly gone
+once it is only confirming.** The instinct is to settle at something still comfortably readable;
+the designer's correction says go lower than that.
 
 ⚠️ **A CHALK RING THAT CIRCLED THE DOOR ON FIRST SIGHT WAS BUILT AND CUT** (designer, 2026-08-20):
 *"too basic … i don't think it's even a good idea to have them at all"*, delivered with a general

@@ -58,11 +58,17 @@ public class ExitMarker : MonoBehaviour
     private const float LostMargin = 0.02f;
     private const float SeenMargin = 0.10f;
 
-    // The arrow is loudest while you are still working out where you are, then steps back.
-    private const float SettleDelay = 5f;
+    // The arrow is loudest while you are still working out where you are, then all but disappears.
+    //
+    // ⚠️ SettleAlpha is DELIBERATELY almost invisible (designer, 2026-08-20: "way more transparent,
+    // almost kind of invisible"). Once a player has read the arrow once, they know where the exit is;
+    // from then on it only needs to be findable when they go looking for it, not noticeable when they
+    // are not. At this value the nudge motion is doing most of the work of making it findable at all,
+    // which is why that must not be removed to "clean up" the settled state.
+    private const float SettleDelay = 3f;
     private const float SettleTime = 1.6f;    // slow enough that it reads as easing off, not blinking
     private const float FullAlpha = 0.92f;
-    private const float SettleAlpha = 0.42f;
+    private const float SettleAlpha = 0.15f;
 
     private const float ArrowLen = 66f;
     private const float FadeSpeed = 5.5f;
