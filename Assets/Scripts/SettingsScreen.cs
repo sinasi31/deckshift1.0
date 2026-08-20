@@ -7,24 +7,28 @@ using TMPro;
 
 // The settings screen.
 //
-// THEME: Instrument (FlatUI.Instrument) — a brass surveying instrument carried down into the
-// dungeon. Tarnished, thumbed at the controls, dust in the engraving, and lit FROM BEHIND through
-// its own lens glass.
+// ══ SALVAGE — the same board the pause screen hangs on ═══════════════════════════════════════════
 //
-// ⚠️ IT REPLACED *APPARATUS*, WHICH THE DESIGNER REJECTED (2026-08-20): "a modern type of cool UI,
-// in a game that happens in a dungeon, where you fight zombies and orcs and slimes, using shift and
-// cards. does not read well." Three things were carrying that, and none of them was the palette
-// alone — so do not "fix" this screen by retinting it back:
+// Planks bound with iron, dropped in on two chains in front of the dungeon wall. Designer's brief,
+// 2026-08-20: "lets work on the settings menu. it can basically have the same stuff that the pause
+// menu has." Wall, board, chains, chalk, typography and the drop-in entrance all come from the same
+// place — see SalvageScreen, which owns them so the two screens cannot drift apart.
 //
-//   · A TRAVELLING SCAN SWEEP. A line of light crossing glass is the single most sci-fi gesture in
-//     UI. Replaced by a static warm bloom behind the plate: the instrument is BACKLIT, not scanned.
-//   · AN iOS TOGGLE PILL — a rounded capsule with a knob sliding inside it. That one widget was
-//     doing more to make the screen read as an app than the colours were. It is now a lever that
-//     stands PROUD of a slotted plate and is thrown left or right.
-//   · ARC-CYAN, a colour that exists nowhere in this world.
+// ⚠️ THIS SCREEN HAS NOW BEEN REJECTED TWICE UNDER TWO DIFFERENT INVENTED MATERIALS. Read that
+// before "improving" it back toward either:
 //
-// Calibration is kept, because settings genuinely IS calibration and it was Apparatus's one good
-// idea — the crosshair marks stay, they are just scribed into brass now instead of glowing.
+//   · APPARATUS — smoked glass, arc-cyan, a travelling scan sweep, an iOS toggle pill. Verdict:
+//     "a modern type of cool UI, in a game that happens in a dungeon, where you fight zombies and
+//     orcs and slimes, using shift and cards. does not read well."
+//   · INSTRUMENT — a tarnished brass surveying instrument, backlit, with a thrown lever. Better,
+//     and still not the game: "i wouldnt say i dont like it but i wouldnt say i like it as well."
+//
+// Both were carefully made, and both failed for the same reason: they invented a material rather
+// than using one the world is built from. That is the whole thesis of Salvage — see Salvage.cs.
+//
+// What survived from Instrument, because it was right and is not sci-fi: settings genuinely IS
+// calibration, so the sliders keep their graduated scale and blade pointer. On wood that reads as a
+// carpenter's rule rather than a dial, which is exactly the translation wanted.
 //
 // ⚠️ EVERY ROW ON THIS SCREEN CHANGES SOMETHING. Values live in GameSettings, which names the
 // consumer for each one. Do not add a control without a consumer — a slider that moves and does
@@ -37,11 +41,36 @@ public class SettingsScreen : MonoBehaviour
 {
     private static SettingsScreen instance;
 
-    private static readonly FlatUI.Theme T = FlatUI.Instrument;
+    // ⚠️ A FlatUI.Theme STRUCT WHOSE EVERY COLOUR COMES FROM SALVAGE. It is a shim, deliberately:
+    // this screen's control code (sliders, levers, cycles, ticks, rules) reads T.* in about forty
+    // places, and rewriting all of them to reach for Salvage directly would be a large diff with
+    // nothing to show for it. Pointing the struct at Salvage re-tints the whole screen at once and
+    // keeps the single-source rule — nothing here is a colour somebody picked.
+    //
+    // ⚠️ Surface is TRANSPARENT on purpose: the plank board supplies the surface now, and a plate
+    // drawn under it would show as a rectangle of flat colour around the board's edges.
+    private static readonly FlatUI.Theme T = new FlatUI.Theme
+    {
+        Backdrop = new Color(0.020f, 0.017f, 0.015f, 1f),
+        Surface = new Color(0f, 0f, 0f, 0f),
+        SurfaceRaised = Salvage.Lit(Salvage.Ramp("wood").Sample(0.75f)),
+        Border = Salvage.Lit(Salvage.Ramp("wood").Sample(0.05f)),
+        BorderSoft = Salvage.Lit(Salvage.Ramp("wood").Sample(0.20f)),
+        EdgeLight = Salvage.Lit(Salvage.Ramp("wood").Sample(1f), 1.6f),
+        Accent = Salvage.Torch,
+        TextBright = Salvage.TextBright,
+        TextBody = Salvage.TextBody,
+        TextMuted = Salvage.TextMuted,
+        TextDisabled = Salvage.TextFaint,
+    };
 
-    private const float WIN_W = 1240f;
-    private const float WIN_H = 940f;
-    private const int CHAMFER = 10;
+    // ⚠️ SAME WIDTH AS THE PAUSE BOARD, AND SYMMETRIC ABOUT THE CENTRE. Two boards in the same game
+    // that are different widths read as two different objects; and every row here is positioned by
+    // offset from the window centre, so top and bottom must be equal and opposite or the whole
+    // layout shifts. 880 tall because settings has 11 controls and 3 section headers to carry —
+    // more than pause — which is a legitimate reason for a taller sign, unlike a wider one.
+    private const float WIN_W = 1400f;
+    private const float WIN_H = 880f;
 
     private const float CONTENT_TOP = 304f;      // from the window's centre
     private const float ROW_H = 44f;
@@ -89,7 +118,10 @@ public class SettingsScreen : MonoBehaviour
     private readonly List<Row> rows = new List<Row>();
     private int selected;
 
-    private RectTransform window, sweep;
+    // `window` is the content parent (canvas-centre coordinates, so every row offset below is
+    // unchanged from the plate version); `board` is the physical panel that drops, swings and scales.
+    private RectTransform window, board;
+    private SalvageScreen.Hang hang;
     private CanvasGroup group;
     private TMP_FontAsset font;
     private AudioSource audioSource;
@@ -174,119 +206,16 @@ public class SettingsScreen : MonoBehaviour
         back.transition = Selectable.Transition.None;
         back.onClick.AddListener(Hide);
 
-        window = AddPoint(transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero,
-                          new Vector2(WIN_W, WIN_H));
-        Image winBg = window.gameObject.AddComponent<Image>();
-        winBg.sprite = FlatUI.Panel(CHAMFER);
-        winBg.type = Image.Type.Sliced;          // ⚠️ Simple stretches the 26px plate into a blob
-        winBg.color = T.Surface;
-        winBg.raycastTarget = true;
+        // Same wall and same board as the pause screen, from the same builder — see SalvageScreen
+        // for why that is one function and not two copies.
+        SalvageScreen.BuildWall(transform);
+        SalvageScreen.BuildBoard(transform, WIN_W, WIN_H * 0.5f, -WIN_H * 0.5f, out board, out window);
 
-        Image edge = AddImage(window, "Edge", FlatUI.Outline(CHAMFER, 2), T.Border, false);
-        edge.type = Image.Type.Sliced;
-        Stretch(edge.rectTransform);
-        FlatUI.ApplySliceThickness(edge, 2f);
-
-        BuildCalibrationMarks();
-        BuildBacklight();
-        BuildWear();
         BuildTitle();
         BuildRows();
         BuildFooter();
 
         SetSelected(0, false);
-    }
-
-    // Four crosshairs just inside the corners. Deliberately dim: they are the panel saying what
-    // KIND of object it is, not decoration competing with the controls.
-    private void BuildCalibrationMarks()
-    {
-        Color c = T.EdgeLight;
-        c.a = 0.32f;
-        Vector2[] at =
-        {
-            new Vector2(-WIN_W * 0.5f + 30f,  WIN_H * 0.5f - 30f),
-            new Vector2( WIN_W * 0.5f - 30f,  WIN_H * 0.5f - 30f),
-            new Vector2(-WIN_W * 0.5f + 30f, -WIN_H * 0.5f + 30f),
-            new Vector2( WIN_W * 0.5f - 30f, -WIN_H * 0.5f + 30f),
-        };
-        for (int i = 0; i < at.Length; i++)
-        {
-            Image m = AddImage(window, "Mark" + i, FlatUI.CalibrationMark(), c, false);
-            m.rectTransform.sizeDelta = new Vector2(18f, 18f);
-            m.rectTransform.anchoredPosition = at[i];
-        }
-    }
-
-    // ⚠️ THIS REPLACED A TRAVELLING SCAN SWEEP, and the swap is most of why the screen stopped
-    // reading as sci-fi. A line of light crossing a plate says "being scanned"; an instrument is
-    // not scanned, it is LIT — so the light is now a static warm bloom sitting BEHIND the plate,
-    // as though the lamp were on the far side of the lens glass.
-    //
-    // Backlighting is also the one light direction nothing else in the game had claimed: Iron
-    // lights from below, Arcane from above, Halt from the edges inward, Bulletin rakes from the
-    // left, and Apparatus was lit by its own content.
-    private void BuildBacklight()
-    {
-        // Drawn BEFORE the plate in sibling order (this is called before the window's contents),
-        // so it genuinely sits behind rather than glowing on top of the brass.
-        Color c = T.Accent;
-        // ⚠️ 0.022 and SMALLER THAN THE PANEL, both corrected by screenshot. Linear colour space
-        // punishes a warm saturated glow twice over: at 0.055 spanning the full window it did not
-        // read as light behind glass at all — it lit the centre, left the corners dark, and the
-        // whole plate came out as a muddy brown gradient with the text sitting in a haze. A
-        // backlight has to be a POOL the plate sits in front of, not a wash over the plate.
-        c.a = 0.022f;
-        Image s = AddImage(window, "Backlight", FlatUI.SoftGlow(), c, false);
-        s.rectTransform.sizeDelta = new Vector2(WIN_W * 0.72f, WIN_H * 0.55f);
-        s.rectTransform.anchoredPosition = new Vector2(0f, WIN_H * 0.10f);
-        s.rectTransform.SetAsFirstSibling();
-        sweep = s.rectTransform;   // field reused; nothing animates it any more
-    }
-
-    // ⚠️ THIS IS THE "WHAT HAS IT BEEN THROUGH" LAYER, and it is not decoration — it is the lesson
-    // the run map paid for twice. That screen was given a material (slate, then etched copper) and
-    // rejected both times as still reading like a diagram; it only became a map when it became a
-    // DOCUMENT that had been folded, carried and written on. A material alone is not enough.
-    //
-    // ⚠️ THE WEAR IS *BRIGHTER* THAN THE PLATE, NOT DARKER, and that is both physically right and
-    // the only thing that works here. Real tarnish is darker than brass — but this plate is already
-    // dark, and the calibration rule in the UI skill is blunt about it: a dark mark on a dark
-    // surface is invisible. What a thumb actually does to a tarnished instrument is POLISH it, so
-    // the wear is brass showing THROUGH the tarnish where hands have been. Dark-on-dark would have
-    // been correct and unseeable.
-    //
-    // ⚠️ Kept in the MARGINS, never in a content column. The forge's first scuff pass ran a streak
-    // straight through its title; these sit in the bands the layout leaves empty at any row count.
-    private void BuildWear()
-    {
-        // rubbed-bright blooms where the thing has been held — outer margins only
-        var spots = new[]
-        {
-            new Vector4(-WIN_W * 0.44f,  WIN_H * 0.10f, 150f, 190f),
-            new Vector4( WIN_W * 0.45f, -WIN_H * 0.06f, 130f, 220f),
-            new Vector4(-WIN_W * 0.41f, -WIN_H * 0.31f, 120f, 130f),
-        };
-        foreach (var s in spots)
-        {
-            Color c = T.EdgeLight;
-            // ⚠️ 0.075, arrived at by previewing values at runtime rather than recompiling to guess. The
-            // forge learned that scuffs at 0.045 read as rendering glitches and 0.022 reads as wear —
-            // but brass-on-brass is FAR lower contrast than its steel-on-charcoal, and at 0.030 this was
-            // invisible. Never carry an alpha between themes; measure it on the surface it lands on.
-            c.a = 0.075f;
-            Image w = AddImage(window, "Wear", FlatUI.SoftGlow(), c, false);
-            w.rectTransform.anchoredPosition = new Vector2(s.x, s.y);
-            w.rectTransform.sizeDelta = new Vector2(s.z, s.w);
-        }
-
-        // Patina gathers in the crevice where the plate meets its frame — along the bottom inner
-        // edge, which is where anything left standing collects it.
-        Color v = FlatUI.Patina;
-        v.a = 0.10f;
-        Image gr = AddImage(window, "Patina", FlatUI.BottomGlow(), v, false);
-        gr.rectTransform.sizeDelta = new Vector2(WIN_W - 28f, 90f);
-        gr.rectTransform.anchoredPosition = new Vector2(0f, -WIN_H * 0.5f + 45f);
     }
 
     private void BuildTitle()
@@ -312,17 +241,16 @@ public class SettingsScreen : MonoBehaviour
     {
         // The selection cursor is built first so every row's widgets draw over it.
         cursor = AddPoint(window, "Cursor", new Vector2(0.5f, 0.5f), Vector2.zero,
-                          new Vector2(WIN_W - 96f, 38f));
+                          new Vector2(780f, 3.4f));
+        // ⚠️ A CHALK UNDERLINE, NOT A TINTED PLATE — the same mark the pause screen uses, in the same
+        // colour the world uses for the exit arrow. The plate version was inherited from a cyan
+        // theme at alpha 0.03, and amber is far brighter than cyan: in linear space it composited
+        // into a solid glowing bar across the selected row. Do not just lower the alpha — the two
+        // screens should agree about what "selected" looks like, and chalk has an edge.
         Image cu = cursor.gameObject.AddComponent<Image>();
-        cu.sprite = FlatUI.Panel(5);
-        cu.type = Image.Type.Sliced;
-        // ⚠️ 0.03, not the 0.065 that looks right on paper. The project renders in LINEAR colour
-        // space, so a small alpha of a bright, saturated colour composites far brighter than the
-        // number suggests: 0.065 of this cyan over the panel surface landed near 0.36 sRGB on
-        // screen and filled the selected row with a solid teal slab. Pick these by screenshot.
-        cu.color = new Color(T.Accent.r, T.Accent.g, T.Accent.b, 0.03f);
+        cu.sprite = Parchment.Stroke();
+        cu.color = Salvage.Chalk;
         cu.raycastTarget = false;
-        FlatUI.ApplySliceThickness(cu, 5f);
 
         layoutY = CONTENT_TOP;
 
@@ -362,7 +290,10 @@ public class SettingsScreen : MonoBehaviour
     {
         if (rows.Count > 0) layoutY -= SECTION_GAP;
 
-        TextMeshProUGUI h = AddText(window, "Section_" + name, name, 15f, T.Accent,
+        // ⚠️ MUTED, NOT ACCENT. Salvage has two accents for the whole game and a section header is not
+        // a state — it is a label. Amber headers plus amber values plus amber sliders made the whole
+        // screen one colour, which is exactly what the two-accent rule exists to prevent.
+        TextMeshProUGUI h = AddText(window, "Section_" + name, name, 15f, T.TextMuted,
                                     TextAlignmentOptions.Left);
         h.rectTransform.sizeDelta = new Vector2(LABEL_W, 22f);
         h.rectTransform.anchoredPosition = new Vector2(LABEL_X, layoutY - 10f);
@@ -387,7 +318,7 @@ public class SettingsScreen : MonoBehaviour
         r.labelText.rectTransform.anchoredPosition = new Vector2(LABEL_X, r.y);
         r.labelText.characterSpacing = 3f;
 
-        r.valueText = AddText(window, "V_" + label, "", 17f, T.Accent, TextAlignmentOptions.Right);
+        r.valueText = AddText(window, "V_" + label, "", 17f, T.TextBody, TextAlignmentOptions.Right);
         r.valueText.rectTransform.sizeDelta = new Vector2(VALUE_W, 26f);
         r.valueText.rectTransform.anchoredPosition = new Vector2(VALUE_X, r.y);
 
@@ -397,7 +328,7 @@ public class SettingsScreen : MonoBehaviour
                                 new Vector2(LABEL_X - LABEL_W * 0.5f - 18f, r.y), new Vector2(9f, 2f));
         Image tick = r.selectMark.gameObject.AddComponent<Image>();
         tick.sprite = FlatUI.Pixel();
-        tick.color = T.Accent;
+        tick.color = Salvage.Chalk;
         tick.raycastTarget = false;
         tick.enabled = false;
 
@@ -528,7 +459,11 @@ public class SettingsScreen : MonoBehaviour
         Image ki = knob.gameObject.AddComponent<Image>();
         ki.sprite = FlatUI.Panel(3);
         ki.type = Image.Type.Sliced;
-        ki.color = T.EdgeLight;                 // polished brass, where a thumb has worn it
+        // ⚠️ IRON, AND PUT IN THE LIGHT (key 2.2). It inherited T.EdgeLight, which under Salvage is
+        // the brightest WOOD — about 0.43 value — and a mid-brown lever over a black shadow slab read
+        // as a dark blob on an amber bar rather than as a handle. A lever is metal, and the one thing
+        // it must do is be the brightest object in its own control.
+        ki.color = Salvage.Lit(Salvage.Ramp("iron").Sample(1f), 2.2f);
         ki.raycastTarget = false;
         FlatUI.ApplySliceThickness(ki, 3f);
         r.knob = knob;
@@ -624,6 +559,8 @@ public class SettingsScreen : MonoBehaviour
         if (hudWasActive && HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(true);
 
         fitScale = FitScale();
+        board.localScale = Vector3.one * fitScale;
+        hang.Release();
 
         RefreshAll();
         SetSelected(0, false);
@@ -668,6 +605,10 @@ public class SettingsScreen : MonoBehaviour
         cb?.Invoke();
     }
 
+    // ⚠️ NO SCALE POP. The board arrives by being DROPPED IN on its chains (SalvageScreen.Hang,
+    // ticked in Update), which is the same entrance the pause screen makes — the designer named that
+    // motion as the part of the pause screen that was working. All this does is fade the frame in
+    // underneath it so the wall does not snap on.
     private IEnumerator OpenAnim()
     {
         const float dur = 0.16f;
@@ -675,13 +616,10 @@ public class SettingsScreen : MonoBehaviour
         while (t < dur)
         {
             t += Time.unscaledDeltaTime;   // the screen pauses the game; scaled time is frozen
-            float k = Mathf.Clamp01(t / dur);
-            group.alpha = k;
-            window.localScale = Vector3.one * fitScale * Mathf.Lerp(0.985f, 1f, k);
+            group.alpha = Mathf.Clamp01(t / dur);
             yield return null;
         }
         group.alpha = 1f;
-        window.localScale = Vector3.one * fitScale;
     }
 
     // ---- input -----------------------------------------------------------------------------------
@@ -712,7 +650,7 @@ public class SettingsScreen : MonoBehaviour
             Adjust(selected, +1);
 
         TickCursor();
-        // (no sweep to tick any more - the instrument is backlit, not scanned)
+        hang.Tick(board, WIN_H * 0.5f);
     }
 
     // Skips rows that are currently greyed out (Frame Cap with VSync on), so the keyboard never
@@ -819,7 +757,8 @@ public class SettingsScreen : MonoBehaviour
                     r.fill.sizeDelta = new Vector2(TRACK_W * v, 0f);
                     r.handle.anchoredPosition = new Vector2(-TRACK_W * 0.5f + TRACK_W * v, 5f);
                     r.valueText.text = Mathf.RoundToInt(v * 100f) + "%";
-                    r.valueText.color = accent;
+                    // The FILL carries the accent (it is the quantity); the number is just a number.
+                    r.valueText.color = live ? T.TextBody : T.TextDisabled;
                     r.fill.GetComponent<Image>().color = accent;
 
                     // Graduations the value has passed brighten, so the scale reads as filled.
@@ -878,37 +817,13 @@ public class SettingsScreen : MonoBehaviour
     {
         float k = 1f - Mathf.Exp(-24f * Time.unscaledDeltaTime);
         cursorY = Mathf.Lerp(cursorY, cursorTargetY, k);
-        cursor.anchoredPosition = new Vector2(0f, cursorY);
+        // Sits UNDER the row, like the pause screen's underline, and indented so it starts at the label.
+        cursor.anchoredPosition = new Vector2(-150f, cursorY - 20f);
     }
 
     // The scan sweep: one line of light crossing the plate top to bottom, then a long dark pause
     // before the next pass. The pause is what keeps it a measuring instrument rather than a loading
     // bar — a continuously cycling line reads as "busy", and this panel is idle by definition.
-    private void TickSweep()
-    {
-        const float period = 7f;
-        const float travel = 2.2f;      // seconds of the period the line is actually visible
-
-        float t = Time.unscaledTime % period;
-        Image img = sweep.GetComponent<Image>();
-
-        if (t > travel)
-        {
-            Color hidden = img.color;
-            hidden.a = 0f;
-            img.color = hidden;
-            return;
-        }
-
-        float k = t / travel;
-        float half = WIN_H * 0.5f;
-        sweep.anchoredPosition = new Vector2(0f, Mathf.Lerp(half, -half, k));
-
-        // Fade in and out at the ends so the line doesn't pop into existence at the panel edge.
-        Color c = T.Accent;
-        c.a = 0.10f * Mathf.Min(Mathf.Clamp01(k / 0.15f), Mathf.Clamp01((1f - k) / 0.15f));
-        img.color = c;
-    }
 
     // ---- small builders --------------------------------------------------------------------------
 

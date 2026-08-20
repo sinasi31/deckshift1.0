@@ -127,18 +127,8 @@ public class PauseScreen : MonoBehaviour
     private bool wasUIPaused;
     private float markY, markTargetY;
 
-    // ---- the swing ------------------------------------------------------------------------------
-    // A hung sheet is a pendulum, so it is integrated as one rather than lerped. Explicit integration
-    // plus one very long frame (a domain reload, an editor stall) throws a spring off the screen, so
-    // dt is clamped — the same guard the character-select figures needed.
-    private float swingAngle, swingVel;
-    private float dropY, dropVel;
-    // ⚠️ SLOWER AND HEAVIER THAN THE CLOTH VERSION (was K 26 / damp 3.1). A board of planks on iron
-    // chains has real mass: it should swing lazily and take its time settling. Cloth numbers on a
-    // heavy object read as tinny.
-    private const float SwingK = 15f, SwingDamp = 2.5f;
-    private const float DropK = 62f, DropDamp = 9.5f;
-    private const float MaxStep = 1f / 30f;
+    // The hanging motion lives in SalvageScreen.Hang so every board in the game swings alike.
+    private SalvageScreen.Hang hang;
 
     private GameObject subPanel;
     private bool subScreenOpen;
@@ -214,8 +204,8 @@ public class PauseScreen : MonoBehaviour
                                                         : new Color(0.020f, 0.017f, 0.015f, 1f), true);
         Stretch(backdrop.rectTransform);
 
-        if (GROUND == Ground.Wall) BuildWall();
-        BuildPanel();
+        if (GROUND == Ground.Wall) SalvageScreen.BuildWall(content);
+        SalvageScreen.BuildBoard(content, SHEET_W, SHEET_TOP, SHEET_BOTTOM, out sheet, out printed);
 
         BuildTitle();
         BuildMenu();
@@ -223,144 +213,6 @@ public class PauseScreen : MonoBehaviour
         BuildFooter();
 
         content.gameObject.SetActive(false);
-    }
-
-    // The dungeon wall, tiled at world magnification, lit by an off-screen torch from the upper left.
-    //
-    // ⚠️ Image.Type.Tiled is not optional — Simple stretches one 256px block across the whole screen.
-    // ⚠️ And the tint is measured, not computed: the character select found 0.15 leaves the masonry
-    // invisible (a flat void, throwing away the one piece of real game art on screen) and near full
-    // value gives a bright grey field. That screen settled on 0.25; this one sits under a menu rather
-    // than behind portraits, so it starts lower and gets calibrated by screenshot.
-    private void BuildWall()
-    {
-        Sprite wall = Salvage.Wall();
-        if (wall == null) { Debug.LogWarning("PauseScreen: SalvageArt.wall missing — run Deckshift/Bake Salvage Art."); return; }
-
-        Image w = AddImage(content, "Wall", wall, WallTint, false);
-        w.type = Image.Type.Tiled;
-        Stretch(w.rectTransform);
-
-        // ---- landmarks -------------------------------------------------------------------------
-        //
-        // ⚠️ THIS IS THE FIX FOR "THE BACKDROP LOOKS UNFINISHED". A seamless texture repeated across
-        // a screen has no landmarks, so the eye stops reading it as a wall and reads it as a fill —
-        // and the only variation left was a big soft light gradient, which is exactly what an
-        // unfinished placeholder looks like. Cainos ships cracks, dents, an outfall and 15 grime
-        // patches for this job; they cost nothing and they are the same art the rooms are dressed in.
-        //
-        // ⚠️ EVERY PIECE IS ANCHORED TO A SCREEN CORNER, never to the centre. The canvas matches on
-        // height, so width flexes from 1440 at 4:3 to 2560 at 21:9 — anything placed by offset from
-        // the middle drifts out of its corner as the aspect changes, and the margins beside the
-        // board are the only place these are visible at all.
-        Deco("Break 01",   new Vector2(0f, 0f), new Vector2(210f, 250f), false);
-        Deco("Dent 04",    new Vector2(1f, 0f), new Vector2(-190f, 190f), true);
-        Deco("Outfall 01", new Vector2(1f, 1f), new Vector2(-150f, -170f), false);
-        Deco("Dent 01 A",  new Vector2(0f, 1f), new Vector2(240f, -120f), false);
-
-        Dirt(0, new Vector2(0f, 0f), new Vector2(120f, 470f));
-        Dirt(3, new Vector2(0f, 1f), new Vector2(150f, -330f));
-        Dirt(6, new Vector2(1f, 0f), new Vector2(-140f, 430f));
-        Dirt(9, new Vector2(1f, 1f), new Vector2(-260f, -300f));
-        Dirt(12, new Vector2(0f, 0f), new Vector2(330f, 120f));
-
-        // ---- light -----------------------------------------------------------------------------
-        //
-        // ⚠️ MUCH GENTLER THAN THE FIRST PASS (amber 0.085 over 1900x1500, black 0.42 over 2600x1900).
-        // That ran from a warm blob on the left to featureless black on the right — a vignette so
-        // strong the masonry only existed in one band, which is most of why the backdrop read as a
-        // gradient rather than a room. A torch biases a wall; it does not erase it.
-        Image glow = AddImage(content, "TorchGlow", SalvageSurfaces.Bloom(),
-                              new Color(Salvage.Torch.r, Salvage.Torch.g, Salvage.Torch.b, 0.026f), false);
-        glow.rectTransform.sizeDelta = new Vector2(1700f, 1350f);
-        glow.rectTransform.anchoredPosition = new Vector2(-560f, 260f);
-
-        Image dark = AddImage(content, "FarCorner", SalvageSurfaces.Bloom(),
-                              new Color(0f, 0f, 0f, 0.20f), false);
-        dark.rectTransform.sizeDelta = new Vector2(2800f, 2000f);
-        dark.rectTransform.anchoredPosition = new Vector2(620f, -400f);
-    }
-
-    // The wall and everything on it share one tint, so decoration sits IN the masonry rather than on
-    // top of it. Pack art is painted at full value and UI does not pass through the scene's
-    // 0.5-intensity global light, so this is doing the lighting the world would have done.
-    private static readonly Color WallTint = new Color(0.300f, 0.293f, 0.315f, 1f);
-
-    private void Deco(string suffix, Vector2 anchor, Vector2 offset, bool flip)
-    {
-        Sprite s = Salvage.Deco(suffix);
-        if (s == null) return;
-
-        Image img = AddImage(content, "Deco_" + suffix, s, WallTint, false);
-        img.rectTransform.anchorMin = img.rectTransform.anchorMax = anchor;
-        img.rectTransform.sizeDelta = new Vector2(Salvage.Px(s.rect.width), Salvage.Px(s.rect.height));
-        img.rectTransform.anchoredPosition = offset;
-        // Flipping doubles the vocabulary for free and stops two dents reading as a repeat.
-        if (flip) img.rectTransform.localScale = new Vector3(-1f, 1f, 1f);
-    }
-
-    private void Dirt(int index, Vector2 anchor, Vector2 offset)
-    {
-        Sprite s = Salvage.Dirt(index);
-        if (s == null) return;
-
-        Image img = AddImage(content, "Dirt_" + index, s, WallTint, false);
-        img.rectTransform.anchorMin = img.rectTransform.anchorMax = anchor;
-        img.rectTransform.sizeDelta = new Vector2(Salvage.Px(s.rect.width), Salvage.Px(s.rect.height));
-        img.rectTransform.anchoredPosition = offset;
-    }
-
-    // The board: planks bound with iron, hung on two chains.
-    private void BuildPanel()
-    {
-        float h = SHEET_TOP - SHEET_BOTTOM;
-
-        // ⚠️ THE PIVOT IS WHERE IT HANGS FROM. Everything about this screen's motion — the drop in,
-        // the swing, the lift on resume — is a rotation about that line. Pivoting at the centre makes
-        // a swinging board look like a spinning card, which is the exact failure the quest board's
-        // tack pivot exists to avoid.
-        sheet = AddPoint(content, "Panel", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-        sheet.pivot = new Vector2(0.5f, 1f);
-        sheet.sizeDelta = new Vector2(SHEET_W, h);
-        sheet.anchoredPosition = new Vector2(0f, SHEET_TOP);
-
-        // ⚠️ Chains are built FIRST so they draw behind the board — a chain link crossing in front of
-        // the planks reads as a chain lying on the board rather than one carrying it. They are
-        // children of the panel so they travel and swing with it; their tops run well off the top of
-        // the screen, so nothing gives away that the ceiling end is moving too.
-        Sprite chain = SalvageSurfaces.Chain(Salvage.Tex(520f));
-        float chainW = Salvage.Px(chain.rect.width);
-        for (int i = 0; i < 2; i++)
-        {
-            Image ch = AddImage(sheet, "Chain" + i, chain, Color.white, false);
-            ch.rectTransform.sizeDelta = new Vector2(chainW, Salvage.Px(chain.rect.height));
-            // ⚠️ Aligned with the IRON STRAPS, not merely near the corners — a chain bolts to the
-            // band, and one hanging in the middle of bare planks looks like it would tear straight out.
-            ch.rectTransform.anchorMin = ch.rectTransform.anchorMax = new Vector2(i == 0 ? 0.055f : 0.945f, 1f);
-            ch.rectTransform.pivot = new Vector2(0.5f, 0f);            // grows upward from the board
-            ch.rectTransform.anchoredPosition = new Vector2(0f, -10f); // tucked just under the top edge
-        }
-
-        Sprite board = SalvageSurfaces.PlankBoard(Salvage.Tex(SHEET_W), Salvage.Tex(h));
-        Image img = AddImage(sheet, "Board", board, Color.white, false);
-        cloth = img.rectTransform;
-        Stretch(cloth);
-
-        // A shadow the board casts on whatever is behind it. It is what stops the panel reading as
-        // painted onto the backdrop, and it is the cheapest depth cue available.
-        Image shadow = AddImage(sheet, "BoardShadow", SalvageSurfaces.Bloom(),
-                                new Color(0f, 0f, 0f, 0.45f), false);
-        shadow.rectTransform.anchorMin = Vector2.zero;
-        shadow.rectTransform.anchorMax = Vector2.one;
-        shadow.rectTransform.offsetMin = new Vector2(-70f, -90f);
-        shadow.rectTransform.offsetMax = new Vector2(70f, 40f);
-        shadow.transform.SetAsFirstSibling();
-
-        // Everything printed on the board hangs off it, so it moves with the surface it is on.
-        RectTransform onBoard = AddPoint(sheet, "OnBoard", new Vector2(0.5f, 1f),
-                                         new Vector2(0f, -SHEET_TOP), Vector2.zero);
-        onBoard.sizeDelta = Vector2.zero;
-        printed = onBoard;
     }
 
 
@@ -600,10 +452,7 @@ public class PauseScreen : MonoBehaviour
         SetSelected(0, false);
 
         // The throw. It comes in from above the rope, overshoots, and swings itself out.
-        dropY = 620f;
-        dropVel = 0f;
-        swingAngle = Random.Range(0.7f, 1.5f) * (Random.value < 0.5f ? -1f : 1f);
-        swingVel = 0f;
+        hang.Release();
 
         if (audioSource != null) SfxManager.PlayOn(audioSource, ProcSfx.PauseHalt, 0.85f);
 
@@ -653,7 +502,7 @@ public class PauseScreen : MonoBehaviour
             t += Time.unscaledDeltaTime;
             float k = Mathf.Clamp01(t / dur);
             sheet.anchoredPosition = new Vector2(0f, startY + 780f * k * k);   // hauled up and away
-            sheet.localRotation = Quaternion.Euler(0f, 0f, swingAngle * (1f - k) + k * 3.5f);
+            sheet.localRotation = Quaternion.Euler(0f, 0f, hang.angle * (1f - k) + k * 3.5f);
             group.alpha = 1f - k * k;
             yield return null;
         }
@@ -790,7 +639,7 @@ public class PauseScreen : MonoBehaviour
             // Nudging the row nudges the sheet. Tiny, but it is the difference between cloth and a
             // picture of cloth: touching a hung thing moves it.
 
-            swingVel += Random.Range(-1.5f, 1.5f);
+            hang.Knock();
         }
     }
 
@@ -831,30 +680,7 @@ public class PauseScreen : MonoBehaviour
             if (entries[i].armed && Time.unscaledTime > entries[i].armedUntil) Disarm(entries[i]);
     }
 
-    // The sheet is a pendulum on a spring, integrated on unscaled time because the game is frozen.
-    private void TickCloth()
-    {
-
-
-        float dt = Mathf.Min(Time.unscaledDeltaTime, MaxStep);
-
-        dropVel += (-DropK * dropY - DropDamp * dropVel) * dt;
-        dropY += dropVel * dt;
-        if (Mathf.Abs(dropY) < 0.05f && Mathf.Abs(dropVel) < 0.05f) { dropY = 0f; dropVel = 0f; }
-
-        swingVel += (-SwingK * swingAngle - SwingDamp * swingVel) * dt;
-        swingAngle += swingVel * dt;
-
-        // ⚠️ A BOARD ON CHAINS IS NOT CLOTH IN A DRAUGHT. The sheet version breathed at 0.16° + 0.10°
-        // on periods under two seconds, which on something with mass reads as jitter rather than as
-        // weight. This is a third of that amplitude at half the rate: a slow settling drift you
-        // notice only if you look for it, which is what a heavy hung thing actually does.
-        float idle = Mathf.Sin(Time.unscaledTime * 0.42f) * 0.055f
-                   + Mathf.Sin(Time.unscaledTime * 0.17f) * 0.040f;
-
-        sheet.anchoredPosition = new Vector2(0f, SHEET_TOP + dropY);
-        sheet.localRotation = Quaternion.Euler(0f, 0f, swingAngle + idle);
-    }
+    private void TickCloth() { hang.Tick(sheet, SHEET_TOP); }
 
     private void TickSelectionVisual()
     {
