@@ -33,6 +33,18 @@ public static class EnemySenses
     // How long an enemy keeps coming after losing sight.
     public const float Memory = 2.5f;
 
+    // ⚠️ THE RAY STARTS THIS FAR ALONG, AND THAT IS LOAD-BEARING. `Physics2D.queriesStartInColliders`
+    // is ON by default, so a ray whose ORIGIN sits inside any collider returns a hit at distance
+    // 0.000 — permanently blind. It is not hypothetical: the bat hovers against ceilings and ledges,
+    // and a bat overlapping a tile reported "blocked by Ground at distance 0.00" and never attacked
+    // once, for as long as it lived. Exactly the bug that made the player's old wallCheck return true
+    // while standing on flat open ground.
+    //
+    // 0.35 is safe against seeing THROUGH anything: level geometry is on a 1-unit grid, so a wall is
+    // at least a full unit thick and the caster would have to be buried inside it for this to skip
+    // past the far face.
+    public const float StartSkip = 0.35f;
+
     // ⚠️ A LayerMask left unset serializes as 0, which as a raycast mask means "hit nothing" — so an
     // unconfigured field would silently disable line of sight entirely and restore exactly the bug
     // this file exists to fix. Falling back to Ground means a forgotten Inspector slot degrades to
@@ -59,7 +71,9 @@ public static class EnemySenses
         LayerMask mask = ResolveBlockers(blockers);
         if (mask.value == 0) return true;   // nothing can block; do not pretend to be blind
 
-        return Physics2D.Raycast(eye, delta / dist, dist, mask).collider == null;
+        Vector2 dir = delta / dist;
+        float skip = Mathf.Min(StartSkip, dist * 0.5f);   // never skip past the target itself
+        return Physics2D.Raycast(eye + dir * skip, dir, dist - skip, mask).collider == null;
     }
 
     // Convenience for the common shape: "am I allowed to act on the player right now?" — true if

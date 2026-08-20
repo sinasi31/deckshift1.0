@@ -1181,6 +1181,53 @@ in the whole AI codebase, in `SlimeAI.cs`, as `false`), so they still stop dead 
 `MeleeEnemyAI` still does not patrol, so 27 enemies stand frozen until aggroed. Both change
 difficulty and were left for the designer to call.
 
+### ⚠️ The bat (`BatMan.prefab` + `AeroBatAI`), rebuilt 2026-08-20
+
+Reported as "really bad… maybe doing it from scratch might be easier". It did not need rebuilding —
+the Cainos rig and `AC Bat` controller render well. It needed five things fixed:
+
+**1. IT NEVER ATTACKED WHEN NEAR TERRAIN — the big one.** `CheckForPlayer` raycast from
+`transform.position`, and `Physics2D.queriesStartInColliders` is ON, so a bat hovering against a
+ceiling or ledge — *which is where bats hang* — started its sight ray INSIDE that tile and got
+**"blocked by Ground at distance 0.00"**. Measured live. Such a bat is inert for its whole life.
+Now routed through `EnemySenses`, which skips `StartSkip` (0.35) units of ray before testing. 0.35 is
+safe against seeing *through* anything, because level geometry is on a 1-unit grid.
+
+**2. THE TELEGRAPH WAS AN UNREADABLE RED BOX.** The wind-up showed a plain red `Square` sprite above
+the bat — at almost exactly the height of the enemy health bar, which is **also a red bar**. They
+overlapped and were indistinguishable, so the dive effectively had no warning. ⚠️ **Deleted, and the
+bat itself is the telegraph now: it REARS BACK away from you and flushes hot (`windUpTint`) before it
+commits.** Anticipation is the oldest and most readable tell there is, it needs no icon or new art,
+it cannot be confused with a health bar, and it shows *which way* the dive is coming because the
+recoil runs along the same line. The Cainos monster shader exposes `_Color` (unlike the PLAYER rig's
+"Alpha Cut", which exposes no colour property at all), so the flush is a `MaterialPropertyBlock`.
+
+⚠️ **The recoil is applied in `FixedUpdate`, not in the coroutine that times it.** The body is
+Kinematic, so `MovePosition` belongs on the physics step; driven from a coroutine it stutters. The
+coroutine publishes `prepK` and FixedUpdate consumes it.
+
+**3. NO COOLDOWN BETWEEN DIVES.** It re-acquired on the frame it arrived home. Measured: it killed a
+full-health player in a few seconds *while the test was still being set up*. `diveCooldown` 1.1s.
+
+**4. COMPENSATING SCALES.** Root was **0.40** with the visual child at **2.88** to cancel it out —
+the same corruption shape as the old CardTemplate. Root is now (1,1,1) with the factor pushed down
+into the child, **and the PolygonCollider2D's 150 points scaled by the same 0.40**, since points are
+local and would otherwise have grown 2.5×. Verified a no-op: drawn bounds 1.753 × 1.761 and collider
+1.627 × 1.623 **before and after, to three decimals**.
+
+**5. Root position was `(-66.88, 19.79)`** (left over from being dragged out of a scene) and the
+**layer was Default(0)**; now origin and Enemy(11). Health bar offset 1.00 → 0.62, which was a full
+unit above a bat only 1.75 tall.
+
+⚠️ **`Collider2D.bounds` on a PREFAB ASSET reads (0,0,0)** — it is only real on an instance. This
+looked exactly like a degenerate collider and nearly got "fixed"; instantiate before believing it.
+
+⚠️ **`AeroBatAI.startPos` is captured once in `Start()`**, so teleporting a bat to test it does not
+stick — `IdleBehavior` flies it back. Respawn at the position you want instead.
+
+Still true: `Assets/Prefabs/AeroBat.prefab` remains a legacy husk (a SpriteRenderer with concept art
+and **no AI at all**). `BatMan` is the real one and the importer's `b` marker uses it.
+
 ### Layer Convention Mismatch (Known Issue)
 
 **Verified against every enemy prefab 2026-07-18** (an earlier version of this file wrongly claimed MeleeEnemy was on Default — it is on Enemy):
