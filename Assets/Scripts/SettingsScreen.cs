@@ -7,11 +7,24 @@ using TMPro;
 
 // The settings screen.
 //
-// THEME: Apparatus (FlatUI.Apparatus) — smoked glass and etched, self-illuminated linework. See the
-// theme's own header for why: settings is the one screen that is not inside the fiction, so it is
-// the machine's control panel rather than another room in the Oxidation District. Its light is
-// EMITTED BY THE CONTENT, its motion is a single travelling scan sweep, and its corner marks are
-// calibration crosshairs instead of rivets or stars.
+// THEME: Instrument (FlatUI.Instrument) — a brass surveying instrument carried down into the
+// dungeon. Tarnished, thumbed at the controls, dust in the engraving, and lit FROM BEHIND through
+// its own lens glass.
+//
+// ⚠️ IT REPLACED *APPARATUS*, WHICH THE DESIGNER REJECTED (2026-08-20): "a modern type of cool UI,
+// in a game that happens in a dungeon, where you fight zombies and orcs and slimes, using shift and
+// cards. does not read well." Three things were carrying that, and none of them was the palette
+// alone — so do not "fix" this screen by retinting it back:
+//
+//   · A TRAVELLING SCAN SWEEP. A line of light crossing glass is the single most sci-fi gesture in
+//     UI. Replaced by a static warm bloom behind the plate: the instrument is BACKLIT, not scanned.
+//   · AN iOS TOGGLE PILL — a rounded capsule with a knob sliding inside it. That one widget was
+//     doing more to make the screen read as an app than the colours were. It is now a lever that
+//     stands PROUD of a slotted plate and is thrown left or right.
+//   · ARC-CYAN, a colour that exists nowhere in this world.
+//
+// Calibration is kept, because settings genuinely IS calibration and it was Apparatus's one good
+// idea — the crosshair marks stay, they are just scribed into brass now instead of glowing.
 //
 // ⚠️ EVERY ROW ON THIS SCREEN CHANGES SOMETHING. Values live in GameSettings, which names the
 // consumer for each one. Do not add a control without a consumer — a slider that moves and does
@@ -24,7 +37,7 @@ public class SettingsScreen : MonoBehaviour
 {
     private static SettingsScreen instance;
 
-    private static readonly FlatUI.Theme T = FlatUI.Apparatus;
+    private static readonly FlatUI.Theme T = FlatUI.Instrument;
 
     private const float WIN_W = 1240f;
     private const float WIN_H = 940f;
@@ -63,7 +76,7 @@ public class SettingsScreen : MonoBehaviour
         // Toggle
         public System.Func<bool> getB;
         public System.Action<bool> setB;
-        public RectTransform knob;
+        public RectTransform knob, leverShadow;
         public Image switchTrack, switchFill;
 
         // Cycle
@@ -175,7 +188,8 @@ public class SettingsScreen : MonoBehaviour
         FlatUI.ApplySliceThickness(edge, 2f);
 
         BuildCalibrationMarks();
-        BuildSweep();
+        BuildBacklight();
+        BuildWear();
         BuildTitle();
         BuildRows();
         BuildFooter();
@@ -204,13 +218,75 @@ public class SettingsScreen : MonoBehaviour
         }
     }
 
-    private void BuildSweep()
+    // ⚠️ THIS REPLACED A TRAVELLING SCAN SWEEP, and the swap is most of why the screen stopped
+    // reading as sci-fi. A line of light crossing a plate says "being scanned"; an instrument is
+    // not scanned, it is LIT — so the light is now a static warm bloom sitting BEHIND the plate,
+    // as though the lamp were on the far side of the lens glass.
+    //
+    // Backlighting is also the one light direction nothing else in the game had claimed: Iron
+    // lights from below, Arcane from above, Halt from the edges inward, Bulletin rakes from the
+    // left, and Apparatus was lit by its own content.
+    private void BuildBacklight()
     {
+        // Drawn BEFORE the plate in sibling order (this is called before the window's contents),
+        // so it genuinely sits behind rather than glowing on top of the brass.
         Color c = T.Accent;
-        c.a = 0.10f;
-        Image s = AddImage(window, "Sweep", FlatUI.SweepLine(), c, false);
-        s.rectTransform.sizeDelta = new Vector2(WIN_W - 40f, 90f);
-        sweep = s.rectTransform;
+        // ⚠️ 0.022 and SMALLER THAN THE PANEL, both corrected by screenshot. Linear colour space
+        // punishes a warm saturated glow twice over: at 0.055 spanning the full window it did not
+        // read as light behind glass at all — it lit the centre, left the corners dark, and the
+        // whole plate came out as a muddy brown gradient with the text sitting in a haze. A
+        // backlight has to be a POOL the plate sits in front of, not a wash over the plate.
+        c.a = 0.022f;
+        Image s = AddImage(window, "Backlight", FlatUI.SoftGlow(), c, false);
+        s.rectTransform.sizeDelta = new Vector2(WIN_W * 0.72f, WIN_H * 0.55f);
+        s.rectTransform.anchoredPosition = new Vector2(0f, WIN_H * 0.10f);
+        s.rectTransform.SetAsFirstSibling();
+        sweep = s.rectTransform;   // field reused; nothing animates it any more
+    }
+
+    // ⚠️ THIS IS THE "WHAT HAS IT BEEN THROUGH" LAYER, and it is not decoration — it is the lesson
+    // the run map paid for twice. That screen was given a material (slate, then etched copper) and
+    // rejected both times as still reading like a diagram; it only became a map when it became a
+    // DOCUMENT that had been folded, carried and written on. A material alone is not enough.
+    //
+    // ⚠️ THE WEAR IS *BRIGHTER* THAN THE PLATE, NOT DARKER, and that is both physically right and
+    // the only thing that works here. Real tarnish is darker than brass — but this plate is already
+    // dark, and the calibration rule in the UI skill is blunt about it: a dark mark on a dark
+    // surface is invisible. What a thumb actually does to a tarnished instrument is POLISH it, so
+    // the wear is brass showing THROUGH the tarnish where hands have been. Dark-on-dark would have
+    // been correct and unseeable.
+    //
+    // ⚠️ Kept in the MARGINS, never in a content column. The forge's first scuff pass ran a streak
+    // straight through its title; these sit in the bands the layout leaves empty at any row count.
+    private void BuildWear()
+    {
+        // rubbed-bright blooms where the thing has been held — outer margins only
+        var spots = new[]
+        {
+            new Vector4(-WIN_W * 0.44f,  WIN_H * 0.10f, 150f, 190f),
+            new Vector4( WIN_W * 0.45f, -WIN_H * 0.06f, 130f, 220f),
+            new Vector4(-WIN_W * 0.41f, -WIN_H * 0.31f, 120f, 130f),
+        };
+        foreach (var s in spots)
+        {
+            Color c = T.EdgeLight;
+            // ⚠️ 0.075, arrived at by previewing values at runtime rather than recompiling to guess. The
+            // forge learned that scuffs at 0.045 read as rendering glitches and 0.022 reads as wear —
+            // but brass-on-brass is FAR lower contrast than its steel-on-charcoal, and at 0.030 this was
+            // invisible. Never carry an alpha between themes; measure it on the surface it lands on.
+            c.a = 0.075f;
+            Image w = AddImage(window, "Wear", FlatUI.SoftGlow(), c, false);
+            w.rectTransform.anchoredPosition = new Vector2(s.x, s.y);
+            w.rectTransform.sizeDelta = new Vector2(s.z, s.w);
+        }
+
+        // Patina gathers in the crevice where the plate meets its frame — along the bottom inner
+        // edge, which is where anything left standing collects it.
+        Color v = FlatUI.Patina;
+        v.a = 0.10f;
+        Image gr = AddImage(window, "Patina", FlatUI.BottomGlow(), v, false);
+        gr.rectTransform.sizeDelta = new Vector2(WIN_W - 28f, 90f);
+        gr.rectTransform.anchoredPosition = new Vector2(0f, -WIN_H * 0.5f + 45f);
     }
 
     private void BuildTitle()
@@ -398,31 +474,65 @@ public class SettingsScreen : MonoBehaviour
         r.getB = get;
         r.setB = set;
 
+        // ⚠️ A THROWN LEVER, NOT A TOGGLE PILL. What was here was a rounded capsule with a knob
+        // sliding inside it — the iOS/Android switch, and the single most "modern app" object that
+        // can appear on a screen. It was doing more to make this panel read as software than the
+        // colours were.
+        //
+        // The read now comes from geometry rather than from a coloured fill:
+        //   · the SLOT is recessed and dark (a channel milled into the plate)
+        //   · the LEVER is TALLER than the slot, so it stands proud of it and casts a shadow
+        //   · state is WHERE THE LEVER IS, not what colour the track is
+        // A lever standing above its plate cannot be mistaken for a capsule with a dot in it, and
+        // it works with the accent removed entirely — which is the test for whether a control's
+        // shape is carrying its meaning.
         RectTransform sw = AddPoint(window, "Switch_" + label, new Vector2(0.5f, 0.5f),
-                                    new Vector2(CTRL_X + 34f, r.y), new Vector2(68f, 24f));
+                                    new Vector2(CTRL_X + 34f, r.y), new Vector2(64f, 26f));
+        // The slot itself: a dark channel, darker than the plate it is cut into.
         Image bg = sw.gameObject.AddComponent<Image>();
-        bg.sprite = FlatUI.Panel(5);
+        bg.sprite = FlatUI.Panel(3);
         bg.type = Image.Type.Sliced;
-        bg.color = T.SurfaceRaised;
+        bg.color = new Color(T.Backdrop.r * 1.4f, T.Backdrop.g * 1.4f, T.Backdrop.b * 1.4f, 1f);
         bg.raycastTarget = true;
-        FlatUI.ApplySliceThickness(bg, 5f);
+        FlatUI.ApplySliceThickness(bg, 3f);
         r.switchTrack = bg;
 
-        Image swFill = AddImage(sw, "SwitchFill", FlatUI.Panel(5), T.Accent, false);
+        // ⚠️ A THIN LIT LINE ALONG THE CHANNEL FLOOR — NOT a block. The first pass made this
+        // 30x20, nearly the size of the lever itself, so the control rendered as TWO BRASS
+        // RECTANGLES SIDE BY SIDE and read as neither a lever nor a switch. The channel is
+        // background; the lever is the subject. It has to be obviously the lesser of the two.
+        Image swFill = AddImage(sw, "SwitchFill", FlatUI.Panel(2), T.Accent, false);
         swFill.type = Image.Type.Sliced;
-        Stretch(swFill.rectTransform);
-        FlatUI.ApplySliceThickness(swFill, 5f);
+        swFill.rectTransform.anchorMin = new Vector2(0f, 0.5f);
+        swFill.rectTransform.anchorMax = new Vector2(0f, 0.5f);
+        swFill.rectTransform.pivot = new Vector2(0f, 0.5f);
+        swFill.rectTransform.sizeDelta = new Vector2(46f, 5f);
+        swFill.rectTransform.anchoredPosition = new Vector2(9f, 0f);
+        FlatUI.ApplySliceThickness(swFill, 2f);
         r.switchFill = swFill;
 
-        RectTransform knob = AddPoint(sw, "Knob", new Vector2(0.5f, 0.5f), Vector2.zero,
-                                      new Vector2(26f, 16f));
+        // Shadow under the lever — this is what sells it standing OUT of the plate rather than
+        // sitting flush in it. Parented to the slot so it travels with the lever.
+        RectTransform lipShadow = AddPoint(sw, "LeverShadow", new Vector2(0.5f, 0.5f),
+                                           new Vector2(2f, -3f), new Vector2(16f, 36f));
+        Image ls = lipShadow.gameObject.AddComponent<Image>();
+        ls.sprite = FlatUI.Panel(3);
+        ls.type = Image.Type.Sliced;
+        ls.color = new Color(0f, 0f, 0f, 0.45f);
+        ls.raycastTarget = false;
+        FlatUI.ApplySliceThickness(ls, 3f);
+
+        // The lever: 34 tall against a 26 slot, so it genuinely overhangs top and bottom.
+        RectTransform knob = AddPoint(sw, "Lever", new Vector2(0.5f, 0.5f), Vector2.zero,
+                                      new Vector2(14f, 36f));
         Image ki = knob.gameObject.AddComponent<Image>();
-        ki.sprite = FlatUI.Panel(5);
+        ki.sprite = FlatUI.Panel(3);
         ki.type = Image.Type.Sliced;
-        ki.color = T.TextBright;
+        ki.color = T.EdgeLight;                 // polished brass, where a thumb has worn it
         ki.raycastTarget = false;
-        FlatUI.ApplySliceThickness(ki, 4f);
+        FlatUI.ApplySliceThickness(ki, 3f);
         r.knob = knob;
+        r.leverShadow = lipShadow;   // moved alongside the lever in Refresh
 
         int index = rows.Count - 1;
         Button b = sw.gameObject.AddComponent<Button>();
@@ -602,7 +712,7 @@ public class SettingsScreen : MonoBehaviour
             Adjust(selected, +1);
 
         TickCursor();
-        TickSweep();
+        // (no sweep to tick any more - the instrument is backlit, not scanned)
     }
 
     // Skips rows that are currently greyed out (Frame Cap with VSync on), so the keyboard never
@@ -727,16 +837,25 @@ public class SettingsScreen : MonoBehaviour
                 case RowKind.Toggle:
                 {
                     bool on = r.getB();
-                    r.knob.anchoredPosition = new Vector2(on ? 18f : -18f, 0f);
-                    r.knob.GetComponent<Image>().color = live ? (on ? T.Surface : T.TextMuted)
-                                                              : T.TextDisabled;
+                    // The lever is THROWN to one end of its slot. Position is the state; the
+                    // colours below only reinforce it.
+                    float lx = on ? 17f : -17f;
+                    r.knob.anchoredPosition = new Vector2(lx, 0f);
+                    if (r.leverShadow != null)
+                        r.leverShadow.anchoredPosition = new Vector2(lx + 2f, -3f);
+                    // Polished brass when live, dull when the row is greyed out.
+                    r.knob.GetComponent<Image>().color = live ? T.EdgeLight : T.TextDisabled;
+
                     // ⚠️ 0.55, not full. At alpha 1 in linear space these are solid slabs of
-                    // saturated cyan, and five of them stacked pulled the eye straight off the
+                    // saturated colour, and five of them stacked pulled the eye straight off the
                     // sliders — the loudest thing on a settings panel should not be whichever
-                    // control happens to be a switch. The bright knob still carries the state.
+                    // control happens to be a switch. The lever's POSITION carries the state.
                     Color f = accent;
                     f.a = on ? 0.55f : 0f;
                     r.switchFill.color = f;
+                    // The lit channel sits behind wherever the lever ISN'T — it is the ground the
+                    // lever has uncovered by travelling, so it must not follow the lever.
+                    r.switchFill.rectTransform.anchoredPosition = new Vector2(3f, 0f);
                     r.valueText.text = on ? "ON" : "OFF";
                     r.valueText.color = on ? accent : T.TextMuted;
                     break;
