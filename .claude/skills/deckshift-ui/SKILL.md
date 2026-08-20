@@ -124,6 +124,30 @@ vocabulary before reaching for more particles.** The settle beat was called blan
 because it *expanded* while everything else converged; pressing a seal inward
 fixed it.
 
+⚠️ **AN EFFECT MUST COME FROM WHAT THE THING MEANS, NOT FROM A SHAPE.** Standing
+instruction from the designer (2026-08-20), after a chalk ring that circled the
+exit door on first sight was cut as "too basic … i don't think it's even a good
+idea to have them at all", with: **be more creative with animations and effects.**
+
+The reflex to avoid is the *generic reveal* — a ring that expands, an outline that
+pulses, a glow that pops in, a shape drawn around the thing you want noticed. They
+are interchangeable, they carry no information, and they would fit any game.
+
+The test that replaced it: **what does this object already MEAN in this game, and
+what does the thing that acts on it mean?** Worked example from the same day — the
+gate. It was animated as a realistic medieval door (groan, strain, brown dust,
+1.6s) while the `ShiftAltar` was firing a glowing **cyan orb of Shift** across the
+room that burst on it. Cause and effect were in two different genres. The rebuild
+made the gate **sealed with Shift**: a cyan hairline breathing in the join, which
+flares and shatters when the orb lands, in the altar's exact colour. Same event,
+but now it says something — *this is locked, Shift is what locks it, and Shift is
+what just broke it* — and it doubles as gameplay information that sends the player
+looking for the switch.
+
+**Ask what is causing the effect and answer in that thing's own language.** If the
+effect would work equally well on a chest, a door and a menu button, it is the
+generic reveal wearing a costume.
+
 ### A permanent overlay must not compete with the game behind it
 
 Loadout is the quietest theme by weight because the relic bar sits over gameplay
@@ -696,9 +720,23 @@ red is already **damage** (health bar, damage numbers, hurt flashes), so a red a
 reads as "you are being hurt". Same lesson as the card's last-charge warning that could not be red
 because it sat on a red medallion: **pick a status colour against what it will appear on and mean.**
 
-**Two states, and the second is what makes it teach rather than nag:** off screen → an arrow rides the
-inset frame pointing at the door; on screen → the chalk **circles the arch once**, then goes away for
-good. Once you can see the archway there is nothing left to say.
+**It shows an arrow riding the inset frame while the door is off screen, and nothing at all once the
+door is in view** — once you can see the archway there is nothing left to say.
+
+⚠️ **IT ALSO SETTLES BACK.** After 5s in a room the arrow eases from alpha 0.92 down to 0.42 over
+1.6s and stays there; a new room restarts the clock. The first seconds are when a player actually
+needs telling which way is out — after that it is a reference they glance at, not a thing that should
+keep asking. **This is the general shape for any persistent guidance mark: loud while it is teaching,
+quiet once it is only confirming.**
+
+⚠️ **A CHALK RING THAT CIRCLED THE DOOR ON FIRST SIGHT WAS BUILT AND CUT** (designer, 2026-08-20):
+*"too basic … i don't think it's even a good idea to have them at all"*, delivered with a general
+instruction to **be more creative with animations and effects**. Do not re-propose it. The lesson
+generalises past this one mark: **a shape that simply appears around a thing is the most obvious
+effect available**, and reaching for it is a failure of imagination rather than a design. Expanding
+rings, pulsing outlines and pop-in glows are all the same reflex. If something must say "look here",
+the answer has to come from what the game already MEANS — the way the gate's seal became Shift-cyan
+because Shift is literally what opens it — not from a shape drawn around it.
 
 - ⚠️ Bootstraps through **`SceneBootstrap.Register`**, never a bare `RuntimeInitializeOnLoadMethod`.
 - Parented under **`GameplayHUD`**, so it inherits the HUD auto-hide for free.

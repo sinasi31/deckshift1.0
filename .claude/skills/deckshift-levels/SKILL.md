@@ -203,11 +203,45 @@ warm pixel means nothing. Two traps: a "longest wood run" test breaks on the iro
 doors, and the arch's **keystone is warm-toned stone**, so without a vertical-contiguity filter the
 baker punches a hole through the crown and hands the leaves a slice of masonry.
 
-**The sequence is BOLT → STILL → STRAIN → SWING → STOP**, keeping the old gate's best idea: a beat of
-**complete stillness** before it gives. Weight is communicated by the pause before a thing moves.
+#### ⚠️ The animation: THE GATE IS SEALED WITH SHIFT (rebuilt again 2026-08-20)
+
+**The first swing animation was competent and the designer rejected it: "not great … it just doesn't
+fit in."** It didn't, and the fault was not the timing curve — it was that the gate was animated as a
+REALISTIC MEDIEVAL DOOR (groan, strain, brown dust, ~1.6 seconds) **in a game where doors are opened
+by magic**. The `ShiftAltar` rips motes of Shift out of the air, absorbs them, flashes, and fires a
+glowing **cyan orb that flies across the room and bursts on the gate** — and the gate answered that
+with carpentry. Cause and effect were in two different genres, and it spent 1.6 seconds of a game
+whose whole thesis is momentum.
+
+**The fix was to make the gate speak the game's own language:**
+
+1. **A CLOSED GATE IS VISIBLY SEALED.** A hairline of Shift-cyan light breathes in the seam between
+   the two leaves — the *same* colour as the altar's orb, deliberately. This is information the gate
+   never gave before: it says "locked, and Shift is what locks it", which is what sends a player
+   looking for the altar or lever. `RestGlow` 0.12, breathing ±30% at 1.5 rad/s.
+2. **OPENING IS AN EVENT, NOT A PROCESS.** BREAK (the seal flares past full and shatters) → a held
+   BEAT of stillness → THROW (the doors are flung, ease-OUT because they were *released* not pushed,
+   overshooting to 1.06) → REBOUND off the jambs. **~0.52s, down from ~1.6s.**
+3. **THE PARTICLES INVERT.** Breaking sheds cyan motes OUTWARD from the seam; re-sealing draws them
+   back INWARD and the hairline re-ignites. Stone grit survives only where a leaf actually strikes
+   stone (the jambs on opening, the seam on the slam). The out/in inversion is the same trick that
+   fixed Blompo's forging→binding rebuild.
+
+⚠️ **DO NOT re-add the groaning strain sequence, brown dust as the primary particle, or a
+multi-second open.** Each was tried and each is what made it read as the wrong game.
+
 ⚠️ **Closing is deliberately NOT a mirror** — it accelerates the whole way into a single slam as the
-leaves meet. Opening ends softly at the jambs, closing ends loudly in the middle, so the two are
-distinguishable with your eyes shut.
+leaves meet, then the seal knits back. Opening ends softly at the jambs, closing ends loudly in the
+middle, so the two are distinguishable with your eyes shut.
+
+⚠️ **SCALE A PROCEDURAL SPRITE *TO* A SIZE, NEVER *BY* IT.** The seam sprite is 32×128px at PPU 32,
+i.e. natively **1 × 4 world units** — multiplying its scale by the 4-unit opening height made it 16
+units tall and the seal rendered as a line running off the top and bottom of the screen. Always divide
+the desired size by `sprite.bounds.size`; never assume a generated sprite is 1×1.
+
+⚠️ **Spawn particles on a TIME ACCUMULATOR, not a per-frame probability.** `if (Random.value < 0.5f)`
+inside the throw loop is framerate-dependent — twice as many at 120fps as at 60 — and in slow motion
+it runs away completely: **measured 109 live sparks at `timeScale` 0.05 where normal speed makes ~8.**
 
 ⚠️ **The layer stack goes UP from the sprite's original sorting order, never down.** The Ground tilemap
 draws at Default order 1 and the gate art is wider than the 1-tile gap it stands in, so in a room where

@@ -26,11 +26,20 @@ using UnityEngine.UI;
 // last-charge warning, which could not be red because it sat on a red medallion: pick a status
 // colour against what it will actually appear on and mean, never for its symbolism alone.
 //
-// TWO STATES, and the second one is what makes it teach rather than nag:
-//   off screen -> an arrow rides the screen edge, pointing at the door.
-//   on screen  -> the chalk circles the door ONCE, then gets out of the way for good.
-// Once you can see the arch there is nothing left to say, so it says nothing. A permanent overlay
+// It shows an arrow riding the screen edge while the door is off screen, and nothing at all once
+// the door is in view — once you can see the arch there is nothing left to say. A permanent overlay
 // must not compete with the game behind it.
+//
+// ⚠️ IT ALSO SETTLES BACK. After SettleDelay seconds in a room the arrow drops to SettleAlpha and
+// stays there. The first few seconds are when a player actually needs telling which way is out;
+// after that it is a reference they glance at, not a thing that should keep asking for attention.
+//
+// ⚠️ A CHALK RING THAT CIRCLED THE DOOR ON FIRST SIGHT WAS BUILT AND CUT (designer, 2026-08-20):
+// "too basic … i don't think it's even a good idea to have them at all". Do not re-propose it. The
+// general note that came with it is worth more than the specific cut: a shape that simply appears
+// around a thing is the most obvious effect available, and reaching for it is a failure of
+// imagination rather than a design. If this screen ever needs to say "that is the exit", the answer
+// has to come from something the game already means, not from a circle.
 public class ExitMarker : MonoBehaviour
 {
     // Chalk: warm, near-white, and deliberately not fully white so it reads as a soft mineral mark
@@ -49,6 +58,12 @@ public class ExitMarker : MonoBehaviour
     private const float LostMargin = 0.02f;
     private const float SeenMargin = 0.10f;
 
+    // The arrow is loudest while you are still working out where you are, then steps back.
+    private const float SettleDelay = 5f;
+    private const float SettleTime = 1.6f;    // slow enough that it reads as easing off, not blinking
+    private const float FullAlpha = 0.92f;
+    private const float SettleAlpha = 0.42f;
+
     private const float ArrowLen = 66f;
     private const float FadeSpeed = 5.5f;
 
@@ -66,17 +81,12 @@ public class ExitMarker : MonoBehaviour
     private RectTransform canvasRect;
     private CanvasGroup group;
     private RectTransform arrow;          // container: rotated to point, never scaled
-    private RectTransform ring;
-    private Image ringImg;
 
     private ExitDoor exit;
     private float findRetry;
     private float shown;                  // 0..1 arrow visibility, eased
-
-    // The reveal is per-room and one-shot: 0 = not yet seen, >0 = playing, <0 = done.
-    private float revealT;
-    private bool revealed;
-    private ExitDoor revealedFor;
+    private bool onScreen;                // last frame's verdict, so the margin can be asymmetric
+    private float roomTime;               // seconds since this room's exit was picked up
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
@@ -127,7 +137,6 @@ public class ExitMarker : MonoBehaviour
         group.blocksRaycasts = false;    // it must never eat a click
 
         BuildArrow();
-        BuildRing();
     }
 
     // A chalk arrow: one shaft and two barbs, each a tapered hand-drawn stroke, each set down at a
@@ -167,22 +176,6 @@ public class ExitMarker : MonoBehaviour
         img.raycastTarget = false;
     }
 
-    private void BuildRing()
-    {
-        var go = new GameObject("Ring", typeof(RectTransform));
-        go.transform.SetParent(transform, false);
-        ring = (RectTransform)go.transform;
-        ring.anchorMin = ring.anchorMax = new Vector2(0.5f, 0.5f);
-        ring.pivot = new Vector2(0.5f, 0.5f);
-        ring.localScale = Vector3.one;
-
-        ringImg = go.AddComponent<Image>();
-        ringImg.sprite = Parchment.InkRing(false);
-        ringImg.color = Chalk;
-        ringImg.raycastTarget = false;
-        go.SetActive(false);
-    }
-
     void LateUpdate()
     {
         // unscaled throughout: HitStop parks timeScale at 0 for whole frames, and a marker that
@@ -205,17 +198,20 @@ public class ExitMarker : MonoBehaviour
         // whole aspect ratio out. WorldToViewportPoint comes off the camera's own rect and cannot
         // disagree with what was actually drawn.
         Vector3 vp = Camera.main.WorldToViewportPoint(world);
-        float margin = revealed ? LostMargin : SeenMargin;
-        bool onScreen = vp.x > margin && vp.x < 1f - margin && vp.y > margin && vp.y < 1f - margin;
+        // Asymmetric margin, driven by LAST frame's verdict: once the door counts as on screen it
+        // has to leave properly to be lost again, and vice versa.
+        float margin = onScreen ? LostMargin : SeenMargin;
+        onScreen = vp.x > margin && vp.x < 1f - margin && vp.y > margin && vp.y < 1f - margin;
 
         Vector2 local;
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
             canvasRect, sp, canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera, out local);
 
+        roomTime += dt;
+
         if (onScreen)
         {
             shown = Mathf.MoveTowards(shown, 0f, dt * FadeSpeed);
-            if (!revealed) { revealed = true; revealT = 0f; ring.gameObject.SetActive(true); }
         }
         else
         {
@@ -223,7 +219,6 @@ public class ExitMarker : MonoBehaviour
             PlaceArrow(local);
         }
 
-        TickReveal(dt, local, world);
         Apply();
     }
 
@@ -252,45 +247,21 @@ public class ExitMarker : MonoBehaviour
 
     // The one-shot circle: it grows in fast, holds, then fades. Sized to the door itself so it reads
     // as circling THAT thing rather than as a generic blip on top of it.
-    private void TickReveal(float dt, Vector2 local, Vector3 world)
-    {
-        if (!revealed || revealT < 0f) { if (ring.gameObject.activeSelf && revealT < 0f) ring.gameObject.SetActive(false); return; }
-
-        revealT += dt;
-        const float draw = 0.30f, hold = 0.55f, fade = 0.65f;
-        float total = draw + hold + fade;
-        if (revealT >= total) { revealT = -1f; ring.gameObject.SetActive(false); return; }
-
-        float k = Mathf.Clamp01(revealT / draw);
-        float ease = 1f - (1f - k) * (1f - k);
-
-        // Size from the door's real on-screen extent: project a point one world unit above it and
-        // measure the gap in canvas units, so the circle fits the arch at any zoom or aspect.
-        Vector3 upSp = Camera.main.WorldToScreenPoint(world + Vector3.up);
-        Vector2 upLocal;
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            canvasRect, upSp, canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera, out upLocal);
-        float perUnit = Mathf.Max(1f, Vector2.Distance(local, upLocal));
-
-        // Resize, never scale - the door is ~3.2 world units tall, so a ring a shade wider than that
-        // encircles the arch without swallowing half the room.
-        float size = perUnit * Mathf.Lerp(5.2f, 4.1f, ease);
-        ring.sizeDelta = new Vector2(size, size);
-        ring.anchoredPosition = local;
-
-        float a = revealT < draw + hold ? ease : 1f - Mathf.Clamp01((revealT - draw - hold) / fade);
-        ringImg.color = new Color(Chalk.r, Chalk.g, Chalk.b, a * 0.85f);
-    }
-
     private void Apply()
     {
         float e = shown * shown * (3f - 2f * shown);
         arrow.gameObject.SetActive(e > 0.001f);
-        // The group carries the arrow; the ring drives its own alpha so it can play while the arrow
-        // is fading out, which is exactly the moment the door comes into view.
         group.alpha = 1f;
+
+        // After the first few seconds the mark stops asking and starts merely being available.
+        // Eased rather than stepped, and slowly, so it reads as the chalk settling into the wall
+        // instead of the HUD blinking at you.
+        float settle = Mathf.Clamp01((roomTime - SettleDelay) / SettleTime);
+        settle = settle * settle * (3f - 2f * settle);
+        float target = Mathf.Lerp(FullAlpha, SettleAlpha, settle);
+
         foreach (var img in arrow.GetComponentsInChildren<Image>(true))
-            img.color = new Color(Chalk.r, Chalk.g, Chalk.b, e * 0.92f);
+            img.color = new Color(Chalk.r, Chalk.g, Chalk.b, e * target);
     }
 
     private Vector3 ExitCentre()
@@ -304,14 +275,15 @@ public class ExitMarker : MonoBehaviour
     private bool ResolveExit()
     {
         if (exit != null) return true;
-        if (revealedFor != null || revealed) { revealed = false; revealT = 0f; revealedFor = null; }
 
         findRetry -= Time.unscaledDeltaTime;
         if (findRetry > 0f) return false;
         findRetry = 0.4f;
 
         exit = Object.FindFirstObjectByType<ExitDoor>();
-        if (exit != null) { revealed = false; revealT = 0f; revealedFor = exit; }
+        // A new room restarts the settle clock: the arrow is loud again in a place you have not
+        // seen before, which is the whole point of it being loud in the first place.
+        if (exit != null) { roomTime = 0f; onScreen = false; }
         return exit != null;
     }
 }
