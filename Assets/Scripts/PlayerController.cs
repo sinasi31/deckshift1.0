@@ -2169,8 +2169,23 @@ public class PlayerController : MonoBehaviour
 
     // Called by the walk/run animation's footstep event, relayed from PlayerAnimEventSink on the
     // Animator child. Clips/volume live here on the main player object.
+    // ⚠️ MIGRATED TO THE SOUND BANK (2026-08-20) — this is the worked example for the other call
+    // sites. Everything this method used to do by hand (pick a clip, jitter the pitch, own an
+    // AudioSource) is now data on the "Player.Footstep" event, and the bank does it better: a
+    // shuffle bag instead of Random.Range, so the same step can never play twice in a row.
+    //
+    // The serialized `footstepClips` / `footstepVolume` / `footstepPitchRange` fields are kept as a
+    // FALLBACK, not as the live path — if the bank or the event is missing, footsteps still work.
+    // A silent player would be a bad way to find out an asset failed to load.
     public void PlayFootstep()
     {
+        if (Sfx.Bank != null && Sfx.Bank.Find("Player.Footstep") != null)
+        {
+            Sfx.Play("Player.Footstep");
+            return;
+        }
+
+        // ---- fallback: the pre-bank behaviour ----
         if (footstepClips == null || footstepClips.Length == 0) return;
         AudioClip clip = footstepClips[Random.Range(0, footstepClips.Length)];
         if (clip == null) return;
