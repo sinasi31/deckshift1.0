@@ -989,63 +989,197 @@ public static class ProcSfx
         }
     }
 
+    // =============================================================================================
+    // ⚠️ REBUILT 2026-08-20 — MECHANISM, NOT MELODY.
+    //
+    // The version this replaces was built from musical intervals and the designer's verdict was
+    // that it "does not read well" in a dungeon. Reading the numbers back, that was exactly right:
+    //
+    //     Confirm = 620 -> 930 Hz   a perfect fifth, up
+    //     Cancel  = 780 -> 585 Hz   a perfect fourth, down
+    //     Refuse  = 600 +  636 Hz   a minor second
+    //     Open    = 520 / 693 / 780 a three-note melody, and Close was it backwards
+    //
+    // The interface was playing little TUNES at the player. Every one was a clean tuned-percussion
+    // note, and clean tuned percussion is a musical signal — which is why the family read as a
+    // modern app rather than as a dungeon, no matter that the comment above says "wood". It is the
+    // same fault as the settings screen being smoked glass and neon: well made, coherent, and from
+    // a different game.
+    //
+    // THE INVERSION: real interfaces in this world are OBJECTS BEING OPERATED — a latch dropping, a
+    // card sliding, a bolt that will not move. Objects differ by MATERIAL and ACTION, never by
+    // pitch interval. So pitch is no longer the thing that distinguishes these six sounds; what
+    // they are MADE OF is:
+    //
+    //     Move    paper only, no pitched component at all — a card edge brushing past
+    //     Confirm wood seating, then iron catching     — two materials, one action
+    //     Cancel  wood alone, lower and damped         — it came back down, nothing caught
+    //     Refuse  wood with the resonance stripped     — the sound of something NOT moving
+    //     Open    a slide, then iron releasing
+    //     Close   a slide, ending in the wood arriving
+    //
+    // Open and Close are still the same gesture inverted, which was the old family's best idea —
+    // but the inversion is now physical (where the impact falls) rather than melodic.
+    //
+    // ⚠️ Refuse is deliberately NOT dissonant any more. Dissonance is a musical idea; a real thing
+    // refusing to move is UNRESONANT. Killing the ring says "it didn't budge" far better than a
+    // beating interval, and it cannot be mistaken for a tune.
+    // =============================================================================================
+
+    // A struck wooden object with a BODY, as opposed to WoodTap's three bare sines. The differences
+    // are all the ones that separate "an object was hit" from "a note was played": many more modes,
+    // a transient with spectral shape instead of 4ms of white noise, and a tail that is not a
+    // perfect exponential.
+    private static void Thud(float[] buf, float atSeconds, float hz, float amp, float decay,
+                             System.Random rng, float ring = 1f)
+    {
+        int start = Mathf.RoundToInt(atSeconds * SampleRate);
+        if (start >= buf.Length) return;
+
+        // Irregular ratios: a real wooden body has no tidy harmonic series.
+        float[] ratio = { 1f, 1.87f, 2.71f, 4.16f, 5.93f, 8.05f };
+        float[] gain = { 1f, 0.42f, 0.28f, 0.15f, 0.08f, 0.04f };
+
+        float lp = 0f, hp = 0f;
+        float lpC = 1f - Mathf.Exp(-2f * Mathf.PI * 2600f / SampleRate);
+        float hpC = 1f - Mathf.Exp(-2f * Mathf.PI * 420f / SampleRate);
+
+        for (int i = start; i < buf.Length; i++)
+        {
+            float t = (float)(i - start) / SampleRate;
+            float env = Mathf.Exp(-decay * t);
+            if (env < 0.0006f) break;
+
+            float body = 0f;
+            for (int k = 0; k < ratio.Length; k++)
+                body += Mathf.Sin(2f * Mathf.PI * hz * ratio[k] * t) * gain[k]
+                        * Mathf.Exp(-decay * (1f + 1.15f * k) * t);
+            body *= ring;                     // ring 0 = a dead thud, all transient and no tone
+
+            // Contact: ~14ms of BAND-LIMITED noise, not a click. This is most of what makes it read
+            // as a material being struck rather than a tone being started.
+            float contact = 0f;
+            if (t < 0.014f)
+            {
+                float nz = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp += lpC * (nz - lp);
+                hp += hpC * (lp - hp);
+                contact = (lp - hp) * 1.6f * (1f - t / 0.014f);
+            }
+
+            // A little noise riding the tail so the decay isn't a mathematically perfect curve.
+            float grit = (float)(rng.NextDouble() * 2.0 - 1.0) * 0.02f * env;
+
+            buf[i] += (body * 0.34f + contact + grit) * env * amp;
+        }
+    }
+
+    // Paper, cloth, leather — a sound with NO pitched component whatsoever. The whole point of the
+    // paper family, borrowed here because a cursor moving over a card should sound like a card.
+    private static void Rustle(float[] buf, float atSeconds, float dur, float amp,
+                               System.Random rng, float centreHz, float swell)
+    {
+        int start = Mathf.RoundToInt(atSeconds * SampleRate);
+        int n = Mathf.RoundToInt(dur * SampleRate);
+        float lp = 0f, hp = 0f;
+        float lpC = 1f - Mathf.Exp(-2f * Mathf.PI * (centreHz * 2.1f) / SampleRate);
+        float hpC = 1f - Mathf.Exp(-2f * Mathf.PI * (centreHz * 0.55f) / SampleRate);
+
+        for (int i = 0; i < n; i++)
+        {
+            int j = start + i;
+            if (j < 0 || j >= buf.Length) continue;
+            float k = (float)i / n;
+
+            // swell > 0 opens toward the end (a drawer coming out), < 0 closes (settling shut)
+            float env = swell >= 0f
+                ? Mathf.Sin(Mathf.PI * k) * Mathf.Lerp(1f, k, Mathf.Clamp01(swell))
+                : Mathf.Sin(Mathf.PI * k) * Mathf.Lerp(1f, 1f - k, Mathf.Clamp01(-swell));
+
+            float nz = (float)(rng.NextDouble() * 2.0 - 1.0);
+            lp += lpC * (nz - lp);
+            hp += hpC * (lp - hp);
+            buf[j] += (lp - hp) * env * amp;
+        }
+    }
+
+    // A small iron catch. Very short, very inharmonic, no warmth — the counterpoint to the wood.
+    private static void Latch(float[] buf, float atSeconds, float amp, System.Random rng, float hz = 2400f)
+    {
+        int start = Mathf.RoundToInt(atSeconds * SampleRate);
+        float[] ratio = { 1f, 2.41f, 3.83f };
+        float[] gain = { 1f, 0.5f, 0.22f };
+        for (int i = start; i < buf.Length; i++)
+        {
+            float t = (float)(i - start) / SampleRate;
+            float env = Mathf.Exp(-78f * t);
+            if (env < 0.0008f) break;
+            float s = 0f;
+            for (int k = 0; k < ratio.Length; k++)
+                s += Mathf.Sin(2f * Mathf.PI * hz * ratio[k] * t) * gain[k] * Mathf.Exp(-120f * k * t);
+            float click = t < 0.002f ? (float)(rng.NextDouble() * 2.0 - 1.0) * 0.5f : 0f;
+            buf[i] += (s * 0.22f + click) * env * amp;
+        }
+    }
+
     private static AudioClip BuildUIMove()
     {
-        var dry = new float[Mathf.CeilToInt(SampleRate * 0.13f)];
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.10f)];
         var rng = new System.Random(9101);
-        // Deliberately the quietest sound in the game. It fires on every arrow key.
-        WoodTap(dry, 0f, 700f, 0.085f, 58f, rng);
-        return Finalize(dry, 0.055f, 6200f);
+        // A card edge brushing past. The quietest sound in the game — it fires on every arrow key,
+        // and anything with a pitch in it becomes a melody once you hold the key down.
+        Rustle(dry, 0f, 0.045f, 0.085f, rng, 3200f, 0f);
+        return Finalize(dry, 0.04f, 7200f);
     }
 
     private static AudioClip BuildUIConfirm()
     {
-        var dry = new float[Mathf.CeilToInt(SampleRate * 0.30f)];
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.28f)];
         var rng = new System.Random(9102);
-        WoodTap(dry, 0f,     620f, 0.155f, 34f, rng);
-        WoodTap(dry, 0.062f, 930f, 0.150f, 30f, rng);   // x1.5 — perfect fifth up
-        return Finalize(dry, 0.085f, 6800f);
+        Thud(dry, 0f, 300f, 0.130f, 30f, rng);        // it seats
+        Latch(dry, 0.028f, 0.075f, rng, 2600f);       // and catches
+        return Finalize(dry, 0.075f, 6400f);
     }
 
     private static AudioClip BuildUICancel()
     {
-        var dry = new float[Mathf.CeilToInt(SampleRate * 0.30f)];
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.26f)];
         var rng = new System.Random(9103);
-        WoodTap(dry, 0f,     780f, 0.145f, 34f, rng);
-        WoodTap(dry, 0.062f, 585f, 0.140f, 30f, rng);   // x0.75 — perfect fourth down
-        return Finalize(dry, 0.085f, 6200f);
+        // The same wood, lower and shorter, and crucially NO latch — nothing engaged. That absence
+        // is the whole difference from Confirm, and absence reads faster than a different pitch.
+        Thud(dry, 0f, 232f, 0.115f, 40f, rng, 0.7f);
+        return Finalize(dry, 0.06f, 4800f);
     }
 
     private static AudioClip BuildUIRefuse()
     {
-        var dry = new float[Mathf.CeilToInt(SampleRate * 0.24f)];
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.20f)];
         var rng = new System.Random(9104);
-        // Sounded TOGETHER, not in sequence: a beating minor second is the dissonance, and playing
-        // the two notes one after the other would just read as another little melody.
-        WoodTap(dry, 0f,      600f, 0.135f, 46f, rng);
-        WoodTap(dry, 0.006f,  636f, 0.130f, 46f, rng);  // ~x1.06 — minor second
-        return Finalize(dry, 0.05f, 5200f);             // driest and dullest: it should not ring
+        // ring = 0.12: almost all contact, almost no tone. A dead knock is what something immovable
+        // sounds like. Followed by a short scrape — the thing was pushed and did not give.
+        Thud(dry, 0f, 190f, 0.235f, 62f, rng, 0.12f);
+        Rustle(dry, 0.020f, 0.070f, 0.045f, rng, 900f, -0.8f);
+        return Finalize(dry, 0.03f, 3400f);           // driest and dullest in the family
     }
 
     private static AudioClip BuildUIOpen()
     {
-        var dry = new float[Mathf.CeilToInt(SampleRate * 0.42f)];
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.38f)];
         var rng = new System.Random(9105);
-        WoodTap(dry, 0f,     520f, 0.120f, 30f, rng);
-        WoodTap(dry, 0.055f, 693f, 0.125f, 28f, rng);
-        WoodTap(dry, 0.110f, 780f, 0.130f, 24f, rng);
-        return Finalize(dry, 0.10f, 7000f);
+        Latch(dry, 0f, 0.105f, rng, 2200f);          // the catch lets go...
+        Rustle(dry, 0.020f, 0.185f, 0.155f, rng, 1500f, 0.85f);  // ...and it slides out, opening up
+        return Finalize(dry, 0.10f, 6600f);
     }
 
     private static AudioClip BuildUIClose()
     {
-        var dry = new float[Mathf.CeilToInt(SampleRate * 0.42f)];
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.38f)];
         var rng = new System.Random(9106);
-        // The identical three pitches of UIOpen, in reverse.
-        WoodTap(dry, 0f,     780f, 0.125f, 30f, rng);
-        WoodTap(dry, 0.055f, 693f, 0.120f, 28f, rng);
-        WoodTap(dry, 0.110f, 520f, 0.118f, 24f, rng);
-        return Finalize(dry, 0.10f, 6400f);
+        // The same gesture inverted — but physically, not melodically: the slide comes FIRST and
+        // the impact lands at the END, which is what closing a thing actually sounds like.
+        Rustle(dry, 0f, 0.165f, 0.120f, rng, 1500f, -0.85f);
+        Thud(dry, 0.150f, 250f, 0.115f, 38f, rng, 0.6f);
+        return Finalize(dry, 0.085f, 5400f);
     }
 
     private static float[] ApplyReverbAndWarmth(float[] dry, float wet, float masterLpHz)
