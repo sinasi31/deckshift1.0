@@ -140,23 +140,6 @@ public class PauseScreen : MonoBehaviour
     private const float DropK = 62f, DropDamp = 9.5f;
     private const float MaxStep = 1f / 30f;
 
-    // ---- dust ------------------------------------------------------------------------------------
-    // ⚠️ NOT the old suspended frost motes. Those said "time is held", which was Halt's idea and a
-    // good one for frost. Cloth says something different and more physical: dust is knocked OFF the
-    // sheet when it drops, and it falls. It is dense for the first second and then thins to almost
-    // nothing, so the screen calms down instead of fidgeting at you for as long as you leave it open.
-    private struct Mote
-    {
-        public RectTransform rt;
-        public Image img;
-        public Vector2 pos;
-        public float vx, vy, size, alpha, life, maxLife;
-    }
-
-    private Mote[] motes;
-    private const int MOTE_COUNT = 40;
-    private float dustBurst;
-
     private GameObject subPanel;
     private bool subScreenOpen;
 
@@ -233,7 +216,6 @@ public class PauseScreen : MonoBehaviour
 
         if (GROUND == Ground.Wall) BuildWall();
         BuildPanel();
-        BuildDust();
 
         BuildTitle();
         BuildMenu();
@@ -255,23 +237,77 @@ public class PauseScreen : MonoBehaviour
         Sprite wall = Salvage.Wall();
         if (wall == null) { Debug.LogWarning("PauseScreen: SalvageArt.wall missing — run Deckshift/Bake Salvage Art."); return; }
 
-        Image w = AddImage(content, "Wall", wall, new Color(0.190f, 0.186f, 0.205f, 1f), false);
+        Image w = AddImage(content, "Wall", wall, WallTint, false);
         w.type = Image.Type.Tiled;
         Stretch(w.rectTransform);
 
-        // The torch. Law 2 says warm from the upper left, and on a bare wall that light is the only
-        // thing stopping the stone reading as wallpaper.
+        // ---- landmarks -------------------------------------------------------------------------
+        //
+        // ⚠️ THIS IS THE FIX FOR "THE BACKDROP LOOKS UNFINISHED". A seamless texture repeated across
+        // a screen has no landmarks, so the eye stops reading it as a wall and reads it as a fill —
+        // and the only variation left was a big soft light gradient, which is exactly what an
+        // unfinished placeholder looks like. Cainos ships cracks, dents, an outfall and 15 grime
+        // patches for this job; they cost nothing and they are the same art the rooms are dressed in.
+        //
+        // ⚠️ EVERY PIECE IS ANCHORED TO A SCREEN CORNER, never to the centre. The canvas matches on
+        // height, so width flexes from 1440 at 4:3 to 2560 at 21:9 — anything placed by offset from
+        // the middle drifts out of its corner as the aspect changes, and the margins beside the
+        // board are the only place these are visible at all.
+        Deco("Break 01",   new Vector2(0f, 0f), new Vector2(210f, 250f), false);
+        Deco("Dent 04",    new Vector2(1f, 0f), new Vector2(-190f, 190f), true);
+        Deco("Outfall 01", new Vector2(1f, 1f), new Vector2(-150f, -170f), false);
+        Deco("Dent 01 A",  new Vector2(0f, 1f), new Vector2(240f, -120f), false);
+
+        Dirt(0, new Vector2(0f, 0f), new Vector2(120f, 470f));
+        Dirt(3, new Vector2(0f, 1f), new Vector2(150f, -330f));
+        Dirt(6, new Vector2(1f, 0f), new Vector2(-140f, 430f));
+        Dirt(9, new Vector2(1f, 1f), new Vector2(-260f, -300f));
+        Dirt(12, new Vector2(0f, 0f), new Vector2(330f, 120f));
+
+        // ---- light -----------------------------------------------------------------------------
+        //
+        // ⚠️ MUCH GENTLER THAN THE FIRST PASS (amber 0.085 over 1900x1500, black 0.42 over 2600x1900).
+        // That ran from a warm blob on the left to featureless black on the right — a vignette so
+        // strong the masonry only existed in one band, which is most of why the backdrop read as a
+        // gradient rather than a room. A torch biases a wall; it does not erase it.
         Image glow = AddImage(content, "TorchGlow", SalvageSurfaces.Bloom(),
-                              new Color(Salvage.Torch.r, Salvage.Torch.g, Salvage.Torch.b, 0.085f), false);
-        glow.rectTransform.sizeDelta = new Vector2(1900f, 1500f);
-        glow.rectTransform.anchoredPosition = new Vector2(-620f, 300f);
+                              new Color(Salvage.Torch.r, Salvage.Torch.g, Salvage.Torch.b, 0.026f), false);
+        glow.rectTransform.sizeDelta = new Vector2(1700f, 1350f);
+        glow.rectTransform.anchoredPosition = new Vector2(-560f, 260f);
 
-        // ...and the far corner falling away from it.
         Image dark = AddImage(content, "FarCorner", SalvageSurfaces.Bloom(),
-                              new Color(0f, 0f, 0f, 0.42f), false);
-        dark.rectTransform.sizeDelta = new Vector2(2600f, 1900f);
-        dark.rectTransform.anchoredPosition = new Vector2(560f, -360f);
+                              new Color(0f, 0f, 0f, 0.20f), false);
+        dark.rectTransform.sizeDelta = new Vector2(2800f, 2000f);
+        dark.rectTransform.anchoredPosition = new Vector2(620f, -400f);
+    }
 
+    // The wall and everything on it share one tint, so decoration sits IN the masonry rather than on
+    // top of it. Pack art is painted at full value and UI does not pass through the scene's
+    // 0.5-intensity global light, so this is doing the lighting the world would have done.
+    private static readonly Color WallTint = new Color(0.300f, 0.293f, 0.315f, 1f);
+
+    private void Deco(string suffix, Vector2 anchor, Vector2 offset, bool flip)
+    {
+        Sprite s = Salvage.Deco(suffix);
+        if (s == null) return;
+
+        Image img = AddImage(content, "Deco_" + suffix, s, WallTint, false);
+        img.rectTransform.anchorMin = img.rectTransform.anchorMax = anchor;
+        img.rectTransform.sizeDelta = new Vector2(Salvage.Px(s.rect.width), Salvage.Px(s.rect.height));
+        img.rectTransform.anchoredPosition = offset;
+        // Flipping doubles the vocabulary for free and stops two dents reading as a repeat.
+        if (flip) img.rectTransform.localScale = new Vector3(-1f, 1f, 1f);
+    }
+
+    private void Dirt(int index, Vector2 anchor, Vector2 offset)
+    {
+        Sprite s = Salvage.Dirt(index);
+        if (s == null) return;
+
+        Image img = AddImage(content, "Dirt_" + index, s, WallTint, false);
+        img.rectTransform.anchorMin = img.rectTransform.anchorMax = anchor;
+        img.rectTransform.sizeDelta = new Vector2(Salvage.Px(s.rect.width), Salvage.Px(s.rect.height));
+        img.rectTransform.anchoredPosition = offset;
     }
 
     // The board: planks bound with iron, hung on two chains.
@@ -327,44 +363,6 @@ public class PauseScreen : MonoBehaviour
         printed = onBoard;
     }
 
-
-    private void BuildDust()
-    {
-        motes = new Mote[MOTE_COUNT];
-        Sprite dot = Salvage.Pixel();
-
-        for (int i = 0; i < MOTE_COUNT; i++)
-        {
-            RectTransform rt = AddPoint(content, "Dust" + i, new Vector2(0.5f, 0.5f), Vector2.zero,
-                                        Vector2.one);
-            Image img = rt.gameObject.AddComponent<Image>();
-            img.sprite = dot;
-            img.raycastTarget = false;
-            img.color = new Color(0, 0, 0, 0);
-
-            motes[i] = new Mote { rt = rt, img = img };
-            RespawnMote(ref motes[i], true);
-        }
-    }
-
-    private void RespawnMote(ref Mote m, bool anywhere)
-    {
-        // Dust comes off the CLOTH, so it starts inside the sheet's footprint, not the whole screen.
-        float x = Random.Range(-SHEET_W * 0.5f, SHEET_W * 0.5f);
-        float y = anywhere ? Random.Range(SHEET_BOTTOM, SHEET_TOP)
-                           : Random.Range(SHEET_TOP - 180f, SHEET_TOP);
-
-        m.pos = new Vector2(x, y);
-        m.vx = Random.Range(-7f, 7f);
-        m.vy = Random.Range(-26f, -9f);          // it falls; nothing here hangs still
-        // Sized in WORLD pixels, so a dust speck is the size of a pixel of the game behind it.
-        m.size = Salvage.Px(Random.value < 0.22f ? 2f : 1f);
-        m.maxLife = Random.Range(2.2f, 5.5f);
-        m.life = 0f;
-        m.alpha = Random.Range(0.26f, 0.58f);
-        m.rt.sizeDelta = new Vector2(m.size, m.size);
-        m.rt.anchoredPosition = m.pos;
-    }
 
     private void BuildTitle()
     {
@@ -606,8 +604,6 @@ public class PauseScreen : MonoBehaviour
         dropVel = 0f;
         swingAngle = Random.Range(0.7f, 1.5f) * (Random.value < 0.5f ? -1f : 1f);
         swingVel = 0f;
-        dustBurst = 1f;
-        for (int i = 0; i < motes.Length; i++) RespawnMote(ref motes[i], false);
 
         if (audioSource != null) SfxManager.PlayOn(audioSource, ProcSfx.PauseHalt, 0.85f);
 
@@ -714,7 +710,6 @@ public class PauseScreen : MonoBehaviour
 
         TickArmTimeout();
         TickCloth();
-        TickDust();
         TickSelectionVisual();
     }
 
@@ -859,40 +854,6 @@ public class PauseScreen : MonoBehaviour
 
         sheet.anchoredPosition = new Vector2(0f, SHEET_TOP + dropY);
         sheet.localRotation = Quaternion.Euler(0f, 0f, swingAngle + idle);
-    }
-
-    private void TickDust()
-    {
-        if (motes == null) return;
-        float dt = Mathf.Min(Time.unscaledDeltaTime, MaxStep);
-
-        dustBurst = Mathf.Max(0f, dustBurst - dt * 0.55f);
-
-        for (int i = 0; i < motes.Length; i++)
-        {
-            Mote m = motes[i];
-            if (m.rt == null) continue;
-
-            m.life += dt;
-            m.pos += new Vector2(m.vx, m.vy) * dt;
-
-            // Drifting sideways as it falls, because dust in still air does not fall straight.
-            m.vx += Mathf.Sin(Time.unscaledTime * 1.3f + i) * 3f * dt;
-
-            float k = Mathf.Clamp01(m.life / m.maxLife);
-            float fade = 1f - k * k;
-
-            // Only a fraction stay alive once the burst has settled — the screen calms down.
-            float ceiling = 0.42f + dustBurst * 0.58f;
-
-            Color c = Salvage.Torch;
-            c.a = m.alpha * fade * ceiling;
-            m.img.color = c;
-            m.rt.anchoredPosition = m.pos;
-
-            if (m.life >= m.maxLife || m.pos.y < SHEET_BOTTOM - 40f) RespawnMote(ref m, false);
-            motes[i] = m;
-        }
     }
 
     private void TickSelectionVisual()

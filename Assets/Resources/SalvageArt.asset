@@ -13,6 +13,40 @@ MonoBehaviour:
   m_Name: SalvageArt
   m_EditorClassIdentifier: 
   wall: {fileID: 2800000, guid: 696dadb57c80a0744be25cd33ceff002, type: 3}
+  wallDeco:
+  - {fileID: 193657962, guid: 1b889f1dae3d99e439731ec938d3c7dd, type: 3}
+  - {fileID: -1667771189, guid: 1b889f1dae3d99e439731ec938d3c7dd, type: 3}
+  - {fileID: 108265984, guid: 1b889f1dae3d99e439731ec938d3c7dd, type: 3}
+  - {fileID: 1498372933, guid: 1b889f1dae3d99e439731ec938d3c7dd, type: 3}
+  - {fileID: -1462265514, guid: 1b889f1dae3d99e439731ec938d3c7dd, type: 3}
+  - {fileID: -2088226846, guid: 1b889f1dae3d99e439731ec938d3c7dd, type: 3}
+  - {fileID: 113887317, guid: 1b889f1dae3d99e439731ec938d3c7dd, type: 3}
+  - {fileID: -1873267270, guid: 1b889f1dae3d99e439731ec938d3c7dd, type: 3}
+  - {fileID: 1693368308, guid: 1b889f1dae3d99e439731ec938d3c7dd, type: 3}
+  - {fileID: -1405079813, guid: 1b889f1dae3d99e439731ec938d3c7dd, type: 3}
+  - {fileID: -1653534716, guid: 1b889f1dae3d99e439731ec938d3c7dd, type: 3}
+  - {fileID: -1055340635, guid: 1b889f1dae3d99e439731ec938d3c7dd, type: 3}
+  - {fileID: -508533114, guid: 1b889f1dae3d99e439731ec938d3c7dd, type: 3}
+  - {fileID: -1424436253, guid: 1b889f1dae3d99e439731ec938d3c7dd, type: 3}
+  - {fileID: 1127892381, guid: 1b889f1dae3d99e439731ec938d3c7dd, type: 3}
+  - {fileID: -1030937375, guid: 1b889f1dae3d99e439731ec938d3c7dd, type: 3}
+  - {fileID: 1355698434, guid: 1b889f1dae3d99e439731ec938d3c7dd, type: 3}
+  wallDirt:
+  - {fileID: 1011848814, guid: 788b01b24b947f74b9c18245e3cf1ef3, type: 3}
+  - {fileID: 1520466344, guid: 788b01b24b947f74b9c18245e3cf1ef3, type: 3}
+  - {fileID: -1933495746, guid: 788b01b24b947f74b9c18245e3cf1ef3, type: 3}
+  - {fileID: -83548089, guid: 788b01b24b947f74b9c18245e3cf1ef3, type: 3}
+  - {fileID: 1693221278, guid: 788b01b24b947f74b9c18245e3cf1ef3, type: 3}
+  - {fileID: -1031036300, guid: 788b01b24b947f74b9c18245e3cf1ef3, type: 3}
+  - {fileID: 1491061045, guid: 788b01b24b947f74b9c18245e3cf1ef3, type: 3}
+  - {fileID: -1469892866, guid: 788b01b24b947f74b9c18245e3cf1ef3, type: 3}
+  - {fileID: 353587064, guid: 788b01b24b947f74b9c18245e3cf1ef3, type: 3}
+  - {fileID: 369098457, guid: 788b01b24b947f74b9c18245e3cf1ef3, type: 3}
+  - {fileID: -231488988, guid: 788b01b24b947f74b9c18245e3cf1ef3, type: 3}
+  - {fileID: -1126232417, guid: 788b01b24b947f74b9c18245e3cf1ef3, type: 3}
+  - {fileID: 238850072, guid: 788b01b24b947f74b9c18245e3cf1ef3, type: 3}
+  - {fileID: -831773984, guid: 788b01b24b947f74b9c18245e3cf1ef3, type: 3}
+  - {fileID: 950417661, guid: 788b01b24b947f74b9c18245e3cf1ef3, type: 3}
   linen:
     id: linen
     source: 'TX Village Props.png :: TX Village Props - Cloth 08'

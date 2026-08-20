@@ -50,6 +50,12 @@ public class SalvageArt : ScriptableObject
     // checkerboard — the same mistake that made generated rooms never look hand-made.
     public Texture2D wall;  // TX Tileable - Dungeon Wall
 
+    // Wall decoration, straight from the pack. ⚠️ THESE ARE WHY A TILED WALL STOPS LOOKING LIKE
+    // WALLPAPER. A seamless texture repeated across a screen has no landmarks, so the eye reads it
+    // as a fill; cracks, dents and grime give it places. Cainos drew them for this exact job.
+    public Sprite[] wallDeco;   // TX Dungeon Wall Deco — breaks, dents, windows, an outfall
+    public Sprite[] wallDirt;   // TX Dungeon Wall Dirt — 15 small grime patches
+
     public Ramp linen;      // TX Village Props — Cloth 08. The dust sheet.
     public Ramp rope;       // TX Village Props — Clother Hanger Rope 01.
     public Ramp wood;       // TX Dungeon Props  — plank/beam browns.

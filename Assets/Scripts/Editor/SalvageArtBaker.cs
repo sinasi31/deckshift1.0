@@ -42,6 +42,8 @@ public static class SalvageArtBaker
     private const string Village = "Assets/Cainos/Pixel Art Platformer - Village Props/Texture/TX Village Props.png";
     private const string Props = "Assets/Cainos/Pixel Art Platformer - Dungeon/Texture/TX Dungeon Props.png";
     private const string Wall = "Assets/Cainos/Pixel Art Platformer - Dungeon/Texture/TX Tileable - Dungeon Wall.png";
+    private const string WallDeco = "Assets/Cainos/Pixel Art Platformer - Dungeon/Texture/TX Dungeon Wall Deco.png";
+    private const string WallDirt = "Assets/Cainos/Pixel Art Platformer - Dungeon/Texture/TX Dungeon Wall Dirt.png";
 
     [MenuItem("Deckshift/Bake Salvage Art")]
     public static void Bake()
@@ -68,6 +70,9 @@ public static class SalvageArtBaker
         art.wall = AssetDatabase.LoadAssetAtPath<Texture2D>(Wall);
         log.Add("  wall   " + (art.wall != null ? art.wall.width + "x" + art.wall.height : "MISSING"));
 
+        art.wallDeco = AllSprites(WallDeco, log, "wallDeco");
+        art.wallDirt = AllSprites(WallDirt, log, "wallDirt");
+
         if (fresh)
         {
             Directory.CreateDirectory("Assets/Resources");
@@ -79,6 +84,23 @@ public static class SalvageArtBaker
 
         Debug.Log("[SalvageArt] baked to " + AssetPath + "\n" + string.Join("\n", log));
         Selection.activeObject = art;
+    }
+
+    // ⚠️ SORTED BY NAME, ALWAYS. AssetDatabase returns sub-assets in an order that is not guaranteed
+    // stable across reimports, and a screen that indexes into this array would silently redecorate
+    // itself — a different crack in a different corner — every time somebody touched the pack.
+    private static Sprite[] AllSprites(string sheet, System.Collections.Generic.List<string> log, string label)
+    {
+        var found = new List<Sprite>();
+        foreach (Object o in AssetDatabase.LoadAllAssetsAtPath(sheet))
+        {
+            Sprite s = o as Sprite;
+            if (s != null) found.Add(s);
+        }
+        found.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
+
+        log.Add("  " + label + "  " + found.Count + " sprites   (" + Path.GetFileName(sheet) + ")");
+        return found.ToArray();
     }
 
     // ---- sampling --------------------------------------------------------------------------------

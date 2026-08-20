@@ -167,6 +167,30 @@ public static class Salvage
         return s;
     }
 
+    /// <summary>
+    /// A piece of wall decoration by name — pass the bit after "TX Dungeon Wall Deco - ",
+    /// e.g. "Break 01", "Dent 04", "Outfall 01".
+    ///
+    /// ⚠️ BY NAME, NOT BY INDEX. Indexing an array of sub-sprites means a pack reimport can quietly
+    /// put a different crack in a different corner, and nothing would ever report it.
+    /// </summary>
+    public static Sprite Deco(string suffix)
+    {
+        SalvageArt art = SalvageArt.Get();
+        if (art == null || art.wallDeco == null) return null;
+        foreach (Sprite s in art.wallDeco)
+            if (s != null && s.name.EndsWith(suffix)) return s;
+        return null;
+    }
+
+    /// <summary>One of the grime patches. Index wraps, so a caller can never pick a missing one.</summary>
+    public static Sprite Dirt(int index)
+    {
+        SalvageArt art = SalvageArt.Get();
+        if (art == null || art.wallDirt == null || art.wallDirt.Length == 0) return null;
+        return art.wallDirt[((index % art.wallDirt.Length) + art.wallDirt.Length) % art.wallDirt.Length];
+    }
+
     /// <summary>1x1 white. The flat-fill workhorse.</summary>
     public static Sprite Pixel()
     {
