@@ -56,6 +56,14 @@ public class SalvageArt : ScriptableObject
     public Sprite[] wallDeco;   // TX Dungeon Wall Deco — breaks, dents, windows, an outfall
     public Sprite[] wallDirt;   // TX Dungeon Wall Dirt — 15 small grime patches
 
+    // ⚠️ EVERY PROP IN BOTH PACKS, SO A SCREEN CAN BE DRESSED AS A PLACE RATHER THAN AS A PANEL.
+    // The designer's standing instruction (2026-08-21): "i dont want the same exact thing for each
+    // UI. i want you to make a distinct, special version for each one ... do not repeat the same
+    // visuals for everything." Reskinning eight screens in one material is exactly the monotony that
+    // objection is about; composing each one out of the props its PLACE would actually contain is the
+    // answer, and it costs no art because Cainos already drew all of it.
+    public Sprite[] props;      // TX Dungeon Props + TX Village Props
+
     public Ramp linen;      // TX Village Props — Cloth 08. The dust sheet.
     public Ramp rope;       // TX Village Props — Clother Hanger Rope 01.
     public Ramp wood;       // TX Dungeon Props  — plank/beam browns.

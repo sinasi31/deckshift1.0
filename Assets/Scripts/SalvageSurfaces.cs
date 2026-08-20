@@ -321,6 +321,64 @@ public static class SalvageSurfaces
     }
 
     /// <summary>
+    /// A slab of dressed stone with a chiselled bevel — the surface for screens that are not
+    /// furniture. Same five laws, different material.
+    ///
+    /// ⚠️ THIS IS HOW SALVAGE AVOIDS MONOTONY WITHOUT SPENDING A COLOUR. The designer's objection to
+    /// a single substrate was that everything would look the same, and they were right: eight wooden
+    /// boards is a set of eight wooden boards. Stone is the dungeon's other structural material, it
+    /// is already in the sampled palette, and it reads as instantly different from planks at a
+    /// glance — no hue involved. Use wood for things people BUILT and stone for things that were
+    /// CUT: an altar, a plinth, a threshold.
+    /// </summary>
+    public static Sprite StoneSlab(int w, int h, int seed = 9)
+    {
+        string key = "slab_" + w + "x" + h + "_" + seed;
+        Sprite cached;
+        if (Salvage.TryCached(key, out cached) && cached != null) return cached;
+
+        SalvageArt.Ramp stone = Salvage.Ramp("stone");
+        var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        var px = new Color[w * h];
+
+        const int Bevel = 5;
+
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                float u = x / (float)(w - 1), v = 1f - y / (float)(h - 1);
+
+                // Coarse mottle plus a fine tooth — dressed stone is pitted, not smooth.
+                float coarse = Salvage.Grain(x * 0.22f, y * 0.22f, seed, 0.30f, 3);
+                float tooth = Salvage.Grain(x * 1.6f, y * 1.6f, seed + 17, 0.85f, 1);
+
+                float shade = 0.95f
+                            + (coarse - 0.5f) * 0.34f
+                            + (tooth - 0.5f) * 0.13f
+                            + (-(u - 0.5f) * Salvage.LightDir.x + (0.5f - v) * Salvage.LightDir.y) * 0.34f;
+
+                Color c = stone.Sample(0.25f + coarse * 0.62f);
+
+                // The chiselled edge: lit on the top and left, in shadow on the bottom and right.
+                // One rule, and it is the whole reason a flat rectangle reads as a cut block.
+                int ex = Mathf.Min(x, w - 1 - x);
+                int ey = Mathf.Min(y, h - 1 - y);
+                int edge = Mathf.Min(ex, ey);
+                if (edge < Bevel)
+                {
+                    bool lit = (x < Bevel) || (y > h - 1 - Bevel);
+                    float k = 1f - edge / (float)Bevel;
+                    shade *= lit ? (1f + 0.42f * k) : (1f - 0.46f * k);
+                }
+
+                px[y * w + x] = Salvage.Lit(c, Mathf.Clamp(shade, 0.38f, 1.40f));
+            }
+
+        tex.SetPixels(px);
+        return Salvage.MakeSprite(tex, key);
+    }
+
+    /// <summary>
     /// A hanging chain, 5 texture pixels wide, links repeating every 8. Alternating upright and
     /// crosswise links — a chain drawn as a plain dashed line reads as a zip, and the alternation is
     /// the only thing that sells it at this size.

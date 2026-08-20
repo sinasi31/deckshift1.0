@@ -183,6 +183,27 @@ public static class Salvage
         return null;
     }
 
+    /// <summary>
+    /// A prop from either pack, by the bit after "TX Dungeon Props - " / "TX Village Props - "
+    /// (e.g. "Anvil", "Hammer", "Fireplace 01", "Barrel 01 A").
+    ///
+    /// ⚠️ THIS IS HOW EACH SCREEN BECOMES ITS OWN PLACE. Standing instruction from the designer:
+    /// do NOT give every screen the same visuals. A screen dressed with the props its location would
+    /// actually contain — an anvil and a lit hearth at the forge, notices on a board, goods on a
+    /// stall — is a place; the same panel eight times is a template. All of it is already drawn.
+    ///
+    /// Returns null if nothing matches, so a caller must guard. Silent absence beats a magenta box
+    /// on a shipped screen.
+    /// </summary>
+    public static Sprite Prop(string suffix)
+    {
+        SalvageArt art = SalvageArt.Get();
+        if (art == null || art.props == null) return null;
+        foreach (Sprite s in art.props)
+            if (s != null && s.name.EndsWith(" - " + suffix)) return s;
+        return null;
+    }
+
     /// <summary>One of the grime patches. Index wraps, so a caller can never pick a missing one.</summary>
     public static Sprite Dirt(int index)
     {

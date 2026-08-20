@@ -44,6 +44,7 @@ public static class SalvageArtBaker
     private const string Wall = "Assets/Cainos/Pixel Art Platformer - Dungeon/Texture/TX Tileable - Dungeon Wall.png";
     private const string WallDeco = "Assets/Cainos/Pixel Art Platformer - Dungeon/Texture/TX Dungeon Wall Deco.png";
     private const string WallDirt = "Assets/Cainos/Pixel Art Platformer - Dungeon/Texture/TX Dungeon Wall Dirt.png";
+    private const string VillageProps = "Assets/Cainos/Pixel Art Platformer - Village Props/Texture/TX Village Props.png";
 
     [MenuItem("Deckshift/Bake Salvage Art")]
     public static void Bake()
@@ -72,6 +73,11 @@ public static class SalvageArtBaker
 
         art.wallDeco = AllSprites(WallDeco, log, "wallDeco");
         art.wallDirt = AllSprites(WallDirt, log, "wallDirt");
+
+        var allProps = new List<Sprite>();
+        allProps.AddRange(AllSprites(Props, log, "props(dungeon)"));
+        allProps.AddRange(AllSprites(VillageProps, log, "props(village)"));
+        art.props = allProps.ToArray();
 
         if (fresh)
         {

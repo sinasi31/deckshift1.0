@@ -22,6 +22,13 @@ public static class SalvageScreen
     // 0.5-intensity global light, so this is doing the lighting the world would have done.
     public static readonly Color WallTint = new Color(0.300f, 0.293f, 0.315f, 1f);
 
+    // ⚠️ PROPS ARE BRIGHTER THAN THE WALL, AND THAT IS NOT A PREFERENCE. Wall decoration is part of
+    // the backdrop and must stay behind everything; a prop is an OBJECT IN THE ROOM standing in
+    // front of it. Dressing the forge at WallTint made the hearth vanish into the masonry — it was
+    // there, and you could not see it. Roughly the scene light (0.5), which is what the same prop
+    // would render at in a real room.
+    public static readonly Color PropTint = new Color(0.470f, 0.455f, 0.450f, 1f);
+
     /// <summary>
     /// The dungeon's own masonry, tiled at world magnification, dressed with the pack's cracks and
     /// grime and biased by an off-screen torch from the upper left.
@@ -125,6 +132,103 @@ public static class SalvageScreen
         // ordinary canvas-centre coordinates so a screen's layout numbers need no adjusting.
         printed = Point(board, "OnBoard", new Vector2(0.5f, 1f), new Vector2(0f, -top), Vector2.zero);
         printed.sizeDelta = Vector2.zero;
+    }
+
+    /// <summary>
+    /// Re-cut the board to a new height, for screens that size themselves to their content.
+    ///
+    /// ⚠️ THE PLANKS MUST BE REGENERATED, NOT STRETCHED. The board is a generated texture at world
+    /// pixel scale; letting an Image stretch it to a different height smears the grain, thickens the
+    /// seams and skews the bolts — the surface stops being 1:1 with the game's pixels, which is the
+    /// one thing Law 1 exists to guarantee. `PlankBoard` caches by size, so a height the screen has
+    /// used before costs nothing.
+    ///
+    /// ⚠️ AND THE CONTENT ANCHOR MOVES WITH THE TOP. `printed` is positioned by the board's top edge,
+    /// so a resize that forgets it silently shifts every label on the screen.
+    /// </summary>
+    public static void ResizeBoard(RectTransform board, RectTransform printed,
+                                   float width, float top, float bottom)
+    {
+        float h = top - bottom;
+        board.sizeDelta = new Vector2(width, h);
+        board.anchoredPosition = new Vector2(0f, top);
+
+        Transform face = board.Find("Board");
+        if (face != null)
+        {
+            Image img = face.GetComponent<Image>();
+            if (img != null) img.sprite = SalvageSurfaces.PlankBoard(Salvage.Tex(width), Salvage.Tex(h));
+        }
+
+        if (printed != null) printed.anchoredPosition = new Vector2(0f, -top);
+    }
+
+    /// <summary>
+    /// Place a pack prop at world magnification. The workhorse for dressing a screen as a PLACE.
+    ///
+    /// ⚠️ ANCHOR IT TO A SCREEN EDGE, not the centre. Props live in the margins beside a panel, and
+    /// the canvas matches on height — width flexes 1440 → 2560 — so anything positioned from the
+    /// middle slides out of frame or under the panel as the aspect changes.
+    /// </summary>
+    public static Image Prop(Transform parent, string suffix, Vector2 anchor, Vector2 offset,
+                             float scale = 1f, bool flip = false, Color? tint = null)
+    {
+        Sprite s = Salvage.Prop(suffix);
+        if (s == null) return null;
+
+        Image img = Img(parent, "Prop_" + suffix, s, tint ?? PropTint);
+        img.rectTransform.anchorMin = img.rectTransform.anchorMax = anchor;
+        img.rectTransform.sizeDelta = new Vector2(Salvage.Px(s.rect.width) * scale,
+                                                  Salvage.Px(s.rect.height) * scale);
+        img.rectTransform.anchoredPosition = offset;
+        if (flip) img.rectTransform.localScale = new Vector3(-1f, 1f, 1f);
+        return img;
+    }
+
+    /// <summary>
+    /// A pool of firelight. Two blooms so the flicker has a core and a spill rather than one
+    /// pulsing disc, driven by <see cref="FireGlow"/>.
+    /// </summary>
+    public static FireGlow Fire(Transform parent, Vector2 anchor, Vector2 offset, float size)
+    {
+        Image spill = Img(parent, "FireSpill", SalvageSurfaces.Bloom(),
+                          new Color(Salvage.Torch.r, Salvage.Torch.g, Salvage.Torch.b, 0.055f));
+        spill.rectTransform.anchorMin = spill.rectTransform.anchorMax = anchor;
+        spill.rectTransform.sizeDelta = new Vector2(size * 2.6f, size * 2.0f);
+        spill.rectTransform.anchoredPosition = offset;
+
+        Image core = Img(parent, "FireCore", SalvageSurfaces.Bloom(),
+                         new Color(1f, 0.80f, 0.46f, 0.20f));
+        core.rectTransform.anchorMin = core.rectTransform.anchorMax = anchor;
+        core.rectTransform.sizeDelta = new Vector2(size * 0.85f, size * 0.85f);
+        core.rectTransform.anchoredPosition = offset;
+
+        return new FireGlow { spill = spill, core = core, seed = Random.value * 10f };
+    }
+
+    /// <summary>
+    /// ⚠️ FIRE FLICKERS ON TWO TIMESCALES, AND ONE SINE READS AS A PULSING LAMP. A slow swell plus a
+    /// fast irregular jitter is the whole difference between "a fire" and "something animating".
+    /// Unscaled, because these screens freeze the game.
+    /// </summary>
+    public struct FireGlow
+    {
+        public Image spill, core;
+        public float seed;
+
+        public void Tick()
+        {
+            if (spill == null || core == null) return;
+            float t = Time.unscaledTime + seed;
+
+            float slow = Mathf.Sin(t * 1.7f) * 0.5f + Mathf.Sin(t * 0.9f) * 0.3f;
+            float fast = Mathf.Sin(t * 11.3f) * 0.12f + Mathf.Sin(t * 17.7f) * 0.08f;
+            float k = 1f + slow * 0.18f + fast;
+
+            Color c = spill.color; c.a = 0.055f * k; spill.color = c;
+            Color d = core.color; d.a = 0.200f * k; core.color = d;
+            core.rectTransform.localScale = Vector3.one * (1f + slow * 0.06f + fast * 0.5f);
+        }
     }
 
     // ---- the hanging motion ----------------------------------------------------------------------
