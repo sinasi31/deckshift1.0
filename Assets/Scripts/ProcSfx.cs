@@ -675,6 +675,110 @@ public static class ProcSfx
     }
 
     // =============================================================================================
+    // NOTICE BOARD — timber, iron nails, paper.
+    //
+    // ⚠️ THESE REPLACE PaperRustle / WaxStamp ON THE QUEST BOARD (designer, 2026-08-21: "change the
+    // sound effects that the quest board uses currently as well. the sound should fit the theme").
+    // The two old clips are pure PAPER, and paper was the whole board when the board was a painted
+    // sheet. It is now a timber notice board with contracts NAILED to it, so two thirds of the
+    // material was inaudible: no wood, no iron.
+    //
+    // The set is built as a three-way where the MATERIAL carries the meaning, not the volume:
+    //
+    //   BoardOpen  — paper and wood.            you disturbed the sheaf
+    //   BoardNail  — paper, wood AND IRON.      it went in
+    //   BoardDud   — paper and wood, NO IRON.   it did not
+    //
+    // ⚠️ THE ABSENCE OF THE IRON IS THE REFUSAL. Refuse is not the accept played quieter or lower —
+    // it is the accept with the one layer that means "fastened" removed. That is why it reads
+    // instantly even at the same loudness, and it is the same trick the pause pair uses (choked
+    // envelope) rather than a pitch drop.
+    //
+    // ⚠️ AND THIS IS WHERE THE PAPER FAMILY'S "NO PITCHED COMPONENT" RULE STOPS APPLYING — carefully.
+    // BoardOpen still obeys it (its wood knock sits under 80Hz, where it reads as weight, not a
+    // note). BoardNail deliberately breaks it, because a nail IS metal, and it is the only sound on
+    // the screen with a bar mode in it. That exclusivity is what makes the accept land.
+
+    private static AudioClip boardOpen, boardNail, boardDud;
+
+    /// <summary>Stepping up to the board: several pinned sheets stirring against timber.</summary>
+    public static AudioClip BoardOpen
+    { get { if (boardOpen == null) boardOpen = BuildBoardOpen(); return boardOpen; } }
+
+    /// <summary>Taking a contract: a nail driven through paper into the board, two strikes.</summary>
+    public static AudioClip BoardNail
+    { get { if (boardNail == null) boardNail = BuildBoardNail(); return boardNail; } }
+
+    /// <summary>Refused: the hammer meets the board and nothing goes in.</summary>
+    public static AudioClip BoardDud
+    { get { if (boardDud == null) boardDud = BuildBoardDud(); return boardDud; } }
+
+    private static AudioClip BuildBoardOpen()
+    {
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.58f)];
+        var rng = new System.Random(4471);
+
+        // ⚠️ SEPARATE BURSTS, NOT ONE LONG HISS. A continuous shaped noise reads as wind; only the
+        // granularity says "several distinct sheets". Same rule the original rustle was built on.
+        // Staggered irregularly — evenly spaced bursts read as a machine.
+        Rustle(dry, 0.000f, 0.14f, 0.30f, rng, 5200f, 0.4f);
+        Rustle(dry, 0.055f, 0.11f, 0.22f, rng, 6400f, -0.3f);
+        Rustle(dry, 0.140f, 0.16f, 0.26f, rng, 4600f, 0.2f);
+        Rustle(dry, 0.255f, 0.13f, 0.16f, rng, 5800f, -0.6f);
+        Rustle(dry, 0.370f, 0.15f, 0.10f, rng, 4200f, -0.9f);
+
+        // The board itself taking the disturbance. Under 80Hz and almost no ring, so it is felt as
+        // the paper being attached to SOMETHING rather than heard as a note.
+        Thud(dry, 0.020f, 74f, 0.13f, 26f, rng, 0.10f);
+
+        return Finalize(dry, 0.06f, 10000f);
+    }
+
+    private static AudioClip BuildBoardNail()
+    {
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.50f)];
+        var rng = new System.Random(4472);
+
+        // STRIKE ONE — the nail bites. Bright iron, the board still ringing under it, paper
+        // compressing where the head lands.
+        Latch(dry, 0.000f, 0.46f, rng, 2950f);
+        Thud(dry, 0.002f, 126f, 0.40f, 32f, rng, 0.55f);
+        Rustle(dry, 0.000f, 0.05f, 0.16f, rng, 5600f, -1f);
+
+        // STRIKE TWO — and it SEATS. Harder, but the wood goes deeper and the ring is choked,
+        // because the nail is now home and the board is no longer free to sound.
+        //
+        // ⚠️ THIS IS THE WHOLE SOUND. One strike is a generic impact and could be any screen's
+        // confirm; two strikes where the SECOND IS DEADER is unmistakably something being driven in.
+        // If this ever needs retuning, keep that relationship — do not make strike two louder and
+        // brighter, which is the instinct and which turns it back into a generic double-click.
+        Latch(dry, 0.094f, 0.60f, rng, 3150f);
+        Thud(dry, 0.096f, 101f, 0.52f, 47f, rng, 0.16f);
+
+        // The sheet settling against the timber afterwards.
+        Rustle(dry, 0.135f, 0.13f, 0.09f, rng, 4800f, -0.8f);
+
+        return Finalize(dry, 0.10f, 9500f);
+    }
+
+    private static AudioClip BuildBoardDud()
+    {
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.32f)];
+        var rng = new System.Random(4473);
+
+        // Wood, struck once, and NOTHING FASTENS. ring 0.05 is almost pure transient — the sound of
+        // a hammer meeting a board rather than driving anything through it.
+        Thud(dry, 0.000f, 92f, 0.42f, 55f, rng, 0.05f);
+        Rustle(dry, 0.004f, 0.07f, 0.13f, rng, 5000f, -1f);
+
+        // ⚠️ NO Latch(). Deliberately. See the family note above: the missing iron IS the message,
+        // and adding "just a little" metal here would make refuse and accept the same event at
+        // different volumes.
+
+        return Finalize(dry, 0.05f, 7200f);
+    }
+
+    // =============================================================================================
     // GATE — heavy banded doors hung in a stone arch.
     //
     // A FIFTH family, and deliberately the only one built from TWO materials at once. Every family
