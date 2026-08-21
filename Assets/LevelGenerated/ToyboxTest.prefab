@@ -6036,11 +6036,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d03eefb3cad51fb418e4693891b190cd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  openOffset: {x: 0, y: -3}
   startOpen: 0
-  ratchetSteps: 5
-  moveSound: {fileID: 0}
-  moveVolume: 1
+  volume: 1
 --- !u!1 &4772880306998384327
 GameObject:
   m_ObjectHideFlags: 0
@@ -6205,8 +6202,8 @@ MonoBehaviour:
           m_BoolArgument: 0
         m_CallState: 2
   signalTarget: {fileID: 0}
-  paySound: {fileID: 0}
-  refuseSound: {fileID: 0}
+  paySound: {fileID: 8300000, guid: 0fa20e8138f09e04990378ad855e9f43, type: 3}
+  refuseSound: {fileID: 8300000, guid: dbccacd9b3c150c48b07e81dadc7c761, type: 3}
   labelHeight: 2
 --- !u!1 &7064056239590935807
 GameObject:
@@ -8527,11 +8524,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d03eefb3cad51fb418e4693891b190cd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  openOffset: {x: 0, y: -3}
   startOpen: 0
-  ratchetSteps: 5
-  moveSound: {fileID: 0}
-  moveVolume: 1
+  volume: 1
 --- !u!1001 &1017052135150878655
 PrefabInstance:
   m_ObjectHideFlags: 0

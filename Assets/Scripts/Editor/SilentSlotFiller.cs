@@ -44,6 +44,8 @@ public static class SilentSlotFiller
         { "paySound",     "AltarPay" },
         { "refuseSound",  "AltarRefuse" },
         { "collectSound", "CrystalCollect" },
+        { "glassParrySound",    "GlassParry" },
+        { "freefallBladeSound", "FreefallBlade" },
     };
 
     [MenuItem("Deckshift/Fill Silent Audio Slots")]
@@ -79,6 +81,18 @@ public static class SilentSlotFiller
             foreach (MonoBehaviour mb in root.GetComponentsInChildren<MonoBehaviour>(true))
             {
                 if (mb == null) continue;
+
+                // ⚠️ NEVER WRITE INTO A NESTED PREFAB INSTANCE. Level prefabs contain the enemies and
+                // props as instances of their source prefabs, so filling a slot here does not create
+                // a sound — it creates a PINNED OVERRIDE that freezes that instance at today's clip
+                // and stops it following the source prefab forever after. This project has a
+                // dedicated auditor (Deckshift → Audit Prefab Overrides) precisely because that class
+                // of drift is invisible until something mysteriously stops updating.
+                //
+                // The first run of this tool did exactly that to 13 level prefabs before it was
+                // caught. Fill the SOURCE; the instances inherit for free.
+                if (PrefabUtility.IsPartOfPrefabInstance(mb.gameObject)) continue;
+
                 foreach (FieldInfo f in mb.GetType().GetFields(BindingFlags.Public |
                                                                BindingFlags.NonPublic |
                                                                BindingFlags.Instance))

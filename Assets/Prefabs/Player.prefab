@@ -246,8 +246,8 @@ MonoBehaviour:
   createPlatformSound: {fileID: 8300000, guid: 1cac8dcf0c7c72e429604b798d25fa5d, type: 3}
   vampireBiteSound: {fileID: 8300000, guid: b99cde183dfddad499d2a40bc701e1e9, type: 3}
   glassVailSound: {fileID: 8300000, guid: 0335a30fbf68921448cf9922e6b028cb, type: 3}
-  glassParrySound: {fileID: 0}
-  freefallBladeSound: {fileID: 0}
+  glassParrySound: {fileID: 8300000, guid: a172e14be5e197b42b2f27c69e1ea36f, type: 3}
+  freefallBladeSound: {fileID: 8300000, guid: b14f02cf911d6d745b65f4fcdbad3e40, type: 3}
   jumpSound: {fileID: 8300000, guid: e41a7d00afe07be4ebe4d42dc03c77b3, type: 3}
   leapSound: {fileID: 8300000, guid: e41a7d00afe07be4ebe4d42dc03c77b3, type: 3}
   spendSound: {fileID: 8300000, guid: 70cad06b332b69049ad572f5628c41c5, type: 3}

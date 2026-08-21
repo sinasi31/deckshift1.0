@@ -901,6 +901,116 @@ public static class ProcSfx
         return Finalize(dry, 0.14f, 13000f);
     }
 
+    private static AudioClip glassParry, freefallBlade;
+
+    /// <summary>A blow stopped on glass: struck, an instant of ring, then shards.</summary>
+    public static AudioClip GlassParry
+    { get { if (glassParry == null) glassParry = BuildGlassParry(); return glassParry; } }
+
+    /// <summary>The blade's arc — fast, high, and the edge singing behind it.</summary>
+    public static AudioClip FreefallBlade
+    { get { if (freefallBlade == null) freefallBlade = BuildFreefallBlade(); return freefallBlade; } }
+
+    // ⚠️ THE RING IS CUT OFF BY THE SHARDS, not faded under them. That is the whole difference
+    // between glass that RANG and glass that BROKE — a decaying tone reads as a chime no matter how
+    // many ticks you scatter over it. Inverted against WallBreak on purpose: masonry is low rubble
+    // falling and settling, glass is high shards thrown outward and over fast.
+    private static AudioClip BuildGlassParry()
+    {
+        const float dur = 0.70f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(5506);
+
+        // Glass plate modes: inharmonic like metal, but far higher and with almost no sustain.
+        float[] ratio = { 1f, 2.66f, 4.83f, 7.19f };
+        float[] gain = { 1f, 0.58f, 0.31f, 0.14f };
+        const float root = 1180f;
+        const float choke = 0.085f;              // when the shatter takes it
+
+        for (int i = 0; i < n; i++)
+        {
+            float t = (float)i / SampleRate;
+            if (t > choke + 0.012f) break;
+
+            float s = 0f;
+            for (int p = 0; p < ratio.Length; p++)
+                s += Mathf.Sin(2f * Mathf.PI * root * ratio[p] * t) * gain[p] * Mathf.Exp(-(14f + p * 9f) * t);
+
+            // The blow landing. Bright and very short — this is contact, not a hit on flesh.
+            float strike = t < 0.006f ? (float)(rng.NextDouble() * 2.0 - 1.0) * (1f - t / 0.006f) * 0.62f : 0f;
+
+            // 12ms taper into the break, so the cut is abrupt without clicking.
+            float gate = t < choke ? 1f : 1f - (t - choke) / 0.012f;
+            dry[i] = (s * 0.30f + strike) * gate;
+        }
+
+        // 24 shards over the next half second: each a tiny high mode pair with a steep decay,
+        // amplitude thinning with time so the spray falls away rather than stopping.
+        for (int k = 0; k < 24; k++)
+        {
+            float at = choke + (float)rng.NextDouble() * 0.46f;
+            float hz = 2300f + (float)rng.NextDouble() * 3900f;
+            float amp = 0.20f * (1f - (at - choke) / 0.52f) * (0.35f + (float)rng.NextDouble() * 0.65f);
+            int start = Mathf.RoundToInt(at * SampleRate);
+            for (int i = start; i < n; i++)
+            {
+                float t = (float)(i - start) / SampleRate;
+                float env = Mathf.Exp(-95f * t);
+                if (env < 0.001f) break;
+                float s = Mathf.Sin(2f * Mathf.PI * hz * t)
+                        + Mathf.Sin(2f * Mathf.PI * hz * 2.44f * t) * 0.4f;
+                float tick = t < 0.0015f ? (float)(rng.NextDouble() * 2.0 - 1.0) * 0.45f : 0f;
+                dry[i] += (s * 0.5f + tick) * env * amp;
+            }
+        }
+        return Finalize(dry, 0.22f, 14000f);
+    }
+
+    // ⚠️ SAME FAMILY AS ZombieSwing (both are air) AND IT MUST NOT BE CONFUSABLE WITH IT. The axis
+    // that separates them is speed and pitch, not volume: the zombie is slow, low (320-1500Hz) and
+    // grunts; this is half the length, four times higher, and rings. It also fires on EVERY cast
+    // including into empty air, so it carries no impact and no tail.
+    private static AudioClip BuildFreefallBlade()
+    {
+        const float dur = 0.26f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(5507);
+
+        const float swipe = 0.13f;
+        float lp = 0f, hp = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            float t = (float)i / SampleRate;
+            float air = 0f;
+            if (t < swipe)
+            {
+                // Narrow band climbing hard and dropping — an edge, not a mass.
+                float k = t / swipe;
+                float centre = Mathf.Lerp(1800f, 6400f, Mathf.Sin(k * Mathf.PI * 0.72f));
+                float nz = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp += (1f - Mathf.Exp(-2f * Mathf.PI * (centre * 1.6f) / SampleRate)) * (nz - lp);
+                hp += (1f - Mathf.Exp(-2f * Mathf.PI * (centre * 0.7f) / SampleRate)) * (lp - hp);
+                air = (lp - hp) * Mathf.Sin(k * Mathf.PI) * 0.85f;
+            }
+
+            // The edge sings from the peak of the arc onward — metal bar modes, thin and quick.
+            float ring = 0f;
+            if (t > swipe * 0.55f)
+            {
+                float rt = t - swipe * 0.55f;
+                float[] ratio = { 1f, 2.76f, 5.40f };
+                float[] gain = { 1f, 0.34f, 0.12f };
+                for (int p = 0; p < ratio.Length; p++)
+                    ring += Mathf.Sin(2f * Mathf.PI * 1420f * ratio[p] * rt) * gain[p] * Mathf.Exp(-(26f + p * 16f) * rt);
+                ring *= 0.16f;
+            }
+            dry[i] = air + ring;
+        }
+        return Finalize(dry, 0.12f, 15000f);
+    }
+
     // =============================================================================================
     // NOTICE BOARD — timber, iron nails, paper.
     //
