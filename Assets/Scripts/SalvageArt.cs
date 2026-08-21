@@ -68,7 +68,13 @@ public class SalvageArt : ScriptableObject
     public Ramp rope;       // TX Village Props — Clother Hanger Rope 01.
     public Ramp wood;       // TX Dungeon Props  — plank/beam browns.
     public Ramp stone;      // TX Tileable - Dungeon Wall.
-    public Ramp iron;       // TX Dungeon Props  — Beam Metal.
+    // ⚠️ KNOWN WRONG, 2026-08-21: this ramp is BROWN, not grey. Measured — Sample(0.10) returns
+    // RGBA(0.251, 0.114, 0.075), which is rust. The source sprites (Beam Metal 01 A-C, Door Frame
+    // Iron Side 01) are rusted ironwork in the pack, so "iron" currently means "rusty iron".
+    // Anything wanting COLD metal (the settings lever, the chains) is getting warm brown instead.
+    // Fix by re-sourcing from genuinely grey sprites — the anvil and the ground tileset masonry are
+    // the obvious candidates — not by tinting at the call site.
+    public Ramp iron;       // TX Dungeon Props — Beam Metal (SEE WARNING ABOVE)
 
     private static SalvageArt cached;
 
