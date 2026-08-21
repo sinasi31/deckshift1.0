@@ -12,6 +12,10 @@ public class RangedEnemyAI : MonoBehaviour
     [Tooltip("Oyuncu okçudan en fazla ne kadar yukarıda/aşağıda olursa ateş etsin? (Y ekseni farkı)")]
     public float yTolerance = 1.5f;
 
+    [Header("Line of Sight")]
+    [Tooltip("What blocks sight. Left empty it falls back to the Ground layer — see EnemySenses.")]
+    public LayerMask sightBlockers;
+
     [Header("Ses")]
     // Played when the archer fires. PlayClipAtPoint requires no AudioSource component.
     [SerializeField] private AudioClip shootSound;
@@ -22,6 +26,7 @@ public class RangedEnemyAI : MonoBehaviour
     private PixelMonster pm; // Yüzünü dönmesi için eklendi
     private Transform player;
     private float lastAttackTime;
+    private float lastSeen = -999f;
 
     void Start()
     {
@@ -49,7 +54,10 @@ public class RangedEnemyAI : MonoBehaviour
         float distance = Vector2.Distance(transform.position, player.position);
         float yDifference = Mathf.Abs(player.position.y - transform.position.y); // Yükseklik farkı
 
-        if (distance < aggroRange)
+        // ⚠️ Line of sight with a short memory. Without it the archer drew and fired through solid
+        // rock at a player it could not see. See EnemySenses.
+        if (distance < aggroRange
+            && EnemySenses.IsAware(transform, player, sightBlockers, ref lastSeen))
         {
             // YENİ: Motor dursa bile yüzünü her karede oyuncuya dön (Arkaya sıkma sorununu çözer)
             if (player.position.x > transform.position.x)

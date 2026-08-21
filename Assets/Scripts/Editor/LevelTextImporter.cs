@@ -89,8 +89,12 @@ public static class LevelTextImporter
 
     // Non-prefab structural markers, built procedurally:
     //   '=' one-way platform tiles (jump up through, land on top)
-    //   'G' gate cell — vertical runs of G become one sliding Gate (portcullis)
+    //   'G' gate cell — vertical runs of G become one Gate: a stone arch with double doors in it
     private const string PropsTexturePath = "Assets/Cainos/Pixel Art Platformer - Dungeon/Texture/TX Dungeon Props.png";
+    // ⚠️ This sprite is an ARCH WITH DOUBLE DOORS IN IT, not a portcullis. The importer only lays
+    // down the whole sprite; Gate.cs swaps it at runtime for the arch/leaf pieces cut by
+    // Editor/GateArtBaker and opens the leaves in place. If this constant is ever changed, re-run
+    // Deckshift → Bake Gate Art, which reads the same name.
     private const string GateSpriteName = "TX Dungeon Props - Gate 01";
     // (AltarSpriteName removed 2026-08-09 — the altar's sprite now lives on ShiftAltar.prefab.)
     private const int InteractableLayer = 12; // "Interactable" (PlayerController.interactableLayer)
@@ -1101,7 +1105,7 @@ public static class LevelTextImporter
                 }
             }
 
-            // ---------- Gates: vertical runs of 'G' become sliding portcullises ----------
+            // ---------- Gates: vertical runs of 'G' become one sliding portcullis ----------
             var gates = new List<Gate>();
             foreach (var kv in gateColumns)
             {
@@ -1138,8 +1142,9 @@ public static class LevelTextImporter
                         visual.transform.localPosition = -(Vector3)gateSprite.bounds.center * scale;
                     }
 
+                    // Gate.cs re-dresses this single sprite into arch + passage + two leaves at
+                    // runtime and opens the leaves in place, so there is no travel to configure.
                     var gate = gateGo.AddComponent<Gate>();
-                    gate.openOffset = new Vector2(0f, -h); // sinks fully into the floor
                     gates.Add(gate);
                     runStart = i;
                 }
@@ -1288,6 +1293,7 @@ public static class LevelTextImporter
             foreach (var c in go.GetComponentsInChildren<Collider2D>(true)) Add(c.bounds);
         return b == null ? Vector2.one : new Vector2(b.Value.size.x, b.Value.size.y);
     }
+
 
     private static Sprite LoadPropSprite(string spriteName)
     {

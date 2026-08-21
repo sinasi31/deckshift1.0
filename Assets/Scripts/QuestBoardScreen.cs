@@ -25,7 +25,7 @@ using TMPro;
 // House pattern: entirely procedural, self-instantiating, no prefab and no art files — same shape
 // as ScrapForgeScreen and BlompoScreen. It replaced a painted board sprite that the designer
 // disliked; QuestSystem no longer owns any UI references at all.
-public class QuestBoardScreen : MonoBehaviour
+public class QuestBoardScreen : GameScreen
 {
     private static QuestBoardScreen instance;
 
@@ -72,11 +72,14 @@ public class QuestBoardScreen : MonoBehaviour
     private TextMeshProUGUI hintLabel;
 
     private readonly List<Slip> slips = new List<Slip>();
-    private bool isOpen;
     private float fitScale = 1f;
-    private GameState prevState;
-    private GameObject cachedHud;
-    private bool hudWasActive;
+    // isOpen, and the pause / game-state / HUD / drawer bookkeeping, now live in GameScreen.
+
+    // ⚠️ THE BOARD OWNS ALL THREE OF ITS SOUNDS, and they are a set rather than three picks:
+    // BoardOpen is paper and wood, BoardNail adds IRON, BoardDud takes the iron away again. Playing
+    // the generic UI pair over the top would put a fourth material on the screen and bury the one
+    // relationship the set is built on. See ProcSfx → NOTICE BOARD.
+    protected override bool PlaysDefaultOpenCloseSound { get { return false; } }
 
     // One pinned contract.
     private class Slip
@@ -134,18 +137,9 @@ public class QuestBoardScreen : MonoBehaviour
         instance.Build();
     }
 
-    private static Canvas FindRootCanvas()
-    {
-        Canvas[] all = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
-        Canvas fallback = null;
-        foreach (Canvas c in all)
-        {
-            if (c == null) continue;
-            if (fallback == null) fallback = c;
-            if (c.isRootCanvas && c.renderMode == RenderMode.ScreenSpaceOverlay) return c;
-        }
-        return fallback;
-    }
+    // FindRootCanvas now lives in GameScreen — every screen carried its own copy, and the one screen
+    // that did NOT (the character select, which used FindFirstObjectByType<Canvas>) built itself
+    // inside a world-space enemy health bar and rendered invisibly.
 
     // ---- construction -----------------------------------------------------------------------------
 
@@ -161,7 +155,14 @@ public class QuestBoardScreen : MonoBehaviour
 
         // Backdrop. Clicking it leaves — a notice board is something you step away from, and there
         // is nothing here that a stray click could destroy.
-        Image backdrop = AddImage(transform, "Backdrop", null, T.Backdrop, true);
+        //
+        // ⚠️ OPAQUE, unlike the 0.94 it inherited. This screen is opened in the HUB, which is the
+        // best-lit room in the game — a shopkeeper, a forge, lit barrels, a torch — and at 0.94 all
+        // of it read straight through and competed with the slips. It also broke the one thing this
+        // screen is built on: the value inversion only works while there are TWO surfaces, pale
+        // paper on dark board, and a busy lit room behind it is a third.
+        Image backdrop = AddImage(transform, "Backdrop", null,
+                                  new Color(0.016f, 0.013f, 0.011f, 1f), true);
         Stretch(backdrop.rectTransform);
         AddClick(backdrop.gameObject, Hide);
 
@@ -177,13 +178,75 @@ public class QuestBoardScreen : MonoBehaviour
     // The board itself: oiled wood, raked by a lamp somewhere off to the left.
     private void BuildBoardSurface()
     {
-        Image plate = AddImage(board, "Plate", FlatUI.Panel(10), T.Surface, true);
-        plate.type = Image.Type.Sliced;   // ⚠️ Image.Type defaults to Simple; a 26px sprite stretched
-        Stretch(plate.rectTransform);     //    across 1280 renders as an enormous soft octagon.
+        // ⚠️ REAL TIMBER, GENERATED AT WORLD PIXEL SCALE — not a flat plate. This was
+        // FlatUI.Panel(10) in T.Surface, a single chamfered colour, and it is the last thing on the
+        // screen that was a "panel" rather than an object.
+        //
+        // ⚠️ NO WALL BEHIND IT. Every other Salvage screen tiles the dungeon masonry; this one
+        // deliberately does not (designer, 2026-08-21: "the background, i didnt really like
+        // honestly. maybe this does not need a background image. the panel might just be fine for
+        // it."). It is also the right call on its own terms — this screen's whole idea is the
+        // VALUE INVERSION, pale paper on dark board, and a lit brick wall behind it puts a third
+        // mid-value surface into a composition that works precisely because it only has two.
+        Image plate = AddImage(board, "Plate",
+                               SalvageSurfaces.PlankBoard(Salvage.Tex(BoardW), Salvage.Tex(BOARD_H), 9),
+                               Color.white, true);
+        plate.type = Image.Type.Simple;
 
-        Image edge = AddImage(board, "Edge", FlatUI.Outline(10, 2), T.Border, false);
-        edge.type = Image.Type.Sliced;
-        Stretch(edge.rectTransform);
+        // The frame: real Beam 01 timbers laid end to end across the top and bottom edges, which is
+        // what makes it a MOUNTED notice board rather than a floating rectangle. Beam 01 is 128x10,
+        // so at world scale each length is ~309px and the run tiles without stretching anything.
+        Sprite beam = Salvage.Prop("Beam 01");
+        if (beam != null)
+        {
+            // ⚠️ THE FRAME IS MASKED TO THE BOARD. Beams are tiled at their NATIVE width so the
+            // timber is never stretched (Law 1), which means the last one in each run inevitably
+            // straddles the edge — and an unmasked run overhung by up to a full beam length, 309px
+            // of rail hanging in the black past the corner. Trimming the loop early instead would
+            // leave a gap at the corner, which is worse; clipping keeps the joinery flush.
+            RectTransform frameLayer = AddPoint(board, "Frame", Vector2.zero,
+                                                new Vector2(BoardW, BOARD_H));
+            frameLayer.gameObject.AddComponent<RectMask2D>();
+
+            float bw = Salvage.Px(beam.rect.width);
+            float bh = Salvage.Px(beam.rect.height) * 1.6f;
+            int count = Mathf.CeilToInt(BoardW / bw) + 1;
+            for (int i = 0; i < count; i++)
+            {
+                float x = -BoardW * 0.5f + bw * (i + 0.5f);
+                if (x - bw * 0.5f > BoardW * 0.5f) break;
+                for (int edgeIdx = 0; edgeIdx < 2; edgeIdx++)
+                {
+                    Image b = AddImage(frameLayer, "Frame" + edgeIdx + "_" + i, beam,
+                                       SalvageScreen.PropTint, false);
+                    b.rectTransform.sizeDelta = new Vector2(bw, bh);
+                    b.rectTransform.anchoredPosition =
+                        new Vector2(x, edgeIdx == 0 ? BOARD_H * 0.5f - bh * 0.4f
+                                                    : -BOARD_H * 0.5f + bh * 0.4f);
+                }
+            }
+
+            // ⚠️ THE UPRIGHTS ARE WHAT MAKE IT A FRAME. With only the top and bottom rails the board
+            // has no left or right edge, so a dark timber field against a dark backdrop has no
+            // silhouette at all — it read as the slips floating in front of nothing. Same beam
+            // rotated 90°, drawn LAST so the corners lap over the rails like real joinery.
+            int vCount = Mathf.CeilToInt(BOARD_H / bw) + 1;
+            for (int i = 0; i < vCount; i++)
+            {
+                float y = -BOARD_H * 0.5f + bw * (i + 0.5f);
+                if (y - bw * 0.5f > BOARD_H * 0.5f) break;
+                for (int side = 0; side < 2; side++)
+                {
+                    Image b = AddImage(frameLayer, "Upright" + side + "_" + i, beam,
+                                       SalvageScreen.PropTint, false);
+                    b.rectTransform.sizeDelta = new Vector2(bw, bh);
+                    b.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+                    b.rectTransform.anchoredPosition =
+                        new Vector2(side == 0 ? -BoardW * 0.5f + bh * 0.4f
+                                              : BoardW * 0.5f - bh * 0.4f, y);
+                }
+            }
+        }
 
         // Wood grain: a few long, very faint scores. They live in the margins the slips leave
         // exposed, since a streak crossing the content is the mistake the forge screen already made.
@@ -474,9 +537,30 @@ public class QuestBoardScreen : MonoBehaviour
         // of that reserve into a single hole above the progress bar and the slip read as unfinished.
         TextMeshProUGUI desc = AddText(rt, "Desc", s.data.description, 21f, T.TextBody,
                                        TextAlignmentOptions.Center);
+
+        // ⚠️ THE ONE PIECE OF REAL PROSE ON A SLIP, so it takes the PROSE face (see `UIType`). The
+        // display face has no lowercase, which rendered every contract as
+        // `CLEAR 4 ROOMS IN A ROW WITHOUT PLAYING STAGGER.` — a board of shouting. Sentence case is
+        // what makes a slip read as something a person wrote and pinned up, which is the whole
+        // Bulletin conceit. The title, tag, payout and progress stay in the display face: they are
+        // labels, not sentences.
+        TMP_FontAsset prose = UIType.Prose();
+        if (prose != null)
+        {
+            desc.font = prose;
+
+            // ⚠️ A THIN FACE ON A LIGHT GROUND NEEDS DARKER INK THAN THE NUMBER SUGGESTS. `T.TextBody`
+            // was picked for the display face, which is heavy enough to hold its value; Pixie's
+            // strokes cover far less area, so the identical colour reads visibly weaker. Measured on
+            // the slip: paper luminance 0.75, title ink 0.109, this ink 0.189 — it sat nearly twice
+            // as light as the title while carrying the sentence you actually have to read. Pulled
+            // most of the way toward the title without reaching it, since the title still outranks it.
+            desc.color = new Color(0.165f, 0.137f, 0.110f, desc.color.a);
+        }
+
         desc.enableAutoSizing = true;
-        desc.fontSizeMin = 15f;
-        desc.fontSizeMax = 21f;
+        desc.fontSizeMin = UIType.SizeFor(TextRole.Caption, true);   // 19 — was 15 in the display face
+        desc.fontSizeMax = UIType.SizeFor(TextRole.Body, true);      // 22 — was 21
         desc.rectTransform.sizeDelta = new Vector2(292f, 86f);
         desc.rectTransform.anchoredPosition = new Vector2(0f, -12f);
 
@@ -590,15 +674,27 @@ public class QuestBoardScreen : MonoBehaviour
         }
     }
 
+    private void PlayBoardDud() { SfxManager.PlayOn(audioSource, ProcSfx.BoardDud, 0.85f); }
+
     private void TryAccept(Slip s)
     {
         QuestSystem qs = QuestSystem.instance;
-        if (qs == null || !s.interactable) return;
-        if (!qs.AcceptQuest(s.data)) return;
+
+        // ⚠️ A refused click used to return in SILENCE, so clicking a contract while the board was
+        // full — or one already taken — did nothing at all and looked broken rather than refused.
+        //
+        // ⚠️ AND IT IS THE BOARD'S OWN REFUSAL, NOT THE GENERIC UI ONE. BoardDud is BoardNail with
+        // the iron layer removed — the hammer meets the timber and nothing fastens. That
+        // relationship is what makes it read instantly, and a shared beep throws it away.
+        if (qs == null || !s.interactable) { PlayBoardDud(); return; }
+        if (!qs.AcceptQuest(s.data)) { PlayBoardDud(); return; }
 
         s.hovered = false;
         s.interactable = false;
-        SfxManager.PlayOn(audioSource, ProcSfx.WaxStamp, 0.9f);
+
+        // Keeps its own confirm: a seal pressed into wax is this screen's signature and beats the
+        // generic one, exactly like the paper rustle beats the generic open.
+        SfxManager.PlayOn(audioSource, ProcSfx.BoardNail, 0.95f);
 
         StartCoroutine(SealRoutine(s));
     }
@@ -659,21 +755,16 @@ public class QuestBoardScreen : MonoBehaviour
         gameObject.SetActive(true);
         transform.SetAsLastSibling();
 
-        prevState = GameManager.instance != null ? GameManager.instance.currentState : GameState.Playing;
-        if (GameManager.instance != null)
-        {
-            GameManager.instance.RequestPause();
-            GameManager.instance.SetGameState(GameState.Paused);
-        }
-        if (cachedHud == null) cachedHud = GameObject.Find("GameplayHUD");
-        hudWasActive = cachedHud != null && cachedHud.activeSelf;
-        if (cachedHud != null) cachedHud.SetActive(false);
-        if (hudWasActive && HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(true);
+        // The pause / game-state / HUD / hand-drawer handover lives in GameScreen — it was twelve
+        // identical lines in every screen, and three of its details are load-bearing and non-obvious
+        // (the HUD state is recorded rather than assumed, the drawer lock is gated on it, and the
+        // previous game state is restored rather than hardcoded to Playing).
+        AcquireDisplay();
 
         Refresh();
         FitScale();
 
-        SfxManager.PlayOn(audioSource, ProcSfx.PaperRustle, 0.7f);
+        SfxManager.PlayOn(audioSource, ProcSfx.BoardOpen, 0.75f);
 
         StopAllCoroutines();
         StartCoroutine(OpenAnim());
@@ -684,13 +775,7 @@ public class QuestBoardScreen : MonoBehaviour
         if (!isOpen) return;
         isOpen = false;
 
-        if (GameManager.instance != null)
-        {
-            GameManager.instance.ReleasePause();
-            GameManager.instance.SetGameState(prevState);
-        }
-        if (cachedHud != null) cachedHud.SetActive(hudWasActive);
-        if (hudWasActive && HandUIDrawer.instance != null) HandUIDrawer.instance.SetLocked(false);
+        ReleaseDisplay();
 
         StopAllCoroutines();
         gameObject.SetActive(false);

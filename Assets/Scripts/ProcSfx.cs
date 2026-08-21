@@ -674,6 +674,634 @@ public static class ProcSfx
         return Finalize(dry, 0.12f, 9000f);
     }
 
+    // =============================================================================================
+    // THE SILENT SLOTS — sounds for things that currently make none.
+    //
+    // ⚠️ THIS IS WHERE THE GAME'S SILENCE ACTUALLY LIVES, and it is NOT the SoundBank. Measured
+    // 2026-08-21: 75 AudioClip fields across our 172 prefabs are NULL, and `SfxManager.PlayOn` with
+    // a null clip is a silent no-op — so every melee enemy swings without a sound (15 prefabs), no
+    // breakable wall makes a noise (13), no spitter spits (8), no Shift Altar responds (12).
+    // Meanwhile `Sfx.Play` has ONE call site, so filling the SoundBank would have built a library
+    // nothing reads. Fill the slots first; migrate the architecture after.
+    //
+    // Six clips here cover 54 of the 75 slots. They are baked to real .wav assets and assigned by
+    // `Deckshift → Fill Silent Audio Slots`.
+
+    private static AudioClip zombieSwing, spitterSpit, wallBreak, altarPay, altarRefuse, crystalCollect;
+
+    /// <summary>A heavy, unskilled swing: mass moving through air, and a wet grunt behind it.</summary>
+    public static AudioClip ZombieSwing
+    { get { if (zombieSwing == null) zombieSwing = BuildZombieSwing(); return zombieSwing; } }
+
+    /// <summary>The spitter's launch — a wet gather and a release.</summary>
+    public static AudioClip SpitterSpit
+    { get { if (spitterSpit == null) spitterSpit = BuildSpitterSpit(); return spitterSpit; } }
+
+    /// <summary>Masonry giving way: a crack, then rubble.</summary>
+    public static AudioClip WallBreak
+    { get { if (wallBreak == null) wallBreak = BuildWallBreak(); return wallBreak; } }
+
+    /// <summary>The altar takes your Shift. Harmonic, rising, and it RESOLVES.</summary>
+    public static AudioClip AltarPay
+    { get { if (altarPay == null) altarPay = BuildAltarPay(); return altarPay; } }
+
+    /// <summary>The altar refuses. The same voice, falling, and it does not resolve.</summary>
+    public static AudioClip AltarRefuse
+    { get { if (altarRefuse == null) altarRefuse = BuildAltarRefuse(); return altarRefuse; } }
+
+    /// <summary>A Shift crystal collected — small, bright, over fast.</summary>
+    public static AudioClip CrystalCollect
+    { get { if (crystalCollect == null) crystalCollect = BuildCrystalCollect(); return crystalCollect; } }
+
+    // ⚠️ THE SWING IS AIR, NOT AN IMPACT. It plays when the attack STARTS, before anything is hit —
+    // the hit has its own sound. Giving this a transient makes every enemy sound like it connected
+    // even when it whiffed, which is actively misleading in a game where dodging is the whole point.
+    private static AudioClip BuildZombieSwing()
+    {
+        const float dur = 0.34f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(5501);
+
+        float lp = 0f, hp = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            float t = (float)i / SampleRate;
+            float k = t / dur;
+
+            // A band of noise swept UP then down — the doppler of something heavy passing you.
+            float centre = Mathf.Lerp(320f, 1500f, Mathf.Sin(k * Mathf.PI));
+            float nz = (float)(rng.NextDouble() * 2.0 - 1.0);
+            lp += (1f - Mathf.Exp(-2f * Mathf.PI * (centre * 2f) / SampleRate)) * (nz - lp);
+            hp += (1f - Mathf.Exp(-2f * Mathf.PI * (centre * 0.5f) / SampleRate)) * (lp - hp);
+            float air = (lp - hp) * Mathf.Sin(k * Mathf.PI) * 0.55f;
+
+            // The grunt: low, breathy, no clear pitch. It arrives slightly AFTER the swing peaks,
+            // because the effort comes out of you a beat behind the movement.
+            float g = 0f;
+            if (t > 0.06f)
+            {
+                float gt = t - 0.06f;
+                float wob = 74f + Mathf.Sin(gt * 38f) * 9f;
+                g = Mathf.Sin(2f * Mathf.PI * wob * gt) * Mathf.Exp(-11f * gt) * 0.22f;
+                g += (float)(rng.NextDouble() * 2.0 - 1.0) * Mathf.Exp(-15f * gt) * 0.07f;
+            }
+            dry[i] = air + g;
+        }
+        return Finalize(dry, 0.08f, 6000f);
+    }
+
+    private static AudioClip BuildSpitterSpit()
+    {
+        const float dur = 0.40f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(5502);
+
+        float lp = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            float t = (float)i / SampleRate;
+
+            // GATHER — a rising wet rattle for the first 180ms. This is the windup the AI already
+            // animates and which currently has no sound at all, so the player gets no warning.
+            float gather = 0f;
+            if (t < 0.20f)
+            {
+                float k = t / 0.20f;
+                float nz = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp += (1f - Mathf.Exp(-2f * Mathf.PI * Mathf.Lerp(260f, 900f, k) / SampleRate)) * (nz - lp);
+                float chop = 0.5f + 0.5f * Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(22f, 46f, k) * t);
+                gather = lp * chop * k * 0.5f;
+            }
+
+            // RELEASE — a short pressurised burst, low-passed hard so it stays wet rather than hissy.
+            float rel = 0f;
+            if (t >= 0.20f)
+            {
+                float rt = t - 0.20f;
+                float nz = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp += (1f - Mathf.Exp(-2f * Mathf.PI * Mathf.Lerp(2400f, 400f, Mathf.Clamp01(rt / 0.10f)) / SampleRate)) * (nz - lp);
+                rel = lp * Mathf.Exp(-16f * rt) * 0.85f;
+            }
+            dry[i] = gather + rel;
+        }
+        return Finalize(dry, 0.10f, 5200f);
+    }
+
+    private static AudioClip BuildWallBreak()
+    {
+        const float dur = 0.95f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(5503);
+
+        // THE CRACK — the wall failing. One hard, bright, very short event.
+        Thud(dry, 0f, 210f, 0.85f, 26f, rng, 0.30f);
+        Latch(dry, 0.002f, 0.30f, rng, 1900f);
+
+        // THE COLLAPSE — a body of low noise under it, so it has weight.
+        float lp = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            float t = (float)i / SampleRate;
+            float nz = (float)(rng.NextDouble() * 2.0 - 1.0);
+            lp += (1f - Mathf.Exp(-2f * Mathf.PI * 700f / SampleRate)) * (nz - lp);
+            dry[i] += lp * Mathf.Exp(-7f * t) * 0.42f;
+        }
+
+        // ⚠️ AND THEN RUBBLE — 14 small stone hits scattered over the next 700ms. The tail is the
+        // whole difference between "a wall broke" and "something was hit". A single impact with a
+        // decay reads as a drum; discrete pieces landing at irregular times reads as debris.
+        for (int k = 0; k < 14; k++)
+        {
+            float at = 0.10f + (float)rng.NextDouble() * 0.62f;
+            float hz = 150f + (float)rng.NextDouble() * 460f;
+            float amp = 0.16f * (1f - at / 0.80f) * (0.5f + (float)rng.NextDouble() * 0.5f);
+            Thud(dry, at, hz, Mathf.Max(0.03f, amp), 46f + (float)rng.NextDouble() * 40f, rng, 0.18f);
+        }
+        return Finalize(dry, 0.18f, 8000f);
+    }
+
+    // ⚠️ PAY AND REFUSE ARE THE SAME VOICE, INVERTED. Both are Shift, so both are harmonic bell
+    // partials in the magic family — what separates them is DIRECTION and RESOLUTION: pay rises and
+    // lands on its root, refuse falls and stops on an unresolved interval. That is far clearer than
+    // making refuse a buzzer, and it keeps the altar sounding like one object.
+    private static AudioClip BuildAltarPay()
+    {
+        const float dur = 0.85f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(5504);
+
+        float[] partial = { 1f, 2f, 3f, 4f, 5.1f };
+        float[] gain = { 1f, 0.52f, 0.30f, 0.16f, 0.09f };
+
+        for (int i = 0; i < n; i++)
+        {
+            float t = (float)i / SampleRate;
+            // Root rises a fifth and settles — the altar accepting.
+            float root = Mathf.Lerp(196f, 294f, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 0.30f)));
+            float s = 0f;
+            for (int p = 0; p < partial.Length; p++)
+                s += Mathf.Sin(2f * Mathf.PI * root * partial[p] * t) * gain[p] * Mathf.Exp(-(2.2f + p * 1.5f) * t);
+
+            // A breath of noise on the attack only, so it starts as an event rather than a tone.
+            float air = t < 0.03f ? (float)(rng.NextDouble() * 2.0 - 1.0) * (1f - t / 0.03f) * 0.10f : 0f;
+            dry[i] = s * 0.24f + air;
+        }
+        return Finalize(dry, 0.30f, 11000f);
+    }
+
+    private static AudioClip BuildAltarRefuse()
+    {
+        const float dur = 0.60f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(5505);
+
+        float[] partial = { 1f, 2f, 3f, 4f, 5.1f };
+        float[] gain = { 1f, 0.52f, 0.30f, 0.16f, 0.09f };
+
+        for (int i = 0; i < n; i++)
+        {
+            float t = (float)i / SampleRate;
+            // Falls, and stops on a tritone below the root — deliberately unresolved.
+            float root = Mathf.Lerp(294f, 208f, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 0.22f)));
+            float s = 0f;
+            for (int p = 0; p < partial.Length; p++)
+                s += Mathf.Sin(2f * Mathf.PI * root * partial[p] * t) * gain[p] * Mathf.Exp(-(4.5f + p * 2.2f) * t);
+
+            float air = t < 0.03f ? (float)(rng.NextDouble() * 2.0 - 1.0) * (1f - t / 0.03f) * 0.10f : 0f;
+            dry[i] = s * 0.20f + air;
+        }
+        return Finalize(dry, 0.16f, 9000f);
+    }
+
+    // ⚠️ SHORT. This fires on every crystal picked up, often several in a row, and anything with a
+    // tail turns a handful of pickups into a chord. 180ms and out.
+    private static AudioClip BuildCrystalCollect()
+    {
+        const float dur = 0.22f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+
+        float[] partial = { 1f, 2.01f, 3.02f };
+        float[] gain = { 1f, 0.44f, 0.20f };
+
+        for (int i = 0; i < n; i++)
+        {
+            float t = (float)i / SampleRate;
+            float root = Mathf.Lerp(660f, 880f, Mathf.Clamp01(t / 0.05f));
+            float s = 0f;
+            for (int p = 0; p < partial.Length; p++)
+                s += Mathf.Sin(2f * Mathf.PI * root * partial[p] * t) * gain[p] * Mathf.Exp(-(16f + p * 10f) * t);
+            dry[i] = s * 0.24f;
+        }
+        return Finalize(dry, 0.14f, 13000f);
+    }
+
+    private static AudioClip glassParry, freefallBlade;
+
+    /// <summary>A blow stopped on glass: struck, an instant of ring, then shards.</summary>
+    public static AudioClip GlassParry
+    { get { if (glassParry == null) glassParry = BuildGlassParry(); return glassParry; } }
+
+    /// <summary>The blade's arc — fast, high, and the edge singing behind it.</summary>
+    public static AudioClip FreefallBlade
+    { get { if (freefallBlade == null) freefallBlade = BuildFreefallBlade(); return freefallBlade; } }
+
+    // ⚠️ THE RING IS CUT OFF BY THE SHARDS, not faded under them. That is the whole difference
+    // between glass that RANG and glass that BROKE — a decaying tone reads as a chime no matter how
+    // many ticks you scatter over it. Inverted against WallBreak on purpose: masonry is low rubble
+    // falling and settling, glass is high shards thrown outward and over fast.
+    private static AudioClip BuildGlassParry()
+    {
+        const float dur = 0.70f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(5506);
+
+        // Glass plate modes: inharmonic like metal, but far higher and with almost no sustain.
+        float[] ratio = { 1f, 2.66f, 4.83f, 7.19f };
+        float[] gain = { 1f, 0.58f, 0.31f, 0.14f };
+        const float root = 1180f;
+        const float choke = 0.085f;              // when the shatter takes it
+
+        for (int i = 0; i < n; i++)
+        {
+            float t = (float)i / SampleRate;
+            if (t > choke + 0.012f) break;
+
+            float s = 0f;
+            for (int p = 0; p < ratio.Length; p++)
+                s += Mathf.Sin(2f * Mathf.PI * root * ratio[p] * t) * gain[p] * Mathf.Exp(-(14f + p * 9f) * t);
+
+            // The blow landing. Bright and very short — this is contact, not a hit on flesh.
+            float strike = t < 0.006f ? (float)(rng.NextDouble() * 2.0 - 1.0) * (1f - t / 0.006f) * 0.62f : 0f;
+
+            // 12ms taper into the break, so the cut is abrupt without clicking.
+            float gate = t < choke ? 1f : 1f - (t - choke) / 0.012f;
+            dry[i] = (s * 0.30f + strike) * gate;
+        }
+
+        // 24 shards over the next half second: each a tiny high mode pair with a steep decay,
+        // amplitude thinning with time so the spray falls away rather than stopping.
+        for (int k = 0; k < 24; k++)
+        {
+            float at = choke + (float)rng.NextDouble() * 0.46f;
+            float hz = 2300f + (float)rng.NextDouble() * 3900f;
+            float amp = 0.20f * (1f - (at - choke) / 0.52f) * (0.35f + (float)rng.NextDouble() * 0.65f);
+            int start = Mathf.RoundToInt(at * SampleRate);
+            for (int i = start; i < n; i++)
+            {
+                float t = (float)(i - start) / SampleRate;
+                float env = Mathf.Exp(-95f * t);
+                if (env < 0.001f) break;
+                float s = Mathf.Sin(2f * Mathf.PI * hz * t)
+                        + Mathf.Sin(2f * Mathf.PI * hz * 2.44f * t) * 0.4f;
+                float tick = t < 0.0015f ? (float)(rng.NextDouble() * 2.0 - 1.0) * 0.45f : 0f;
+                dry[i] += (s * 0.5f + tick) * env * amp;
+            }
+        }
+        return Finalize(dry, 0.22f, 14000f);
+    }
+
+    // ⚠️ SAME FAMILY AS ZombieSwing (both are air) AND IT MUST NOT BE CONFUSABLE WITH IT. The axis
+    // that separates them is speed and pitch, not volume: the zombie is slow, low (320-1500Hz) and
+    // grunts; this is half the length, four times higher, and rings. It also fires on EVERY cast
+    // including into empty air, so it carries no impact and no tail.
+    private static AudioClip BuildFreefallBlade()
+    {
+        const float dur = 0.26f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(5507);
+
+        const float swipe = 0.13f;
+        float lp = 0f, hp = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            float t = (float)i / SampleRate;
+            float air = 0f;
+            if (t < swipe)
+            {
+                // Narrow band climbing hard and dropping — an edge, not a mass.
+                float k = t / swipe;
+                float centre = Mathf.Lerp(1800f, 6400f, Mathf.Sin(k * Mathf.PI * 0.72f));
+                float nz = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp += (1f - Mathf.Exp(-2f * Mathf.PI * (centre * 1.6f) / SampleRate)) * (nz - lp);
+                hp += (1f - Mathf.Exp(-2f * Mathf.PI * (centre * 0.7f) / SampleRate)) * (lp - hp);
+                air = (lp - hp) * Mathf.Sin(k * Mathf.PI) * 0.85f;
+            }
+
+            // The edge sings from the peak of the arc onward — metal bar modes, thin and quick.
+            float ring = 0f;
+            if (t > swipe * 0.55f)
+            {
+                float rt = t - swipe * 0.55f;
+                float[] ratio = { 1f, 2.76f, 5.40f };
+                float[] gain = { 1f, 0.34f, 0.12f };
+                for (int p = 0; p < ratio.Length; p++)
+                    ring += Mathf.Sin(2f * Mathf.PI * 1420f * ratio[p] * rt) * gain[p] * Mathf.Exp(-(26f + p * 16f) * rt);
+                ring *= 0.16f;
+            }
+            dry[i] = air + ring;
+        }
+        return Finalize(dry, 0.12f, 15000f);
+    }
+
+    // =============================================================================================
+    // NOTICE BOARD — timber, iron nails, paper.
+    //
+    // ⚠️ THESE REPLACE PaperRustle / WaxStamp ON THE QUEST BOARD (designer, 2026-08-21: "change the
+    // sound effects that the quest board uses currently as well. the sound should fit the theme").
+    // The two old clips are pure PAPER, and paper was the whole board when the board was a painted
+    // sheet. It is now a timber notice board with contracts NAILED to it, so two thirds of the
+    // material was inaudible: no wood, no iron.
+    //
+    // The set is built as a three-way where the MATERIAL carries the meaning, not the volume:
+    //
+    //   BoardOpen  — paper and wood.            you disturbed the sheaf
+    //   BoardNail  — paper, wood AND IRON.      it went in
+    //   BoardDud   — paper and wood, NO IRON.   it did not
+    //
+    // ⚠️ THE ABSENCE OF THE IRON IS THE REFUSAL. Refuse is not the accept played quieter or lower —
+    // it is the accept with the one layer that means "fastened" removed. That is why it reads
+    // instantly even at the same loudness, and it is the same trick the pause pair uses (choked
+    // envelope) rather than a pitch drop.
+    //
+    // ⚠️ AND THIS IS WHERE THE PAPER FAMILY'S "NO PITCHED COMPONENT" RULE STOPS APPLYING — carefully.
+    // BoardOpen still obeys it (its wood knock sits under 80Hz, where it reads as weight, not a
+    // note). BoardNail deliberately breaks it, because a nail IS metal, and it is the only sound on
+    // the screen with a bar mode in it. That exclusivity is what makes the accept land.
+
+    private static AudioClip boardOpen, boardNail, boardDud;
+
+    /// <summary>Stepping up to the board: several pinned sheets stirring against timber.</summary>
+    public static AudioClip BoardOpen
+    { get { if (boardOpen == null) boardOpen = BuildBoardOpen(); return boardOpen; } }
+
+    /// <summary>Taking a contract: a nail driven through paper into the board, two strikes.</summary>
+    public static AudioClip BoardNail
+    { get { if (boardNail == null) boardNail = BuildBoardNail(); return boardNail; } }
+
+    /// <summary>Refused: the hammer meets the board and nothing goes in.</summary>
+    public static AudioClip BoardDud
+    { get { if (boardDud == null) boardDud = BuildBoardDud(); return boardDud; } }
+
+    private static AudioClip BuildBoardOpen()
+    {
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.58f)];
+        var rng = new System.Random(4471);
+
+        // ⚠️ SEPARATE BURSTS, NOT ONE LONG HISS. A continuous shaped noise reads as wind; only the
+        // granularity says "several distinct sheets". Same rule the original rustle was built on.
+        // Staggered irregularly — evenly spaced bursts read as a machine.
+        Rustle(dry, 0.000f, 0.14f, 0.30f, rng, 5200f, 0.4f);
+        Rustle(dry, 0.055f, 0.11f, 0.22f, rng, 6400f, -0.3f);
+        Rustle(dry, 0.140f, 0.16f, 0.26f, rng, 4600f, 0.2f);
+        Rustle(dry, 0.255f, 0.13f, 0.16f, rng, 5800f, -0.6f);
+        Rustle(dry, 0.370f, 0.15f, 0.10f, rng, 4200f, -0.9f);
+
+        // The board itself taking the disturbance. Under 80Hz and almost no ring, so it is felt as
+        // the paper being attached to SOMETHING rather than heard as a note.
+        Thud(dry, 0.020f, 74f, 0.13f, 26f, rng, 0.10f);
+
+        return Finalize(dry, 0.06f, 10000f);
+    }
+
+    private static AudioClip BuildBoardNail()
+    {
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.50f)];
+        var rng = new System.Random(4472);
+
+        // STRIKE ONE — the nail bites. Bright iron, the board still ringing under it, paper
+        // compressing where the head lands.
+        Latch(dry, 0.000f, 0.46f, rng, 2950f);
+        Thud(dry, 0.002f, 126f, 0.40f, 32f, rng, 0.55f);
+        Rustle(dry, 0.000f, 0.05f, 0.16f, rng, 5600f, -1f);
+
+        // STRIKE TWO — and it SEATS. Harder, but the wood goes deeper and the ring is choked,
+        // because the nail is now home and the board is no longer free to sound.
+        //
+        // ⚠️ THIS IS THE WHOLE SOUND. One strike is a generic impact and could be any screen's
+        // confirm; two strikes where the SECOND IS DEADER is unmistakably something being driven in.
+        // If this ever needs retuning, keep that relationship — do not make strike two louder and
+        // brighter, which is the instinct and which turns it back into a generic double-click.
+        Latch(dry, 0.094f, 0.60f, rng, 3150f);
+        Thud(dry, 0.096f, 101f, 0.52f, 47f, rng, 0.16f);
+
+        // The sheet settling against the timber afterwards.
+        Rustle(dry, 0.135f, 0.13f, 0.09f, rng, 4800f, -0.8f);
+
+        return Finalize(dry, 0.10f, 9500f);
+    }
+
+    private static AudioClip BuildBoardDud()
+    {
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.32f)];
+        var rng = new System.Random(4473);
+
+        // Wood, struck once, and NOTHING FASTENS. ring 0.05 is almost pure transient — the sound of
+        // a hammer meeting a board rather than driving anything through it.
+        Thud(dry, 0.000f, 92f, 0.42f, 55f, rng, 0.05f);
+        Rustle(dry, 0.004f, 0.07f, 0.13f, rng, 5000f, -1f);
+
+        // ⚠️ NO Latch(). Deliberately. See the family note above: the missing iron IS the message,
+        // and adding "just a little" metal here would make refuse and accept the same event at
+        // different volumes.
+
+        return Finalize(dry, 0.05f, 7200f);
+    }
+
+    // =============================================================================================
+    // GATE — heavy banded doors hung in a stone arch.
+    //
+    // A FIFTH family, and deliberately the only one built from TWO materials at once. Every family
+    // above commits to one (magic = harmonic bell partials, metal = inharmonic bar modes, stone =
+    // noise + sub, paper = no pitched component at all, UI = pitch motion). A barred door in a stone
+    // opening is iron working against masonry, so these layer bar modes OVER grit — which is what
+    // stops a hinge creak reading as a scrap pickup and the stop reading as a Meteor Greaves landing.
+    //
+    // FOUR clips, because a gate opening is a SEQUENCE and not a hit. The old gate played nothing at
+    // all, and that silence was most of why it felt like nothing was happening.
+    //
+    // ⚠️ These were written for a PORTCULLIS (strain → catch → ratchet down → seat) and are now
+    // sequenced by Gate.cs as a DOUBLE DOOR (bolt → strain → swing → stop, and a slam on the way
+    // back). The clips still fit — the materials did not change, only the choreography — so the
+    // names below describe the sound rather than the beat it happens to serve. Do not assume
+    // "Ratchet" means the gate ratchets; it is the dry repeatable tick, used as a hinge creak.
+
+    private static AudioClip gateGroan, gateRelease, gateRatchet, gateSeat;
+
+    // The mechanism taking the weight before anything moves. Deliberately has NO attack transient —
+    // it swells. A sound that arrives gradually is what makes the release that follows land.
+    public static AudioClip GateGroan
+    { get { if (gateGroan == null) gateGroan = BuildGateGroan(); return gateGroan; } }
+
+    // The catch letting go: the one sharp event in the whole sequence, so nothing else may compete.
+    public static AudioClip GateRelease
+    { get { if (gateRelease == null) gateRelease = BuildGateRelease(); return gateRelease; } }
+
+    // One pawl catch during the descent. Played a dozen times per open, so it is deliberately the
+    // quietest and driest clip in the game — give this a tail and the drop turns to mush.
+    public static AudioClip GateRatchet
+    { get { if (gateRatchet == null) gateRatchet = BuildGateRatchet(); return gateRatchet; } }
+
+    // The slab arriving. Lower and longer than MeteorImpact on purpose: that is a body hitting the
+    // floor, this is the floor taking a tonne of rock.
+    public static AudioClip GateSeat
+    { get { if (gateSeat == null) gateSeat = BuildGateSeat(); return gateSeat; } }
+
+    private static AudioClip BuildGateGroan()
+    {
+        const float dur = 0.55f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(20819);
+
+        float lp = 0f, hp = 0f;
+        float lpCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 520f / SampleRate);
+        float hpCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 150f / SampleRate);
+        float subPhase = 0f;
+
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+
+            // Swell in and ease out. No transient anywhere — this is load ARRIVING, not an impact.
+            float env = Mathf.Sin(Mathf.PI * Mathf.Clamp01(ts / dur));
+            env *= env;
+
+            // Stone bearing on stone: a narrow noise band with a slow wobble, as the faces bind.
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+            lp += lpCoef * (noise - lp);
+            hp += hpCoef * (lp - hp);
+            float grit = (lp - hp) * (0.75f + 0.25f * Mathf.Sin(2f * Mathf.PI * 11f * ts));
+
+            subPhase += 2f * Mathf.PI * 52f / SampleRate;   // the weight itself
+            float sub = Mathf.Sin(subPhase);
+
+            dry[i] = (grit * 0.42f + sub * 0.30f) * env;
+        }
+        return Finalize(dry, 0.20f, 3200f);   // dark: heard through rock, not through air
+    }
+
+    private static AudioClip BuildGateRelease()
+    {
+        const float dur = 0.34f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(60313);
+
+        float f0 = 168f;                                   // heavy iron => LOW fundamental
+        float[] ratio = { 1f, 2.76f, 5.40f, 8.93f };       // ideal free-bar modes = metal
+        float[] pAmp  = { 1f, 0.48f, 0.22f, 0.09f };
+        float[] pDec  = { 15f, 24f, 36f, 52f };
+
+        float lp = 0f;
+        float lpCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 4200f / SampleRate);
+        float subPhase = 0f;
+
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+
+            float body = 0f;
+            for (int p = 0; p < ratio.Length; p++)
+                body += Mathf.Sin(2f * Mathf.PI * f0 * ratio[p] * ts) * pAmp[p] * Mathf.Exp(-pDec[p] * ts);
+
+            lp += lpCoef * (noise - lp);
+            float grit = lp * Mathf.Exp(-70f * ts);
+
+            subPhase += 2f * Mathf.PI * 64f / SampleRate;
+            float sub = Mathf.Sin(subPhase) * Mathf.Exp(-13f * ts);
+
+            dry[i] = body * 0.20f + grit * 0.26f + sub * 0.30f;
+        }
+        return Finalize(dry, 0.18f, 6000f);
+    }
+
+    private static AudioClip BuildGateRatchet()
+    {
+        const float dur = 0.13f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(11279);
+
+        float f0 = 315f;
+        float[] ratio = { 1f, 2.76f, 5.40f };
+        float[] pAmp  = { 1f, 0.40f, 0.16f };
+        float[] pDec  = { 46f, 62f, 84f };                 // very fast: a tick, never a ring
+
+        float lp = 0f;
+        float lpCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 3400f / SampleRate);
+
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+
+            float body = 0f;
+            for (int p = 0; p < ratio.Length; p++)
+                body += Mathf.Sin(2f * Mathf.PI * f0 * ratio[p] * ts) * pAmp[p] * Mathf.Exp(-pDec[p] * ts);
+
+            lp += lpCoef * (noise - lp);
+            float grit = lp * Mathf.Exp(-150f * ts);
+
+            dry[i] = body * 0.11f + grit * 0.16f;
+        }
+        return Finalize(dry, 0.05f, 7000f);   // almost dry — a dozen of these must not smear
+    }
+
+    private static AudioClip BuildGateSeat()
+    {
+        const float dur = 1.30f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(77404);
+
+        float b0 = 96f;                                    // below MeteorImpact 132 = more mass
+        float[] ratio = { 1f, 1.71f, 2.43f };
+        float[] pAmp  = { 1f, 0.38f, 0.17f };
+        float[] pDec  = { 8f, 13f, 20f };
+
+        float crackLp = 0f;
+        float crackCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 6200f / SampleRate);
+        float debLp = 0f, debHp = 0f;
+        float debLpCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 1500f / SampleRate);
+        float debHpCoef = 1f - Mathf.Exp(-2f * Mathf.PI * 220f / SampleRate);
+        float subPhase = 0f;
+
+        for (int i = 0; i < n; i++)
+        {
+            float ts = (float)i / SampleRate;
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+
+            crackLp += crackCoef * (noise - crackLp);
+            float crack = crackLp * Mathf.Exp(-260f * ts);
+
+            float subF = Mathf.Lerp(92f, 30f, Mathf.Clamp01(ts / 0.36f));
+            subPhase += 2f * Mathf.PI * subF / SampleRate;
+            float sub = Mathf.Sin(subPhase) * Mathf.Exp(-4.2f * ts);
+
+            float body = 0f;
+            for (int p = 0; p < ratio.Length; p++)
+                body += Mathf.Sin(2f * Mathf.PI * b0 * ratio[p] * ts) * pAmp[p] * Mathf.Exp(-pDec[p] * ts);
+
+            debLp += debLpCoef * (noise - debLp);
+            debHp += debHpCoef * (debLp - debHp);
+            float band = debLp - debHp;
+            float debris = band * Mathf.Exp(-3.4f * ts) * Mathf.Clamp01(ts / 0.025f)
+                         * (0.7f + 0.3f * Mathf.Sin(2f * Mathf.PI * 19f * ts));
+
+            dry[i] = crack * 0.22f + sub * 0.58f + body * 0.20f + debris * 0.18f;
+        }
+        return Finalize(dry, 0.30f, 4600f);   // wet and dark — a big room, heard from inside it
+    }
+
     private static AudioClip Finalize(float[] dry, float reverbWet, float masterLpHz)
     {
         float[] s = ApplyReverbAndWarmth(dry, reverbWet, masterLpHz);
@@ -694,6 +1322,307 @@ public static class ProcSfx
 
     // Small Schroeder reverb (3 damped combs -> 1 allpass) for a tight, warm stone room, then a
     // one-pole master low-pass. Damping keeps the tail warm/candlelit.
+    // =============================================================================================
+    // UI — the interface's own voice.
+    //
+    // THE FAMILY RULE, and it is a different KIND of rule from the others. Every family above is
+    // defined by a MATERIAL: magic by harmonic bell partials, metal by inharmonic bar modes, stone
+    // by noise and sub, paper by having no pitched component at all, the pause pair by a choked
+    // envelope. A UI sound has no material — it is not a thing in the world, it is the interface.
+    //
+    // So this family is defined by PITCH MOTION instead. All six share ONE voice, literally the
+    // same `WoodTap` call, and differ only in which way the pitch moves and by how much. That is
+    // what makes them a learnable language rather than six noises — and it is the right mechanism
+    // for the job, because these are the only sounds in the game that must be told apart FROM EACH
+    // OTHER. A world sound only has to be distinguishable from other materials.
+    //
+    // ⚠️ THE VOICE IS SOFT STRUCK WOOD, and that is a deliberate claim on the one material the
+    // world does not already use. Metal is the forge, glass and bells are magic, stone is the
+    // rooms, paper is the quest board. Wood is unclaimed, warm, and belongs in a candlelit
+    // dungeon — where a clean synth blip would sound like it came from a different game.
+    //
+    // ⚠️ THEY MUST BE SMALL AND DRY. These play hundreds of times a session. Anything with shimmer
+    // or a long tail becomes torture by minute ten, which is why the reverb here is the driest in
+    // the file and the decays are the shortest.
+    //
+    // ⚠️ CANCEL AND REFUSE ARE NOT THE SAME SOUND, and conflating them is the usual mistake.
+    // CANCEL is the player choosing to back out — consonant, unremarkable, no fault implied.
+    // REFUSE is the game saying no — the only DISSONANT sound in the family. And refuse must not
+    // read as damage or failure either; it means "you can't do that", not "you got hurt".
+    //
+    // ⚠️ OPEN AND CLOSE ARE THE SAME FIGURE INVERTED — the identical three notes, backwards. Two
+    // unrelated sounds would not read as a pair, and the pairing is what tells the player that the
+    // thing that arrived is the thing that just left.
+
+    private static AudioClip uiMove, uiConfirm, uiCancel, uiRefuse, uiOpen, uiClose;
+
+    /// <summary>Moving a selection. Neutral, no pitch motion, quiet enough to hold a key through.</summary>
+    public static AudioClip UIMove
+    {
+        get { if (uiMove == null) uiMove = BuildUIMove(); return uiMove; }
+    }
+
+    /// <summary>Committing. Rising perfect fifth — the most consonant way up, so it reads as resolution.</summary>
+    public static AudioClip UIConfirm
+    {
+        get { if (uiConfirm == null) uiConfirm = BuildUIConfirm(); return uiConfirm; }
+    }
+
+    /// <summary>Backing out by choice. Falling fourth: downward, but consonant — this is not an error.</summary>
+    public static AudioClip UICancel
+    {
+        get { if (uiCancel == null) uiCancel = BuildUICancel(); return uiCancel; }
+    }
+
+    /// <summary>The game saying no. A minor second sounded together, damped hard. The only dissonance here.</summary>
+    public static AudioClip UIRefuse
+    {
+        get { if (uiRefuse == null) uiRefuse = BuildUIRefuse(); return uiRefuse; }
+    }
+
+    /// <summary>A panel arriving. Three notes up.</summary>
+    public static AudioClip UIOpen
+    {
+        get { if (uiOpen == null) uiOpen = BuildUIOpen(); return uiOpen; }
+    }
+
+    /// <summary>The same three notes, backwards.</summary>
+    public static AudioClip UIClose
+    {
+        get { if (uiClose == null) uiClose = BuildUIClose(); return uiClose; }
+    }
+
+    // The one voice. Every UI sound in the family is this function and nothing else, so the family
+    // physically cannot drift apart the way a set of hand-tuned one-offs would.
+    //
+    // Struck wood is INHARMONIC but only mildly so — far less than metal's bar modes, which is what
+    // keeps it reading as a soft tap rather than a clank. The tiny noise transient is the mallet
+    // contact; without it the tone starts from nothing and sounds synthesised rather than struck.
+    private static void WoodTap(float[] buf, float atSeconds, float hz, float amp, float decay,
+                                System.Random rng)
+    {
+        int start = Mathf.RoundToInt(atSeconds * SampleRate);
+        if (start >= buf.Length) return;
+
+        // Mild inharmonic partials — a struck wooden bar, not a metal one.
+        float[] ratio = { 1f, 2.83f, 4.94f };
+        float[] gain  = { 1f, 0.26f, 0.09f };
+
+        for (int i = start; i < buf.Length; i++)
+        {
+            float t = (float)(i - start) / SampleRate;
+            float env = Mathf.Exp(-decay * t);
+            if (env < 0.0008f) break;
+
+            float body = 0f;
+            for (int k = 0; k < ratio.Length; k++)
+            {
+                // Higher partials die faster, which is most of what makes a tap sound wooden.
+                body += Mathf.Sin(2f * Mathf.PI * hz * ratio[k] * t) * gain[k] * Mathf.Exp(-decay * 1.9f * k * t);
+            }
+
+            // Mallet contact: a couple of milliseconds of noise, gone almost immediately.
+            float tap = 0f;
+            if (t < 0.004f)
+                tap = (float)(rng.NextDouble() * 2.0 - 1.0) * 0.35f * (1f - t / 0.004f);
+
+            buf[i] += (body * 0.42f + tap) * env * amp;
+        }
+    }
+
+    // =============================================================================================
+    // ⚠️ REBUILT 2026-08-20 — MECHANISM, NOT MELODY.
+    //
+    // The version this replaces was built from musical intervals and the designer's verdict was
+    // that it "does not read well" in a dungeon. Reading the numbers back, that was exactly right:
+    //
+    //     Confirm = 620 -> 930 Hz   a perfect fifth, up
+    //     Cancel  = 780 -> 585 Hz   a perfect fourth, down
+    //     Refuse  = 600 +  636 Hz   a minor second
+    //     Open    = 520 / 693 / 780 a three-note melody, and Close was it backwards
+    //
+    // The interface was playing little TUNES at the player. Every one was a clean tuned-percussion
+    // note, and clean tuned percussion is a musical signal — which is why the family read as a
+    // modern app rather than as a dungeon, no matter that the comment above says "wood". It is the
+    // same fault as the settings screen being smoked glass and neon: well made, coherent, and from
+    // a different game.
+    //
+    // THE INVERSION: real interfaces in this world are OBJECTS BEING OPERATED — a latch dropping, a
+    // card sliding, a bolt that will not move. Objects differ by MATERIAL and ACTION, never by
+    // pitch interval. So pitch is no longer the thing that distinguishes these six sounds; what
+    // they are MADE OF is:
+    //
+    //     Move    paper only, no pitched component at all — a card edge brushing past
+    //     Confirm wood seating, then iron catching     — two materials, one action
+    //     Cancel  wood alone, lower and damped         — it came back down, nothing caught
+    //     Refuse  wood with the resonance stripped     — the sound of something NOT moving
+    //     Open    a slide, then iron releasing
+    //     Close   a slide, ending in the wood arriving
+    //
+    // Open and Close are still the same gesture inverted, which was the old family's best idea —
+    // but the inversion is now physical (where the impact falls) rather than melodic.
+    //
+    // ⚠️ Refuse is deliberately NOT dissonant any more. Dissonance is a musical idea; a real thing
+    // refusing to move is UNRESONANT. Killing the ring says "it didn't budge" far better than a
+    // beating interval, and it cannot be mistaken for a tune.
+    // =============================================================================================
+
+    // A struck wooden object with a BODY, as opposed to WoodTap's three bare sines. The differences
+    // are all the ones that separate "an object was hit" from "a note was played": many more modes,
+    // a transient with spectral shape instead of 4ms of white noise, and a tail that is not a
+    // perfect exponential.
+    private static void Thud(float[] buf, float atSeconds, float hz, float amp, float decay,
+                             System.Random rng, float ring = 1f)
+    {
+        int start = Mathf.RoundToInt(atSeconds * SampleRate);
+        if (start >= buf.Length) return;
+
+        // Irregular ratios: a real wooden body has no tidy harmonic series.
+        float[] ratio = { 1f, 1.87f, 2.71f, 4.16f, 5.93f, 8.05f };
+        float[] gain = { 1f, 0.42f, 0.28f, 0.15f, 0.08f, 0.04f };
+
+        float lp = 0f, hp = 0f;
+        float lpC = 1f - Mathf.Exp(-2f * Mathf.PI * 2600f / SampleRate);
+        float hpC = 1f - Mathf.Exp(-2f * Mathf.PI * 420f / SampleRate);
+
+        for (int i = start; i < buf.Length; i++)
+        {
+            float t = (float)(i - start) / SampleRate;
+            float env = Mathf.Exp(-decay * t);
+            if (env < 0.0006f) break;
+
+            float body = 0f;
+            for (int k = 0; k < ratio.Length; k++)
+                body += Mathf.Sin(2f * Mathf.PI * hz * ratio[k] * t) * gain[k]
+                        * Mathf.Exp(-decay * (1f + 1.15f * k) * t);
+            body *= ring;                     // ring 0 = a dead thud, all transient and no tone
+
+            // Contact: ~14ms of BAND-LIMITED noise, not a click. This is most of what makes it read
+            // as a material being struck rather than a tone being started.
+            float contact = 0f;
+            if (t < 0.014f)
+            {
+                float nz = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp += lpC * (nz - lp);
+                hp += hpC * (lp - hp);
+                contact = (lp - hp) * 1.6f * (1f - t / 0.014f);
+            }
+
+            // A little noise riding the tail so the decay isn't a mathematically perfect curve.
+            float grit = (float)(rng.NextDouble() * 2.0 - 1.0) * 0.02f * env;
+
+            buf[i] += (body * 0.34f + contact + grit) * env * amp;
+        }
+    }
+
+    // Paper, cloth, leather — a sound with NO pitched component whatsoever. The whole point of the
+    // paper family, borrowed here because a cursor moving over a card should sound like a card.
+    private static void Rustle(float[] buf, float atSeconds, float dur, float amp,
+                               System.Random rng, float centreHz, float swell)
+    {
+        int start = Mathf.RoundToInt(atSeconds * SampleRate);
+        int n = Mathf.RoundToInt(dur * SampleRate);
+        float lp = 0f, hp = 0f;
+        float lpC = 1f - Mathf.Exp(-2f * Mathf.PI * (centreHz * 2.1f) / SampleRate);
+        float hpC = 1f - Mathf.Exp(-2f * Mathf.PI * (centreHz * 0.55f) / SampleRate);
+
+        for (int i = 0; i < n; i++)
+        {
+            int j = start + i;
+            if (j < 0 || j >= buf.Length) continue;
+            float k = (float)i / n;
+
+            // swell > 0 opens toward the end (a drawer coming out), < 0 closes (settling shut)
+            float env = swell >= 0f
+                ? Mathf.Sin(Mathf.PI * k) * Mathf.Lerp(1f, k, Mathf.Clamp01(swell))
+                : Mathf.Sin(Mathf.PI * k) * Mathf.Lerp(1f, 1f - k, Mathf.Clamp01(-swell));
+
+            float nz = (float)(rng.NextDouble() * 2.0 - 1.0);
+            lp += lpC * (nz - lp);
+            hp += hpC * (lp - hp);
+            buf[j] += (lp - hp) * env * amp;
+        }
+    }
+
+    // A small iron catch. Very short, very inharmonic, no warmth — the counterpoint to the wood.
+    private static void Latch(float[] buf, float atSeconds, float amp, System.Random rng, float hz = 2400f)
+    {
+        int start = Mathf.RoundToInt(atSeconds * SampleRate);
+        float[] ratio = { 1f, 2.41f, 3.83f };
+        float[] gain = { 1f, 0.5f, 0.22f };
+        for (int i = start; i < buf.Length; i++)
+        {
+            float t = (float)(i - start) / SampleRate;
+            float env = Mathf.Exp(-78f * t);
+            if (env < 0.0008f) break;
+            float s = 0f;
+            for (int k = 0; k < ratio.Length; k++)
+                s += Mathf.Sin(2f * Mathf.PI * hz * ratio[k] * t) * gain[k] * Mathf.Exp(-120f * k * t);
+            float click = t < 0.002f ? (float)(rng.NextDouble() * 2.0 - 1.0) * 0.5f : 0f;
+            buf[i] += (s * 0.22f + click) * env * amp;
+        }
+    }
+
+    private static AudioClip BuildUIMove()
+    {
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.10f)];
+        var rng = new System.Random(9101);
+        // A card edge brushing past. The quietest sound in the game — it fires on every arrow key,
+        // and anything with a pitch in it becomes a melody once you hold the key down.
+        Rustle(dry, 0f, 0.045f, 0.085f, rng, 3200f, 0f);
+        return Finalize(dry, 0.04f, 7200f);
+    }
+
+    private static AudioClip BuildUIConfirm()
+    {
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.28f)];
+        var rng = new System.Random(9102);
+        Thud(dry, 0f, 300f, 0.130f, 30f, rng);        // it seats
+        Latch(dry, 0.028f, 0.075f, rng, 2600f);       // and catches
+        return Finalize(dry, 0.075f, 6400f);
+    }
+
+    private static AudioClip BuildUICancel()
+    {
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.26f)];
+        var rng = new System.Random(9103);
+        // The same wood, lower and shorter, and crucially NO latch — nothing engaged. That absence
+        // is the whole difference from Confirm, and absence reads faster than a different pitch.
+        Thud(dry, 0f, 232f, 0.115f, 40f, rng, 0.7f);
+        return Finalize(dry, 0.06f, 4800f);
+    }
+
+    private static AudioClip BuildUIRefuse()
+    {
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.20f)];
+        var rng = new System.Random(9104);
+        // ring = 0.12: almost all contact, almost no tone. A dead knock is what something immovable
+        // sounds like. Followed by a short scrape — the thing was pushed and did not give.
+        Thud(dry, 0f, 190f, 0.235f, 62f, rng, 0.12f);
+        Rustle(dry, 0.020f, 0.070f, 0.045f, rng, 900f, -0.8f);
+        return Finalize(dry, 0.03f, 3400f);           // driest and dullest in the family
+    }
+
+    private static AudioClip BuildUIOpen()
+    {
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.38f)];
+        var rng = new System.Random(9105);
+        Latch(dry, 0f, 0.105f, rng, 2200f);          // the catch lets go...
+        Rustle(dry, 0.020f, 0.185f, 0.155f, rng, 1500f, 0.85f);  // ...and it slides out, opening up
+        return Finalize(dry, 0.10f, 6600f);
+    }
+
+    private static AudioClip BuildUIClose()
+    {
+        var dry = new float[Mathf.CeilToInt(SampleRate * 0.38f)];
+        var rng = new System.Random(9106);
+        // The same gesture inverted — but physically, not melodically: the slide comes FIRST and
+        // the impact lands at the END, which is what closing a thing actually sounds like.
+        Rustle(dry, 0f, 0.165f, 0.120f, rng, 1500f, -0.85f);
+        Thud(dry, 0.150f, 250f, 0.115f, 38f, rng, 0.6f);
+        return Finalize(dry, 0.085f, 5400f);
+    }
+
     private static float[] ApplyReverbAndWarmth(float[] dry, float wet, float masterLpHz)
     {
         int n = dry.Length;

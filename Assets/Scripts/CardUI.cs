@@ -85,11 +85,14 @@ public class CardUI : MonoBehaviour, IPointerClickHandler
         // Uses
         if (usesText != null)
         {
-            if (card.isInfinite) usesText.text = "∞";
+            if (card.isInfinite) { usesText.text = "∞"; usesText.color = CardFace.ChargeColor; }
             else
             {
                 usesText.text = card.currentUses.ToString();
-                usesText.color = (card.currentUses == 1) ? Color.red : Color.white;
+                // ⚠️ NOT red. The canonical frame's charge medallion IS a red ball, so the
+                // last-charge warning was red on red — invisible exactly when it matters most.
+                // Colours come from CardFace so the hand and every screen agree.
+                usesText.color = (card.currentUses == 1) ? CardFace.ChargeLowColor : CardFace.ChargeColor;
             }
         }
 
@@ -97,6 +100,17 @@ public class CardUI : MonoBehaviour, IPointerClickHandler
         // Eski nokta (dot) sistemi kaldırıldı; maliyet artık costText'te sayı olarak gösteriliyor.
         if (costText != null) costText.text = card.cardData.shiftCost.ToString();
         // -----------------------------
+
+        // ⚠️ The two medallion numbers are POSITIONED AND SIZED IN CODE, not left at their authored
+        // prefab values — through the same `CardFace` maths every other screen uses, so the hand and
+        // the forge can never disagree about where a card's numbers go. Two things make this
+        // necessary, and neither is visible in the prefab:
+        //   • the art is drawn with `preserveAspect`, so a sprite of a different aspect letterboxes
+        //     inside the 200x300 box and every number authored against 200 drifts outward;
+        //   • the sockets are drawn for ONE digit, and "10" is 1.93x the width of "9" — it spilled
+        //     straight off the medallion, which is what the designer reported.
+        CardFace.PlaceMedallion(usesText, cardArtImage, false);
+        CardFace.PlaceMedallion(costText, cardArtImage, true);
 
         RefreshBlessingBadge(card);
         RefreshCardFace(card);

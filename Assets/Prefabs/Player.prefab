@@ -246,8 +246,8 @@ MonoBehaviour:
   createPlatformSound: {fileID: 8300000, guid: 1cac8dcf0c7c72e429604b798d25fa5d, type: 3}
   vampireBiteSound: {fileID: 8300000, guid: b99cde183dfddad499d2a40bc701e1e9, type: 3}
   glassVailSound: {fileID: 8300000, guid: 0335a30fbf68921448cf9922e6b028cb, type: 3}
-  glassParrySound: {fileID: 0}
-  freefallBladeSound: {fileID: 0}
+  glassParrySound: {fileID: 8300000, guid: a172e14be5e197b42b2f27c69e1ea36f, type: 3}
+  freefallBladeSound: {fileID: 8300000, guid: b14f02cf911d6d745b65f4fcdbad3e40, type: 3}
   jumpSound: {fileID: 8300000, guid: e41a7d00afe07be4ebe4d42dc03c77b3, type: 3}
   leapSound: {fileID: 8300000, guid: e41a7d00afe07be4ebe4d42dc03c77b3, type: 3}
   spendSound: {fileID: 8300000, guid: 70cad06b332b69049ad572f5628c41c5, type: 3}
@@ -301,7 +301,7 @@ MonoBehaviour:
   character: {fileID: 11400000, guid: 21b96c1d04ec32147ae371aee3de4593, type: 2}
   fireballPrefab: {fileID: 6847861146471343392, guid: c410de68076b28846bb5e156129b8267, type: 3}
   firePoint: {fileID: 7525573285496672760}
-  shurikenThrowSound: {fileID: 0}
+  shurikenThrowSound: {fileID: 8300000, guid: 4f25667166ce44040bd09867cd3a4042, type: 3}
   shurikenSprite: {fileID: 1030694015, guid: b217a154a8231e54bbb50405bdfafbaf, type: 3}
   wailRange: 10
   fireballCastDelay: 0.12

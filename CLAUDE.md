@@ -10,13 +10,24 @@ This file is loaded automatically into Claude Code at the start of every session
 
 **Core concept:** "Movement is a Resource." Jumping consumes **Shift**, which does not regenerate on its own — and **Shift CARRIES OVER between rooms** (designer-confirmed 2026-07-13: it is a run-long resource, and this persistence is "the whole identity of the game" — spending Shift now means having less for the rest of the run). Do NOT describe or implement Shift as a per-room resource. Most other actions (attacks, special movement, utility) are delivered via cards. Cards have **charges**; when charges deplete the card moves to the exhaust pile and must be recovered via scrap.
 
-**Current state:** Act 1 (Oxidation District) prototype. **10 combat levels in the run pool** (+ hub + boss room; ~15 more contract-valid rooms exist unused — see Room Pool), **16 CardData assets in `Assets/Cards/`, 19 relics, and 8 quest assets** (relics/quests re-verified 2026-08-11; note 2 of the 16 cards are not normal reward cards — `Stagger` is the fail-state card and `AnaKartVeritabanı` is the card *database* asset, so the real playable pool is ~14). Two acts (Vapor Stratum, Final Forge) planned but not started. Target: 45-50 minute run length, 60+ cards total at content-complete. **24 Blompo blessings** as of 2026-08-14 — the card *pool* is still the bottleneck, but the enhancement multiplier on it is now built.
+**Current state:** Act 1 (Oxidation District) prototype. **11 combat levels in the run pool** (+ hub + boss room; ~15 more contract-valid rooms exist unused — see Room Pool), **18 CardData assets in `Assets/Cards/`, 19 relics, and 8 quest assets** (cards re-counted 2026-08-16; note 2 of the 18 are not normal reward cards — `Stagger` is the fail-state card and `AnaKartVeritabanı` is the card *database* asset, so the real playable pool is **16**). **2 playable characters** in `Assets/Resources/Characters/` (see Characters). Two acts (Vapor Stratum, Final Forge) planned but not started. Target: 45-50 minute run length, 60+ cards total at content-complete. **24 Blompo blessings** as of 2026-08-14 — the card *pool* is still the bottleneck, but the enhancement multiplier on it is now built.
 
 ⚠️ **`DeckManager.startingDeck` is currently 3 cards (Phase, Freefall Blade, Second Thoughts) and that is the designer using it as a TESTING TOOL, not the intended starting deck.** Do not balance against it, and do not "fix" it. It does have one live side effect worth knowing: the `Only Child` blessing keys off a deck under 10 cards, so it currently fires for the whole run.
 
-📐 **UI work has its own loadable skill: `.claude/skills/deckshift-ui/SKILL.md`.** House style and the inversion rule, linear-colour-space calibration, uGUI traps, pause/HUD wiring, and a pre-delivery checklist. Invoke it (`/deckshift-ui`) before building or restyling any screen — the UI sections of this file are the summary, that is the working reference.
+📐 **TWO LOADABLE SKILLS HOLD THE DETAIL. This file is the always-on summary; they are the working references.**
 
-⚠️ **Content is the project's real bottleneck, and it gates the two biggest planned systems.** The run map is explicitly blocked on level count (it's mediocre at ~7 rooms, sings at ~30), and card *enhancements* ("Blompo") are a multiplier on the card pool — both want more content underneath them before they pay off. When choosing between "build another system" and "author more cards/levels", the honest answer is usually the latter.
+- **`/deckshift-ui`** — the **Salvage** material system (see below), linear-colour-space calibration, uGUI traps, the wiring contract, a pre-delivery checklist, and a catalogue of every screen that exists. Invoke before building, restyling or debugging **any** screen, panel, HUD element, card face, world-space marker or UI VFX.
+- **`/deckshift-levels`** — the Level Design Laws with their reasoning, the ASCII importer and its tile-painting rules, the validator's measured movement budget, doors and gates, the room pool inventory, and the run map. Invoke before authoring, importing, validating or debugging a room, or before touching `LevelManager`, tiles, gates or the exit door.
+
+⚠️ **These were split OUT of this file on 2026-08-20 because it had grown to ~75k tokens and was being loaded in full for every session, including ones that never touched a screen or a room.** Between them the two sections were 41% of the file. **When you learn something new about UI or levels, write it into the SKILL, not back into here** — otherwise this grows again and the split buys nothing. Only add here what must be true even when you are working on something else entirely.
+
+⚠️ **PRIORITY, RESET BY THE DESIGNER 2026-08-20: POLISH AND FEEL COME BEFORE MORE CONTENT.** This file said for months that "content is the project's real bottleneck" — that was written when the run map and Blompo were unbuilt and explicitly gated on room and card count. **Both shipped.** The claim outlived its reason and kept steering sessions toward authoring.
+
+**The framing that replaced it: polish debt blocks JUDGING the game; content blocks FINISHING it.** You cannot tell whether the game is fun through placeholder audio, enemies that swing backwards and a bat that never attacks — all three were real and all three were found in a single day. Feel, visuals and audio come first, because everything else is unevaluable until they do.
+
+⚠️ **Audio is the designer's stated top priority, and the real problem is not what it looked like.** It is not that the procedural clips are weak (they are, and `ProcSfx` should be read as a **sound-design brief** rather than a source — see `AudioInventory.md`). It is that **a large fraction of the game is literally SILENT**: an audit found **103 empty `AudioClip` slots**, including every zombie's swing, every spitter, every Shift Altar, every breakable wall, and the boss's death. Some were silent *while the correct file already sat in the project unreferenced*. **Read `AudioInventory.md` before touching audio** — it holds the layout, the licence record, and the eleven-sound shopping list.
+
+**The content gap is still real, just no longer first.** 11 combat rooms and 16 playable cards remain thin for a 45–50 minute run, the two named archetypes are the thinnest lines in the deck (Glass has 2 cards, Vampiric 1), and Acts 2–3 do not exist. Do not read "polish first" as "content is solved".
 
 The player character was recently swapped from the skeleton rig (`PF Skeleton - Mage`) to `PF Pixel Character - Mage M` from the Cainos Customizable Pixel Character pack. The wizard identity is now the canonical character. The skeleton remains in the Player prefab disabled, intended for future use as an enemy. **Renderer facts (verified in-editor 2026-07-17): the Mage M body is 16 `SkinnedMeshRenderer` parts (Body, Hair, Hat, Cloth… — Cainos "Alpha Cut"/Body/Hair shaders); only the magic staff is a `SpriteRenderer`.** Any code that snapshots/copies the player's look must handle SkinnedMeshRenderers (e.g. `SkinnedMeshRenderer.BakeMesh`, as `CardAimIndicator`'s dash trail does) — a SpriteRenderer-only pass silently produces a staff-only ghost.
 
@@ -68,6 +79,213 @@ These are absolute. Do not suggest alternatives without explicit user approval.
 6. **Asset pack imports require extreme care.** The Cainos Customizable Pixel Character pack ships as a "complete project" that wants to overwrite `ProjectSettings/`. Always uncheck `ProjectSettings/` in the import dialog and uncheck any duplicate packs you already have. See "Common Pitfalls" for the full story.
 
 ---
+
+## Characters (built 2026-08-14)
+
+**A character is TWO things and no more: the deck you start the run with, and one passive trait.**
+`CharacterData` assets live in **`Assets/Resources/Characters/`** and are found by `Resources.LoadAll`,
+not a hand-kept list — adding a character is dropping in an asset, with nothing to rebuild.
+
+| | deck | trait |
+|---|---|---|
+| **Wizard** | Fireball ×2, Create Platform, Dash | *Big Sleeves* — +1 hand |
+| **Ninja** | Shuriken ×2, Dash, Leap | *Fast Hands* — Recall never escalates, **−1 hand** |
+
+⚠️ **A character's innate ACTIVE ability was built and then CUT. Do not re-propose it.** The first
+version gave the Wizard a free, unlimited, aimed attack on right mouse. It worked, and the designer
+rejected it after one playtest. The reasoning generalises, which is why it is recorded here:
+
+- A free attack doesn't out-damage your attack cards — it **prevents the situations those cards exist
+  for**. Comet Dive is for being surrounded, Glass Wail for being overwhelmed. Delete everything at
+  range for nothing and none of those moments happen.
+- Underneath that: **the game charges nothing for TIME.** No timer, no reinforcements, Shift does not
+  decay. So an infinite-but-slow attack always beats a finite-but-fast one, and every attack card in
+  the game is fundamentally selling speed.
+- It also made breakable walls free to open, and voided the design law that a boss room must provide
+  a way to damage the boss.
+
+Measured at the time: of the playable cards, 7 are attacks but only **Fireball** and **Dead Weight**
+were *directly* outclassed. **The felt problem was far broader than the measured one, and that gap is
+the whole lesson** — don't re-litigate this with a damage table.
+
+**Traits are read, never mirrored into a field**, so a character swap can't leave a stale copy:
+- **`DeckManager.HandCapacity`** — the ONE place hand size is decided. Never read `handCapacity`
+  directly. (Base is **3** in the scene, not the script default of 4.) `handCapacityBonus` may be
+  **negative** — traits are allowed real downsides, and the designer wants that.
+- **`DeckManager.RecallCostIsLocked`** — read at the escalation site.
+- **`PlayerController.Awake`** — `CharacterSelection.Chosen` (static + PlayerPrefs) overrides the
+  prefab's `character`.
+
+### `CharacterAppearance` — it re-dresses the rig, it does not swap the model
+
+⚠️ **It copies the preset's MATERIALS onto the existing rig.** The player's visual model carries a lot
+of fragile hand setup (Cainos controller scripts stripped, `AnimationEventReceiver` removed,
+`PlayerAnimEventSink` on the Animator child, 0.8 scale) and every one of those steps fails silently
+when missed. Every preset is the same rig in different clothes.
+
+⚠️ **Weapons go through the pack's `PixelCharacter.AddWeapon(prefab, true)`.** `PixelCharacter.Weapon`
+is read-only, and the pack syncs the weapon to the rig bone and pushes sorting layer + alpha onto the
+new renderers. Hand-parenting looks right standing still and then sorts or fades wrong.
+
+⚠️ **Reading an unassigned object reference on a Cainos preset THROWS** `UnassignedReferenceException`
+instead of returning null, so every slot read goes through a `Safe()` guard. `HairRampTexture` is
+deliberately not copied.
+
+⚠️ **`Apply` catches everything, and it must.** Unity **DISABLES a MonoBehaviour whose `Awake`
+throws** — when this threw inside `PlayerController.Awake` it switched off the entire player: no
+movement, no jump, no card hotkeys, while Recall and clicking cards still worked (those are
+DeckManager and UI). **A cosmetic pass must never be able to brick the character.**
+
+### ⚠️ Starting a run: the load is 1.04s and must be OVERLAPPED, not queued (2026-08-17)
+
+**Measured, not estimated: `SceneManager.LoadScene` into SampleScene takes 1.04 seconds**, and the
+synchronous call spends every one of them frozen on the last rendered frame — no animation, no
+feedback, indistinguishable from a hang. On top of that the character select used to play its exit
+animation and *then* hand over, so a player clicking BEGIN waited **1.46s**: 0.42s of animation
+followed by a full second of dead image. The designer reported it as "it takes too long for the next
+screen to load".
+
+Two changes, and the order matters more than either one:
+- **`MainMenuController.StartRun` uses `LoadSceneAsync`.** The load costs the same second; it just
+  stops freezing the frame while it happens.
+- **`CharacterSelectScreen.ConfirmRoutine` fires its callback FIRST, not last.** The exit burst now
+  plays *through* the load instead of before it. **This is where the saving comes from** — the load
+  did not get faster, it stopped being dead time.
+
+Now **1.085s, all of it animated.** The residual is the scene load itself; making that shorter means
+restructuring SampleScene, which is out of bounds.
+
+⚠️ **The screen washes to near-white and HOLDS.** The swap lands whenever the load happens to
+finish, which is not a moment anything can predict — cutting out of a detailed frame reads as a
+glitch, cutting out of a white one is invisible.
+
+⚠️ **The hold loop must still be able to END.** The scene swap normally destroys the screen mid-hold,
+so the loop usually never exits — but `ScreenGallery` opens the screen with a **null callback**, and
+a failed or absent load must not strand the player on a white rectangle. There is a give-up timeout.
+
+⚠️ **`SceneManager.GetActiveScene().buildIndex + 1` resolves to SampleScene ONLY because `Hub` is
+DISABLED in Build Settings** and disabled scenes are not counted. Verified: [0] MainMenu,
+[1] SampleScene, [2] GameOverScene, [3] GameScene. **Enabling Hub would silently send PLAY to the
+wrong scene** — it looks like a build-settings tick, and it re-routes the game.
+
+### Character select — theme **Marquee** (rebuilt 2026-08-17; see UI System → Themes)
+
+Opens on PLAY from the main menu; the designer chose "always ask" over "remember last pick". **The
+billing before you go on:** one character owns the frame at full size, the rest of the roster stands
+back in the dark, the name is printed across the top at poster size, and the whole screen tears past
+in that character's colour.
+
+⚠️ **THIS REPLACED *VIGIL*, WHICH THE DESIGNER REJECTED TWICE. DO NOT REBUILD IT.** Vigil was a cold
+hall of stone alcoves: the roster stood dormant as statues and one warm lamp travelled the row to
+whoever you were on. It was carefully made — real dungeon art, a torch per alcove, a diegetic flame
+— and it was wrong, for a reason that generalises: **its entire vocabulary was DORMANCY.** Stillness,
+cold, low light, a row of equals waiting their turn. That is a fine mood and it is the opposite of
+what this screen is FOR. The character select is the last beat before the run starts — the one screen
+in the game that is pure hype rather than decision support. A screen about to launch you should not
+feel like a mausoleum. **When a screen is rejected twice, question what it is SAYING before dressing
+it better; the second Vigil pass improved the art and changed nothing about the problem.**
+
+Three inversions of what Vigil did, and all three are the design:
+
+1. **ONE HERO, NOT A ROW OF EQUALS.** Vigil gave every character the same small alcove, which with a
+   roster of two is two little figures in a lot of empty dark. The chosen one now steps forward at
+   full size; the others recede, shrink and go cold. Readable from silhouettes alone.
+2. **VELOCITY, NOT STILLNESS.** Nothing rests: streaks tear across the backdrop, figures spring
+   between slots and overshoot, the name slams in. The game's stated thesis is "movement is a
+   resource" — the select screen may as well say so.
+3. **FEWER WORDS** (designer-requested). Vigil printed a title ("WHO'S UP?"), the name on every
+   alcove AND again below, a trait name, a trait line and a six-word key line. What is left is the
+   **name, the trait, the trait's one sentence, BEGIN and ESC** — the name appeared twice and the
+   title said nothing the screen did not already say.
+
+⚠️ **THE THEME CLAIMS NO HUE — IT TAKES THE CHARACTER'S.** Every other screen has ONE fixed accent
+identifying a PLACE. This screen is about an IDENTITY, so the accent belongs to the character and the
+whole frame cross-fades when the selection moves: **colour here is the selection signal, not the
+theme signature.** It therefore costs nothing from the nearly-spent hue budget, which is the standing
+instruction when hues run out (invert a different axis instead of picking a new colour).
+
+⚠️ **Accents are PALETTE-BY-INDEX, not a field on `CharacterData`.** A new character must never be
+able to arrive with an unset colour and render black — dropping an asset into `Resources/Characters`
+is still the whole job of adding one. Ordered for maximum separation between *neighbours* (jade →
+magenta → gold → ice), because with a roster of two the player only ever compares slot 0 against 1.
+
+**Still true from the old screen, do not re-learn:**
+- **Live rigs render to one RenderTexture each** (`CharacterStagePortrait`, stage at world
+  (3000, −3000) on its own `CharacterStage` layer). The menu Canvas is Screen Space Overlay, so a
+  world character would sit *behind* the backdrop; and one texture each makes dimming a plain
+  `RawImage.color` tint instead of reaching into Cainos shaders.
+- ⚠️ **A `RawImage` with no texture draws a solid WHITE quad** — tinted, that was a large coloured
+  slab where a character should have been. A half-authored character must leave an empty slot.
+- ⚠️ **A key that activated the button which OPENED this screen is still down on its first `Update`.**
+  It confirmed instantly from the Enter that pressed PLAY; guarded with `openedFrame`. Same family as
+  `PauseScreen`'s Escape memory, from the other direction.
+- ⚠️ **`RefreshInfo` is called every frame and self-guards on `lastShown`** — the panel is DERIVED
+  from `index`, never pushed at it. It had already rotted once when the click handler set `index`
+  without refreshing. Requiring every mutation site to remember is the losing pattern.
+- It uses `GameScreen.FindRootCanvas()`, never `FindFirstObjectByType<Canvas>()` (which in a gameplay
+  scene returns a world-space **enemy health bar** — 18 canvases in SampleScene), and all text routes
+  through `UIType` (skipping it is how the screen once shipped in Liberation Sans).
+
+**New traps paid for in the rebuild:**
+
+⚠️ **AN ADOPTED SCREEN MAY BE A HUSK.** `Open` now re-finds an existing screen when the static
+`instance` is null (a domain reload clears statics while scene objects survive — otherwise you stack
+a second screen, a second roster and a live camera per character; measured **three screens and six
+portrait plots**). But a domain reload also **resets every non-serialized field**, so the component
+comes back with `figures` and `roster` EMPTY while `content` and the built children survive. The
+symptom is a beautifully half-updated frame: the previous character still standing there under the
+previous name, while the accent — the one value computed from `index` alone — cross-fades to the new
+pick. `Open` therefore checks `IsBuilt` and rebuilds rather than adopting a husk.
+
+⚠️ **THE CHARACTER PLOTS ARE SCENE-ROOT OBJECTS, SO HIDING THE SCREEN DOES NOT STOP THEM.** They have
+to be — world space, 3000 units out, while the screen is a RectTransform. Without
+`CharacterStagePortrait.SetStageActive`, one camera per character keeps rendering a 420×614 target
+every frame for the rest of the session, through the entire run. `Build` also sweeps any orphaned
+plot before creating its own.
+
+⚠️ **The bars were calibrated DOWN by two-thirds.** At alpha 0.055/0.035 the two raked accent bars
+stopped being livery and became enormous slabs owning the composition — they read as the subject
+rather than as light behind it, and flattened the character they crossed. 0.020/0.012. Linear colour
+space again: measure by screenshot, never by arithmetic.
+
+⚠️ **The unlit floor is 0.42, not 0.30.** Below ~0.4 a flanking character stops reading as "someone
+standing in the dark" and starts reading as a rendering artefact — and showing you the roster is this
+screen's job, so the ones you did *not* pick still have to be recognisable.
+
+⚠️ **The contact mark under each figure is LIGHT, not a shadow.** A black ellipse on a near-black
+backdrop is invisible by definition. Inverting it grounds the figure AND carries the accent.
+
+⚠️ **Arrow hints are DRAWN AS SPRITES, never typed as "← →".** CCBattleScarred is a display face with
+no guarantee of carrying arrow glyphs, and a missing glyph renders as a blank or a box.
+
+⚠️ **Springs, not lerps — and they were measured, not eyeballed.** Simulated at 144/60/30 fps: peak
+overshoot 52–69px, settles ~0.65s, converges exactly, and the scale spring never goes negative
+(min 0.51, max 1.08). `dt` is clamped to 1/30 because an explicit integrator plus one long frame (a
+domain reload, an editor stall) throws a figure off the screen.
+
+**Nothing is fit-scaled**, deliberately: every CanvasScaler matches on HEIGHT, so the canvas is always
+1080 tall and only width flexes (1440 at 4:3 → 2560 at 21:9). The widest element is ~1150px, so the
+fixed layout is safe everywhere and the Point-filtered portraits stay at exactly 1:1. Verified by
+screenshot at 4:3, 16:9 and 21:9.
+
+⚠️ **`Assets/Resources/VigilArt.asset` survives but ONLY `wallTexture` is still consumed.** The name
+is historical — the alcove/plinth/torch/flame/banner/beam/floor/grime slots are Vigil's and are now
+unused. They are kept because the class name and the asset path are loaded by name at runtime
+(renaming is a live risk to a lookup for no visible benefit) and the references are already resolved.
+**Do not read that file as a description of what the screen looks like.**
+
+⚠️ **The wall is ONE seamless 8×8 picture, so the WHOLE 256×256 texture is tiled as a single sprite** —
+tiling any one of its 64 sub-sprites repeats a fragment of a larger image and reads as a
+checkerboard. This is the same mistake that made generated rooms never look hand-made. Tint measured
+on screen: at 0.15 the masonry was invisible and the backdrop was a flat void, throwing away the one
+piece of real game art on the screen; near full value it is a bright grey field. **0.25.**
+
+**Two lessons from the Vigil art pass that still hold, and cost real time:**
+- ⚠️ **PIXEL ART ENLARGED PAST ~2× STOPS READING AS THE THING IT DEPICTS.** A 38×27 grime sprite blown
+  to 420×420 (15×) became angular shapes that looked like broken masonry floating in mid-air.
+- ⚠️ **`Image.Type.Tiled` on an ATLASED sprite repeats the wrong part.** `Pillar 01 A` tiled up a
+  shaft repeated the pillar's *capital*, so both alcoves grew brackets at chest height; stretched, it
+  gave a 3× vertical smear. A real column needs a purpose-drawn shaft sprite.
 
 ## Player System
 
@@ -247,6 +465,34 @@ Kills are credited in `EnemyHealth.Die`, which runs *inside* `TakeDamage` while 
 ⚠️ **`Understudy` needs a THIRD pick step** in `BlompoScreen` (blessing → card → partner). It's the only blessing that does; `NeedsPartner` is the flag.
 
 ⚠️ **Per-card blessing state lives on `RuntimeCard`**, not CardData — `grudgeBonus`, `roomsSincePlayed`, `lastCallUsed`, `playedThisRoom`, `lastCostPaid`, `understudyPartner`. Same reason the enhancement itself does: it's per-copy and per-run.
+
+### Shuriken (built 2026-08-14) — and the Animator traps it exposed
+
+`CardActionType.Shuriken = 20`. **8 damage, 10 charges, 0 Shift, and AIMED** — it flies at the cursor
+in any direction, which is the thing Fireball structurally cannot do. It is in the shared card pool,
+so any character can find it (verified surfacing in 107 of 2000 reward draws); the procedural star is
+the fallback for a character not holding one.
+
+Aiming needed no new input mode: cards are cast with a left click, so **the cursor at click time IS
+the aim**, and `CardAimIndicator` draws the same line beforehand.
+
+⚠️ **`AttackAction = 13` is THROW; `AttackAction = 14` is CAST.** 13 is a wind-up / hold / release
+driven by `IsAttacking`; 14 is the wizard's spell pose, a 1.0s clip that self-exits at 80%. Using 14
+for the throw is why it first looked wrong and ran long. (`AttackAction` is an **Int** — see the
+Animator Parameter Map.)
+
+⚠️ **`AttackSpeedMul` IS A GLOBAL ANIMATOR PARAMETER.** The throw sets it to **2.2** and must restore
+it to **1** afterwards, or **any character carrying a Shuriken gets a double-speed Fireball cast**.
+
+⚠️ **The star leaves on the arm's snap, not the keypress** (`THROW_RELEASE = 0.13s`). Spawned
+immediately it outran the animation. The aim is captured at the press; only the release waits.
+
+The projectile uses the pack's own shuriken sprite, sized from `sprite.bounds` rather than a fixed
+scale, and the held star is hidden for 0.28s during the throw so the thing that flies is the thing
+that was in his hand.
+
+**Still open: the card ART is a placeholder** borrowed from Freefall Blade. `nameIsPaintedIntoArt` is
+correctly `false`, so the title draws in code and reads right — only the illustration is wrong.
 
 ### Stagger Mechanic (REDESIGNED 2026-08-09 — it is no longer a three-strikes death sentence)
 
@@ -694,292 +940,104 @@ All the shared sprites live in **`RelicUISprites`** (`GoldBorder()`, `StonePanel
 
 ## UI System
 
-### Canvas Hierarchy
-
-SampleScene's main Canvas contains:
-- **`GameplayHUD`** — contains all in-game HUD elements (gold, health, shift counter, recall button, deck/discard/exhaust pile buttons, hand drawer trigger zone, **RelicHUD**, **QuestTracker**). Toggle with `SetActive(false)` to hide HUD during full-screen UI.
-- Various menu panels (ShopUI, TutorialPanel, etc.) as direct children of Canvas. **Procedural screens (`PauseScreen`, `RunMapScreen`, `ScrapForgeScreen`, `BlompoScreen`, `QuestBoardScreen`, `SettingsScreen`…) create themselves under this Canvas at runtime and are NOT in the scene file** — do not go looking for them in the hierarchy at edit time. (`QuestBoardOverlay` and both `SettingsPanel`s were deleted; only `TutorialPanel` remains as a scene-placed panel.)
-
-**When adding new full-screen UI panels**, hide GameplayHUD when they open by adding a `[SerializeField] GameObject gameplayHUD;` reference and toggling SetActive. ShopManager and QuestBoardScreen already follow this pattern.
-
-### `FlatUI.cs` — the new UI direction (2026-08-03)
-
-**The designer has disliked the ornate stone-and-gold chrome "since the beginning."** `FlatUI.cs` is the replacement, prototyped on the Scrap Forge screen.
-
-**It took two passes, and the first one's failure is the useful part.** Pass 1 delivered the literal brief ("soothing, simple, understandable, but also cool") as flat slate-blue panels, uniform rounded corners, neutral greys, one accent. The designer's verdict: **"it screams AI."** That was right — it was the house style of every dev dashboard, and crucially it had no *place* in it. Simple and generic are not the same thing.
-
-**Pass 2 keeps the restraint but points every choice at the world: a sheet of iron on a workbench, lit by the forge.**
-- **Warm charcoal, not slate-blue.** Act 1 is the *Oxidation District* — rust, not brushed steel. This single palette shift did most of the work.
-- **Chamfered corners, not rounded.** Cut plate reads as a made object; a uniform corner radius reads as a web card. Biggest silhouette cue.
-- **Directional light.** A lit top lip plus an ember glow rising off the *bottom* edge (firelight under the bench), instead of a uniform glowing border. Uneven light = physical object in a place.
-- **Rivets and faint scuffs.** Small, dark, functional — fasteners, not jewels. Imperfection is what kills the "generated" feel.
-- **Rules score across and fade at the ends** rather than running edge to edge like a CSS border.
-- **The only two colours on screen are the game's own two resources:** charges in Shift-blue, costs in scrap-orange.
-
-API: `Panel(chamfer)` / `Outline(chamfer, thickness)` (9-sliced chamfered plates), `Rivet()`, `FadedRule()`, `SoftGlow()`, `BottomGlow()`, `VerticalFade()`, `EmberDot()`, `Pixel()`. **All shapes are WHITE and tinted via `Image.color`**, so one cached sprite serves every panel. Shared palette at the bottom of the file.
-
-**`UIEmberField.cs`** — drifting embers for a panel background (`UIEmberField.Attach(rect, count, colour)`); builds and animates its own Image dots, no particle system. Two things that would break it: it must use **`Time.unscaledDeltaTime`** (every screen it belongs on pauses the game, so scaled time freezes the embers solid), and it must **re-read the parent rect every frame** (the forge window's height is dynamic, so a bounds snapshot would leave embers outside a collapsed panel).
-
-Lessons already paid for, don't re-learn them:
-- **Get the SDF right.** Rounded box is `inside + outside - radius`; the chamfer is that box distance `max`'d with a normalised diagonal half-plane. Naive versions pinch the outline at corners.
-- Textures need `FilterMode.Bilinear` — Point aliases the chamfer edges badly.
-- **Hairlines need to be brighter than theory says**, or they don't register on a dark surface.
-- **Atmosphere effects want roughly half the alpha you first reach for.** The ember at 0.085/140px was an orange wash owning the bottom third; ~0.05 over 120px is firelight. Scuffs at 0.045 read as *rendering glitches*; 0.022 reads as wear.
-- ⚠️ **A glow that doesn't reach its container's edge must fade on that axis too, or it draws its own border.** The bottom glow originally reused `VerticalFade` (which only falls off in Y) inset 14px from the window sides — the sprite's hard left/right ends produced a visible vertical seam down BOTH edges of the panel. That's what `BottomGlow()` exists for: falloff in both axes.
-- **Keep wear out of content columns.** The first scuff pass ran a streak straight through the title. They belong in margins that are empty at any content count.
-- **Small icons inside dense text don't work.** A 17px scrap shard beside each cost read as a smudge fused to the first digit; the accent colour alone carries it.
-- **An emblem needs STRUCTURE, or it reads as a lens flare.** Blompo's offer marks were a plain four-point sparkle behind a big soft glow and looked cheap. `ArcaneSigil` fixed it with a containing ring, rays of two lengths, and ticks outside the ring — plus a much tighter, dimmer glow, since the haze was doing most of the damage.
-- **Detail placed exactly on another element disappears.** `ArcaneSeal`'s four diamond glyphs originally sat at the inner ring's radius and merged into it invisibly; they now punctuate the outer ring on the diagonals, clear of the twelve ticks.
-- **Show the numbers a decision depends on.** Blompo's card-pick step listed only a bare charge count — no Shift cost, no maximum — so you chose which card to permanently alter without seeing what it cost or how much life it had. Chips now carry labelled SHIFT / CHARGES stats, and `StampChip` refreshes *both* on the bind frame because several blessings visibly change them.
-- **Empty states must collapse.** `LayoutSections` lays the screen out top-down and resizes the window to its content, so an empty section shrinks to one explanatory line. The fixed-height version had two large voids and looked broken — and that state is *common*, since early in a run nothing is damaged or exhausted.
-
-### Themes — same ideology, never the same skin (2026-08-03)
-
-**Screens must NOT all look alike.** Designer's rule: share the ideology (flat procedural plates, restraint, directional light, a subtle particle drift, one meaningful accent), but each place gets its own material, and **the material should say what the place DOES**.
-
-`FlatUI.Theme` is the mechanism — a colour set (`Surface`, `Border`, `EdgeLight`, `Accent`, text ramp) picked per screen:
-
-| | **Iron** (`ScrapForgeScreen`) | **Arcane** (`BlompoScreen`) | **Loadout** (`RelicHUD`, `RelicIcon`, `RelicTooltip`) | **Halt** (`PauseScreen`) | **Apparatus** (`SettingsScreen`) | **Bulletin** (`QuestBoardScreen`) |
-|---|---|---|---|---|---|---|
-| What it is | a workbench you repair cards at | a mythic creature granting a blessing | what you're **carrying** | the **moment** you stopped | the **machine's own control panel** | a board of **contracts** you promise to do |
-| Palette | warm charcoal (rust district) | cold indigo | near-**colourless** | cold blue-black (frost) | smoked glass + arc-**cyan** | dark wood + **pale paper** + wax red |
-| Light | fire from **below** | descends from **above** | none — it's not a place | from the **edges inward** | **emitted by the content itself** | **rakes in from the LEFT** |
-| Particles | embers **rising**, fast | motes **settling**, slow, twinkling | none | **suspended**, shivering in place | none — one **scan sweep** instead | none — **the content itself sways** |
-| Corner marks | **rivets** (fasteners) | **four-point stars** (light) | none | none — it has no corners | **calibration crosshairs** | **brass tacks**, on the content not the frame |
-| Surface | scuffed and worn | pristine | plain, recessed sockets | **crazed** (hairline fractures) | unblemished glass | **perforated** (old pin holes) |
-
-**The inversions are the point.** Warm/cold, below/above, rising/falling, worn/clean, still/moving, and — with Apparatus — inside/outside the fiction. When adding a screen, pick a material and invert something — **do not just retint Iron**.
-
-⚠️ **Bulletin proves the strongest available inversion is VALUE, not hue.** Every other screen is a dark plate with light text on it; the quest board is a dark board with **pale paper pinned to it**, so its text ramp is INK (`TextBright` is nearly black) and the bright/dark areas have swapped places. That single structural choice makes it unmistakable at a glance while claiming almost no colour. Its wear is also the only wear in the game that says something about the **world** (other people took contracts here) rather than about the object. **Reach for this before reaching for another hue.**
-
-### Cartograph — the run map, rebuilt on paper (2026-08-14)
-
-⚠️ **THE MAP TOOK THREE ATTEMPTS AND THE TWO FAILURES ARE THE LESSON.** It was a flat slate panel, then an acid-etched copper plate. Both were given a MATERIAL, both were carefully lit, and the designer rejected both as still reading like a diagram. **A material is not enough.** A map feels like a map because it is a **DOCUMENT** — printed, folded, carried, then scribbled on. Four things carry that, and stripping any one slides it back to a node graph:
-
-1. **PAPER, NOT A PANEL.** The sheet IS the window — no frame, and its edge is a torn deckle rather than a chamfer. Every other screen is a plate you look AT; this is an object you're holding.
-2. **FOLDS.** Two vertical creases and one horizontal. The cheapest possible signal the thing was in a pocket a second ago.
-3. **DASHED TRAILS.** A solid line between two points is a graph edge; a dashed line is a ROUTE. Biggest change to the read after the paper itself.
-4. **PROGRESS IS ANNOTATION.** The chart is printed in brown ink; where you've been and what you may take next is marked over it in **red pen**. Printed trails are mechanically tiled and neat; the player's are individual strokes with per-stroke wobble — **two different hands, deliberately**. Every state is signalled by that fiction with no colour key.
-
-`Parchment.cs` holds the procedural paper, grain, ink strokes, hand-drawn rings and compass rose. It claims **tan/paper + oxblood** and gives back verdigris.
-
-⚠️ **LIGHT GROUND INVERTS THE CALIBRATION RULES.** Everything in §2 of the `deckshift-ui` skill assumes a dark plate. On paper:
-- The fold **highlight** had to drop 0.20 → **0.055**. A bright line has almost no headroom above bright paper, so any visible value instantly reads as a drawn rule — the sheet came out with three glowing lines across it.
-- The compass was **invisible** as a large 0.115 watermark. A dark mark on a light ground **washes out** rather than reading as subtle. It needed to be *smaller and three times stronger*.
-- The player's pen needed a **shorter stroke period and more overlap** than felt right: a trail between adjacent floors is only ~60px after trimming, so at the printed spacing the player's own route came out fainter than the chart it overlays.
-
-⚠️ **NODE LAYOUT IS A FIXED COLUMN LATTICE. DO NOT REINTRODUCE BARYCENTRIC RELAXATION.** It was tried and reverted the same day. Pulling nodes toward their neighbours' mean X does straighten the trails — measured, sideways travel per edge falls 214px → 86px — but it computes a **different spread for every row**, so a floor with three nodes shares no column with a floor that has five. The designer read the result instantly as *"the nodes are off, they are not where they are meant to be"*. A grid you can scan beats trails that lean less. Edge crossings are **zero either way** (measured over 300 acts), so nothing is lost.
-
-⚠️ **The hue budget is nearly spent.** Claimed: orange (Iron), violet (Arcane), no-hue (Loadout), **tan paper + oxblood (map — Cartograph)**, warm wood/amber (shop), frost blue (Halt), arc-cyan (Apparatus), deep wax red (Bulletin). Roughly magenta and yellow remain. **Cartograph and Bulletin are the two light-ground themes** and stay separable because Bulletin is small pale slips on a DARK board — its dominant field is dark, where the map's whole field is paper. When those run out, **stop reaching for a new colour and invert a different axis instead** — light direction, motion vocabulary, surface treatment and now value structure separate these screens at least as much as hue does, and Loadout proves a theme can carry no hue at all.
-
-**The Marketplace (`ShopScreenUI`) keeps its own material** — warm wood, striped canvas awning, lamplight — and was already bespoke rather than old chrome. What it needed wasn't a reskin but a PERSON; see "The keeper talks back" below.
-
-**Loadout inverts a different axis: it's the only theme where the chrome is NOT the subject.** The other two dress a place, so the material carries the character. The relic bar dresses your inventory, sits over gameplay permanently, and the relic art is colourful pixel work — so the sockets are deliberately near-colourless and the theme is the quietest by weight. **Do not add a hue to the relic bar.** A permanent HUD element cannot compete with the game behind it the way a modal panel can.
-
-`UIEmberField.Settings` carries the motion half (`Settings.Embers` / `Settings.Motes`): rise speed (negative = falling), lateral spread, size, life, sway, twinkle.
-
-⚠️ **RARITY MUST SEPARATE ON MORE THAN HUE (reworked 2026-08-09).** The first palette was amber / violet / azure / cool-slate and the designer could not tell the tiers apart at a glance. Three of the four sat in the blue-violet quadrant with near-identical **luminance**, so the only cue was a ~40° hue step — invisible on a small sigil over a dark panel, and gone entirely for a colour-blind player. `FlatUI.RarityColor` now separates on **three channels at once**: hue spread right around the wheel (neutral → **green** → violet → amber; green is the biggest possible jump from both violet and amber), strictly ascending luminance (0.42 → 0.56 → 0.66 → 0.82, so a better blessing is literally brighter and the order survives greyscale), and saturation climbing from near-zero. Common stays the dimmest, for the reason already established below.
-
-⚠️ **Rarity also has its own GLYPH now — `FlatUI.RaritySigil(rarity)`.** Every Blompo offer used one shared sigil, so colour carried the tier alone. Shape is read faster than hue and survives greyscale, colour-blindness and a 40px icon, so the marks progress **bare ring** (Common) → **ring + 4 axial rays** (Rare) → **ring + 6 rays + inner ring** (Epic) → **the full ornate `ArcaneSigil`** (Legendary). Legendary deliberately reuses the established emblem so the lesser tiers read as reduced versions of it rather than unrelated symbols.
-
-Rarity note: the old chrome carried rarity as a gem set in gold. Without that frame **colour has to carry rarity alone**, so `FlatUI.RarityColor` is brighter and more separated than jewel tones, and Blompo tints the sigil, border, name and label together — four quiet signals instead of one loud jewel. **Common is deliberately muted**: at a lighter slate it rendered near-white and made the *weakest* offer the brightest thing on screen.
-
-**On the relic bar, rarity is a coloured STRIP along the bottom of each socket**, plus a muted tint on the socket outline and (Epic/Legendary only) a slow glow pulse. The strip is the load-bearing signal: at 52px over moving gameplay a tinted hairline is not reliably readable, but a solid bar is legible at a glance. The tooltip repeats the rarity in its border and name, confirming what the strip meant. **Only the two rarities worth noticing animate** — that's what makes a Legendary catch your eye in a row of five.
-
-**Blompo's blessing animation (`BlompoForgeFX`) was rebuilt to match (2026-08-03).** It used to be a hammer-and-anvil forging: three blows, sparks, screen shake. Once his screen went arcane, a smithy sequence fought everything else on the panel — he grants a charm, he isn't a blacksmith. The motion vocabulary is inverted the same way the palette was:
-
-> forging → strikes, impacts, gravity, sparks flying **out**, the window rattling
-> binding → orbit, convergence, weightlessness, motes drawn **in**, nothing ever hit
-
-Four beats: GATHER (rune ring forms, motes stream in) → DRAW (ring contracts, everything accelerates) → BIND (`onSet` fires here) → SETTLE, where an `ArcaneSeal` contracts **into** the card and snuffs out. Two procedural sounds accompany it (`ProcSfx.ArcaneGather`, `ArcaneBind`).
-
-The settle originally used an *expanding* ring, which the designer called bland — and re-reading it, that was the one beat in the sequence pushing **outward** while everything else converged. Pressing a seal inward finishes the idea the rest of the animation sets up. **When a beat feels weak, check whether it contradicts the sequence's own vocabulary before reaching for more particles.**
-
-⚠️ **UI children are NOT clipped, so FX geometry is bounded by the WINDOW, not the stage.** A first pass used a 520px ring radius and scattered runes across the whole screen, outside the panel, onto the backdrop. The stage sits 60px below centre in a 762-tall window, so there is only ~321px of room downward — anything that must travel further does so on an ellipse squashed in Y (`VERT_SQUASH`). Check this whenever you add UI FX.
-
-**Sound design note:** magic is **harmonic** (bell/chime partials 1,2,3,4,5.1), metal is **inharmonic** (bar modes 1,2.76,5.40,8.93 — see `ProcSfx.ScrapPickup`). That ratio choice is the whole difference between "charm" and "clank"; keep the two families distinct so a blessing and a scrap pickup are never confusable.
-
-### The keeper talks back (`ShopScreenUI`, 2026-08-03)
-
-The designer's brief for the shop was **"make the player feel like they are talking to a person who is trying to sell them stuff."** The stall already looked like a stall; what was missing was a shopkeeper.
-
-- **He has a face.** `Shopkeeper.ResolvePortrait()` returns an assignable `portrait` sprite, falling back to the shopkeeper's own world sprite — so a placed stall gets a face with zero wiring. ⚠️ The fallback grabs the whole stall prop, not a head; **assign `portrait` for a proper close-up.**
-- **He reacts to what you do.** Barks used to be one array with a single line picked at open — decoration that never changed. They're now split by EVENT (`Greetings` / `BrowseCard` / `BrowseRelic` / `BrowseService` / `TooPoor` / `Bought` / `AlreadySold` / `Farewells`) and fired from hover, purchase, refusal and the Leave button. **Affordability outranks item type** on hover: being told you can't afford it is more useful than a joke about what it does, and it's what a real trader would say to you eyeing something out of your league.
-- **Speech is typed out a character at a time.** A line that snaps in whole reads as a label changing; typed, it reads as *said*.
-- **Small body language** — `Mood.Lean` on browse, `Nod` on a sale, `Slump` on a refusal, plus a constant idle bob. Deliberately tiny: a portrait that lurches around pulls focus off the prices, which is what the player is there to read.
-- **No line repeats back-to-back** (`lastLine`), because with pools this small plain randomness repeats constantly and repetition is what makes barks feel canned.
-- Lamplit **dust** drifts through the stall (`UIEmberField.Settings.Dust` — warm, very slow, no twinkle). A shop is a place with air in it; stillness is what made the panel feel like a menu.
-
-⚠️ `ShopScreenUI` already had an `Update()`. The keeper's idle bob is a `TickKeeperIdle()` called from it, **not a second `Update`** — and it skips while a mood coroutine owns the transform, or the two fight over `anchoredPosition`.
-
-**Status: converted —** `ScrapForgeScreen`, `ScrapHUD`, `BlompoScreen`, `RelicHUD`, `RelicIcon`, `RelicTooltip`, `RelicManagePanel`, `RelicSwapScreen`, `ResourceBarUI`/`ResourcePanelHUD`, `ShopScreenUI`, `CardUI`, `PauseScreen`, `SettingsScreen`. **The pass is complete.** (`PixelUI` remains and is fine as-is — the shop uses it for grain/frames.)
-
-### The pause screen (`PauseScreen.cs`, rebuilt from scratch 2026-08-09)
-
-Escape. **The old `PauseMenu` + `PauseMenuPanel` + `MenuManager` are DELETED** at the designer's word — do not resurrect a scene-placed pause panel. (For the record, the old one also had a wiring bug nobody had noticed: its `settingsPanel` field pointed at **TutorialPanel**, so the Settings button opened the how-to-play text, and `CloseSettings` then closed a different object than the one it had opened.)
-
-**It is the only screen with NO window plate, and that is structural, not decorative.** Every other screen is a place you walked to inside the world, so each is a panel sitting on top of the game. Pause is not somewhere you go — it is the world being stopped — so it takes the whole frame. That choice separates it from every other screen before a single colour is picked.
-
-The **suspended mote field** is the signature and the one thing to preserve: motes hang dead still, each still dragging the streak it had when the clock stopped, shivering about a pixel against it. It says "time is held" before a word has been read.
-
-⚠️ **The streak must be SHORT and the dot must lead.** The first pass ran 16–52px streaks behind a 3–6px dot and the screen read as **rain**, or worse as scratches on the lens — a long thin line is a line first and a particle second. A mote has to read as a POINT that happens to be smeared; the instant the smear is the bigger half, the idea is gone. Same reason the hairline fractures had to drop to a third of the motes' brightness and move out into the margins: at equal value the two effects collapse into one look and the whole screen just looks like a dirty lens.
-
-⚠️ **The root GameObject stays ACTIVE; only its `Content` child toggles.** `Update` has to run to catch the Escape that *opens* the screen, and a deactivated GameObject gets no `Update`. Same reason `SetContentVisible` (used while a sub-panel borrows the display) drops the CanvasGroup's alpha rather than deactivating anything.
-
-**It doubles as the run's status readout** — floor, HP, Shift, gold, scrap, relics, deck, exhausted, recall cost, and the next Stagger price (red once it exceeds current HP, mirroring the card's own rule). Several of those numbers are visible **nowhere else in the game**, and it is the one screen that can afford to show everything at once. That is what makes it worth its space; four buttons on a dark rectangle is not.
-
-Destructive entries (**ABANDON RUN**, **QUIT**) are two-step: the first activation arms and relabels, the second commits, and moving the selection away or 4s of silence disarms. Sitting one keypress below RESUME, they need it.
-
-**Settings and How To Play still open the OLD panels** (`SettingsPanel` / `TutorialPanel` under the Canvas). `PauseScreen` hides its own furniture, keeps its pause held, and **polls the panel's `activeSelf`** to know when it closed — both panels dismiss via their own buttons, so this needed no rewiring of either. They are next to be rebuilt; this handover exists so the pause rebuild wasn't blocked on theirs.
-
-### Settings — `GameSettings.cs` + `SettingsScreen.cs` (rebuilt 2026-08-09)
-
-**`GameSettings` is THE single source of truth for every player setting**, PlayerPrefs-backed, loaded through `SceneBootstrap` so it re-applies on every scene load. `SettingsMenu.cs` and both `SettingsPanel` objects (SampleScene *and* MainMenu) plus `Assets/LevelSinasi/SettingsPanel.prefab` are **DELETED**.
-
-⚠️ **THE MAIN MENU AND THE PAUSE MENU NOW OPEN THE SAME SCREEN.** There used to be two settings panels, one per scene; with two copies every new setting has to be added twice and they drift apart the first time one is missed. `MainMenuController.OpenSettings()` calls `SettingsScreen.Open()` and its `settingsPanel` field is gone.
-
-⚠️ **A SETTING MUST DO SOMETHING.** Never add a row without a consumer — a slider that moves and changes nothing is worse than an absent feature, because the player then stops trusting the ones that work. Every property in `GameSettings` names its consumer in a comment. The eleven live settings and where they land:
-
-| Setting | Consumer |
-|---|---|
-| Master / Music / SFX volume | `AudioListener.volume`, `MusicManager.SetVolume`, `SfxManager.SetVolume` |
-| **Screen Shake** | `CameraShake.Shake` scales intensity; 0 refuses the call outright |
-| **Freeze Frames** | `HitStop.Stop` scales duration; **0 must return BEFORE touching `timeScale`**, or a zero-length freeze still sets it to 0 for a frame — a visible hitch |
-| Damage Numbers | `EnemyHealth`'s popup spawn |
-| **Enemy Health Bars** | `EnemyHealthBar` — switches its whole Canvas |
-| Card Aim Preview | `CardAimIndicator.LateUpdate` |
-| Display Mode / VSync / Frame Cap | `Screen.fullScreenMode`, `QualitySettings.vSyncCount`, `Application.targetFrameRate` |
-
-**Screen Shake and Freeze Frames are scaled at the ONE chokepoint each**, not at the 23 and 8 call sites — so a shake added later cannot forget to respect the setting.
-
-`ApplyDisplayMode` is deliberately `#if !UNITY_EDITOR`: `Screen.fullScreenMode` in the editor resizes the actual **editor window**, which is alarming and has to be undone by hand.
-
-Screen details worth keeping: the value is re-read from `GameSettings` on every `RefreshAll` rather than mirrored in widget state (rows affect each other — VSync greys out Frame Cap — and RESET changes all eleven at once); keyboard navigation **skips disabled rows** so it never parks on a control that ignores input; a slider click anywhere on the track jumps the value there (grabbing a 3px handle would be miserable); and there is **one shared hint line** describing the selected row rather than eleven permanent captions burying the controls.
-
-Three procedural sounds in `ProcSfx`: `PauseHalt`, `PauseRelease`, `PauseTick`. They are a **fourth sound family**, defined by their ENVELOPE rather than their spectrum (magic = harmonic bell partials, metal = inharmonic bar modes, stone = noise + sub). The halt is the only sound in the game that gets **choked** — a damper clamps the ring away over 180ms instead of letting it decay. A sound that fades out says "ending"; a sound cut short says "held". Release is its inverse and is allowed to run out naturally.
-
-### Cards: rarity colour is the ART's job, not the UI's (designer 2026-08-06)
-
-**Card rarity is telegraphed in the card ARTWORK, in colour: dark grey Common, light grey Uncommon, yellow Rare, purple Epic. There are no Legendary cards.** The incoming art has this baked in, so **UI code must not invent a second rarity colour system on a card** — two colour codes on one object that disagree is worse than one.
-
-This is a live constraint, not a preference: `CardUI`'s blessing mark originally tinted itself by the *blessing's* rarity via `FlatUI.RarityColor`. That's a different axis, but no player would read it as one — and it contradicted the art (calling Rare azure where the art calls it yellow). It is now **one fixed teal on every blessing**, chosen to sit outside the grey/grey/yellow/purple palette and pushed green of Shift-blue so it can't read as a cost either. Blessing hierarchy moved to a channel the art doesn't use: **only Epic/Legendary blessings pulse.**
-
-### Hovering a card TURNS IT OVER (`CardBack.cs` + `CardHoverFlip.cs`, 2026-08-09)
-
-⚠️ **`CardHoverFlip` IS THE ONE IMPLEMENTATION — never hand-roll a second.** The hand (`CardUI`), the Scrap Forge's repair chips and Blompo's card picker all attach it. It exists as a component because the mechanism has three non-obvious requirements that have each already caused a shipped bug: the back must be **pre-rotated 180°** or it renders mirrored; the hit target must **counter-rotate** or the card flaps edge-on under the cursor; and showing the front must **restore only what it hid** or deliberately-inactive children get resurrected. `CardBack.BindStandard(card)` fills the normal SHIFT/CHARGES footer (CardUI overrides it only for Stagger), so every screen reads identically.
-
-⚠️ **`CardHoverFlip.Attach` takes a GEOMETRY SOURCE.** Pass `cardArtImage` for a hand card — its root is rewritten to 200×100 by the hand's layout group. Pass nothing for the forge and Blompo, whose chips are built at the size the player sees; `CardBack.MatchTo` detects "the source is my parent" and fills it.
-
-
-The old hover was a flat grey rectangle laid over the card, the art faded to 12% behind it, and a **140×50** text box that every real description overflowed. It read as a tooltip that had landed on the card. The designer asked for something nicer and suggested the card's back — so the card now flips.
-
-**The flip is free.** Screen Space Overlay is an orthographic projection, so rotating the card on Y renders as a horizontal squash to nothing and back out — exactly what turning a card over looks like, for one `Quaternion` per frame. No perspective canvas, no shader. Unscaled time throughout (the reward screen and deck view both hold `timeScale` at 0). Faces swap at the halfway point, where the card is edge-on.
-
-⚠️ **THE HOVER IS DETECTED BY A COUNTER-ROTATING CHILD, NOT BY THE CARD.** A rotating card's raycast rect narrows exactly as its picture does, so halfway through the flip the pointer is inside nothing, `OnPointerExit` fires, the card turns back, widens, `OnPointerEnter` fires — and it sits edge-on flapping, a vertical sliver under the cursor. That is the shipped-broken state the designer reported. `CardUI.hoverTarget` is an invisible, full-card-size child that cancels the root's turn each frame, holding a stable axis-aligned rect for the whole animation; pointer events bubble from it to `CardUI` and clicks bubble to the root's `Button`. Its centre sits on the root's rotation axis, which is what makes the cancellation exact. It must never be disabled by `SetFrontVisible`.
-
-⚠️ **POINTER BEHAVIOUR CANNOT BE VERIFIED BY CALLING `OnPointerEnter` YOURSELF.** That is precisely how this shipped: invoking the handler directly never produces the *exit* that breaks it, so every test passed while real hovering was unusable. Verify geometrically instead — build a `PointerEventData` at the cursor's would-be position and run `EventSystem.current.RaycastAll` at each flip angle. Measured, with the counter-rotation the card is HIT at all of 0/22.5/…/180°; without it, MISS from 90° onward (past 90° the graphics are also back-face-culled, so it can't be re-entered at all).
-
-⚠️ **`CardBack` is pre-rotated 180° on Y.** Past 90° every child of the rotating root renders MIRRORED, text included; the pre-rotation cancels it exactly when the back is the face you're looking at.
-
-⚠️ **The back is SIZED OFF `cardArtImage`, never off the card root.** The root carries a `LayoutElement` inside the hand's layout group, which overwrites its RectTransform at runtime — it measures **200×100**, not the 200×300 the prefab shows. Stretching to it produced a back a third of the card's height over its bottom edge. Same reason the blessing mark anchors to the art. The back still *parents* to the root (that's what turns it) and copies the art's geometry instead.
-
-⚠️ **The front is "every child that isn't the back", re-read on each face change — never a list cached in `Awake`.** Other systems parent things onto a card afterwards: `RewardScreenFX` hangs a "+1 SHIFT" bonus badge on the offered card, and an `Awake` snapshot left it showing straight through the flip, rendered mirrored as "+1 TFIHS".
-
-⚠️ **AND THE FLIP ONLY RE-SHOWS WHAT IT ITSELF HID.** Turning every child back on is *not* the inverse of hiding them — three of `CardUI_Template`'s children are supposed to be off. `Image` and `ShiftCostContainer` ship disabled in the prefab (dead leftovers) and `Awake` retires the legacy `Hover_Panel`, so one flip out and back **resurrected all three** and the card came back wearing a grey overlay reading "New Text". `SetFrontVisible` records what was actually visible when it hid the face and restores exactly that set.
-
-**It is NOT dressed in FlatUI's iron.** FlatUI is the material for *screens*, and each screen picks a material and inverts something. A card back is not a screen — it belongs to the deck, whose fronts are painted gold-on-near-black. Re-skinning it as a charcoal workbench plate would make the card visibly stop being a card halfway through its own flip. It borrows FlatUI's *shapes* (they're just white sprites) and none of its palette.
-
-**Sizing the description text (2026-08-09).** The card is only ~160×240 screen px, which is small for a paragraph, so two things carry it:
-- **A flip zoom of 1.2×, plus a 40px LIFT.** Hand cards sit 200px apart and are 160px wide, so 1.2× (=192px) is the largest zoom that cannot overlap a neighbour — measured, not guessed. It composes with the selection bump rather than replacing it, and it lerps on **unscaled** time because `Time.deltaTime` is 0 on every screen that pauses, which would have left reward cards flipping without ever growing.
-  ⚠️ **The zoom is useless without the lift.** The hand sits on the screen's bottom edge and a card's art already overhangs it — measured, the card bottom is **6px below the screen at rest**, and because the zoom grows about the root's pivot that becomes **22px** at 1.2×. The Shift/charges row lives in the lowest 12% of the back, so it was exactly the part that got cut off. 40px clears it with ~18px to spare. If the zoom or the drawer's resting position ever changes, re-measure the back's bottom corner against y=0.
-- ⚠️ **The body's auto-size CEILING is the design; the floor is a safety net.** The first pass capped it at 13pt while the box was two-thirds empty — nothing was constraining the text except the cap. 14 of 15 cards now settle at exactly **21pt**, so they look identical; the longest steps to 19. **Do not widen the ceiling to give short cards bigger text** — a one-line card rendering at twice the size of a wordy one reads as broken, not as emphasis. If a card can't reach 21, shorten the card's text (Glass Parry was trimmed from 173 to 142 chars for exactly this reason). The floor is 12 for the rare **blessed** long card, which carries two extra lines on an already-full face; at a 16pt floor three blessings clipped straight out of the box.
-
-⚠️ **TMP auto-size does not settle within one frame, so you cannot batch-measure it.** Setting `text` and calling `ForceMeshUpdate` in a loop gives sticky, wrong numbers — one pass reported 36pt with `textBounds.size.y` of −4294967000, another reported 12pt for a string that really renders at 21. Measure ONE string per frame, read line metrics (`textInfo.lineInfo[0].ascender − lineInfo[last].descender`) rather than `textBounds`, or better, drive a real card through `Setup` and read it on the following frame.
-
-Two calibration lessons, both re-learned the hard way:
-- ⚠️ **Rules are 2px, not 1.** Cards render at ~0.8 scale in the hand, so a 1px rule is 0.8 device pixels and visibility comes down to subpixel luck. Both rules were drawn by identical code and only the lower one appeared — measured at `#9D8541`, full strength, while the upper sampled as bare card.
-- ⚠️ **The watermark is an OUTLINE, small and faint.** First pass was a filled diamond at 56% of the card width and 0.055 alpha: it measured `#231E12` against a `#0D0D0D` ground — three times the ground's value — and read as an olive blob the body text sat on. A watermark has to survive being ignored.
-
-**The deck view does not flip.** `DeckViewUI` sets `ui.enabled = false` after `Setup` (so `CardUI.Update` stops resetting the scale it needs for grid cells), which also stops `Update` and pointer events. That's unchanged behaviour — the deck view never had hover text — but it's the obvious follow-up if browsing your deck should read descriptions too.
-
-### Card descriptions are written for a player, not a spec (2026-08-09)
-
-Rewritten across all 15 cards: lead with the verb, state the number, one or two short sentences, no restating the cost (the card face and the back's footer both show it). Two were also **factually wrong** and are fixed — Comet Dive said 20 damage when `cometDamage` is **40** (radius 5), and Dash never mentioned that it grants **i-frames**, which is most of why you'd play it.
-
-### Every screen draws the REAL card face — `CardFace.cs` (2026-08-09)
-
-**All three non-hand screens use it: the Scrap Forge, Blompo and the shop.** The shop was the worst of them — it drew the card into a **68×68 square icon**, letterboxing a 2:3 card down to ~45×68, then re-printed the name and `N SHIFT  N CHARGES` underneath. Its card tiles are now card-shaped (`TILE_H / CardFace.ASPECT` wide; relics and services keep the square shelf tile) and carry no grain plate or PixelUI frame — the card has its own painted border, and a second frame around it read as a card inside a card. ⚠️ The price plaque is lifted clear of the card's **name plate** (bottom ~10% of the face); at the normal height it covered the title, leaving a row of unlabelled pictures.
-
-The Scrap Forge and Blompo used to build their own card chips: a FlatUI plate with `cardArt` squeezed into a **square** box, which letterboxed the whole 2:3 painted face down small enough that its own medallions were unreadable — which is exactly why those screens re-printed the name, SHIFT and CHARGES as separate text underneath. Both now draw the card at its true aspect via `CardFace.Build`, and the duplicate readouts are gone. There was never a design reason for the divergence; it was history.
-
-⚠️ **THE MEDALLION NUMBERS ARE NOT PAINTED INTO THE ART.** The art carries the empty gold circles; the digits are TMP fields in `CardUI_Template`. Any screen that draws `cardData.cardArt` on its own gets a card with two **blank sockets**. `CardFace` stamps them at fractions measured off the prefab (`Cost_Text` at (69.5, 121.4), `Uses_Text` at (-65.4, 126.4) in a 200×300 rect), so there is one place to fix if the art is re-cut.
-
-⚠️ **THE SET CURRENTLY HAS TWO ART STYLES AND THEY FIGHT.** The older cards socket their medallions in dark gold circles; **Dead Weight, Freefall Blade and Glass Parry** are newer art with a red ball and a **blue crystal**, and no painted name. Consequences already hit: a blue Shift digit on a blue crystal was *invisible* at ~10px (fixed with a 4-way dark **keyline**, not a one-sided drop shadow — that leaves most of the glyph edge unlit), and those three had `nameIsPaintedIntoArt` wrongly set true in the bulk pass, so they rendered a blank name plate **in the hand as well**. Both styles put cost right / charges left, so the positions do hold.
-
-⚠️ **`CardUI_Template` is NOT scale-corrupted** — measured 2026-08-09: root scale (1,1,1), 200×300, `ShiftCostContainer` scale (1,1,1) and inactive. The "non-uniform (0.119, 0.568, 0.92)" warning below refers to an older prefab and does not apply to the card the game actually uses.
-
-### Card name plates are drawn in CODE from now on (designer 2026-08-09)
-
-**New card art must ship with an EMPTY name plate.** `CardUI` types `cardName` into it. This decouples a card's name from its texture — renaming a card stops being a repaint — and it is why **`CardData.nameIsPaintedIntoArt` defaults to `false`**.
-
-⚠️ **The 14 pre-2026-08-09 cards have their titles painted in and all set that flag**, so nothing about them changed. **Clear it on each card as its art is replaced.** Getting it backwards is visible instantly: set-when-blank leaves an empty plate, clear-when-painted prints the name on top of itself.
-
-Plate geometry (`PLATE_CY/W/H` in `CardUI`) was measured on Stagger's art but is expressed as fractions of the **sprite rect**, and the legacy 1024×1536 cards put their plate within ~1% of the same place — so one set of constants serves both layouts, letterboxing included. Re-measure only if new art moves the plate. Colour is the set's title gold, matching the painted plates.
-
-### `CardUI` — the blessing mark (2026-08-06)
-
-`CardUI`'s only procedural chrome was the blessing badge; the card frame, cost medallions, rarity tag and name plate are all **painted into the card art sprite**, so "converting CardUI" meant converting that one mark. Three things were wrong with it and all three are fixed:
-
-- **It wasn't on the card.** It was anchored to the card ROOT, whose RectTransform is a **200×100 stub** — while `cardArtImage` is the real 200×300 card face. The mark floated off the card's right *edge* at mid-height. It is now parented to `cardArtImage.rectTransform`, the only honest geometry on the prefab.
-- ⚠️ **`cardArtImage`'s sprite is the WHOLE CARD FACE** (1024×1536), not the inner picture — frame, medallions and name plate included. Measured on the real cards, the inner picture occupies roughly **10%–80% of the card height**, so a naive small inset lands the mark inside the painted *name plate*, on top of the card's title. `MARK_INSET_Y = 62` (of 300) clears it.
-- **The look** was a jewel in an ornate gold ring — the chrome this pass exists to remove, and its bright gold setting drowned the gem so different rarities read identically. It is now Blompo's own `ArcaneSigil` glowing over a soft dark halo: light *inscribed on* the card rather than an object stuck to it, tying the mark to the screen that grants it. The dark halo (not a frame) is what keeps it legible over busy artwork.
-
-The mark deliberately does **not** say which of the seven blessings it is — the hover text names it. Seven legible glyphs at ~24 screen px is a bespoke-art job, not a procedural one.
-
-Verified in play mode across the hand and the deck view: blessed cards mark, unblessed cards build no mark at all.
-
-### Resolution independence (2026-08-09) — the game is NOT 1920x1080-only
-
-The project was believed to be locked to 1920x1080. It never was: `defaultIsNativeResolution` is **on**, so a build launches at the player's native resolution and the 1920x1080 in ProjectSettings is only the *windowed fallback* size. What was actually wrong was three settings.
-
-⚠️ **EVERY CanvasScaler IS `ScaleWithScreenSize`, ref 1920x1080, `matchWidthOrHeight = 1` (HEIGHT). Do not change the match value.**
-
-**Match HEIGHT because the camera is height-anchored.** `Camera.main.orthographicSize = 7` means the view is exactly **14 world units tall at every aspect**, with the width flexing (`halfW = orthoSize * aspect`, which `CameraFollow` already computes correctly). Matching *width* made the UI do the opposite of the camera: on a 21:9 display the canvas became only **810** logical px tall instead of 1080, which clipped 170px off the run map (980 tall) and 130px off settings (940 tall). With match=height the canvas is always 1080 tall and its width is `1080 * aspect` — 1440 at 4:3, 1728 at 16:10, 1920 at 16:9, 2560 at 21:9.
-
-Also fixed: **MainMenu and GameOverScene were `ConstantPixelSize`**, so their UI did not scale at all (measured: at 2560x1440 the menu rendered at its authored pixel size and looked shrunken). And `resizableWindow` was off, so windowed mode could not be dragged.
-
-⚠️ **AN ACTIVE BUILD PROFILE OVERRIDES ProjectSettings, AND `PlayerSettings.*` WRITES TO THE PROFILE.** Setting `PlayerSettings.resizableWindow = true` changed `Assets/Settings/Build Profiles/New Windows Profile.asset` and left `ProjectSettings/ProjectSettings.asset` still reading `resizableWindow: 0`. Both are now set. **When changing a player setting, check which of the two actually moved** — a value set only in the profile silently reverts for any build made without it, and reading `PlayerSettings.x` back gives you the profile's value, so it looks correct either way.
-
-⚠️ **A UI element that sits at a screen EDGE must be anchored to that edge.** With the canvas width now varying, a centre-anchored element at a large offset drifts. Audited every `GameplayHUD` child; exactly one was wrong — **`RecallButton`** was anchored to centre `(0.5, 0.5)` at `x = -859.2`, which put it 5px from the left edge on a 1728-wide canvas and cut it in half. Re-anchored to `(0, 0.5)` at `x = 100.8`, which is the identical position at 1920 and correct everywhere else. Everything else was already edge-anchored.
-
-**Oversized windows now fit themselves**, and the two mechanisms are NOT interchangeable:
-- **`RunMapScreen.FitWindowToCanvas()` RESIZES** the window (1560x980, the widest in the game). Its chart lives in `area`, anchored to the window corners with insets, so it genuinely reflows into a smaller box.
-- **`BlompoScreen` (1600) and `SettingsScreen` (1240) SCALE** uniformly instead, via `FitScale()`, never above 1. Their content sits at fixed offsets from the window centre, so *resizing* them would overlap their own columns — shrinking is only safe as a uniform scale. `ShopScreenUI` already did this.
-
-**Verified by screenshot at 4:3 (1440x1080), 16:10 (1920x1200), 16:9 (1920x1080, 2560x1440) and 21:9 (2560x1080):** zero visible graphics off-screen in SampleScene or GameOverScene at any of them, and every change is a **no-op at 1920x1080** (canvas scaleFactor 1, RecallButton on the same pixels, both windows at full size).
-
-**Camera vs room width — measured, no action needed up to 21:9.** A room's CameraBounds zone must be at least `14 * aspect` wide or the clamp inverts. Need is 24.9 at 16:9 and **33.2 at 21:9**; the pool's rooms are 42.8–68 wide, so all clear it. Only `EfeVrl5`'s narrow sub-zone (25.9) inverts at 21:9, and its art still covers the overshoot, so nothing is visibly wrong. **32:9 super-ultrawide needs 49.8 and most rooms fail it** — that's the line to draw.
-
-Known cosmetic nit at 21:9: `GameOverScene`'s background art doesn't reach the edges, leaving plain grey strips. Scene art, not UI.
-
-### Never Scale UI Containers — Resize Them
-
-When a UI element needs to be bigger or smaller, **change Width and Height in the RectTransform, not Scale.** Scaling a UI container cascades to children and fights with Layout Groups, producing wildly incorrect sizes (twice during the last session we hit this — once with the RelicHUD container scaled 5.44× on Y, once nearly happened with the QuestBoardOverlay). The honest fix is always Width/Height, sometimes anchor/pivot. Leave Scale at (1, 1, 1) on UI elements.
-
-### HandUIDrawer
-
-The hand drawer at the bottom of the screen auto-slides up on hover and down when idle.
-
-**Critical raycast behavior:** The drawer's `Image` component has `raycastTarget` enabled to detect hover (`IPointerEnterHandler`). This means it absorbs clicks in its rect. The `SetLocked(bool)` method:
-
-- Sets `isLocked` (stops slide animation)
-- Sets `isHovered = false`
-- **Toggles `raycastTarget` on the Image component** so the drawer stops absorbing clicks when locked.
-
-**When opening any full-screen UI panel, call `HandUIDrawer.instance.SetLocked(true)`** and `SetLocked(false)` when closing. ShopManager, QuestBoardScreen and DeckViewUI already do this.
-
----
-
+📐 **UI work has its own loadable skill: `.claude/skills/deckshift-ui/SKILL.md`.** House style and the
+inversion rule, the theme table, linear-colour-space calibration, uGUI traps, the wiring contract, a
+pre-delivery checklist, **and (§8) the full catalogue of every screen that exists** and the traps each
+one paid for. **Invoke it (`/deckshift-ui`) before building, restyling, reviewing or debugging any
+screen, panel, HUD element, card face, world-space marker or UI VFX.** What follows is only what must
+be true even when you are not doing UI work.
+
+### ⚠️ SALVAGE — the one material system (2026-08-20). It replaced the nine-theme rule.
+
+The designer's brief: *"i want a settings menu, a pause menu, a blompo UI/VFX, the shop, the forge,
+the map, and every other UI asset … to feel like they would have been in the cainos packs. i want
+consistency in the visuals overall, not seperated to menus and the actual gameplay, but everything."*
+
+The old rule — **"every screen gets its own material, never the same skin, pick one and invert
+something"** — did exactly what it said, which is make screens look *unlike* each other: nine invented
+materials (smoked glass, brass, frost) and a hue budget that ran out. **Every settings screen built
+under it was rejected, and the rule was why.**
+
+⚠️ **THE FIX IS NOT ONE SUBSTRATE EVERYWHERE — that is monotony, and `Vigil` (stone alcoves, real
+dungeon art, a torch each) was rejected TWICE proving it.** The Cainos pack holds crates, pots,
+banners, chains and fireplaces and still reads as one world. **Consistency lives in the TREATMENT.**
+
+`Assets/Scripts/Salvage.cs` is the file; five laws no screen may disagree with:
+
+1. **Scale** — `Salvage.Scale` = **2.4107** (14 world units / 1080 canvas / 32 PPU). UI art is the
+   exact size the same art is in the game. `Salvage.SpritePPU` enforces it automatically.
+2. **Light** — warm, **upper left**, always.
+3. **Colour** — **sampled from the pack PNGs, never chosen** (`SalvageArt` + its baker). Measured
+   dungeon stone is **`#444548` cool-neutral**; the old "warm charcoal" was reasoned from the
+   district's *name* and is wrong against the art. Warmth comes from wood and torchlight only.
+4. **Accent** — **exactly two in the entire game**: `Salvage.Torch` (lit) and `Salvage.Shift`
+   (energised — the altar orb's cyan, the same that seals the gate). `Salvage.Wound` red is a
+   warning, not an accent. **No screen ever spends a new hue again.**
+5. **Wear** — used **and repaired**. The repair currency is literally called scrap.
+
+Variety comes from **what the object is**, not from a colour: a hung sheet, a notice board, a
+workbench, a banner. **Migrated so far: `PauseScreen` only** (the Hanging Board). Everything else still
+renders in the superseded themes until converted.
+
+⚠️ **`Assets/Cainos/Pixel Art Icon Pack - RPG` has 107 icons and 89 are referenced NOWHERE.** Same
+artist, same PPU, same palette. Use them before drawing another procedural sigil.
+
+### Canvas hierarchy
+
+SampleScene's main Canvas contains **`GameplayHUD`** (gold, health, shift, recall, pile buttons, hand
+drawer, RelicHUD, QuestTracker, ExitMarker) — toggle it off to hide the HUD during full-screen UI.
+
+⚠️ **Procedural screens create themselves under the Canvas at RUNTIME and are NOT in the scene file** —
+`PauseScreen`, `RunMapScreen`, `ScrapForgeScreen`, `BlompoScreen`, `QuestBoardScreen`,
+`SettingsScreen`, `ShopScreenUI`, `CharacterSelectScreen`. **Do not go looking for them in the
+hierarchy at edit time**, and do not "fix" their absence by placing one in the scene. Only
+`TutorialPanel` remains scene-placed.
+
+### Rules that bind any code touching a RectTransform
+
+⚠️ **NEVER SCALE UI CONTAINERS — RESIZE THEM.** Changing Scale cascades to children and fights Layout
+Groups, producing wildly wrong sizes. The honest fix is always Width/Height, sometimes anchor/pivot.
+Leave Scale at (1,1,1). This has bitten twice.
+
+⚠️ **Every CanvasScaler is `ScaleWithScreenSize`, ref 1920x1080, `matchWidthOrHeight = 1` (HEIGHT).
+Do not change the match value.** The camera is height-anchored (`orthographicSize = 7` ⇒ 14 world
+units tall at every aspect), so matching width makes the UI do the opposite of the camera. The canvas
+is therefore always 1080 tall and only width flexes (1440 at 4:3 → 2560 at 21:9).
+
+⚠️ **An element at a screen EDGE must be ANCHORED to that edge**, or it drifts as canvas width varies.
+
+### Wiring any new screen
+
+- **Extend `GameScreen`** (`Assets/Scripts/GameScreen.cs`) — it owns pause, game state, HUD hide,
+  drawer lock, the one-frame Escape memory and both aspect-fit modes. Do NOT retrofit existing
+  screens all at once; `QuestBoardScreen` is the migrated worked example.
+- **Pause through the counter, never `Time.timeScale` directly:** `GameManager.instance.RequestPause()`
+  / `ReleasePause()`. Documented exceptions: `HitStop`, Adrenaline slow-mo, hard resets before a scene
+  transition.
+- **`GameManager.IsUIPaused` is the single honest "is another screen up?" test** — prefer it over a
+  hand-kept list of `SomeScreen.IsOpen` flags, a pattern that has rotted twice here.
+- **Hide `GameplayHUD` and call `HandUIDrawer.instance.SetLocked(true)`** when a full-screen panel
+  opens (and `false` on close). The drawer's Image has `raycastTarget` on to detect hover, so it
+  absorbs clicks in its rect until locked.
+- **Set text through `UIType`** — `Apply` for the display face (CCBattleScarred: titles, labels,
+  numbers), `ApplyProse` for real sentences only (Pixie). The display face has essentially no
+  lowercase and renders prose as a wall of capitals.
+- **Self-bootstrapping singletons must register with `SceneBootstrap.Register`**, and `Create` must be
+  idempotent — `[RuntimeInitializeOnLoadMethod]` fires once per SESSION, not once per scene.
+
+### Cards: rarity colour is the ART's job, not the UI's
+
+**Card rarity is telegraphed in the card ARTWORK** (dark grey Common, light grey Uncommon, yellow
+Rare, purple Epic; there are no Legendary cards). **UI code must never invent a second rarity colour
+system on a card** — two colour codes that disagree is worse than one. The blessing mark is therefore
+one fixed teal, and blessing hierarchy moved to a channel the art does not use: only Epic/Legendary
+pulse.
+
+⚠️ **The Freefall Blade frame is the canonical card frame** (designer, 2026-08-17): red ball = charges
+left, blue crystal = Shift cost right, an **empty name plate** drawn in code, and a heart container on
+cards that deal damage. New card art uses it, and ships with the name plate EMPTY —
+`CardData.nameIsPaintedIntoArt` defaults to `false`; the 14 older cards have their titles painted in
+and set that flag. `CardFace` is the single source for every screen **including the hand**.
 ## Camera System
 
 ### CameraFollow.cs (custom)
@@ -1011,243 +1069,56 @@ Related: a missing-script warning for `CameraBoundsController` appears in the co
 
 ## Level System
 
-### LEVEL DESIGN LAWS (designer-stated 2026-07-14 — absolute)
-
-1. **Every level must be completable with ONLY jumping and moving.** Cards, fans, elevators, trapdoors, and any other mechanic may only gate OPTIONAL things: loot, shortcuts, Shift savings. If a mechanic fails or the player has no cards, the exit must still be reachable. (Violation that prompted this rule: GenLevel3's first draft made a fan relay the only way over a tall wall.)
-2. Mandatory-path geometry (**recalibrated from designer playtest 2026-07-14: the character jumps ~5-6 tiles**, not the 4 the old physics math said): design mandatory rises at **4** (comfortable), 5 only for optional challenge, card-gated pockets need rises ≥ 8. Flat gaps ≤ 5-6 tiles. ≥ 5 tiles of clear air above launch surfaces. **Don't crowd platforms** — same-column vertical spacing between floating ledges ≥ 7 tiles; GenLevel5's 3-tile ladder spacing read as clutter.
-3. Hazard pits on the mandatory path must be escapable (shallow enough to jump out) and crossable without aid platforms.
-4. **NO one-way (`=`) platforms in levels** (designer 2026-07-14: "they feel wrong and also work bad and buggy, and there is no visual clearance for them"). The importer still supports `=` but don't place it — use solid 1-thick `#` strips (the `Extra_112/113/114` platform-strip look) and route jumps AROUND them, zig-zag ladder style on alternating shaft walls.
-5. **Turrets (`t`) only on walls or ceilings** — that's how the hand-made levels use them, so they're hard to kill. The importer can only floor-ground them, so generated levels must NOT use `t` at all; use a melee (`m`) or ranged (`r`) enemy instead. (Designer 2026-07-14, after GenLevel5's exposed floor turret.)
-6. The player has **no wall-breaking attack** (fireballs don't break walls) — never design a secret that requires destroying terrain. Card-gated secrets = Phase through a 1-thick wall, Portal, or an 8+ tile rise.
-8. **THE SPAWN IS A SAFE BEACH** (designer 2026-08-07). The player must be able to arrive, look around, read their deck and decide *before* anything can touch them. **No enemies on the platform the player spawns on, and nothing able to target them there** — ranged/flying enemies must not have line of sight to the spawn. Enforced by `LevelValidator` (LAW 8): it finds the spawn's contiguous ground run and fails on any enemy standing on it, then ray-checks ranged (`r s t`) and flying (`b`) enemies within 26 tiles and melee within 10. Line of sight, not raw distance — a spitter 20 tiles down a clear corridor is aiming at you; one 6 tiles away behind rock is not.
-7. **Entry and exit must be far apart in the map** (designer 2026-07-14, after GenLevel6 v1 put the exit directly above the spawn behind a 2-thick slab): a Phase/Portal card must never be able to skip the level. Keep the spawn and the ExitDoor in different regions — roughly 20+ tiles apart, separated by whole chambers of solid rock, never by a thin wall or single floor slab.
-
-9. ⚠️ **PROVISIONAL — the designer said this was written up wrong and will restate it ("we can see about that later on", 2026-08-08). Do not treat it as settled; ask before designing to it.** The rough shape, from GenLevel8 where they placed a Blompo on such a platform themselves: a ledge reachable only by dropping onto it, or only along one narrow guarded approach, wants **something on it to claim** — loot, a shop, Blompo, an NPC — which is what makes the player accept the narrow path with an enemy in it. What is NOT yet confirmed is how far that generalises.
-
-### Level Text Importer (NEW 2026-07-13 — Stage 1)
-
-`Assets/Scripts/Editor/LevelTextImporter.cs` adds menu **Deckshift → Import Level From Text…**: it reads an ASCII grid `.txt` (legend + example: `Assets/LevelTexts/TestRoom1.txt`) and builds a room prefab into `Assets/LevelGenerated/` satisfying the room contract (`CameraBounds` zone auto-sized to the grid, `GirisNoktasi` spawn, ExitDoor). Markers: `#` ground, `S` spawn (exactly one), `X` exit, `m/r/l/M/b` enemies plus the zombie tiers `z` Shambler / `Z` Rotbrute / `s` Spitter (added 2026-07-16; `b` = `YeniLeveller/BatMan.prefab` — the real flying bat with AeroBatAI; **`Assets/Prefabs/AeroBat.prefab` is a legacy husk with NO AI**, its dead missing-script component was removed 2026-07-13 because Unity refuses to save any new prefab containing missing scripts, which broke level import), `^/T/W` hazards, `+/g/C` pickups, and mechanics (added 2026-07-13): `E` Elevator (Cainos prop, floats at cell center — tune travel in Inspector), `F` UpdraftFan (draft zone ~3 tall, liftForce 20 ≈ 5-7 tiles of lift — chain fans as relays for taller climbs), `w` AcidWater (~6 wide pool, damage+slow), `K` WreckingBall (floats at cell center, tune anchor/swing), `c` CrumblingPlatform (**do NOT use in levels — its sprites are outdated; use `T` Trapdoor instead, designer 2026-07-14**), `t` Taret turret, `$` Shopkeeper_NPC, `B` Blompo (`Assets/Prefabs/Blompo.prefab`, added 2026-08-08 — NPCs are loot, see below) (its TMP/UI scripts live in Library/PackageCache — an Assets-only guid scan wrongly flags them "missing").
-
-**Interactive structure markers (2026-07-14):** `=` one-way platform tiles (own tilemap: TilemapCollider2D via CompositeCollider2D + one-way PlatformEffector2D on Ground layer; painted with the thin `_144` lip so they read differently from solid strips) · `G` gate cells (vertical G-runs become one sliding **Gate** — `Assets/Scripts/Gate.cs`, solid Ground-layer collider, slides down + fades on Open, Cainos Gate 01 sprite scaled to height) · `L` Lever (`YeniLeveller/Lever.prefab`; its `OnFlippedOn/Off` UnityEvents are now public) · `A` **Shift Altar** (**`Assets/YeniLeveller/ShiftAltar.prefab`** since 2026-08-09 — it used to be assembled inline by the importer, so its sprite/layer/collider were declared in editor code and existed nowhere you could look at or tweak. `Assets/Scripts/ShiftAltar.cs`: IInteractable on the Interactable layer (12), pays `shiftCost` Shift via `player.SpendShift`, free in hub per the umbrella rule, procedural floating TMP cost label, fires public `OnPaid`). ⚠️ **It is deliberately NOT in `MarkerPrefabs`** — the `'A'` branch still needs its own code path because it collects altars for the gate wiring below; it just instantiates the prefab now instead of building one. **The importer auto-wires each `L` and `A` to its NEAREST `G` gate** (lever On→Open/Off→Close, altar OnPaid→Open) via `UnityEventTools.AddPersistentListener` — rewire in Inspector if a level needs different pairing. Only header directive besides `!backwall` is `!name`. The importer pre-checks for missing scripts before saving and names the culprit object.
-
-**Tile painting reproduces the hand-built visual language** (learned by auditing EfeVrl7's 546 painted tiles, 2026-07-13): an optional "BackWall" backdrop tilemap (**opt-in via `!backwall: on`** — the designer prefers adding backdrop/decoration by hand; when on it must be on the **"Background" sorting LAYER**, NOT Default: ExitDoor's sprite is Default order -1 and gets swallowed by a Default-layer backdrop), plus a "Ground" tilemap (layer 3, TilemapCollider2D, Default sortingOrder 1, z=1). Any 1-tile-thick run (air above AND below, wall-attached or floating) gets the `_112/_113/_114` strip treatment with caps on open ends; the gappy `_186` fill goes in exactly ONE row under a surface, deeper cells get dark `_185` (repeating `_186` looks like a broken colonnade). Frame cells (`#` connected to the grid edge) get role tiles from `Assets/LevelSinasi/biseyler/`: air-above → floor surface `_144`, air-below → ceiling face `_96`, wall faces → inner accent tiles `_188`/`_157` ONLY when backed by a real solid tile (2-thick walls), else the clean outer tiles `_189`/`_156` (the inner tiles have protruding brick nubs + bumpy collision — wrong for 1-thick walls), buried → `_153/_154` top rows, `_156/_189` outer walls, `_186/_185` floor fill. Free-standing `#` platforms: horizontal runs of 2+ get the **platform strip set `Extra_112/_113/_114`** (left cap / middle / right cap — learned from EfeVrl6's interior platforms); lone blocks and 1-wide pillars get chunky `Ground Dirt` block tiles (`#..#..#` = the hand-made stepping-stone style); buried rows of thick platforms get floor fill. NOTE: the edge-strip tiles look like sparse floating crumbs if painted in mid-air, and adjacent Dirt blocks melt into dark blobs — never tile either as strips.
-
-### Sprite-less tiles are the designer's ERASER — do not "fix" them (2026-08-09)
-
-Several tiles in the pack have a **null sprite** (`Ground_13`, `Ground Dirt_31`, `Ground_25`, `Ground Dirt_15` — indices past the end of the sheet). **The designer paints these deliberately to blank a cell**, because it is quicker than switching to the erase tool. Verified by clean-room physics test: `colliderType = Sprite` + null sprite ⇒ no outline to trace ⇒ **draws nothing and collides with nothing**. The technique is safe.
-
-⚠️ **Do not report these as broken tiles.** A scan of the hand-made rooms found 218 such cells (98 in `efeslevel2`, 116 in `efeslevel3`) and they were briefly misdiagnosed as invisible platforms. They are intentional erasures.
-
-⚠️ **But the safety rests entirely on them never getting Grid collision.** A Grid copy of a sprite-less tile is a full-cell collider that renders nothing — an **invisible wall everywhere the designer erased**. Not hypothetical: `Ground_13` was in `MaskTiles` until 2026-08-08 and did exactly that in generated rooms. `TileVariantGenerator` now refuses to build a `Solid` variant of any null-sprite tile, and `LevelTextImporter` already throws if a table tile has no sprite. **Keep both guards.**
-
-⚠️ **Tooling reads an eraser cell as SOLID**, because `Tilemap.GetTile()` returns non-null for it. This contaminated the 8-neighbour mask measurement taken from the hand-made rooms — some configurations counted visually empty cells as solid neighbours, which is part of why the rare corner masks looked erratic. Any future measurement over their tilemaps must skip tiles whose `sprite == null`.
-
-⚠️ **TEN OF THE GROUND TILES ARE BIGGER THAN THEIR CELL — NEVER FORCE GRID COLLISION ON THEM (2026-08-08).** The Cainos ground palette is **not a set of 1×1 blocks**; it is a set of whole pre-drawn **platforms**, each centred on its cell: `Ground_11` **3×1**, `Ground Dirt_0` and `Ground_0` **3×3**, `Ground_1` **2×2**, `Ground Dirt_12` 3×1.6, `Ground Dirt_14` 3×1.3, `Ground Dirt_4` 1.4×2, `Ground_3`/`Ground Dirt_3` 2×1, `Ground Dirt_11` 1.3×1.3.
-
-Grid collision is exactly one cell, so a Grid copy of a 3×1 platform strip **keeps drawing the outer two thirds while deleting their collision** — the player sees platform, steps on it, and drops straight through. That was the "the edges of the mid-air platforms have no colliders" report, and it was self-inflicted: the earlier protruding-brick-nub fix generated Grid `… Solid` variants for *every* painted tile. **The hand-made rooms use `Sprite` collision throughout, which is exactly why their platforms have always felt right — what is drawn is what is solid.**
-
-`TileVariantGenerator` now **skips oversized tiles** when building `Solid` variants (`IsOversized`), so they keep native Sprite collision while cell-sized tiles still get the nub fix. Verified by probing `Physics2D.OverlapPoint` across a platform's drawn width: solid over the full 3-unit art, empty outside. **Before adding any tile to the painting tables, check its sprite size against the cell.**
-
-⚠️ **JUDGE THE MASK TABLE BY SAMPLE COUNT, NEVER BY WINNER SHARE (trimmed 2026-08-08).** `MaskTiles` was measured by taking the tile the designer used most for each 8-neighbour configuration — but some configurations appear only a handful of times across all six hand-made rooms, so their "winner" is a coin flip. And the coin flips are precisely the **outer-corner** configurations: a room has hundreds of buried and wall-face cells and only a few of any given corner. Symptom: mask 193 (a wall's bottom-right outer corner) resolved to `Ground Extra_205` on **2 votes out of 8**, and Extra_205 is a brown interior-looking block — so every generated wall had a brown nub sticking out of that corner. Entries with **n < 10 are now dropped**, falling through to the hand-written, internally consistent `Mask4Tiles`. **Do not trim on winner share:** it is low almost everywhere (mask 255 has n=1231 and its winner takes 12%) because the designer deliberately varies tiles across a mass — that is variety, not uncertainty, and trimming on share would gut the table.
-
-⚠️ **NPCs COUNT AS LOOT when populating a room (designer 2026-08-08).** A Blompo (`B`) or a shopkeeper (`$`) is a place to *spend* what the player picked up, so it pays a room out just as a chest does — and arguably better, since it converts carried gold into something kept. **Chests are the expensive way to reward a room and a pile of them reads as filler**; ~3 is a sensible ceiling even for an Elite. Shift crystals are the exception — the designer considers those genuinely needed, so don't thin them out.
-
-⚠️ **A fitted prefab's COLLIDER is often not centred on its transform (2026-08-08).** `FitAcidToPit`
-scaled the pool by its `BoxCollider2D.size` but then positioned the *transform* at the pit centre, as
-if the collider sat on the origin. `AcidWater`'s collider carries `offset (0, 1.27)`, so every pool in
-every generated room floated a scaled 1.27 units too high — the water's surface sat a full tile above
-the floor it was supposed to be sunk into. It imported without a single warning and looked *almost*
-right, which is why it survived two rooms. Fixed by backing the scaled offset out of the position.
-**Whenever you size or place a prefab from its collider, read `offset` as well as `size`** — and
-verify the result by asking for the instance's world bounds, not by eyeballing the transform value.
-
-⚠️ **`T` Trapdoor grounds to the BOTTOM of its cell, like an enemy standing there.** Used as a bridge
-across a pit that is what you want one row *above* the pit mouth: place the marker on the standing row
-(the row the surrounding floor's occupants use), not in the gap itself, or the planks end up a tile
-down inside the hole — under the acid, invisible.
-
-**Entity placement:** most enemies have kinematic physics and do NOT fall, so the importer auto-grounds standing markers (`X m r l M C ^ W T` + the spawn): after instantiating, it measures the instance's combined renderer bounds (ignoring particles/trails, collider fallback) and shifts it so bounds-bottom sits exactly on the cell floor. Floaty pickups (`+ g`) and flyers (`b`) stay at cell center. Decoration (props) stays a manual pass by design. Planned next stages: movement-metrics doc (jump/dash distances in tiles) then batch room drafting.
-
-### ⚠️ SHIFT SUPPLY IS A MEASURABLE ROOM PROPERTY: ~7 Shift per 1000 tiles (2026-08-14)
-
-The designer reported the generated rooms as far harsher than the hand-made ones and punishing on a missed jump. Measured, it was not a feel problem — it was a **4.5× supply gap that compounds with room size**:
-
-| | shift | area (tiles) | per 1000 |
-|---|---|---|---|
-| hand-made average | 6.9 | 1090 | **6.3** |
-| GenLevel7 | 3 | 2584 | 1.2 |
-| GenLevel8 | 3 | 2880 | 1.0 |
-| GenLevel9 | 7 | 2772 | 2.5 |
-| GenLevel10 | 2 | 2520 | **0.8** |
-
-The generated rooms are **~2.5× larger AND paid half as much**, so per unit of traversal GenLevel10 was **nine times stingier** than efeslevel1. All four are now stocked to **6.9–7.1 per 1000 tiles** (targeting the most generous hand-made rooms, not the average, because the bigger layouts demand more traversal). Total Shift across a 10-room run went **63 → 123**.
-
-**Room size is staying big — the designer likes the large layouts, so the lever is supply, not size.** When authoring a new room, check crystals against area; the hand-made band is 5.1–7.7 per 1000.
-
-⚠️ **The gold/crystal split still holds:** gold piles must be GROUNDED, Shift crystals floating is correct and wanted.
-
-### ⚠️ THREE PLATFORM VARIANTS DO NOT FILL THEIR FOOTPRINT — removed 2026-08-14
-
-Measured by stamping each multi-cell variant on a bare tilemap and probing every cell with `Physics2D.OverlapPoint`:
-
-```
-Ground Dirt_10   2x2   1 of 4 cells solid
-Ground_6         3x3   8 of 9
-Ground Dirt_6    3x3   8 of 9
-```
-
-They are oversized, so `TileVariantGenerator` correctly refuses them full-cell Grid collision and they keep `colliderType = Sprite` — which traces the **alpha outline**. These three are drawn as irregular rounded rocks rather than filled blocks, so the corners simply are not there. **A platform stamped with one looks solid and is not.** All three are gone from `PlatformShapes`; the other 17 variants measured complete.
-
-⚠️ **Being the right pixel size is NOT evidence.** `Ground Dirt_10` measures **2.06 × 2.03**, which looks perfect. Any new variant added to `PlatformShapes` must be probed, not eyeballed.
-
-⚠️ **`Ground Dirt_13 Solid` was the same class of bug and is also gone** — a 0.44 × 0.38 pebble carrying FULL-CELL Grid collision, so the player stood **0.62 units above a pebble**. Every instance sat at the outer edge of a floor run, i.e. exactly the surface you walk onto. This is very likely the designer's "2-3 tiles where the colliders are off and the player seems to float".
-
-### Level Validator (2026-08-07) — run this BEFORE importing a level
-
-`Assets/Scripts/Editor/LevelValidator.cs`, menu **Deckshift → Validate Level Text(s)**.
-
-`LevelTextImporter`'s own validation only counts markers (one `S`, an `X`, unknown chars). Every one of the seven Level Design Laws was enforced by prose in a comment header, which demonstrably does not work. This makes them executable: it simulates the real player and flood-fills reachability from the spawn.
-
-**`LevelValidator.Overlay(path)` is the tool to reach for when authoring** — it prints the room with `o` = reachable standing cell, `x` = standable but ORPHANED. It answers "where does the route actually stop?" directly, and it's how the validator itself gets checked.
-
-⚠️ **The movement model constants are read from `PlayerController` + `Player.prefab`, not estimated. If jump/gravity/speed change in the game, change them here or the validator quietly starts lying.**
-
-**Measured from the code 2026-08-07 (tile = 1 world unit), designer-confirmed by playtest:**
-- **Jump apex ≈ 4.9 tiles.** Confirms Law #2 ("mandatory rises at 4, 5 is the edge").
-- **Airtime ≈ 1.5s** (0.90s up at −12.26, 0.60s down at −26.98 thanks to `fallMultiplier`).
-- **Flat jump reach ≈ 12 tiles** — simply `moveSpeed × airtime`. Still about **2× the "flat gaps ≤ 5-6 tiles"** the design laws assume, which is worth knowing when rooms play flat.
-
-✅ **`PerformJump`'s horizontal impulse is GONE (2026-08-14), and the reason it had to go is worth keeping.** It used to do `AddForce(moveInput * jumpForce, jumpForce)`, which looked like a running jump should launch at 8 + 11 = 19 u/s. It didn't: `isGrounded` is assigned only in `Update()` and nothing clears it on jumping, so the very next `FixedUpdate` saw `isGrounded == true`, ran the grounded branch (`rb.linearVelocity = (moveInput * moveSpeed, y)`) and overwrote it back to 8 about 20ms later. Dead code — **on a grounded jump.**
-
-⚠️ **COYOTE TIME REACHED THAT LANDMINE FROM THE OTHER SIDE.** A coyote jump fires while `isGrounded` is **false**, so FixedUpdate takes the AIR branch instead, which only lerps toward moveSpeed at ~7% per step — the impulse would have survived most of a second. Coyote jumps would have flown noticeably further than the ordinary jumps they're meant to be indistinguishable from, and **every gap in the game would have been clearable by deliberately stepping off the edge first.** The old warning here was about "fixing" the stale `isGrounded` read; that was only one of the two routes in.
-
-Deleted outright rather than special-cased, which is safe because **`maxAirJumps` is 0** so the ground branch is `PerformJump`'s only caller. Verified: a coyote jump while running leaves horizontal velocity at **8.00, not 19**.
-
-(An earlier version of this section claimed a 15-tile reach and a 3× discrepancy, from modelling that impulse as if it survived. It does not.)
-
-**Modelling notes:** the player occupies 1 column × 2 rows. `Solid` (blocks) and `Support` (can land on) are deliberately split — one-way `=` platforms support from above but pass through from below, and treating them as non-support produced a false "exit unreachable" on GenLevel5.
-
-### Tile appearance — what we CAN change (2026-08-07)
-
-Verified, not assumed. The tilemaps render with **`Sprite-Lit-Default` (URP 2D lit)** and the scene has a global `Light2D` at **0.5 intensity**, so:
-
-- **2D lights affect tiles.** Glowing platform edges are achievable with a Light2D, no art needed.
-- **Tiles have a `color` field, but every pack tile ships with `TileFlags.LockColor`**, which makes `Tilemap.color` / `SetColor` no-ops on them. `TileVariantGenerator` (menu **Deckshift → Generate Tile Variants**) sidesteps this by writing DUPLICATE `Tile` assets pointing at the same sprite with their own colour — no shader work, no texture edits, no risk to hand-made rooms.
-- **The textures are editable** — real 512×512 sheets (`TX Tileset - Dungeon Ground Extra.png`); `readable=False` is just an import setting to flip if pixel edits are ever wanted.
-
-⚠️ **Tint darker than you think and you'll get a black hole.** These render through a 0.5-intensity light, so the scene already halves your value. A 0.42 deep-rock tint measured ~0.21 on screen and the mass read as a pit. Multiply by the light, *then* pick.
-
-⚠️ **THE DEEP-ROCK INTERIOR IS SIGNED OFF. DO NOT "IMPROVE" IT (2026-08-08).** Two changes were made to it and both were reverted the same day at the designer's request: brightening `FlattenSprite` to pull toward the **mean** instead of the 25th percentile, and **jittering** the depth threshold to break up the Chebyshev metric's rectangular contours. Both are measurably more "correct" and the designer rejected both on sight — the interiors read better dark and hard-edged. The low percentile and the hard depth-3 step are deliberate. The jitter was actively harmful besides: a +1 nudge pushed **deep tiles out to depth 2**, one cell from the face, producing dark blocks stuck to wall edges.
-
-⚠️ **DISTINGUISH "THE INTERIOR OF THE MASS" FROM "ONE TILE ON ITS OUTER EDGE".** The designer's complaint that "the corner tiles look really bad" was about a **single mask entry** picking a brown interior-looking tile at wall corners — not about the fill behind it. Reading it as the fill cost a full revert. When feedback points at a tile, find *that tile's* mask before changing anything global.
-
-**Deep interiors are painted, not skipped.** An earlier pass left cells >2 from air unpainted so the backdrop showed through — that was worse, because solid rock then reads as open background and misleads the player, especially when peeking with Ctrl. They now get **darkened copies** of the interior tiles: same art, same collision, recessed value.
-
-⚠️ **`TX Tileset - Dungeon Ground_13` is BROKEN — it has a NULL SPRITE.** The pack's valid range stops at `Ground_12`; `_13` is one past the end. It was the most-used tile in the measured platform-run data, so the importer painted every ledge with nothing and generated rooms genuinely had **invisible mid-air platforms** (30 of 499 cells). Replaced with `Ground_11`. **`LevelTextImporter` now fails the import if any table tile is missing OR has a null sprite** — a resolve-only check passes this happily, which is how it survived.
-
-**First run found:** GenLevel3 is **unfinishable** — its header advertises a "zigzag staircase" that was never drawn into the ASCII, so the only route up is the fan relay, violating Law #1. GenLevel4/5 + ToyboxTest carry banned turrets/one-ways. GenLevel1–4 sit at 14–18% rock density (mostly empty void); the two that read as real rooms, GenLevel5 and GenLevel6, are both 67%.
-
-### Room Pool
-
-`LevelManager.roomPrefabs` holds the pool of room prefabs. **Element 0 must be the hub;** elements 1..n are the run's combat levels. The boss room is NOT in this list — it has its own `bossRoomPrefab` slot.
-
-**Verified pool contents (2026-08-08):** `[0] hub, [1] efeslevel1, [2] efeslevel2, [3] efeslevel3, [4] EfeVrl4, [5] EfeVrl5, [6] EfeVrl6, [7] EfeVrl7, [8] GenLevel7, [9] GenLevel8, [10] GenLevel9` + `bossRoomPrefab = BossRoom`. So the run is **10 combat levels**. All satisfy the room contract (CameraBounds / GirisNoktasi / ExitDoor), and only `hub` has a `HubMarker`.
-
-**GenLevel7/8/9 were brought up to the current rules IN PLACE (2026-08-14)** — never by re-import, for the reason immediately below. Four things had drifted, all found by auditing against GenLevel10 (the only generated room built under current rules):
-
-1. **The backdrop was six tiles of a sixty-four piece wall.** `TX Tileable - Dungeon Wall` is one seamless 8×8 picture; the old importer held six pieces and scattered them randomly. **That is why generated rooms never looked like the hand-made ones.** Now 64/64, assembled via `BackWallIndex`. ⚠️ Only cells that ALREADY held a tile were rewritten — the designer erased backdrop tiles by hand in these rooms and filling every empty cell would silently undo that.
-2. **`Ground Dirt_13 Solid`** floating-collider cells (14 of them). See the tile section above.
-3. **Overlapping spikes** — 1.55 wide placed 1.00 apart. Re-spaced to GenLevel10's 1.67 pitch about each run's original centre. No spikes removed; the floor runs had room for their existing count all along.
-4. **Every mid-air platform was `Ground_11` repeated per cell** (GenLevel8 had 86 cells of it and nothing else) — these rooms predate `StampPlatformShapes`. Re-stamped as decomposed whole shapes, plus 11 new **vertical** pieces (pillars, boxes, blocks) added additively so they cannot make an exit unreachable.
-
-⚠️ **RE-STAMPING NARROWED THE PLATFORMS, and this is a real gameplay change.** `Ground_11` is 3 units of art on a 1-cell stamp with Sprite collision, so painting it per cell overlapped it three deep AND spilled past both ends. Measured on a 7-wide run: collision ran x=5.0–15.0 for cells 6..12 — a cell too far left, two too far right. It is now exactly 6.0–13.0, the run as drawn. The old width was a bug, but it is a bug those rooms were playtested with.
-
-⚠️ **THE `.txt` IS NO LONGER THE SOURCE OF TRUTH FOR `GenLevel7/8/9` (2026-08-09).** The designer has hand-edited the built prefabs — moved loot, placed a Blompo, erased tiles. **Re-importing any of them from its text file DESTROYS that work**, and also renumbers every fileID so `LevelManager.roomPrefabs` loses its reference. Edit these rooms in the Unity editor, or if a text re-import is genuinely needed, diff the prefab first and re-apply the hand edits afterwards. `GenLevel8` has carried hand-tuning since 2026-08-08; 7 and 9 now do too.
-
-**Tier tags (2026-08-08):** the three importer-built rooms carry `RoomTier` — `GenLevel7` **Fight** (horizontal corridor), `GenLevel8` **Fight** (vertical shaft), `GenLevel9` **Elite** (loop; the pool's first Elite room). The seven originals stay untagged and therefore serve every tier, so eligibility is **7 Skirmish / 9 Fight / 8 Elite**. Verified by driving the real `PickNextRoomPrefab`.
-
-#### Room inventory — relevant to the planned map system (audited 2026-07-18)
-
-**24 prefabs in the project satisfy the FULL room contract, but only 9 are wired into LevelManager.** That means ~15 contract-valid rooms are sitting unused:
-- **`Assets/LevelGenerated/`** — `GenLevel1..9`, `TestRoom1`, `ToyboxTest`, `ToyboxTest 1` (12 rooms, importer output). **`GenLevel7` (Fight, horizontal corridor), `GenLevel8` (Fight, vertical shaft) and `GenLevel9` (Elite, loop) are the three built to the corrected movement budget and passing `LevelValidator`** — the earlier six predate it and several fail. All three still need a `RoomTier` component and a slot in `LevelManager.roomPrefabs` before they enter the run.
-- **`Assets/LevelSinasi/CainosLeveller/`** — `kuzeymap`, `Room_Easy_01`, `sinasiBigLevel` (3 rooms).
-- **Legacy/retired** — `Assets/LevelEfeS/old_levels/` (`-1`, `0`) and `Assets/LevelEfeVrl/Old Levels/EfeVrl2`. (`Old Levels/` also holds the six contract-INCOMPLETE retirees listed below; the folder was consolidated from a stray `Assets/LevelEfeVrl 1/` copy — don't be surprised by the git rename.)
-
-**Why this matters:** the map system's blocker was framed as "we need to build many more levels." The truer statement is **"a dozen contract-valid rooms already exist and need quality/correction passes, not creation from scratch."** That is a much cheaper path to the ~15-30 rooms a map needs.
-
-**Rooms that would BREAK if naively added to the pool** (incomplete contract — verified): `efeslevel4` has CameraBounds + GirisNoktasi but **no ExitDoor** (unfinishable). `EfeVrl1`, `EfeVrl3`, `EfeVrlLevel1..4` (all six now under `Assets/LevelEfeVrl/Old Levels/`), plus `kuzeymap2`, `kuzeymapv1`, `CainosLevel`, are **missing `CameraBounds`** (camera would not clamp). Always re-check the three-part contract before adding a room to `roomPrefabs`. (Note: `CameraBounds.prefab`, `GirisNoktasi.prefab`, `MainMenu`, `GameOverScreen` also match the scan but are shared components/UI, not rooms.)
-
-### Run Map — BUILT AND WORKING END TO END (2026-08-06)
-
-**The whole system is done and verified in play mode: graph, generator, room routing, and the `M` screen.** Run order is driven by the graph, not by a shuffled pool — the section below describes the pre-map order, which survives only as a fallback.
-
-| File | Role |
-|---|---|
-| `RunMap.cs` | `MapNodeType` / `RechargeType` enums, `MapNode`, `RunMap`. Pure data + queries, no Unity types. `Validate()` and `ToAscii()` live here. |
-| `RunMapGenerator.cs` | `RunMapSettings` (Inspector-tunable) + the carving generator. |
-| `RunMapManager.cs` | Singleton owning the act and the player's position. **Self-bootstraps** via `RuntimeInitializeOnLoadMethod` — no scene wiring. Also owns the `M` key. |
-| `RunMapScreen.cs` | The map UI. Procedural, self-instantiating, Verdigris theme. |
-| `MapGlyphs.cs` | Procedural node + recharge symbols. |
-| `RoomTier.cs` | Marker on a room prefab root declaring which tier it serves. |
-
-**Where the choice happens:** `LevelManager.AdvanceToNextRoom()`, called by `ExitDoor`. (It used to be `RewardManager.FinishReward()`; that screen was deleted 2026-08-09 and the hook moved with it.)
-
-⚠️ **THE MAP OPENS ON EVERY ROOM CHANGE — the "skip it when there's only one branch" rule was WRONG and is reverted (2026-08-09).** The original reasoning was that a screen with a single button is ceremony, not a decision. Measured over 200 generated acts, **62% of room transitions offer exactly one option**, and planning with `M` suppressed the screen for another — so the player crossed several rooms without the map ever appearing and reported it as *"I open the map and I'm 2-3 floors ahead of where I should be."* Nothing was corrupt: the same 200 acts gave **0 invalid maps, 0 dead ends, and every step advanced exactly one floor**. The bug was that the run's only sense of PLACE was hidden whenever it had nothing to ask. Orientation beats the saved click.
-
-⚠️ **The zero-options guard in `AdvanceToNextRoom` is load-bearing.** On the boss node `AvailableNext()` is empty, and a map opened for a required choice refuses Escape and the backdrop — so opening it with nothing clickable is an unescapable screen. Verified: leaving the boss skips the map and starts the next act. `M` opens the same screen in planning mode: clicking marks a branch and stays open. In forced mode Escape, `M` and the backdrop all refuse to dismiss it, and clicking commits and continues the run.
-
-⚠️ If `RunMapScreen` can't find a Canvas, `OpenForChoice` **invokes its callback anyway**. A missing Canvas must never strand the run in a room with no way forward.
-
-**Things that will bite you if you forget them:**
-
-- ⚠️ **Recharge rooms are an ATTACHMENT to a node (`MapNode.recharge`), NOT a node.** Modelling them as nodes would make them floors, which the design forbids. `LevelManager` spawns the combat room first, then the recharge room, *without advancing the map* (`pendingRecharge`).
-- ⚠️ **Only Fight and Elite may carry a recharge room, never Skirmish.** That is the entire run economy, not a tuning value — `Validate()` re-asserts it so it can't rot.
-- ⚠️ **The map never promises a room it cannot spawn.** Recharge types are generated only for the prefab slots assigned on `LevelManager` (`foundryRoomPrefab` / `marketRoomPrefab` / `wellRoomPrefab`). **All three are empty today, so acts currently draw ZERO recharge icons.** Each type starts appearing the moment its prefab is assigned — nothing else to do.
-- **Untagged rooms serve every tier.** The 7 existing rooms predate `RoomTier`, so requiring tags would have meant a broken map until a chore was finished. Tagging narrows a room; not tagging costs nothing.
-- `ToAscii()`'s edge rows show **direction from the source column**, not lines to scale — a wide fan-out (the hub does this) renders as one `\|/`. Use `Validate()` or the raw `next`/`prev` lists to confirm a specific connection.
-- **`RunMapManager` is scene-local, no `DontDestroyOnLoad`** — a map is per-run and must reset on death, exactly like QuestSystem's quests.
-
-**Measured behaviour** (500 seeds, 2000 random routes, default settings — 8 floors, width 5, 4 paths): 0 invalid acts, 0 uniform floors. Per route: **2.34 Skirmish / 2.39 Fight / 1.28 Elite**, **1.44 recharge rooms** (min 0, max 5), and **55% of random routes never pass a Market**. That last number is the one to watch — it is fine if the player can *see* the Market and route to it, and bad if they can't; re-measure it once the map screen exists.
-
-`BreakUniformFloor` exists because the late-floor weights produced all-Elite rows often. A floor where every branch is the same type is a toll, not a choice, which defeats the reason difficulty is the node type at all.
-
-**Traps hit while building the screen — don't re-learn them:**
-
-- ⚠️ **`Image.Type` defaults to `Simple`.** The window outline is a 26px 9-sliced sprite; left at Simple it was stretched across the whole 1040×780 window and rendered as an enormous soft octagon hanging outside the panel. Any FlatUI `Panel`/`Outline` used at panel scale **must** be set to `Image.Type.Sliced` explicitly — the local `AddImage` helper does not do it for you.
-- **Text pivots.** A label positioned by offset with a centred pivot places its BOX centre, so a 34px-tall label put its first line back on top of the glyph it was labelling. Pivot to top (or bottom) whenever the offset is meant to clear something.
-- **Node labels must be narrower than they look like they need to be** — neighbours on a floor sit about one column apart minus jitter, and 150px labels collided on any floor that filled up. Horizontal jitter is deliberately tighter than vertical for the same reason.
-- **`pathCount` must match `width`**, or no route ever starts in the centre column and the act draws as two arcs around an empty middle.
-- ⚠️ **Deferred `Destroy` will bite any test that clicks a map button.** `Refresh()` deactivates old nodes before destroying them, but they survive until end of frame, so `GetComponentsInChildren<Button>(true)` still returns the PREVIOUS chart's buttons — whose listeners point at nodes that are no longer reachable, so the click silently does nothing. Filter on `activeInHierarchy`. This produced a convincing false "callback never fired" failure.
-
-### `roomPrefabs` emptied for testing — RESTORED 2026-08-06
-
-Kept as a diagnostic pointer, because the symptom is confusing. Commit `2f236ad` ("h") left `LevelManager.roomPrefabs` holding only `[0] hub` — the designer had emptied it for a test. The map still generated fine, but every combat node failed to spawn, logging *"no combat room available"*, and the player never left the hub.
-
-Restored to the full 8 (hub + `efeslevel1-3` + `EfeVrl4-7`) by resolving the GUIDs recorded in `b2760be`, so the list is byte-identical to what it was rather than rebuilt by filename.
-
-**If the run stops advancing past the hub, check this list first** — an empty or short `roomPrefabs` looks like a map bug and isn't one. It happened again on 2026-08-08 (found as `[hub, <NULL>]`) and was restored, again by resolving the GUIDs from the scene's last commit rather than re-picking by filename.
-
-⚠️ **DELETING AND RE-IMPORTING A PREFAB SILENTLY NULLS EVERY REFERENCE INTO IT.** The `<NULL>` above was a room the designer had slotted for testing. Re-importing a level (`delete the .prefab`, then `Build` again) **keeps the asset GUID** — the `.meta` survives — but **renumbers every fileID inside the prefab**. A scene reference is `{fileID, guid}`, so the guid still resolves while the fileID matches nothing: the link looks valid in YAML and reads as `null` in the Inspector. Before deleting a generated room prefab, check whether anything points at it, and re-assign afterwards. This is why `GenLevel8` is re-tagged via `PrefabUtility.LoadPrefabContents` + `SaveAsPrefabAsset` rather than a rebuild.
-
-### Run Order — the pre-map order, now a FALLBACK ONLY (reworked 2026-07-02, superseded 2026-08-06)
-
-⚠️ **This is no longer how the run is ordered.** `PickNextRoomPrefab()` routes through the map (above); the logic below now lives in `PickNextRoomPrefabWithoutMap()` and runs only if `RunMapManager.instance` is somehow null. It is kept as a *named, obvious* fallback because a missing manager silently reverting to random rooms would look almost right.
-
-`LevelManager` was changed from an endless-refill pool (which repeated the same level forever) into a **finite, structured run**:
-
-1. **First room is always the hub** (`roomPrefabs[0]`), and `BuildLevelQueue()` fills `availableRoomIndices` with indices `1..n`.
-2. **Then every other pool level, once each, in random order (no repeats)** — pulled from `availableRoomIndices` until empty.
-3. **Pool exhausted → the boss room** (`bossRoomPrefab`, gated by a `bossSpawned` flag so it only happens once).
-4. **After the boss (or if no boss is assigned) → reset the flags and loop back to the hub** for a fresh run.
-
-So a run is: **hub → each combat level once (random) → boss → (loop to hub)**. The old `RefillRoomPool()` and index-stripping logic are gone; `hasSpawnedFirstRoom` + `bossSpawned` are the state.
-
-**Inspector requirements:** assign the BossRoom prefab to the new **`Boss Room Prefab`** slot (and REMOVE it from `roomPrefabs` if it was ever in the pool). The boss room prefab must satisfy the same room contract as every other room — a **`CameraBounds`** child (zone `BoxCollider2D`s) and a **`GirisNoktasi`** entry-point child — or the camera/spawn won't set up. Leaving `Boss Room Prefab` empty just loops hub→levels→hub.
-
-If/when proper scene flow gets built (player starts in hub from main menu, returns after death/run completion), this loop-back should be revisited.
-
----
-
+📐 **Rooms have their own loadable skill: `.claude/skills/deckshift-levels/SKILL.md`.** The full
+Level Design Laws with their reasoning, the ASCII importer and every tile-painting rule, the
+validator's measured movement budget, doors/gates, the room pool inventory, and the run map all live
+there. **Invoke it (`/deckshift-levels`) before authoring, importing, validating or debugging a
+room, or before touching `LevelManager`, tiles, gates or the exit door.** What follows is only what
+must be true even when you are nowhere near a room.
+
+### The Level Design Laws — titles only (full text and reasoning in the skill)
+
+1. **Every level must be completable with ONLY jumping and moving.** Cards, fans, elevators and
+   trapdoors may gate *optional* things — never the exit. This one constrains card and mechanic
+   design too, which is why it is here and not only in the skill.
+2. Mandatory rises at **4** tiles (the character jumps ~5-6); flat gaps ≤ 5-6.
+3. Hazard pits on the mandatory path must be escapable and crossable unaided.
+4. **No one-way (`=`) platforms.**
+5. Turrets (`t`) only on walls/ceilings — so never in generated rooms.
+6. The player has **no wall-breaking attack**; never design a secret that needs terrain destroyed.
+7. **Entry and exit must be far apart**, separated by whole chambers — a Phase/Portal must never skip
+   the level.
+8. **The spawn is a safe beach.** No enemy on the spawn's ground run, and nothing with line of sight
+   to it. Enforced by `LevelValidator`.
+
+### The room contract — three parts, all required
+
+A room prefab must have a **`CameraBounds`** child (exact name, case-sensitive — zone
+`BoxCollider2D`s), a **`GirisNoktasi`** entry point, and an **`ExitDoor`**. Miss `CameraBounds` and
+the camera never clamps, so at wide aspects you see straight past the art into undressed space; miss
+`ExitDoor` and the room is unfinishable. **Always re-check all three before adding a room to
+`LevelManager.roomPrefabs`** — ~15 contract-valid rooms exist unused, and several near-misses do not
+satisfy it.
+
+⚠️ **`LevelManager.roomPrefabs` HAS BEEN WIPED FOUR TIMES, and it does not announce itself.** Element
+0 must be the hub; 1..n are the combat rooms; the boss has its own `bossRoomPrefab` slot. When the
+list is short or holds a scratch room, there is **no hub** (so no sandbox first room, no quest board,
+no forge), every room in the run is the same room, and if the stand-in lacks `CameraBounds` the camera
+stops clamping. The only console clue is one Turkish line, `CameraBounds objesi bulunamadı!`, which
+reads like ordinary noise. **When anything about a run feels wrong — no hub, repeated rooms, a camera
+showing the void — read this list before debugging the map or the camera.** Restore it by resolving
+the GUIDs recorded in the last good commit, never by re-picking prefabs by filename.
+
+⚠️ **The `.txt` is NOT the source of truth for `GenLevel7/8/9/10`.** The designer has hand-edited the
+built prefabs. Re-importing destroys that work **and** renumbers every fileID, which silently drops
+the room out of `roomPrefabs` (the reference keeps a valid guid pointing at a fileID that no longer
+exists, so it reads as `null` in the Inspector while looking fine in YAML). Edit these in the editor.
+
+⚠️ **Actors live at `PlayPlane.Z`; everything else is behind it.** `PlayPlane.Apply(room)` runs on
+every spawn and is why props no longer render over the player. Do not hand-tune prop Z.
+
+**Active scene is `Assets/Scenes/SampleScene.unity`.** Other scene files exist but are inactive or
+legacy — check SampleScene first when debugging "is this in the scene?".
 ## Enemy System
 
 ### Card & Enemy Numbers — see `CardAnchors.md`
@@ -1283,6 +1154,120 @@ And the player's carefully-placed capsule was **never consulted** for any of it.
 - **MeleeEnemy**, **RangedEnemy** — based on Cainos pack patterns.
 
 **`TakeDamage(float damage, Transform damageSource = null)` does not currently track damage source.** Spike or hazard kills would credit the player's kill counter the same as direct kills. Minor concern; flag if it becomes design-relevant.
+
+### ⚠️ The AI pass of 2026-08-20 — three things that were wrong for a long time
+
+The designer reported that enemies "don't mix well with terrain", "work kind of bad", and that **"the
+player can push the enemies around — this should not be able to happen."** All three were real.
+
+**1. THE PLAYER WAS A BULLDOZER.** Player is Dynamic at **mass 1.0**; enemies were Dynamic at 3–10.
+Two dynamic bodies resolve overlap by shoving *both*, and `PlayerController` **assigns
+`rb.linearVelocity` directly every FixedUpdate**, so a collision can never slow the player — all the
+resolution went into moving the enemy. Fixed by raising every enemy body to **mass 500**.
+
+⚠️ **Mass is free here, and that is the whole reason it is the right tool.** `MonsterController`
+assigns `rb.linearVelocity` directly and gravity is `gravityScale`-based, so **neither locomotion nor
+falling depends on mass** — it affects collision response and nothing else. Verified that nothing in
+the project ever pushes an enemy body with a force (the Moss Knight assigns velocity, which is
+mass-independent). Measured with a coasting player: **old mass shoved a Shambler 0.536 units, new
+mass 0.003.**
+
+⚠️ **SIDE EFFECT, AND IT IS A REAL GAMEPLAY CHANGE: the player is now BLOCKED by enemy bodies**
+(measured: the player stops at x 5.69 where it used to barge through to 6.23). Dash does not disable
+collision (only Phase does), so dashing into an enemy now stops you. If that reads badly, the
+alternative is to stop Player↔Enemy colliding at all — but that needs the layer split below fixed
+first, and it changes head-bounce/Pogo Boots.
+
+**2. MELEE ENEMIES ATTACKED BACKWARDS.** `MonsterController.cs:226` only writes `pm.Facing` while
+`inputMove.x != 0`, and every melee AI sets it to **zero** to stand and swing — so an enemy kept
+whatever facing it arrived with while `EnemyMelee` still resolved the hit on the player's real side.
+`RangedEnemyAI` and `ZombieSpitterAI` already carried an explicit per-frame facing line (with a
+comment naming the bug); **`MeleeEnemyAI`, `SlimeAI` and `MimicAI` never got it — 49 of the pool's 77
+enemies.** All three now face every frame. Verified: the enemy turns while `inputMove.x` is still
+0.00, proving the turn comes from the new line and not from the controller.
+
+⚠️ Partly masked in play, which is why it survived: knockback usually shoves the player back out of
+attack range, which restarts walking and re-faces the enemy. It bites when you get behind a *stopped*
+enemy — i.e. after a dash.
+
+**3. NOTHING COULD SEE.** No ground AI checked line of sight at all: spitters lobbed acid through
+solid rock, melee walked into the wall between them and the player, and **`Turret` was a bare
+`while(true)` with no range check and no LOS**, firing every `fireRate` seconds from room spawn.
+Projectiles travel `speed × lifeTime` = 10 × 3 = **30 units** against a ~25-unit screen, so turrets
+shot the player from off screen, out of walls, the whole time the room was loaded. `EnemySenses` is
+now the one place that answers "can it see me", and Turret gained `range` (13) + LOS.
+
+⚠️ **Sight ACQUIRES, memory KEEPS** (`EnemySenses.Memory` 2.5s). Gating the chase on "can see right
+now" makes a *worse* enemy — it freezes the instant you step behind a pillar and unfreezes after,
+which reads as a stutter rather than as awareness.
+
+⚠️ **CAST FROM THE CHEST, NOT THE FEET.** Enemy transforms are grounded at floor level by the level
+importer, so a ray from the origin starts inside the floor tile. Measured on a completely clear line:
+`eyeHeight 1.0 → CanSee true`, `eyeHeight 0.0 → CanSee FALSE`. Same class of bug as the player's old
+`wallCheck` returning true on flat ground.
+
+⚠️ **An unset `LayerMask` serializes as 0, which as a raycast mask means "hit nothing" — i.e. it would
+silently disable line of sight entirely.** `EnemySenses.ResolveBlockers` therefore falls back to
+Ground, so a forgotten Inspector slot degrades to CORRECT behaviour rather than to no behaviour.
+
+⚠️ **TESTING TRAP that produced two false results in a row.** `Physics2D.simulationMode` is
+`FixedUpdate`, so **`Physics2D.Simulate()` called from `execute_code` does nothing** — a push test
+using it reported 0.0000 for both the old and new mass and looked like proof. And placing the test
+player by offsetting from an enemy buries them inside terrain, so every LOS check returns false and
+looks like the feature is broken. **Stand the test player on a real floor found by raycast, and
+always run the control to confirm the test can still detect the bug.**
+
+**Still open, deliberately not done:** enemies still never jump (`inputJump` is written exactly once
+in the whole AI codebase, in `SlimeAI.cs`, as `false`), so they still stop dead at ledges; and
+`MeleeEnemyAI` still does not patrol, so 27 enemies stand frozen until aggroed. Both change
+difficulty and were left for the designer to call.
+
+### ⚠️ The bat (`BatMan.prefab` + `AeroBatAI`), rebuilt 2026-08-20
+
+Reported as "really bad… maybe doing it from scratch might be easier". It did not need rebuilding —
+the Cainos rig and `AC Bat` controller render well. It needed five things fixed:
+
+**1. IT NEVER ATTACKED WHEN NEAR TERRAIN — the big one.** `CheckForPlayer` raycast from
+`transform.position`, and `Physics2D.queriesStartInColliders` is ON, so a bat hovering against a
+ceiling or ledge — *which is where bats hang* — started its sight ray INSIDE that tile and got
+**"blocked by Ground at distance 0.00"**. Measured live. Such a bat is inert for its whole life.
+Now routed through `EnemySenses`, which skips `StartSkip` (0.35) units of ray before testing. 0.35 is
+safe against seeing *through* anything, because level geometry is on a 1-unit grid.
+
+**2. THE TELEGRAPH WAS AN UNREADABLE RED BOX.** The wind-up showed a plain red `Square` sprite above
+the bat — at almost exactly the height of the enemy health bar, which is **also a red bar**. They
+overlapped and were indistinguishable, so the dive effectively had no warning. ⚠️ **Deleted, and the
+bat itself is the telegraph now: it REARS BACK away from you and flushes hot (`windUpTint`) before it
+commits.** Anticipation is the oldest and most readable tell there is, it needs no icon or new art,
+it cannot be confused with a health bar, and it shows *which way* the dive is coming because the
+recoil runs along the same line. The Cainos monster shader exposes `_Color` (unlike the PLAYER rig's
+"Alpha Cut", which exposes no colour property at all), so the flush is a `MaterialPropertyBlock`.
+
+⚠️ **The recoil is applied in `FixedUpdate`, not in the coroutine that times it.** The body is
+Kinematic, so `MovePosition` belongs on the physics step; driven from a coroutine it stutters. The
+coroutine publishes `prepK` and FixedUpdate consumes it.
+
+**3. NO COOLDOWN BETWEEN DIVES.** It re-acquired on the frame it arrived home. Measured: it killed a
+full-health player in a few seconds *while the test was still being set up*. `diveCooldown` 1.1s.
+
+**4. COMPENSATING SCALES.** Root was **0.40** with the visual child at **2.88** to cancel it out —
+the same corruption shape as the old CardTemplate. Root is now (1,1,1) with the factor pushed down
+into the child, **and the PolygonCollider2D's 150 points scaled by the same 0.40**, since points are
+local and would otherwise have grown 2.5×. Verified a no-op: drawn bounds 1.753 × 1.761 and collider
+1.627 × 1.623 **before and after, to three decimals**.
+
+**5. Root position was `(-66.88, 19.79)`** (left over from being dragged out of a scene) and the
+**layer was Default(0)**; now origin and Enemy(11). Health bar offset 1.00 → 0.62, which was a full
+unit above a bat only 1.75 tall.
+
+⚠️ **`Collider2D.bounds` on a PREFAB ASSET reads (0,0,0)** — it is only real on an instance. This
+looked exactly like a degenerate collider and nearly got "fixed"; instantiate before believing it.
+
+⚠️ **`AeroBatAI.startPos` is captured once in `Start()`**, so teleporting a bat to test it does not
+stick — `IdleBehavior` flies it back. Respawn at the position you want instead.
+
+Still true: `Assets/Prefabs/AeroBat.prefab` remains a legacy husk (a SpriteRenderer with concept art
+and **no AI at all**). `BatMan` is the real one and the importer's `b` marker uses it.
 
 ### Layer Convention Mismatch (Known Issue)
 
@@ -1554,6 +1539,46 @@ Verified by regression test: temporarily re-introducing the `warningSoundClip` n
 auditor flag it immediately. Note that restoring a value by **assigning** it creates a PINNED override —
 always fix these with `PrefabUtility.RevertPropertyOverride`, not by re-typing the value.
 
+### Screen gallery (2026-08-16) — photograph every screen at every aspect
+
+`Assets/Scripts/Editor/ScreenGallery.cs`, menu **Deckshift → Screen Gallery**. Walks all 13 full-screen
+UIs, captures each at **4:3 / 16:9 / 21:9**, and writes an HTML contact sheet to
+`<project>/ScreenGallery/<timestamp>/` (gitignored). It is the **baseline** for the planned typography
+and `GameScreen` work, and the **regression net** afterwards — every screen here is procedural, so
+nothing else catches one that silently stopped opening, dropped out of the font system, or overflows a
+narrow aspect.
+
+⚠️ **It requires Play mode and deliberately will not start one.** Entering play mode domain-reloads and
+would wipe the run's state mid-flight.
+
+⚠️ **Waits are WALL CLOCK, never `Time.deltaTime`.** Every screen pauses the game (`timeScale = 0`) and
+animates on unscaled time, so a scaled wait hangs forever on the first modal. It also shoots after a
+settle delay rather than on the build frame — a screenshot taken on the frame a UI is built shows the
+AUTHORED colours, not the animated ones.
+
+⚠️ **Aspect is changed by driving the Game View's own size dropdown** (reflection into
+`UnityEditor.GameView.selectedSizeIndex`), so the capture is genuinely 2560x1080 rather than a
+letterboxed 16:9. That matters because the canvas matches on HEIGHT, so **width is what flexes and
+width is what breaks screens**. The original size is restored on finish or abort.
+
+⚠️ **It stages the run first** (gold, scrap, relics, a damaged card, a blessed card, an exhausted card,
+a shopkeeper) because several screens deliberately collapse to one explanatory line when empty — an
+empty forge is a misleading thing to photograph as "the forge". All of it is play-mode state, discarded
+on Stop.
+
+⚠️ **A screen that fails to open records the failure and the run continues.** A regression net that
+aborts on the first broken screen reports one problem per run.
+
+⚠️ **The close path is reflection onto a private `Hide()`/`Close()`.** Every screen owns its own
+dismissal and none expose a public close, so the tool reaches in. `ScreenDef.DestroyOnClose` exists for
+screens whose `Hide()` is not a full teardown. **If a shared screen base class ever lands, this whole
+section collapses into one virtual call** — that is the strongest argument for building it.
+
+**A leaking screen is the failure mode to fear, so it is checked explicitly.** `CameraCensus` records
+every enabled camera drawing to the screen before the run and warns if a screen leaves a new one behind.
+A screen that leaks something *rendering* does not fail loudly — it composites itself into every capture
+that follows and the run finishes "successfully" with wrong pictures.
+
 ### Visual inspection via MCP screenshots (2026-07-18)
 
 Claude Code CAN see the running game — this is the fix for "I can't judge how it looks." The reliable recipe (via `execute_code`):
@@ -1621,7 +1646,7 @@ Use this liberally to verify visual changes, diagnose "it looks wrong" reports, 
   - ⚠️ **AND THE REASON THE FIRST ATTEMPT SILENTLY FAILED IS WORTH KEEPING:** it tested candidates using `capsuleCollider.bounds`. **`Physics2D.autoSyncTransforms` is OFF by default**, so a collider's `bounds` still report the player's PREVIOUS position until the next physics step — and this code tests positions the player hasn't moved to yet, then moves and re-checks. The search "found" a clear spot, teleported there, and left the player just as embedded. Both `IsPositionClear` and `IsCollidingWithGround` now derive the box from `transform.position + capsuleCollider.offset` (exact, because the player root is guaranteed scale (1,1,1)). **Never read a collider's `bounds` in the same frame you moved its transform.**
 - ~~**Comet Dive identity loss**~~ — **RESOLVED (verified 2026-07-26).** Comet Dive was redesigned into an AoE **dive-blast** (`StartCometDive`/`LandCometDive`: fast downward slam → `Physics2D.OverlapCircleAll` damage at `cometRadius`/`cometDamage`, with a `CometDiveVFX` telegraph while falling). It is no longer the single-target head-bounce; the two are distinct.
 - ~~**Head bounce + gravity reversal**~~ — **RESOLVED (verified 2026-07-26).** All head-bounce branches now flip on `isGravityReversed` (see Head Bounce section). Head-bouncing works upside-down.
-- **Duplicate ExitDoor possible in some room prefabs:** defensive guards now in place but the scene-side duplicate (if any) hasn't been cleaned up.
+- ~~**Duplicate ExitDoor possible in some room prefabs**~~ — **RESOLVED 2026-08-19.** It was never "some rooms": the duplicate was baked into `Assets/Prefabs/ExitDoor.prefab` itself, so **37 of 39 rooms had it**, and one keypress ran `PerformExit()` twice. See Level System → Doors.
 
 ### ⚠️ Runtime spawns must not outlive their room (fixed 2026-08-11)
 
@@ -1668,7 +1693,7 @@ The `CardTemplate` prefab has fundamental scale corruption: root scale is non-un
 
 ### Content (TODO)
 
-- Scale to 60+ cards (currently **16 assets in `Assets/Cards/`, ~14 genuinely playable** — `Stagger` is the fail-state card, `AnaKartVeritabanı` is the database asset). **This is the single biggest content gap and it gates both the map system and card enhancements.**
+- Scale to 60+ cards (currently **18 assets in `Assets/Cards/`, 16 genuinely playable** — `Stagger` is the fail-state card, `AnaKartVeritabanı` is the database asset). **This is the single biggest content gap and it gates both the map system and card enhancements.** The two archetypes the GDD names are the thinnest lines in the deck: **Glass has 2 cards** (Glass Wail, Glass Parry) and **Vampiric has 1** (Vampiric Bite), against 6 movement / 4 attack / 3 utility.
 - Glass archetype: cards exist in theory, not implemented.
 - Expand Vampiric archetype.
 - Three-act structure: Act 1 prototype exists; Acts 2-3 not started.

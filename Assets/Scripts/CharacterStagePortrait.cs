@@ -26,6 +26,19 @@ public class CharacterStagePortrait : MonoBehaviour
     private const float PLOT_SPACING = 60f;
     private static readonly Vector3 StageOrigin = new Vector3(3000f, -3000f, 0f);
 
+    // ── Framing ─────────────────────────────────────────────────────────────────────────────────
+    // Public because the select screen has to STAND the character on something, and the only way to
+    // know where the feet land inside the texture is to know how the camera is framed.
+    //
+    // ⚠️ These are consts rather than numbers typed into `BuildCamera`, so `FeetFraction` cannot go
+    // stale. The screen positions every figure by that fraction; a camera re-frame that left it
+    // behind would silently sink the whole roster into the floor or float it above the line.
+    public const float CAM_Y = 1.05f;      // the rig's origin is at its FEET, so look above it
+    public const float CAM_SIZE = 1.35f;   // orthographic half-height, in world units
+
+    /// <summary>Where world y = 0 (the character's feet) falls inside the texture. 0 = bottom edge.</summary>
+    public static float FeetFraction { get { return (0f - (CAM_Y - CAM_SIZE)) / (CAM_SIZE * 2f); } }
+
     public static CharacterStagePortrait Create(CharacterData character, int index, int width, int height)
     {
         if (character == null || character.appearancePreset == null) return null;
@@ -85,12 +98,11 @@ public class CharacterStagePortrait : MonoBehaviour
 
         var camGO = new GameObject("PortraitCamera");
         camGO.transform.SetParent(parent, false);
-        // Framed on the body: the rig's origin is at its FEET, so the camera has to look above it.
-        camGO.transform.localPosition = new Vector3(0f, 1.05f, -10f);
+        camGO.transform.localPosition = new Vector3(0f, CAM_Y, -10f);
 
         cam = camGO.AddComponent<Camera>();
         cam.orthographic = true;
-        cam.orthographicSize = 1.35f;
+        cam.orthographicSize = CAM_SIZE;
         cam.cullingMask = 1 << layer;                 // only this stage, never the menu behind it
         cam.clearFlags = CameraClearFlags.SolidColor;
         cam.backgroundColor = new Color(0f, 0f, 0f, 0f);
@@ -100,12 +112,25 @@ public class CharacterStagePortrait : MonoBehaviour
         cam.depth = -50;                               // renders before the menu camera
     }
 
-    // Dormant characters are FROZEN, not merely dim. Stillness is what makes the row read as
-    // statues waiting in the dark, and it means the one you are on is the only thing moving —
-    // which is a stronger selection signal than any highlight.
+    // Unchosen characters are FROZEN, not merely dim. Motion is the second selection signal and it
+    // costs nothing: the one you are on is the only thing breathing.
     public void SetAwake(bool awake)
     {
         if (animator != null) animator.speed = awake ? 1f : 0f;
+    }
+
+    /// <summary>
+    /// Switch the whole plot — rig, animator and camera — off while nobody is looking at it.
+    ///
+    /// ⚠️ **THE PLOTS ARE SCENE-ROOT OBJECTS, NOT CHILDREN OF THE SCREEN.** They have to be: they
+    /// live in world space 3000 units away, and the screen is a UI RectTransform. So hiding the
+    /// screen does NOT stop them — without this, one camera per character goes on rendering a
+    /// 420x614 target every frame for the rest of the session, through the whole run, for a menu
+    /// the player left minutes ago.
+    /// </summary>
+    public void SetStageActive(bool active)
+    {
+        if (gameObject.activeSelf != active) gameObject.SetActive(active);
     }
 
     private static void SetLayerRecursive(Transform t, int layer)
