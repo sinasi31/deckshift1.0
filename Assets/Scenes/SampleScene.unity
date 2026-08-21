@@ -4426,7 +4426,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerTransform: {fileID: 5274940026035738714}
   roomPrefabs:
-  - {fileID: 7215409108797724559, guid: e9eeb1e4ce488f843bf2d375efdfb2a4, type: 3}
+  - {fileID: 8313309215655545852, guid: eb58f13b4505df043bd9c7199d8e672d, type: 3}
   bossRoomPrefab: {fileID: 5541417418447933751, guid: ff595fd158fe26a43874b0d5a704a9c9, type: 3}
   foundryRoomPrefab: {fileID: 0}
   marketRoomPrefab: {fileID: 0}
