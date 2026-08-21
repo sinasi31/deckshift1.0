@@ -204,7 +204,7 @@ MonoBehaviour:
     m_Bits: 8
   edgeCheckOffsetX: 0.5
   edgeCheckDepth: 1
-  attackSound: {fileID: 0}
+  attackSound: {fileID: 8300000, guid: 60f3614752a0ae54b9fc2387eb58804b, type: 3}
   attackVolume: 1
 --- !u!1001 &503869603661458961
 PrefabInstance:

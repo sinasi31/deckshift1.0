@@ -675,6 +675,233 @@ public static class ProcSfx
     }
 
     // =============================================================================================
+    // THE SILENT SLOTS — sounds for things that currently make none.
+    //
+    // ⚠️ THIS IS WHERE THE GAME'S SILENCE ACTUALLY LIVES, and it is NOT the SoundBank. Measured
+    // 2026-08-21: 75 AudioClip fields across our 172 prefabs are NULL, and `SfxManager.PlayOn` with
+    // a null clip is a silent no-op — so every melee enemy swings without a sound (15 prefabs), no
+    // breakable wall makes a noise (13), no spitter spits (8), no Shift Altar responds (12).
+    // Meanwhile `Sfx.Play` has ONE call site, so filling the SoundBank would have built a library
+    // nothing reads. Fill the slots first; migrate the architecture after.
+    //
+    // Six clips here cover 54 of the 75 slots. They are baked to real .wav assets and assigned by
+    // `Deckshift → Fill Silent Audio Slots`.
+
+    private static AudioClip zombieSwing, spitterSpit, wallBreak, altarPay, altarRefuse, crystalCollect;
+
+    /// <summary>A heavy, unskilled swing: mass moving through air, and a wet grunt behind it.</summary>
+    public static AudioClip ZombieSwing
+    { get { if (zombieSwing == null) zombieSwing = BuildZombieSwing(); return zombieSwing; } }
+
+    /// <summary>The spitter's launch — a wet gather and a release.</summary>
+    public static AudioClip SpitterSpit
+    { get { if (spitterSpit == null) spitterSpit = BuildSpitterSpit(); return spitterSpit; } }
+
+    /// <summary>Masonry giving way: a crack, then rubble.</summary>
+    public static AudioClip WallBreak
+    { get { if (wallBreak == null) wallBreak = BuildWallBreak(); return wallBreak; } }
+
+    /// <summary>The altar takes your Shift. Harmonic, rising, and it RESOLVES.</summary>
+    public static AudioClip AltarPay
+    { get { if (altarPay == null) altarPay = BuildAltarPay(); return altarPay; } }
+
+    /// <summary>The altar refuses. The same voice, falling, and it does not resolve.</summary>
+    public static AudioClip AltarRefuse
+    { get { if (altarRefuse == null) altarRefuse = BuildAltarRefuse(); return altarRefuse; } }
+
+    /// <summary>A Shift crystal collected — small, bright, over fast.</summary>
+    public static AudioClip CrystalCollect
+    { get { if (crystalCollect == null) crystalCollect = BuildCrystalCollect(); return crystalCollect; } }
+
+    // ⚠️ THE SWING IS AIR, NOT AN IMPACT. It plays when the attack STARTS, before anything is hit —
+    // the hit has its own sound. Giving this a transient makes every enemy sound like it connected
+    // even when it whiffed, which is actively misleading in a game where dodging is the whole point.
+    private static AudioClip BuildZombieSwing()
+    {
+        const float dur = 0.34f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(5501);
+
+        float lp = 0f, hp = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            float t = (float)i / SampleRate;
+            float k = t / dur;
+
+            // A band of noise swept UP then down — the doppler of something heavy passing you.
+            float centre = Mathf.Lerp(320f, 1500f, Mathf.Sin(k * Mathf.PI));
+            float nz = (float)(rng.NextDouble() * 2.0 - 1.0);
+            lp += (1f - Mathf.Exp(-2f * Mathf.PI * (centre * 2f) / SampleRate)) * (nz - lp);
+            hp += (1f - Mathf.Exp(-2f * Mathf.PI * (centre * 0.5f) / SampleRate)) * (lp - hp);
+            float air = (lp - hp) * Mathf.Sin(k * Mathf.PI) * 0.55f;
+
+            // The grunt: low, breathy, no clear pitch. It arrives slightly AFTER the swing peaks,
+            // because the effort comes out of you a beat behind the movement.
+            float g = 0f;
+            if (t > 0.06f)
+            {
+                float gt = t - 0.06f;
+                float wob = 74f + Mathf.Sin(gt * 38f) * 9f;
+                g = Mathf.Sin(2f * Mathf.PI * wob * gt) * Mathf.Exp(-11f * gt) * 0.22f;
+                g += (float)(rng.NextDouble() * 2.0 - 1.0) * Mathf.Exp(-15f * gt) * 0.07f;
+            }
+            dry[i] = air + g;
+        }
+        return Finalize(dry, 0.08f, 6000f);
+    }
+
+    private static AudioClip BuildSpitterSpit()
+    {
+        const float dur = 0.40f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(5502);
+
+        float lp = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            float t = (float)i / SampleRate;
+
+            // GATHER — a rising wet rattle for the first 180ms. This is the windup the AI already
+            // animates and which currently has no sound at all, so the player gets no warning.
+            float gather = 0f;
+            if (t < 0.20f)
+            {
+                float k = t / 0.20f;
+                float nz = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp += (1f - Mathf.Exp(-2f * Mathf.PI * Mathf.Lerp(260f, 900f, k) / SampleRate)) * (nz - lp);
+                float chop = 0.5f + 0.5f * Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(22f, 46f, k) * t);
+                gather = lp * chop * k * 0.5f;
+            }
+
+            // RELEASE — a short pressurised burst, low-passed hard so it stays wet rather than hissy.
+            float rel = 0f;
+            if (t >= 0.20f)
+            {
+                float rt = t - 0.20f;
+                float nz = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp += (1f - Mathf.Exp(-2f * Mathf.PI * Mathf.Lerp(2400f, 400f, Mathf.Clamp01(rt / 0.10f)) / SampleRate)) * (nz - lp);
+                rel = lp * Mathf.Exp(-16f * rt) * 0.85f;
+            }
+            dry[i] = gather + rel;
+        }
+        return Finalize(dry, 0.10f, 5200f);
+    }
+
+    private static AudioClip BuildWallBreak()
+    {
+        const float dur = 0.95f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(5503);
+
+        // THE CRACK — the wall failing. One hard, bright, very short event.
+        Thud(dry, 0f, 210f, 0.85f, 26f, rng, 0.30f);
+        Latch(dry, 0.002f, 0.30f, rng, 1900f);
+
+        // THE COLLAPSE — a body of low noise under it, so it has weight.
+        float lp = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            float t = (float)i / SampleRate;
+            float nz = (float)(rng.NextDouble() * 2.0 - 1.0);
+            lp += (1f - Mathf.Exp(-2f * Mathf.PI * 700f / SampleRate)) * (nz - lp);
+            dry[i] += lp * Mathf.Exp(-7f * t) * 0.42f;
+        }
+
+        // ⚠️ AND THEN RUBBLE — 14 small stone hits scattered over the next 700ms. The tail is the
+        // whole difference between "a wall broke" and "something was hit". A single impact with a
+        // decay reads as a drum; discrete pieces landing at irregular times reads as debris.
+        for (int k = 0; k < 14; k++)
+        {
+            float at = 0.10f + (float)rng.NextDouble() * 0.62f;
+            float hz = 150f + (float)rng.NextDouble() * 460f;
+            float amp = 0.16f * (1f - at / 0.80f) * (0.5f + (float)rng.NextDouble() * 0.5f);
+            Thud(dry, at, hz, Mathf.Max(0.03f, amp), 46f + (float)rng.NextDouble() * 40f, rng, 0.18f);
+        }
+        return Finalize(dry, 0.18f, 8000f);
+    }
+
+    // ⚠️ PAY AND REFUSE ARE THE SAME VOICE, INVERTED. Both are Shift, so both are harmonic bell
+    // partials in the magic family — what separates them is DIRECTION and RESOLUTION: pay rises and
+    // lands on its root, refuse falls and stops on an unresolved interval. That is far clearer than
+    // making refuse a buzzer, and it keeps the altar sounding like one object.
+    private static AudioClip BuildAltarPay()
+    {
+        const float dur = 0.85f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(5504);
+
+        float[] partial = { 1f, 2f, 3f, 4f, 5.1f };
+        float[] gain = { 1f, 0.52f, 0.30f, 0.16f, 0.09f };
+
+        for (int i = 0; i < n; i++)
+        {
+            float t = (float)i / SampleRate;
+            // Root rises a fifth and settles — the altar accepting.
+            float root = Mathf.Lerp(196f, 294f, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 0.30f)));
+            float s = 0f;
+            for (int p = 0; p < partial.Length; p++)
+                s += Mathf.Sin(2f * Mathf.PI * root * partial[p] * t) * gain[p] * Mathf.Exp(-(2.2f + p * 1.5f) * t);
+
+            // A breath of noise on the attack only, so it starts as an event rather than a tone.
+            float air = t < 0.03f ? (float)(rng.NextDouble() * 2.0 - 1.0) * (1f - t / 0.03f) * 0.10f : 0f;
+            dry[i] = s * 0.24f + air;
+        }
+        return Finalize(dry, 0.30f, 11000f);
+    }
+
+    private static AudioClip BuildAltarRefuse()
+    {
+        const float dur = 0.60f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+        var rng = new System.Random(5505);
+
+        float[] partial = { 1f, 2f, 3f, 4f, 5.1f };
+        float[] gain = { 1f, 0.52f, 0.30f, 0.16f, 0.09f };
+
+        for (int i = 0; i < n; i++)
+        {
+            float t = (float)i / SampleRate;
+            // Falls, and stops on a tritone below the root — deliberately unresolved.
+            float root = Mathf.Lerp(294f, 208f, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 0.22f)));
+            float s = 0f;
+            for (int p = 0; p < partial.Length; p++)
+                s += Mathf.Sin(2f * Mathf.PI * root * partial[p] * t) * gain[p] * Mathf.Exp(-(4.5f + p * 2.2f) * t);
+
+            float air = t < 0.03f ? (float)(rng.NextDouble() * 2.0 - 1.0) * (1f - t / 0.03f) * 0.10f : 0f;
+            dry[i] = s * 0.20f + air;
+        }
+        return Finalize(dry, 0.16f, 9000f);
+    }
+
+    // ⚠️ SHORT. This fires on every crystal picked up, often several in a row, and anything with a
+    // tail turns a handful of pickups into a chord. 180ms and out.
+    private static AudioClip BuildCrystalCollect()
+    {
+        const float dur = 0.22f;
+        int n = Mathf.CeilToInt(SampleRate * dur);
+        var dry = new float[n];
+
+        float[] partial = { 1f, 2.01f, 3.02f };
+        float[] gain = { 1f, 0.44f, 0.20f };
+
+        for (int i = 0; i < n; i++)
+        {
+            float t = (float)i / SampleRate;
+            float root = Mathf.Lerp(660f, 880f, Mathf.Clamp01(t / 0.05f));
+            float s = 0f;
+            for (int p = 0; p < partial.Length; p++)
+                s += Mathf.Sin(2f * Mathf.PI * root * partial[p] * t) * gain[p] * Mathf.Exp(-(16f + p * 10f) * t);
+            dry[i] = s * 0.24f;
+        }
+        return Finalize(dry, 0.14f, 13000f);
+    }
+
+    // =============================================================================================
     // NOTICE BOARD — timber, iron nails, paper.
     //
     // ⚠️ THESE REPLACE PaperRustle / WaxStamp ON THE QUEST BOARD (designer, 2026-08-21: "change the
